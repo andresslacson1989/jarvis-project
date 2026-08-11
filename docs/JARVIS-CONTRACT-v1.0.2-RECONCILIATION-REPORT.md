@@ -1,28 +1,28 @@
-# JARVIS Contract v1.0.2 Reconciliation Report
+# JARVIS Contract v1.0.2 Preservation & Reconciliation Audit
 
-**Review date:** August 11, 2026  
+**Review date:** August 12, 2026  
 **Reviewed branch:** `codex/contract-v1.0.2-consolidation`  
-**Semantic base:** `codex/contract-consistency-fixes` at `f3de3ecea08d3ab2dd4413419810846a06d37506`  
-**Canonical contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
-**Scope:** Contract/architecture consistency and implementation-readiness. This is not product release qualification.
+**Historical semantic baseline:** `docs/history/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.md` plus its former normative appendices and accepted ADR lineage  
+**Current canonical contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md` and its listed appendices  
+**Document role:** audit/traceability evidence only; this report is not an implementation overlay.
 
 ---
 
 # 1. PURPOSE
 
-This reconciliation was performed to eliminate the previous model in which an implementer had to read an older contract and mentally apply a growing stack of later ADRs/superseding decisions.
+This audit exists to answer a stricter question than ordinary internal consistency:
 
-The target quality rule is:
+> **Did v1.0.2 preserve every still-valid implementation/product instruction from the old contract and accepted ADR lineage, while intentionally replacing only rules that were corrected, superseded, or merely non-binding defaults?**
 
-> **There is one current contract. History explains it; history does not override it.**
+The required outcome is that an implementer can build from the current v1.0.2 normative suite without reading old contracts or ADRs to recover missing behavior.
 
-The v1.0.2 consolidation therefore rewrites the effective rules directly into one current normative suite, moves old top-level contracts to an explicitly historical location, and changes future contract governance so a new architectural ADR cannot remain as an unreconciled overlay.
+ADRs/history remain rationale/provenance only.
 
 ---
 
-# 2. CANONICAL SOURCE OF TRUTH
+# 2. CURRENT NORMATIVE SUITE
 
-The current implementation source of truth is exactly:
+The current implementation source of truth is:
 
 1. `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`
 2. `docs/JARVIS-V1-RELEASE-PROFILE.md`
@@ -31,467 +31,316 @@ The current implementation source of truth is exactly:
 5. `docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`
 6. `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`
 7. `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`
-8. `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`
-9. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
+8. `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`
+9. `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`
+10. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
 
-`README.md` and root `AGENTS.md` point to this same suite.
+`README.md` and `AGENTS.md` point contributors to the same suite.
 
-ADRs remain useful for context, alternatives, rationale, and decision history. Their still-valid effective behavior has been incorporated into the current suite; they are not a second live implementation layer.
-
----
-
-# 3. DIVERGENT-BRANCH / DUPLICATE-ADR RESOLUTION
-
-Two contract review branches previously diverged from the same earlier baseline:
-
-- `codex/contract-consistency-fixes`
-- `codex/contract-implementation-lock`
-
-The second branch independently reused ADR-054, ADR-055, and ADR-056 identifiers for decisions different from the canonical consistency branch. That made a mechanical branch merge unacceptable because one ADR number would have two meanings.
-
-Resolution:
-
-- the accepted ADR numbering lineage from `codex/contract-consistency-fixes` remains canonical;
-- ADR-054 through ADR-068 retain those identities;
-- ADR-069 records the v1.0.2 consolidation;
-- the duplicate ADR-054/055/056 files from `codex/contract-implementation-lock` are not imported as canonical ADRs;
-- valuable content from that branch was reviewed and incorporated directly into v1.0.2 where still valid;
-- `codex/contract-implementation-lock` is classified as historical/non-authoritative rather than a parallel source of implementation truth.
-
-No valid engineering concept was rejected merely because it originated on the divergent branch; only the duplicate decision identity/parallel-authority model was rejected.
+This report is deliberately outside that normative list.
 
 ---
 
-# 4. HISTORICAL CONTRACT TREATMENT
+# 3. CLASSIFICATION RULE
 
-The former top-level contracts are preserved under:
+Every historical instruction examined in this preservation pass is classified as one of:
 
-- `docs/history/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.md`
-- `docs/history/JARVIS-TECHNICAL-CONTRACT-v0.1.md`
+- **PRESERVED** — same requirement exists in current normative text;
+- **STRENGTHENED / SUPERSEDED** — old behavior remains satisfied by a more precise/safer current rule and the obsolete wording must not be restored;
+- **NON-NORMATIVE DEFAULT** — old value/example was recommendation/tuning guidance rather than a required architectural/product invariant;
+- **RESTORED IN v1.0.2 OPERATIONS CONTRACT** — a valid requirement had been compressed out of the first consolidation and is now explicitly current again.
 
-They no longer exist beside the current contract as apparent implementation alternatives.
-
-`docs/history/README.md` marks them non-normative.
-
-Historical wording is useful for provenance but is not a permitted implementation choice when it differs from v1.0.2.
+Anything that cannot fit one of those categories is a preservation defect and must be corrected before implementation-lock can be claimed.
 
 ---
 
-# 5. FUTURE AMENDMENT MODEL
+# 4. OLD TOP-LEVEL v1.0 DOMAIN TRACEABILITY
 
-The old ordinary pattern:
-
-```text
-old contract
-+ later ADR supersedes one clause
-+ another ADR supersedes another clause
-+ implementer reconstructs effective behavior mentally
-```
-
-is no longer accepted.
-
-A future material architecture change SHALL land synchronously as:
-
-```text
-new unique ADR
-+ every affected current normative document updated
-+ Release Profile updated when support scope changes
-+ verification/compatibility implications updated
-```
-
-Implementation SHALL NOT depend on a new ADR while contradictory canonical wording remains.
-
-If two current normative documents disagree, that is a contract defect to correct, not a precedence puzzle for an implementer to solve.
+| Historical domain | Current result | Current normative destination |
+|---|---|---|
+| Windows desktop, Tauri/Rust host, Node Core separation | PRESERVED/STRENGTHENED | Top-level, Runtime, Coding |
+| React unprivileged / no credentials / no authority | STRENGTHENED | Top-level, Security, Coding |
+| text conversation | PRESERVED | Top-level, Release Profile |
+| production local-first voice | PRESERVED/STRENGTHENED | Top-level, Release Profile, Runtime, Operations, Verification |
+| persistent voice identity | RESTORED/EXPLICIT | Operations §§19–20 + Release Profile |
+| no silent generic voice fallback | RESTORED | Operations §19 |
+| deterministic reflex/stop/mute/cancel | PRESERVED/EXPANDED | Runtime + Operations §§20–22 |
+| immediate truthful acknowledgement / slow-work responsiveness | RESTORED | Operations §§20–21 |
+| bounded conversation continuation window | RESTORED | Operations §20 |
+| voice latency telemetry | RESTORED | Operations §22 + Verification |
+| provider abstraction/supervision/failure isolation | PRESERVED/STRENGTHENED | Runtime, Protocol, Verification, Operations §14 |
+| warm/persistent/streaming provider architecture | RESTORED/EXPLICIT | Operations §14 |
+| resource-aware provider warm/unload behavior | RESTORED | Operations §14 |
+| capability-based provider/worker routing | PRESERVED | Runtime, Protocol |
+| orchestrator has no unrestricted shell | STRENGTHENED | Top-level, Runtime, Security |
+| bounded worker loops | PRESERVED | Runtime, Data, Verification |
+| logical parallelism vs actual concurrency | PRESERVED/EXPLICIT | Operations §5 + Runtime |
+| trivial deterministic work should not become unnecessary missions | RESTORED | Operations §5 |
+| mission DAGs / immutable graph versions | PRESERVED | Top-level, Protocol, Data |
+| dynamic replanning with reuse/invalidation | PRESERVED | Protocol, Data, Verification |
+| authority envelope | PRESERVED/STRENGTHENED | Top-level, Protocol, Security |
+| autonomy inside intent; clarify material expansion | PRESERVED/EXPLICIT | README, Operations §29 |
+| contextual PermissionEngine | STRENGTHENED | Top-level, Security |
+| standing permissions scoped/revocable/non-transitive | RESTORED/EXPLICIT | Operations §8 |
+| precedent is evidence, not blank check | STRENGTHENED | Security |
+| destructive final confirmation | STRENGTHENED | Top-level, Security, Protocol |
+| human-readable destructive target/consequence UX | RESTORED/EXPLICIT | Operations §23 |
+| UI confirmation remains available | RESTORED | Operations §23 |
+| typed/validated tool boundary | STRENGTHENED | Top-level, Protocol, Security, Coding |
+| postcondition verification / `UNCERTAIN` | STRENGTHENED | Runtime, Protocol, Verification |
+| queue transparency | RESTORED/EXPLICIT | Operations §3 |
+| priority/preemption/pause/resume | PRESERVED/STRENGTHENED | Runtime + Operations §6 |
+| delayed safe-point interruption visible | RESTORED | Operations §6 |
+| user priority control over AI priority | RESTORED | Operations §6 |
+| scheduling transitions auditable | RESTORED | Operations §6 |
+| crash/recovery durability | STRENGTHENED | Runtime, Data, Verification |
+| recovery user visibility | RESTORED | Operations §7 |
+| scoped memory / live state beats memory | PRESERVED | Data, Top-level |
+| scoped ranked memory retrieval | RESTORED | Operations §13 |
+| work dashboard | RESTORED/EXPLICIT | Operations §3 |
+| worker journals / no chain-of-thought | PRESERVED/EXPANDED | Operations §4 + Data/Security |
+| budget/quota/hard limits | STRENGTHENED | Protocol, Runtime, Data |
+| budget queue/user visibility | RESTORED | Operations §18 |
+| Credential Broker / no raw secrets | STRENGTHENED | Security, Protocol, Coding |
+| integration catalog / independent capabilities | RESTORED/EXPLICIT | Operations §17 + Release Profile |
+| auth revocation blocks dependent operations only | RESTORED | Operations §§8,17 |
+| module registry/dashboard | RESTORED/EXPLICIT | Operations §15 |
+| module install != enable/authorize/prefer | RESTORED | Operations §15 |
+| staged versioned module update/rollback | PRESERVED + EXPLICIT | Protocol, Coding, Operations §16 |
+| immutable module install units / activation pointer rollback | RESTORED | Operations §16 |
+| event gateway / event does not bypass authority | PRESERVED/STRENGTHENED | Top-level, Security, Operations §9 |
+| per-event disposition controls | RESTORED | Operations §9 |
+| NotificationPolicy / grouping / focus modes | RESTORED | Operations §10 |
+| project/workspace isolation | PRESERVED where applicable | ExecutionScope + Runtime/Operations |
+| diagnostics/degraded states | PRESERVED/EXPANDED | Runtime, Operations §24 |
+| diagnostic export privacy/default exclusion | RESTORED | Operations §24 |
+| audit retention sufficient to explain consequential actions | RESTORED | Operations §25 |
+| audit tamper-evidence claim | STRENGTHENED/normalized | Operations §25; no false same-user guarantee |
+| backup/restore/migration/update | STRENGTHENED substantially | Data, Security, Verification |
+| invalid configuration preserves prior valid config | RESTORED | Operations §11 |
+| import conflict/merge safety | RESTORED | Operations §12 |
+| update preserves durable compatible state | RESTORED/EXPLICIT | Operations §27 |
+| uninstall does not silently delete durable user data | RESTORED | Operations §27 |
+| production vulnerability scanning | PRESERVED/EXPANDED | Security/Coding + Operations §26 |
+| reachable High vulnerability waiver requirements | RESTORED | Operations §26 |
+| Critical reachable vulnerability release block | PRESERVED/STRENGTHENED | Verification + Operations §26 |
+| architecture decision escalation | RESTORED | Operations §28 |
+| concise report of significant autonomously resolved architecture decisions | RESTORED | Operations §28 |
+| production completion evidence, not documentation | PRESERVED/STRENGTHENED | Verification, Release Profile |
 
 ---
 
-# 6. NORMALIZED SEMANTIC DECISIONS
+# 5. HISTORICAL APPENDIX TRACEABILITY
 
-## 6.1 Execution scope
+## Runtime v1.0
 
-Exactly one task scope model is current:
+Preserved or strengthened:
 
-```text
-PROJECT_WORKSPACE
-INTEGRATION
-SYSTEM
-GLOBAL
-```
+- single instance/data directory;
+- Rust host/Core ownership split;
+- authenticated local IPC;
+- provider supervisor;
+- bounded workers;
+- mission scheduler;
+- preemption/recovery;
+- shutdown/process ownership;
+- degraded modes;
+- no detached unmanaged authoritative children.
 
-Non-filesystem work no longer invents fake project/workspace identity.
+Strengthened replacements include restrictive named-pipe DACL/locality, application-owned Node runtime, mandatory Job Objects, explicit delegated-engineering shell limits, exact provider compatibility, and durable `RESUMING`.
 
-## 6.2 Data policy
+Operational behaviors compressed during the original v1.0.2 rewrite—queue/dashboard visibility, safe-point pause visibility, persistent voice fallback, immediate acknowledgement, warm/streaming provider capability—are current in Operations.
 
-Exactly one current vocabulary exists:
+## Data/State v1.0
 
-```text
-DataSensitivity: PUBLIC | PRIVATE | SENSITIVE | SECRET
-DataLocality:    LOCAL_ONLY | ANY_APPROVED_PROVIDER
-```
+Preserved or strengthened:
 
-Sensitivity and routing locality are independent.
+- SQLite authority/state transactions/events;
+- state machines and graph versions;
+- approvals/checkpoints/artifacts/leases;
+- budgets/usage;
+- credential handles only;
+- integration/module state;
+- migrations/backup/restore/corruption response/retention.
 
-## 6.3 Authoritative money
+Restored details include last-known-valid configuration activation, import merge/conflict safety, ranked memory retrieval, immutable module install units/activation-pointer rollback, and security audit evidence retention.
 
-Exactly one current authoritative monetary representation exists:
+The old fixed backup-retention counts remain recommendations rather than mandatory architecture; the current safety invariant protects verified recovery paths without freezing arbitrary retention numbers.
 
-```text
-MoneyAmount {
-  currency,
-  nanoUnits // canonical base-10 integer string, major unit × 1,000,000,000
-}
-```
+## Security v1.0
 
-Binary floating point is not authoritative for budget admission, reservations, settlement, or remaining-budget decisions.
+Preserved or strengthened:
 
-## 6.4 Task resume
+- deterministic security policy;
+- session lock/password;
+- secure storage;
+- DB encryption;
+- prompt-injection boundary;
+- structured AI-output validation;
+- path security;
+- tool manifests;
+- final confirmation;
+- precedent constraints;
+- process/shell/credential boundaries;
+- OAuth/event/module/update/dependency/log/crash/audit/network protections.
 
-`RESUMING` is one durable canonical `TaskState`.
+Strengthened corrections include separate sensitivity/locality, accurate same-user threat claims, WebView/Tauri security, canonical approval material, conditional target mutation, external-module process isolation, provider qualification, and Proxmox typed API boundary.
 
-The previous durable-vs-runtime-only ambiguity is removed.
+Restored operational security details include diagnostic-export privacy, scoped/revocable standing permissions, destructive approval UX, reachable-High vulnerability risk acceptance, and audit-evidence retention.
 
-## 6.5 IPC response
+## Protocol/Schema v1.0
 
-One discriminated response convention is current:
+Preserved or strengthened:
 
-```text
-{ ok: true, result }
-OR
-{ ok: false, error }
-```
+- bounded versioned IPC;
+- canonical IDs/timestamps/errors;
+- session/authority/mission/task/attempt/graph/tool/provider/module/integration/event types;
+- runtime validation and compatibility rules.
 
-Never both and never an ambiguous null/optional convention.
+Strengthened replacements include discriminated ExecutionScope, exact MoneyAmount, explicit response union, machine-readable tool checks, canonical approval descriptor/JCS digest, provider compatibility/health separation, module execution class/lifecycle, Proxmox identity, and exact quota/reservation semantics.
 
-## 6.6 Approval action binding
+The old atomic last-valid configuration rule is current in Operations rather than requiring historical Protocol reading.
 
-Exactly one V1 canonical approval object/algorithm is current:
+## Verification v1.0
 
-```text
-CanonicalActionDescriptorV1
-→ schema validation
-→ RFC 8785 JCS
-→ UTF-8
-→ SHA-256
-→ base64url without padding
-```
+Every still-valid release family remains required, with additional v1.0.2 gates for Tauri/WebView, named-pipe principal security, exact provider sandbox/version behavior, Job Objects, WAL fixed build, portable restore, exact budgets, GitHub/Proxmox, signed package identity, and soak/provenance.
 
-Fresh material target/account/environment/arguments are re-resolved immediately before approval consumption. Material mismatch invalidates approval.
-
-## 6.7 PermissionEngine precedence
-
-The current deterministic order is:
-
-1. mandatory system invariant;
-2. explicit applicable DENY;
-3. session/automation eligibility;
-4. authority-envelope containment;
-5. required capability and canonical identity resolution;
-6. locality/budget/resource/integrity/preconditions;
-7. current explicit authenticated instruction;
-8. explicit matching standing permission;
-9. risk/approval rule;
-10. ALLOW only if every prior gate passes.
-
-Risk is normalized:
-
-- LOW: may run inside valid authority;
-- MODERATE: may run when subordinate to current instruction or matching standing permission;
-- HIGH: precedent alone is never authority; a recoverable HIGH action may run without a new prompt only when the exact action/target/scope is directly authorized by the current authenticated instruction or an explicit matching standing permission under policy; otherwise it requires approval;
-- CRITICAL/destructive/materially unrecoverable: always fresh final confirmation immediately before execution.
-
-AI confidence is not an authorization input.
-
-During the final reconciliation audit, the top-level contract contained one overly compressed HIGH/CRITICAL summary that could have been read as “all HIGH always prompts.” It was corrected so the top-level summary and detailed Security Contract now express the same rule.
-
-## 6.8 Tauri/WebView boundary
-
-The authoritative WebView is local bundled JARVIS UI content and requires:
-
-- explicit per-window/WebView capability allowlists;
-- no privileged remote-origin capabilities;
-- restrictive CSP;
-- no remote executable script/CDN dependency by default;
-- navigation restrictions;
-- external links outside the privileged WebView;
-- inert/sanitized rendering of untrusted HTML/Markdown;
-- production devtools policy;
-- release qualification against relevant upstream security fixes.
-
-## 6.9 Core runtime packaging
-
-Production uses an application-owned pinned Node/Core release unit.
-
-No arbitrary system `node.exe`/PATH fallback is permitted.
-
-## 6.10 Named-pipe IPC
-
-Current rule is restrictive explicit Windows DACL/logon-session scope + local-only behavior + unpredictable endpoint + independent bootstrap authentication + bounded versioned schema protocol.
-
-The default Windows named-pipe ACL is not accepted as the privileged Core boundary.
-
-## 6.11 Windows Job Objects
-
-Job Object containment is mandatory for ordinary JARVIS-managed executable child trees, with narrow documented/verified compatibility exceptions only.
-
-Job Objects are explicitly lifecycle/resource containment, not filesystem/network/same-user security sandboxing.
-
-## 6.12 Delegated engineering worker
-
-`WORKSPACE_ENGINEERING` is the current delegated shell-capable engineering profile.
-
-It may inspect/edit/build/test its assigned project within qualified provider/OS sandbox behavior, but provider shell capability does not grant external consequential authority.
-
-GitHub push, deploy, Proxmox mutation, message/email send, credential administration, and similar external effects return through typed JARVIS tools/integrations and PermissionEngine.
-
-The contract does not falsely claim workspace-only read isolation unless conformance proves the selected provider/OS sandbox enforces it. Delegated network is denied by default.
-
-## 6.13 Provider compatibility
-
-Provider compatibility and runtime health are separate.
-
-Production `SUPPORTED` requires exact executable/version identity, release compatibility policy, conformance evidence, and current required health/auth/capability state.
-
-Installed/launchable is not synonymous with supported.
-
-## 6.14 Provider resume
-
-Provider session resume is an optimization only. JARVIS-owned task/checkpoint/artifact/live-state records are the durability source of truth.
-
-## 6.15 SQLite / SQLCipher / WAL
-
-The current V1 persistence contract requires:
-
-- local-filesystem SQLite/SQLCipher;
-- WAL unless explicitly qualified otherwise;
-- embedded SQLite core with upstream WAL-reset corruption fix;
-- `synchronous=FULL` for authoritative state by default;
-- foreign keys on every connection;
-- bounded busy handling;
-- owned connection initialization;
-- WAL/checkpoint/integrity diagnostics;
-- SQLite-safe online backup.
-
-## 6.16 Backup key hierarchy
-
-The previous clean-machine SQLCipher-key ambiguity is removed.
-
-Current hierarchy:
-
-```text
-live DB_DEK
-  used only for current live database / local secure-store path
-
-backup snapshot
-  re-keyed/exported under fresh SnapshotDBKey
-
-outer backup package
-  encrypted/authenticated under fresh BackupDEK
-
-BackupDEK key slots
-  local DPAPI current-user slot
-  and/or portable Argon2id recovery-factor slot
-```
-
-`SnapshotDBKey` exists only inside the authenticated encrypted backup payload and trusted restore memory; it is not a plaintext sidecar/manifest field.
-
-Clean-machine restore does not need the historical live `DB_DEK`. After verifying/opening the snapshot, restored state is re-keyed under a new local random `DB_DEK` protected by the new Windows profile.
-
-Ordinary backups still exclude raw integration credentials; restored accounts without secrets become `REAUTH_REQUIRED`.
-
-## 6.17 Session password recovery
-
-The session password remains authentication, not a database key.
-
-There is no weak Windows-only forgot-password bypass. A verified portable JARVIS recovery factor may authorize an explicit password-reset/recovery workflow. Without an applicable factor, the verifier is not reversible. Clean-machine restore establishes a new session password.
-
-## 6.18 Consequential target races
-
-Fresh target re-resolution remains mandatory. Where an external platform supports conditional mutation, the adapter also uses expected version/ref/SHA/ETag/hash/generation or equivalent compare-and-set semantics.
-
-A changed target/precondition mismatch causes re-resolution/re-authorization/re-approval as applicable; stale authority is not silently applied to new state.
-
-## 6.19 Module execution
-
-Exactly three execution classes are current:
-
-```text
-DATA_ONLY
-BUILT_IN_TRUSTED
-EXTERNAL_MANAGED
-```
-
-There is no untrusted in-Core execution class.
-
-An open arbitrary executable-plugin marketplace is not required for V1 Production Complete. Only release/profile/catalog-qualified external modules may be represented as supported.
-
-## 6.20 Proxmox
-
-Proxmox VE is consistently mandatory for V1 and uses a typed HTTPS REST API integration with scoped credentials/capabilities, TLS verification, exact connection/environment/resource identity, asynchronous task tracking, live verification, destructive final confirmation, and no silent SSH/CLI/root/raw-API fallback.
-
-Guest OS shell authority is separate. Direct Proxmox Backup Server administration is separate.
-
-## 6.21 V1 release set
-
-The current mandatory V1 integration families are consistently:
-
-1. Local filesystem + Git
-2. GitHub
-3. Codex/OpenAI
-4. Proxmox VE
-
-Voice is also a mandatory V1 production feature.
-
-SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding requirements for the first feature-bearing post-V1 release, while maintenance/security patch releases remain permitted before that feature gate.
+Old user-visible qualification that had been compressed—queue reasons, notification grouping/focus behavior, safe-point pause visibility, diagnostic-export defaults, upgrade-state preservation, High vulnerability waiver, uninstall data preservation—is explicitly required by Operations §30 and blocks Production Complete when applicable.
 
 ---
 
-# 7. IMPLEMENTATION ORDER RECONCILIATION
+# 6. ACCEPTED ADR TRACEABILITY
 
-The current implementation plan builds/proves foundational boundaries before broad AI autonomy:
+The accepted ADR corpus remains history/rationale only. Its effective rules are represented as follows:
 
-```text
-repository/coding standards
-→ Tauri/WebView + application-owned Core
-→ named-pipe/Job Object boundary
-→ SQLite/SQLCipher/WAL + portable-restore proof
-→ authoritative state
-→ session/PermissionEngine/approval
-→ projects/scopes/context/memory
-→ Codex version + actual Windows sandbox proof
-→ controlled tools
-→ workers
-→ missions
-→ resources/budgets/recovery
-→ credentials/modules
-→ Local Git/GitHub
-→ Proxmox VE
-→ voice
-→ events/automation
-→ operations/update
-→ exact signed-release qualification
-```
+| ADR | Effective decision | Current status/destination |
+|---|---|---|
+| 021 | modular TTS / voice identity separated from provider | Runtime, Release Profile, Operations §§19–20 |
+| 022 | voice latency / instant truthful response | Verification, Operations §§20–22 |
+| 023 | dual deterministic reflex + AI reasoning paths | Runtime, Operations §§20–21 |
+| 024 | realtime conversation engine | Runtime, Release Profile, Verification |
+| 025 | context authority / scoped memory | Top-level, Data, Operations §13 |
+| 026 | provider supervisor / failure isolation | Runtime, Protocol, Verification |
+| 027 | modular AEC / full duplex | Runtime, Release Profile, Verification |
+| 028 | resource-aware runtime scheduling | Runtime, Operations §§5,14,18 |
+| 029 | persistent human voice / same-voice acknowledgement | Operations §§19–20 |
+| 030 | context-aware PermissionEngine | Security, Top-level, Operations §8 |
+| 031 | scoped ranked memory retrieval | Operations §13 |
+| 032 | mission planning / worker allocation | Runtime, Data, Operations §5 |
+| 033 | provider fallback / continuity | Runtime, Security, Verification |
+| 034 | supported module registry/dashboard | Protocol + Operations §15 |
+| 035 | versioned staged module update/rollback | Protocol, Coding, Operations §16 |
+| 036 | validated tool execution boundary | Top-level, Protocol, Security, Coding |
+| 037 | durable recovery / safe resume | Runtime, Data, Operations §7 |
+| 038 | work dashboard / journals / auditability | Operations §§3–4,24–25 |
+| 039 | supported integration catalog / credential boundaries | Release Profile, Security, Operations §17 |
+| 040 | Event Gateway / automation | Security, Top-level, Operations §9 |
+| 041 | NotificationPolicy / focus modes | Protocol + Operations §10 |
+| 042 | project registry/workspace isolation | Runtime/ExecutionScope; project-specific semantics preserved, universal fake-project requirement superseded |
+| 043 | budget/usage policy | Protocol, Runtime, Data, Operations §18 |
+| 044 | session-password trust boundary | Top-level, Security, Operations §23 where approval UX intersects |
+| 045 | authority envelope / precedent-aware autonomy | Security, Top-level, Operations §§8,29 |
+| 046 | graph missions / bounded worker loops | Runtime, Data, Verification, Operations §5 |
+| 047 | dynamic graph revision | Protocol, Data, Runtime, Verification |
+| 048 | priority/preemption/safe pause-resume | Runtime + Operations §6 |
+| 049 | architecture decision escalation | Operations §28 + AGENTS/README principles |
+| 050 | capability-based worker/provider routing | Runtime, Protocol |
+| 051 | production implementation contract suite | current v1.0.2 suite governance |
+| 052 | protocol schema + implementation plan | Protocol + Implementation Plan remain current |
+| 053 | JARVIS is platform, not custom LLM | Top-level non-goals/product definition |
+| 054 | contract/schema normalization | current canonical schemas/vocabulary |
+| 055 | Windows Core IPC access control | Security/Runtime/Verification |
+| 056 | same-user compromise boundary | Security/Top-level |
+| 057 | module execution isolation | Top-level/Protocol/Security/Coding |
+| 058 | deterministic approval action digests | Top-level/Protocol/Security/Verification |
+| 059 | Proxmox VE integration boundary | Release Profile/Protocol/Runtime/Security/Verification |
+| 060 | provider-authoritative usage / exact budgets | Protocol/Runtime/Data/Verification |
+| 061 | application-owned Core runtime | Top-level/Runtime/Release Profile/Verification |
+| 062 | backup/recovery key semantics | Data/Security/Verification |
+| 063 | mandatory Windows Job Object containment | Top-level/Runtime/Security/Coding/Verification |
+| 064 | explicit IPC response/error union | Protocol/Verification |
+| 065 | provider version qualification / Codex compatibility | Protocol/Runtime/Verification/Release Profile |
+| 066 | provider resume is optimization, not durability | Protocol/Runtime/Data/Verification |
+| 067 | V1 integration release boundary / immediate post-V1 requirements | Release Profile/Top-level/Operations §17 |
+| 068 | SQLite WAL safety / operational diagnostics | Data/Coding/Verification/Release Profile |
+| 069 | v1.0.2 canonical consolidation / no overlay | Top-level/README/AGENTS/Lineage |
 
-This removes the risk of discovering late that the chosen packaged SQLite binding, recovery design, Tauri security configuration, or provider sandbox cannot satisfy the production contract.
-
----
-
-# 8. VERIFICATION COVERAGE RECONCILIATION
-
-Every major new hard rule has an explicit release test family.
-
-Added/strengthened qualification includes:
-
-- Tauri remote-origin capability denial, CSP/navigation/untrusted-rendering tests;
-- named-pipe DACL/session/remote/bootstrap negative tests;
-- PermissionEngine deny/current-instruction/standing-permission/precedent/HIGH/CRITICAL scenarios;
-- Rust/TypeScript JCS/digest vectors;
-- provider/Codex exact-version and real sandbox write/network/read-boundary evidence;
-- worker shell attempt to perform external consequential action without typed JARVIS authority;
-- conditional-mutation race tests;
-- SQLite WAL-reset-fixed-build, WAL/checkpoint, FULL synchronous, online-backup tests;
-- `SnapshotDBKey`/`BackupDEK` clean-profile restore/re-key tests;
-- Job Object descendant/breakaway/orphan tests;
-- exact budget concurrency/reservation tests;
-- mandatory Git/GitHub/Proxmox V1 conformance;
-- voice, crash/recovery, update/rollback, resource-pressure, soak, packaging, SBOM, and provenance gates.
-
----
-
-# 9. CONTRADICTION CHECKLIST RESULT
-
-The v1.0.2 active suite was reconciled against these known failure modes:
-
-| Check | Result |
-|---|---|
-| One current top-level implementation contract | PASS |
-| Old v1.0/v0.1 top-level contracts outside active root | PASS — moved to `docs/history/` |
-| Active implementation appendices use v1.0.2 parent/semantics | PASS |
-| Duplicate ADR-054/055/056 imported into canonical lineage | PASS — no |
-| One ExecutionScope model | PASS |
-| One DataSensitivity/DataLocality vocabulary | PASS |
-| One authoritative money representation | PASS |
-| One durable `RESUMING` meaning | PASS |
-| One IPC response union | PASS |
-| One canonical approval descriptor/digest pipeline | PASS |
-| PermissionEngine precedence deterministic | PASS |
-| HIGH vs CRITICAL authorization consistent | PASS after final audit correction |
-| Job Objects optional for ordinary managed production children | PASS — no; mandatory with narrow verified exception policy |
-| Job Objects misrepresented as security sandbox | PASS — explicitly prohibited |
-| Tauri privileged remote-origin authority left unspecified | PASS — prohibited/qualified |
-| Engineering shell equated to JARVIS external authority | PASS — explicitly separated |
-| Provider resume required for durability | PASS — no |
-| Portable backup depends on historical live DB_DEK | PASS — no |
-| Portable snapshot key handoff unspecified | PASS — explicit fresh SnapshotDBKey inside authenticated payload |
-| Consequential target race relies only on time-adjacent re-read | PASS — conditional mutation required where supported |
-| Proxmox optional vs mandatory contradiction | PASS — mandatory V1 consistently |
-| Proxmox generic raw API/shell fallback | PASS — prohibited |
-| Voice optional vs required contradiction | PASS — voice required V1; wake word remains optional |
-| Open arbitrary executable-module marketplace required V1 | PASS — no |
-| Future ADR allowed to remain an unreconciled override | PASS — synchronous amendment required |
-
-No known unresolved normative contradiction from this review remains in the active v1.0.2 suite.
+No accepted ADR in this lineage is required as an implementation patch layer after this preservation pass.
 
 ---
 
-# 10. REPOSITORY CHANGE SCOPE
+# 7. INTENTIONAL SUPERSESSIONS — DO NOT RESTORE
 
-Compared with `codex/contract-consistency-fixes`, the consolidation branch changes only contract/governance documentation plus root contributor guidance.
+The following historical instructions/representations were deliberately replaced because restoring them would make the contract worse or contradictory:
 
-No application implementation source is introduced or modified by this reconciliation.
-
-The consolidation intentionally does **not** merge `codex/contract-implementation-lock`; that would reintroduce duplicate ADR identities. Its valid engineering material is incorporated semantically instead.
-
----
-
-# 11. CURRENT EXTERNAL-PLATFORM ASSUMPTIONS REVIEWED
-
-The consolidation was checked against current primary platform documentation for implementation-sensitive assumptions, including:
-
-- Tauri 2 capability and Content Security Policy model, including current remote-origin security-fix requirements;
-- OpenAI/Codex Windows sandbox behavior, particularly the distinction between write/network sandboxing and broad same-user read capability;
-- SQLite WAL behavior and the upstream WAL-reset corruption fix requirement;
-- current supported Windows 11 release lifecycle used for the Release Profile baseline.
-
-These facts are treated as release-qualified dependencies rather than timeless architecture constants. Exact versions belong in the signed Release Profile/release manifest and must be revalidated for each production release.
-
----
-
-# 12. WHAT THIS REPORT DOES NOT CLAIM
-
-This report proves document-level reconciliation only.
-
-It does not prove:
-
-- the application builds;
-- the selected SQLite/SQLCipher binding works in the final package;
-- Tauri configuration is implemented safely;
-- Codex sandbox behavior passes conformance;
-- Proxmox/GitHub integrations work;
-- voice latency/AEC works on real target hardware;
-- portable backup actually restores;
-- release signing/SBOM/provenance exists;
-- soak/recovery/security tests pass.
-
-Those claims require implementation and evidence under `JARVIS-VERIFICATION-RELEASE-CONTRACT.md`.
+1. **Universal project/workspace binding for every task** → replaced by discriminated `PROJECT_WORKSPACE | INTEGRATION | SYSTEM | GLOBAL` ExecutionScope. Project mutation still requires project scope; integration/system work does not invent fake project authority.
+2. **Sensitivity enum containing `LOCAL_ONLY`** → replaced by independent DataSensitivity and DataLocality.
+3. **JavaScript floating-point authoritative cost fields** → replaced by exact `MoneyAmount.nanoUnits`.
+4. **System/PATH Node dependency** → replaced by application-owned pinned runtime.
+5. **Optional/vague Job Object containment** → strengthened to mandatory ordinary managed-child containment with narrow verified exceptions.
+6. **Provider session resume as durability** → replaced by JARVIS-owned checkpoints/artifacts/state.
+7. **Same-user-malware hard-isolation implication** → replaced by accurate defense-in-depth boundary.
+8. **Untrusted separately installed executable module in authoritative Core** → prohibited; external executable modules are managed out-of-Core.
+9. **Arbitrary/raw Proxmox API or SSH/CLI fallback** → prohibited; typed HTTPS API path only for normal V1 control plane.
+10. **Direct public privileged-Core ingress as ordinary event mechanism** → not required; separately hardened ingress boundary needed.
+11. **Unrestricted orchestrator shell** → prohibited.
+12. **Non-canonical/vague approval hashing** → replaced by one cross-language canonical descriptor/JCS/SHA-256 pipeline.
+13. **Precedent independently authorizing HIGH actions** → explicitly prohibited.
+14. **Single fixed-silence voice-turn strategy** → replaced by physical/semantic realtime turn engine and qualification.
+15. **Specific retention counts/tuning numbers as architecture requirements** → remain configurable/recommended unless a current Release Profile explicitly fixes them; safety/recovery invariants remain mandatory.
 
 ---
 
-# 13. STATUS
+# 8. REQUIREMENTS PRESERVATION RESULT
 
-## CONTRACT / ARCHITECTURE
+After the fresh preservation loops, the current normative suite contains explicit implementation instructions for the still-valid old requirements that were initially under-specified after consolidation, including:
 
-**v1.0.2 is the canonical implementation baseline.**
+- queue/dashboard/worker truth;
+- safe pause/preemption/user priority behavior;
+- recovery visibility;
+- standing-permission governance;
+- event disposition and notification/focus behavior;
+- known-good configuration activation;
+- import conflict safety;
+- ranked memory retrieval;
+- provider warm/persistent/streaming/resource lifecycle capability;
+- module registry/update/rollback UX and state separation;
+- integration capability/revocation UX;
+- budget/quota visibility;
+- persistent voice identity/fallback/acknowledgement/slow-work behavior;
+- destructive approval UX;
+- diagnostic export privacy;
+- audit retention/integrity claim boundaries;
+- reachable High/Critical vulnerability release policy;
+- upgrade/uninstall state preservation;
+- architecture escalation and concise autonomous-decision reporting.
 
-The current suite is structured so an implementer reads the current contract rather than reconstructing it from a superseding ADR stack.
-
-## PRODUCT
-
-**NOT Production Complete.**
-
-No documentation reconciliation can substitute for the implementation, signed artifacts, conformance tests, recovery drills, security tests, voice qualification, performance/resource testing, soak tests, and release evidence required by the active Release Profile.
+Those requirements no longer require ADR/history overlay interpretation.
 
 ---
 
-# 14. GOVERNING RESULT
+# 9. GOVERNANCE CHECK
 
-> **History explains why JARVIS is designed this way. v1.0.2 states how JARVIS must be built. A future change must update the current contract when the decision changes—not leave implementers to discover which old sentence was superseded.**
+A future accepted ADR is not implementation-ready by itself when it changes current behavior.
+
+The same reviewed change must update every affected active normative document, applicable Release Profile support scope, schema/migration/compatibility rules, and verification gates.
+
+If an ADR exposes a valid requirement absent from current normative text, the current contract is incomplete and must be corrected before implementation relies on that requirement.
+
+---
+
+# 10. PRODUCT STATUS DISTINCTION
+
+This preservation audit concerns architecture/contract completeness only.
+
+It does not prove the software is Production Complete.
+
+Production Complete still requires implemented code and exact signed release artifacts to pass the complete current normative qualification suite, including the mandatory tests in `JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md` and `JARVIS-VERIFICATION-RELEASE-CONTRACT.md` for the active Release Profile.
+
+---
+
+# 11. GOVERNING RULE
+
+> **Nothing still valid should require historical archaeology. If a behavior matters to implementation, it belongs in the current normative suite.**
+
+> **History explains the contract. The current contract defines the product.**
