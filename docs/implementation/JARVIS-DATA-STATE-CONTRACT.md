@@ -1,207 +1,212 @@
 # JARVIS Data & State Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.md`  
-**Version:** 1.0  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
+**Version:** 1.0.2  
 **Date:** August 11, 2026
 
 ---
 
 # 1. PURPOSE
 
-This document defines authoritative persistence, identifiers, state machines, transactions, event durability, graph/version semantics, backups, schema migration, memory representation, artifacts, and recovery data rules.
+This document defines authoritative persistence, transactions, state machines, events, scopes, memory, artifacts, approvals, provider usage, budgets, SQLite/SQLCipher operation, encrypted backups, migrations, restore, and recovery.
 
-A production implementation SHALL NOT invent state transitions independently in UI components, provider adapters, or workers.
+UI, providers, workers, tools, integrations, and modules SHALL NOT invent their own authoritative state semantics.
 
 ---
 
-# 2. DATABASE
+# 2. AUTHORITATIVE DATABASE
 
-The primary V1 durable state store SHALL be SQLite.
+V1 uses SQLite/SQLCipher-compatible encrypted SQLite for authoritative local state.
 
 The production database SHALL:
 
-- enable foreign-key enforcement;
-- use WAL journaling unless a validated platform limitation requires another mode;
-- use a durability setting appropriate for authoritative mission/task state;
-- use explicit transactions for state transitions;
-- perform integrity checks during backup/recovery workflows;
-- maintain versioned schema migrations;
-- avoid storing raw long-lived credentials.
+- reside on a qualified local filesystem;
+- use WAL unless an explicitly qualified alternative is adopted;
+- use an embedded SQLite core proven to contain the upstream WAL-reset corruption fix;
+- verify `journal_mode=WAL` actually became effective;
+- use `synchronous=FULL` for authoritative state by default;
+- enable foreign keys on every connection;
+- initialize every connection through one owned path;
+- use bounded busy handling;
+- use explicit short transactions;
+- expose WAL/checkpoint/busy/integrity diagnostics;
+- use versioned migrations;
+- contain no raw long-lived integration credentials;
+- use exact monetary representations.
 
-Sensitive database content SHALL be protected at rest according to the Security Hardening Contract. The recommended production implementation is SQLCipher-compatible encrypted SQLite using a random database key protected by Windows secure storage.
+The production manifest identifies the SQLite/SQLCipher core, binding, build/source identity, and WAL-fix evidence.
 
----
-
-# 3. IDENTIFIERS AND TIME
-
-New durable entities SHALL use globally unique, time-sortable identifiers such as UUIDv7.
-
-Identifiers SHALL be opaque to AI providers and users unless displayed for diagnostics.
-
-All durable timestamps SHALL be stored in UTC with millisecond precision or better.
-
-Durations SHALL be stored as numeric milliseconds where practical.
-
-Human-facing timezone conversion SHALL occur at the presentation layer.
+The live authoritative database SHALL NOT run from UNC/SMB/NFS/cloud-sync virtual mounts or other unqualified remote/removable paths.
 
 ---
 
-# 4. CORE TABLE GROUPS
+# 3. DATABASE KEY
 
-The schema SHALL contain logical tables equivalent to the following groups.
+The live database uses a cryptographically random local database data-encryption key (`DB_DEK`).
 
-## System
+`DB_DEK` SHALL NOT be the session password, an integration credential, or a deterministic derivative of either.
 
-```text
-schema_migrations
-system_meta
-settings
-feature_flags
-```
+The local runtime form/wrapping is protected through Windows secure storage under the Rust boundary.
 
-## Session and Conversation
-
-```text
-user_profile
-trusted_sessions
-conversations
-messages
-conversation_context
-```
-
-## Projects and Workspaces
-
-```text
-projects
-project_aliases
-project_environments
-project_workspaces
-project_integrations
-```
-
-## Memory
-
-```text
-memories
-memory_links
-memory_revisions
-```
-
-## Missions and Tasks
-
-```text
-missions
-mission_graph_versions
-tasks
-task_dependencies
-task_attempts
-task_inputs
-task_outputs
-authority_envelopes
-```
-
-## Workers and Artifacts
-
-```text
-worker_checkpoints
-worker_events
-artifacts
-artifact_links
-workspace_leases
-resource_leases
-```
-
-## Permissions and Approvals
-
-```text
-permission_policies
-standing_permissions
-approval_requests
-approval_decisions
-precedent_records
-```
-
-## Providers, Modules, Integrations
-
-```text
-providers
-provider_profiles
-provider_health_history
-modules
-module_versions
-integration_accounts
-integration_capabilities
-```
-
-## Events and Automation
-
-```text
-events
-event_dedup
-subscriptions
-automation_rules
-automation_runs
-notifications
-```
-
-## Budget and Usage
-
-```text
-usage_records
-budgets
-budget_thresholds
-```
-
-## Audit and Operations
-
-```text
-audit_events
-backup_history
-update_history
-recovery_actions
-```
-
-Exact physical normalization MAY evolve, but the logical ownership and constraints in this document SHALL remain.
+Normal Core domain state stores only opaque references/metadata needed to use the key path; plaintext `DB_DEK` is transient trusted-memory material.
 
 ---
 
-# 5. TRANSACTIONAL STATE CHANGES
+# 4. IDENTIFIERS, TIME, EXACT VALUES
 
-Every authoritative state transition SHALL be persisted transactionally with its causative event/audit record when practical.
+New durable entities use UUIDv7 or an equivalently unique/time-sortable opaque identifier.
 
-A transaction changing a mission/task state SHALL not commit the state while failing to persist the event that explains it.
+Durable timestamps use UTC ISO-8601 with millisecond precision or better.
 
-The preferred pattern is:
+Authoritative money uses the Protocol Contract's:
 
-```text
-BEGIN
-  validate current state/version
-  write new state
-  append durable event
-  update derived indexes/leases
-COMMIT
-publish event to in-memory subscribers after commit
+```ts
+interface MoneyAmount {
+  currency: string;
+  nanoUnits: string;
+}
 ```
 
-In-memory event delivery SHALL never be the only record of an authoritative transition.
+No database or TypeScript code may round authoritative budget/cost values through binary floating point.
+
+SQLite storage MAY use checked INTEGER only where the full `nanoUnits` range is proven safe for that field; otherwise canonical decimal text SHALL be used. The logical protocol representation remains the canonical integer string.
 
 ---
 
-# 6. OPTIMISTIC CONCURRENCY
+# 5. LOGICAL TABLE GROUPS
 
-Authoritative mutable rows SHALL include a monotonic `version` or equivalent concurrency token.
+The schema SHALL provide logical ownership equivalent to:
 
-State changes SHALL assert the expected current version/state before update.
+```text
+System
+  schema_migrations
+  system_meta
+  settings
+  feature_flags
+  release_profile_state
 
-A stale worker/provider response SHALL not overwrite newer task/mission state.
+Session/Conversation
+  user_profile
+  trusted_sessions
+  conversations
+  messages
+  conversation_context
 
-Conflict SHALL be surfaced as a typed concurrency error and reconciled by the owning service.
+Projects/Scopes
+  projects
+  project_aliases
+  project_environments
+  project_workspaces
+  project_integrations
+  task_execution_scopes
+  task_integration_scope_bindings
+
+Memory
+  memories
+  memory_links
+  memory_revisions
+
+Missions/Tasks
+  missions
+  mission_graph_versions
+  tasks
+  task_dependencies
+  task_attempts
+  task_inputs
+  task_outputs
+  authority_envelopes
+  authority_envelope_scopes
+
+Workers/Artifacts/Leases
+  worker_checkpoints
+  worker_events
+  artifacts
+  artifact_links
+  workspace_leases
+  resource_leases
+
+Permissions/Approvals
+  permission_policies
+  standing_permissions
+  approval_requests
+  approval_decisions
+  precedent_records
+
+Providers/Modules/Integrations
+  providers
+  provider_profiles
+  provider_qualification_state
+  provider_health_history
+  modules
+  module_versions
+  module_catalog_entries
+  module_catalog_keys
+  integration_accounts
+  integration_capabilities
+  proxmox_connections
+
+Events/Automation
+  events
+  event_dedup
+  subscriptions
+  automation_rules
+  automation_runs
+  notifications
+
+Budget/Usage
+  provider_quota_snapshots
+  usage_records
+  pricing_snapshots
+  budgets
+  budget_reservations
+
+Operations
+  audit_events
+  backup_history
+  update_history
+  recovery_actions
+```
+
+Exact physical normalization may evolve before first production schema freeze as long as these ownership/invariant semantics remain.
 
 ---
 
-# 7. MISSION STATE MACHINE
+# 6. TRANSACTIONAL STATE CHANGES
 
-Mission states SHALL include:
+Authoritative transitions SHALL persist state and causative event/audit evidence atomically where they are within one SQLite transaction boundary.
+
+Preferred pattern:
+
+```text
+compute/resolve/validate outside transaction
+→ BEGIN
+  assert expected row version/state
+  write authoritative transition
+  append causative event/audit
+  update leases/reservations/indexes required by invariant
+→ COMMIT
+→ publish in-memory event
+```
+
+Long-running AI, network, user-wait, filesystem, backup, or external API work SHALL NOT hold an SQLite write transaction open.
+
+SQLite and an external service are never modeled as one atomic transaction. External effects use attempts, idempotency, preconditions, postconditions, and `UNCERTAIN` recovery.
+
+---
+
+# 7. OPTIMISTIC CONCURRENCY
+
+Authoritative mutable records SHALL use a monotonic `version`/equivalent token.
+
+State mutations assert expected prior version/state. Stale worker/provider/UI responses cannot overwrite newer authoritative state.
+
+Consequential policy/action records retain the policy snapshot/version used for authorization. A material policy change invalidates stale authorization according to PermissionEngine/Approval rules.
+
+---
+
+# 8. MISSION STATE MACHINE
+
+Canonical mission states:
 
 ```text
 CREATED
@@ -220,15 +225,7 @@ FAILED
 CANCELLED
 ```
 
-Terminal states are:
-
-```text
-COMPLETED
-FAILED
-CANCELLED
-```
-
-A mission SHALL not transition from a terminal state back to running. Restarting work creates a new mission or an explicit continuation mission linked to the prior mission.
+Terminal mission states are `COMPLETED`, `FAILED`, `CANCELLED`. A terminal mission does not silently return to running; continuation creates explicit linked work.
 
 Representative legal transitions include:
 
@@ -237,7 +234,7 @@ CREATED → PLANNING
 PLANNING → QUEUED | WAITING_FOR_USER | FAILED | CANCELLED
 QUEUED → RUNNING | PAUSED | CANCELLED
 RUNNING → WAITING_FOR_USER | WAITING_FOR_APPROVAL | PAUSING | BLOCKED | VERIFYING | RECOVERING | FAILED | CANCELLED
-PAUSING → PAUSED | FAILED
+PAUSING → PAUSED | FAILED | CANCELLED
 PAUSED → QUEUED | RUNNING | CANCELLED
 BLOCKED → QUEUED | RUNNING | WAITING_FOR_USER | WAITING_FOR_APPROVAL | FAILED | CANCELLED
 WAITING_FOR_USER → QUEUED | RUNNING | CANCELLED
@@ -246,13 +243,13 @@ VERIFYING → COMPLETED | RUNNING | BLOCKED | FAILED
 RECOVERING → QUEUED | RUNNING | PAUSED | BLOCKED | WAITING_FOR_USER | FAILED | CANCELLED
 ```
 
-Illegal transitions SHALL be rejected by the Mission Manager.
+Mission resume does not bypass task-level `RESUMING` validation.
 
 ---
 
-# 8. TASK STATE MACHINE
+# 9. TASK STATE MACHINE
 
-Task states SHALL include:
+Canonical task states:
 
 ```text
 CREATED
@@ -263,6 +260,7 @@ RUNNING
 WAITING_FOR_APPROVAL
 PAUSING
 PAUSED
+RESUMING
 BLOCKED
 VERIFYING
 RECOVERING
@@ -272,17 +270,26 @@ CANCELLED
 INVALIDATED
 ```
 
-`INVALIDATED` is terminal for that task version and means its prior output is no longer valid for the active graph due to changed assumptions or graph revision.
+`RESUMING` is durable and canonical.
 
-A completed task MAY be invalidated by a later graph revision, but the original completion record and artifacts SHALL remain immutable/auditable.
+Required resume transitions:
 
-A task SHALL not become `COMPLETED` directly from `RUNNING` unless all configured verification is part of the same atomic task completion policy; otherwise it SHALL pass through `VERIFYING`.
+```text
+PAUSED → RESUMING | CANCELLED
+RESUMING → RUNNING | QUEUED | BLOCKED | RECOVERING | FAILED | CANCELLED
+```
+
+`RESUMING` revalidates live state, scope, target, leases, provider compatibility/health/locality, budget, approvals, and relevant preconditions.
+
+`INVALIDATED` preserves historical completed output but marks it unusable by the active graph.
+
+A task becomes `COMPLETED` only when its required acceptance/verification policy is satisfied.
 
 ---
 
-# 9. TASK ATTEMPT STATE MACHINE
+# 10. ATTEMPT STATE MACHINE
 
-Each execution attempt SHALL use states equivalent to:
+Attempt states:
 
 ```text
 QUEUED
@@ -299,17 +306,72 @@ TIMED_OUT
 UNCERTAIN
 ```
 
-Attempt state SHALL describe one provider/worker execution, not the task's overall semantic result.
+`SUCCEEDED` means the attempt produced its expected attempt result, not that the overall task is semantically complete.
 
-`SUCCEEDED` means the attempt successfully produced its output; the task may still require verification.
-
-`UNCERTAIN` means execution may have caused side effects but the final result cannot yet be established.
+`UNCERTAIN` means an effect may have occurred but final state is not established. Retry creates a new attempt identity and follows the recovery/idempotency policy.
 
 ---
 
-# 10. APPROVAL STATE MACHINE
+# 11. EXECUTION SCOPE PERSISTENCE
 
-Approval requests SHALL be durable objects with:
+Every executable task stores exactly one:
+
+```text
+PROJECT_WORKSPACE
+INTEGRATION
+SYSTEM
+GLOBAL
+```
+
+`PROJECT_WORKSPACE` persists project/workspace and optional environment IDs and enforces workspace membership.
+
+`INTEGRATION` persists explicit integration/account/capability bindings and optional organizational project/environment context.
+
+`SYSTEM` persists explicit local system capabilities.
+
+`GLOBAL` persists no implicit filesystem/integration/system authority.
+
+Non-project work SHALL NOT create fake project/workspace rows.
+
+Scope expansion after attempt start requires a new validated authority/revision; a worker cannot mutate its own scope.
+
+---
+
+# 12. AUTHORITY ENVELOPES AND PERMISSION RECORDS
+
+Authority envelopes are immutable for active attempts and persist:
+
+```text
+originating instruction
+allowed/denied action classes
+allowed execution scopes
+external systems
+DataSensitivity
+DataLocality
+budget policy/reference
+created/expires timestamps
+policy snapshot version
+```
+
+Permission decisions persist:
+
+```text
+outcome
+contextual risk
+reason codes
+matched policies
+matched precedents as evidence only
+approval request if required
+policy version
+```
+
+The deterministic precedence itself is defined by the Security Contract and must be reproducible from persisted policy/state evidence.
+
+---
+
+# 13. APPROVALS AND CANONICAL ACTION MATERIAL
+
+Approval states are exactly:
 
 ```text
 PENDING
@@ -320,286 +382,110 @@ CANCELLED
 CONSUMED
 ```
 
-An approval SHALL bind to an action digest containing the material target and arguments.
-
-The default validity window for destructive final-confirmation approvals SHOULD be short (recommended 90 seconds) and SHALL be configurable by policy only within a bounded safe range.
-
-Approval SHALL be single-use for the bound action unless the policy explicitly represents a standing permission rather than a one-time approval.
-
-A changed target, environment, destructive scope, or materially changed arguments SHALL invalidate the prior approval.
-
----
-
-# 11. AUTHORITY ENVELOPE
-
-An authority envelope SHALL be immutable once a task attempt starts.
-
-A new broader envelope requires a new validated revision/authorization record.
-
-Envelope data SHALL include at least:
+An approval stores or integrity-binds:
 
 ```text
-id
-originating_user_instruction_id
-project_ids
-environment_ids
-workspace_ids
-allowed_action_classes
-denied_action_classes
-external_systems
-privacy_classification
-budget_limit
-created_at
-expires_at_or_null
-policy_snapshot_version
+approval id/type
+CanonicalActionDescriptorV1 or immutable reference
+descriptor version
+action digest algorithm + encoding
+action digest
+human action/target/environment/consequence summaries
+created/expires timestamps
+policy snapshot version
+session/decision metadata
 ```
 
-Workers receive a reference/copy of the envelope but SHALL not modify it.
+The canonical descriptor contains no raw secrets.
+
+Digest is exactly JCS → UTF-8 → SHA-256 → base64url-no-padding per Protocol Contract.
+
+Immediately before consumption, Core re-resolves material identities/arguments and recomputes the descriptor/digest. Material mismatch invalidates the approval.
+
+Approval is single-use. Approval consumption is transactionally guarded against double use. Crash after consumption with uncertain external execution does not auto-replay a destructive action.
 
 ---
 
-# 12. GRAPH VERSIONING
+# 14. GRAPH VERSIONING AND ACCEPTANCE
 
-A mission graph version SHALL be immutable after activation.
-
-A graph version SHALL include:
+Activated mission graph versions are immutable and include:
 
 ```text
-mission_id
-graph_version
-created_at
-created_by
-reason
-causation_event_id
+mission/version
+creation time/reason/causation
 nodes
-edges
-acceptance_policy
+real dependency edges
+MissionAcceptancePolicy
 ```
 
-Before activation, Core SHALL validate:
+Before activation Core validates:
 
-- no cycle exists between task nodes;
-- every dependency references a valid node;
-- no required output dependency points to a cancelled/invalid node without replacement;
-- environment/workspace constraints are coherent;
-- required tasks have completion policy;
-- destructive nodes contain an approval boundary;
-- graph expansion remains inside or explicitly revises the authority envelope.
+- acyclicity;
+- node/dependency existence;
+- required output dependencies;
+- scope/environment/data-policy coherence;
+- task acceptance/completion policy;
+- destructive approval boundaries;
+- authority-envelope containment or explicit revision;
+- mission-level acceptance policy.
 
-Bounded iterative behavior belongs inside a task/worker loop, not as an unbounded graph cycle.
-
----
-
-# 13. DEPENDENCIES
-
-Dependency types SHOULD distinguish at least:
-
-```text
-REQUIRES_SUCCESS
-REQUIRES_COMPLETION
-REQUIRES_OUTPUT
-OPTIONAL_INPUT
-```
-
-This prevents every edge from being interpreted as a hard success dependency.
-
-A downstream node becomes runnable only when its mandatory dependencies satisfy the declared dependency policy.
+Bounded iteration belongs inside tasks/workers, not unbounded graph cycles.
 
 ---
 
-# 14. TASK INPUTS AND OUTPUTS
+# 15. TASK INPUTS, OUTPUTS, ARTIFACTS
 
-Task inputs and outputs SHALL be persisted as structured references rather than hidden solely in provider conversation history.
+Task inputs persist goal, criteria, scope, authority, data policy, context/artifact references, role/capability requirements, and resource/budget policy.
 
-Task input SHALL include:
+Task outputs persist structured result/findings, artifact/change references, verification evidence, unresolved risks/questions, producing attempt/provider metadata, and resulting data policy.
 
-- goal;
-- acceptance criteria;
-- structured context;
-- artifact references;
-- project/workspace/environment;
-- authority envelope;
-- role/capability requirements;
-- resource/budget policy.
+Large/durable outputs use artifact references. Artifact metadata includes identity, logical/content type, size/hash, producing attempt, project if applicable, DataSensitivity, DataLocality, retention, and canonical internal storage reference.
 
-Task output SHALL include:
+Artifacts derived from `LOCAL_ONLY` remain `LOCAL_ONLY` absent explicit deterministic declassification/export.
 
-- status/result type;
-- structured findings;
-- artifact references;
-- changed artifact references;
-- verification evidence;
-- unresolved risks/questions;
-- provider/attempt reference;
-- completion proposal.
+`SECRET` content normally remains outside the general artifact store.
 
 ---
 
-# 15. ARTIFACT STORE
+# 16. WORKER CHECKPOINTS AND PROVIDER RESUME
 
-Large or durable worker outputs SHALL use an artifact store under the JARVIS data directory or explicit project workspace.
+A checkpoint SHALL be sufficient for a qualified fresh worker to continue without provider-private transcript history. It includes goal summary, completed work, decisions/findings, artifacts, verification state, current activity, next step, blockers, and live-state assumptions.
 
-Artifacts SHALL have metadata equivalent to:
+Private chain-of-thought is not stored.
 
-```text
-artifact_id
-content_type
-logical_type
-path_or_blob_ref
-size
-hash
-created_by_task_attempt
-project_id
-sensitivity
-retention_policy
-created_at
-```
-
-Artifact paths SHALL be canonicalized and constrained to approved artifact/workspace roots.
-
-Hashes SHALL be used when integrity or reproducibility matters.
-
-Artifacts SHALL not silently disappear when provider conversations expire.
+Provider resume references may be persisted as sensitive opaque metadata when useful, but are never the sole source of material progress or completion evidence.
 
 ---
 
-# 16. WORKER CHECKPOINTS
+# 17. EVENTS AND DEDUPLICATION
 
-A checkpoint SHALL contain enough durable state to resume without replaying the entire provider conversation.
+Durable domain events are append-oriented, versioned, and sufficient to explain authoritative transitions without AI reconstruction.
 
-Checkpoint data SHALL include:
+In-memory publication occurs only after the creating transaction commits.
 
-```text
-task_id
-attempt_id
-sequence
-created_at
-goal_summary
-completed_work
-key_decisions
-findings
-artifacts
-verification_state
-current_activity
-next_step
-blockers
-live_state_assumptions
-provider_resume_handle_if_supported
-```
+External events persist source identity and stable deduplication key when available. Dedup survives restarts for at least the supported replay horizon.
 
-Private chain-of-thought SHALL NOT be stored as checkpoint material.
-
-A checkpoint MAY contain a concise provider-generated summary of relevant reasoning results/decisions.
+A duplicate/replayed event does not create duplicate consequential work.
 
 ---
 
-# 17. WORKER EVENTS
+# 18. RESOURCE/WORKSPACE LEASES
 
-Worker events SHALL be append-oriented.
+Exclusive resources use durable/recoverable lease records including owner instance/task/attempt, acquisition/heartbeat, resource identity, and lease type.
 
-Every event SHALL include:
+Examples include writable worktrees, provider slots, migration/backup/update locks, device resources, and other exclusive execution resources.
 
-```text
-event_id
-task_id
-attempt_id
-timestamp
-type
-summary
-payload_version
-payload
-correlation_id
-causation_id
-```
+A lease is reclaimed only after owner death is established or the resource-specific recovery policy permits reclaim.
 
-Worker journals SHALL be reconstructable from these events and task/artifact records.
+`RESUMING` validates/reacquires required leases before `RUNNING`.
 
 ---
 
-# 18. EVENT STORE
+# 19. MEMORY AND CONVERSATION
 
-Durable domain events SHALL use an envelope equivalent to:
+Memory scopes include user/global, project, mission, task, and session as appropriate.
 
-```json
-{
-  "eventId": "uuidv7",
-  "occurredAt": "UTC timestamp",
-  "type": "task.completed",
-  "payloadVersion": 1,
-  "aggregateType": "task",
-  "aggregateId": "...",
-  "correlationId": "...",
-  "causationId": "...",
-  "actorType": "user|core|worker|provider|integration|system",
-  "actorId": "...",
-  "payload": {}
-}
-```
-
-Event payloads SHALL be versioned.
-
-Breaking event changes require a new payload version and migration/compatibility policy.
-
-In-memory subscribers receive events only after the transaction that created them commits.
-
----
-
-# 19. EVENT DEDUPLICATION
-
-External events SHALL carry a source identity and deduplication key when possible.
-
-JARVIS SHALL persist recent deduplication records long enough to survive process restart/replay windows.
-
-Duplicate delivery SHALL not create duplicate consequential tasks or actions.
-
-Where the external source lacks stable IDs, JARVIS MAY derive a bounded hash from source + event type + stable fields + time bucket, but SHALL avoid over-deduplicating legitimately repeated events.
-
----
-
-# 20. RESOURCE AND WORKSPACE LEASES
-
-Exclusive resources SHALL use durable or recoverable leases.
-
-A lease SHALL include:
-
-```text
-resource_id
-owner_instance_id
-owner_task_id
-owner_attempt_id
-acquired_at
-heartbeat_or_last_seen
-lease_type
-```
-
-Examples include writable worktrees, exclusive migration lock, backup lock, update lock, and sensitive device resources.
-
-A stale lease SHALL only be reclaimed after the runtime proves the owning process/instance is dead or the lease's recovery policy permits it.
-
----
-
-# 21. MEMORY RECORD
-
-A memory record SHALL contain at least:
-
-```text
-memory_id
-scope_type
-scope_id
-memory_type
-content
-confidence
-source_type
-source_id
-created_at
-updated_at
-last_verified_at
-stale_after_or_null
-supersedes_memory_id_or_null
-sensitivity
-```
-
-Confidence SHALL include:
+Memory confidence is:
 
 ```text
 VERIFIED
@@ -608,97 +494,77 @@ INFERRED
 STALE
 ```
 
-Corrections SHALL create revision history rather than silently erasing prior recorded decisions where auditability matters.
+Records retain source/revision history, timestamps, verification/staleness metadata, DataSensitivity, and DataLocality.
 
-Retrieved memories SHALL be ranked by scope match, type relevance, confidence, recency/verification, and semantic relevance when embeddings are used.
+Live verified state outranks stale memory for current truth.
 
----
+Conversation history is separate from durable memory. Deleting one does not silently delete the other absent explicit linked policy.
 
-# 22. CONVERSATION STORAGE
-
-Conversation messages SHALL preserve user-visible history separately from long-term memory.
-
-Messages SHALL have sensitivity classification.
-
-Conversation retention MAY be user-configurable.
-
-Deleting conversation history SHALL not automatically delete independent project decisions/memories unless the user explicitly requests linked-memory deletion and policy permits it.
-
-The UI SHALL distinguish conversation history from durable project memory when useful.
+Retrieving stored `LOCAL_ONLY` conversation/memory does not make it remotely routable.
 
 ---
 
-# 23. PRECEDENT RECORDS
+# 20. PRECEDENT RECORDS
 
-Precedent used for autonomy decisions SHALL be structured.
+Precedent records contain action class, scope/environment/target/account class, reversibility, consequence, prior user decision, timestamps, and confidence/relevance metadata.
 
-A precedent SHALL include:
+Precedent is evidence only. It does not directly authorize HIGH/CRITICAL action, cannot cross environment/account/security boundaries, and never waives destructive final confirmation.
+
+---
+
+# 21. PROVIDER QUOTA AND USAGE FACTS
+
+Provider quota/usage snapshots preserve source provenance:
 
 ```text
-action_class
-target_scope
-environment
-project
-reversibility
-consequence_class
-user_decision
-created_at
-last_used_at
-confidence
+PROVIDER_REPORTED
+JARVIS_CALCULATED
+UNKNOWN
 ```
 
-A precedent SHALL NOT directly authorize a destructive/unrecoverable action.
+Provider-reported facts are authoritative for what the provider reports and keep observation/reset timestamps. Local estimates may coexist but cannot be relabeled as provider facts.
 
-Precedent matching SHALL be conservative across environment boundaries.
+Unknown cost/quota remains unknown rather than zero.
 
-Production and security-sensitive precedents SHALL not be inferred from development actions.
+Usage records are append-oriented and include provider/model, task context where applicable, units, estimated/actual MoneyAmount, confidence/provenance, pricing snapshot if used, and time.
+
+Deleting a task does not erase accounting facts required for budget/audit history.
 
 ---
 
-# 24. BUDGET AND USAGE
+# 22. BUDGETS AND ATOMIC RESERVATIONS
 
-Usage records SHALL be append-only accounting facts where possible.
-
-A usage record SHOULD include:
+A hard monetary budget SHALL atomically consider:
 
 ```text
-provider
-model
-project
-mission
-task
-attempt
-units/tokens/runtime if known
-estimated_cost
-actual_cost_if_known
-currency
-occurred_at
-source
+settled spend + outstanding reservations + requested reservation
 ```
 
-Budget checks SHALL use the latest persisted usage plus reservations for running/queued metered work where practical.
+before new chargeable work begins where expected monetary reservation is determinable.
 
-Concurrent workers SHALL not each independently assume the entire remaining budget is available.
+A reservation state is:
+
+```text
+RESERVED
+SETTLED
+RELEASED
+EXPIRED
+UNCERTAIN
+```
+
+Reservation creation/admission is transactionally serialized against the applicable budget state so concurrent workers cannot each spend the same remaining amount.
+
+Actual provider-reported/settled cost is recorded even if it exceeds the prior estimate. Uncertain provider billing/outcome may leave a reservation `UNCERTAIN` until reconciliation.
+
+Different currencies are not added without an explicit versioned FX conversion contract.
 
 ---
 
-# 25. SETTINGS
+# 23. PROVIDERS, MODULES, INTEGRATIONS
 
-Settings SHALL be typed and versioned.
+Provider records separate installation/discovery, compatibility, health/auth state, qualification evidence, model/capability availability, and current profile.
 
-Unknown settings SHALL not silently become active.
-
-Invalid configuration SHALL fail validation and preserve the previous valid configuration.
-
-Secrets SHALL not be stored in ordinary settings rows/files.
-
-Settings that materially affect permission/security policy SHALL be auditable.
-
----
-
-# 26. MODULE STATE
-
-Module records SHALL separate:
+Module records separate:
 
 ```text
 SUPPORTED
@@ -709,201 +575,240 @@ PREFERRED
 HEALTHY
 ```
 
-Module versions SHALL be immutable install units.
+and store authenticated catalog/provenance metadata. Installed external code does not become `BUILT_IN_TRUSTED` through signature alone.
 
-Activation points to one installed version.
+Integration account rows contain metadata and opaque credential handles only. After state restore without local credential-store secrets, affected accounts become `REAUTH_REQUIRED`.
 
-Rollback changes activation pointer/state; it does not overwrite the previous module files in place.
+Proxmox connections persist stable connection/environment IDs, endpoint/trust configuration, capability/scope allowlists, status, and opaque credential handle. VM display names are not authoritative target identity.
 
 ---
 
-# 27. INTEGRATION ACCOUNT STATE
+# 24. SQLITE WAL OPERATIONAL RULES
 
-Integration account rows SHALL contain metadata and opaque credential handles only.
-
-Example:
+Every connection passes the owned initialization path that verifies required settings such as:
 
 ```text
-integration_id
-account_id
-display_name
-tenant/domain
-credential_handle
-scopes/capabilities
-status
-last_verified_at
+foreign_keys = ON
+approved synchronous policy
+bounded busy handling
+approved WAL compatibility
 ```
 
-Raw OAuth refresh tokens/API keys SHALL reside in Windows-protected secure storage, not the SQLite row.
+Long-running providers/network/user waits never occur while holding a write transaction.
+
+Checkpoint strategy SHALL remain owned/observable. Sustained WAL growth, incomplete checkpoints, long-lived readers, repeated `SQLITE_BUSY`, or integrity failures emit diagnostics and may enter degraded/recovery state.
+
+The `-wal`/`-shm` files are part of live database state. Backup SHALL use SQLite's online backup API or another explicitly SQLite-safe snapshot mechanism rather than copying only the main DB file.
 
 ---
 
-# 28. DATABASE MIGRATIONS
+# 25. BACKUP CLASSES AND CRYPTOGRAPHIC ENVELOPE
 
-Every schema change SHALL have a monotonic migration identifier.
-
-Production startup SHALL:
-
-1. read schema version;
-2. reject databases newer than supported by the binary;
-3. create a verified pre-migration backup when migration is required;
-4. acquire exclusive migration lock;
-5. apply migrations in deterministic order;
-6. validate schema/integrity;
-7. record migration success;
-8. release lock;
-9. start normal runtime.
-
-Migration failure SHALL enter Recovery Mode and preserve the pre-migration backup.
-
-Migrations SHALL be forward-oriented. A rollback of application version that cannot read the migrated schema SHALL restore the paired pre-update database snapshot rather than attempting unsafe reverse SQL by default.
-
----
-
-# 29. DATABASE BACKUP
-
-SQLite backup SHALL use the database's online backup mechanism or another SQLite-safe snapshot mechanism rather than copying a live database file incorrectly.
-
-A backup SHALL include metadata:
+Backup protection classes are:
 
 ```text
-backup_id
-app_version
-schema_version
-created_at
-reason
-integrity_status
-content_hash/manifest
+LOCAL_RECOVERY
+PORTABLE_STATE
 ```
 
-Backup creation SHALL run an integrity validation before marking the backup usable.
+Credential-bearing export, if later implemented, is a separate explicit workflow.
 
-Recommended automatic retention baseline:
+For every backup:
 
-```text
-7 daily backups
-4 weekly backups
-3 pre-update/pre-migration backups
-```
+1. create a consistent SQLite-safe snapshot;
+2. generate a fresh random backup-specific SQLCipher snapshot key (`SnapshotDBKey`);
+3. re-key/export the backup snapshot so it is openable with `SnapshotDBKey`, not the historical live `DB_DEK`;
+4. generate a fresh random 256-bit backup data-encryption key (`BackupDEK`);
+5. build an authenticated backup payload containing the encrypted SQLCipher snapshot, `SnapshotDBKey` wrapped/authenticated as internal secret material, non-secret configuration/registry metadata, required durable JARVIS artifacts, and recovery/update manifests;
+6. encrypt/authenticate the payload with `BackupDEK` using a reviewed AEAD (V1 preference AES-256-GCM or an equally reviewed qualified construction, chunked safely where required);
+7. protect `BackupDEK` using one or more key slots.
 
-Retention SHALL be configurable, bounded by disk policy, and MUST NOT delete the last known-good backup merely to satisfy retention count.
+The `SnapshotDBKey` SHALL never be emitted as plaintext sidecar or normal manifest data. It exists only inside the authenticated encrypted backup payload and trusted restore memory.
+
+`BackupDEK` SHALL never be the live `DB_DEK`, session password, integration credential, deterministic backup metadata derivative, or long-lived global backup key.
 
 ---
 
-# 30. BACKUP CONTENT
+# 26. BACKUP KEY SLOTS
 
-Automatic backups SHALL include:
+`LOCAL_RECOVERY` SHALL contain a Windows current-user DPAPI/local-secure-store key slot suitable for unattended same-profile local restore.
 
-- authoritative database;
+`PORTABLE_STATE` SHALL contain an independent portable key slot based on a user-controlled recovery factor. The V1 passphrase path uses Argon2id with fresh salt, versioned parameters, and a strong baseline calibrated for interactive restore. The derived key encrypts/wraps `BackupDEK`; it does not directly encrypt the entire package.
+
+A portable package MAY contain both local DPAPI and portable key slots.
+
+The portable recovery passphrase/factor is never stored.
+
+A package is labeled portable only after JARVIS verifies a non-DPAPI key slot can unlock its `BackupDEK`.
+
+---
+
+# 27. BACKUP CONTENT POLICY
+
+Normal backups may contain:
+
+- authoritative database snapshot;
 - non-secret validated configuration;
 - module/integration registry metadata;
-- durable JARVIS-managed artifacts required to resume accepted missions;
-- migration/update manifests needed for recovery.
+- required durable JARVIS-managed artifacts;
+- migration/update/recovery/release metadata.
 
-Automatic backups SHALL NOT duplicate external Git repositories by default.
+They SHALL NOT contain raw long-lived integration/provider credentials by default.
 
-Raw credentials SHALL NOT be placed into normal backup archives.
+External Git repositories are not duplicated by ordinary JARVIS backup unless explicitly selected by a separate feature/policy.
 
-A user-requested portable credential export, if implemented, SHALL use a separate strongly encrypted export mechanism with explicit confirmation and SHALL never occur automatically.
-
-After restoring a backup without credentials, integration accounts MAY appear disconnected/re-authentication-required rather than inventing access.
+The authenticated backup manifest records format/version, protection class, JARVIS/schema/protocol versions, content identities/hashes/sizes, encryption algorithm metadata, and key-slot types without exposing secret key material.
 
 ---
 
-# 31. RESTORE
+# 28. BACKUP VERIFICATION
 
-Restore SHALL be an explicit maintenance operation.
+A backup is `VERIFIED` only after applicable checks prove:
 
-Restore SHALL:
+- bounded/versioned container parses correctly;
+- applicable key slot unwraps `BackupDEK`;
+- AEAD payload authentication succeeds;
+- content hashes/manifest match;
+- `SnapshotDBKey` can open the SQLCipher snapshot in validation flow;
+- SQLite integrity check passes;
+- required files/metadata exist;
+- application/schema compatibility metadata is valid.
 
-1. stop normal Core execution;
-2. obtain exclusive maintenance lock;
-3. preserve the current state as a rollback snapshot when possible;
-4. verify selected backup manifest/integrity;
-5. restore database/config/artifacts;
-6. verify schema compatibility;
-7. run integrity checks;
-8. restart Core in recovery mode;
-9. reconcile external/live state before resuming previously active work;
-10. report restored/disconnected/uncertain items.
-
-Restore SHALL not blindly re-run external side effects recorded before the backup.
+Portable disaster-recovery readiness additionally requires qualification of clean-profile restore using only the declared portable factor and backup package.
 
 ---
 
-# 32. CORRUPTION RESPONSE
+# 29. CLEAN-PROFILE RESTORE
 
-If database integrity checks fail:
-
-- normal consequential execution SHALL stop;
-- JARVIS SHALL enter Recovery Mode;
-- the damaged database SHALL be preserved for diagnostics;
-- the system SHALL identify the newest verified backup;
-- restore SHALL require explicit user approval unless an existing recovery policy explicitly permits automatic restore;
-- recovered missions/tasks SHALL undergo normal external-state reconciliation.
-
-JARVIS SHALL not attempt speculative write repair against the only copy of a corrupted production database.
-
----
-
-# 33. RETENTION
-
-Retention SHALL distinguish:
-
-- security/audit history;
-- worker verbose events;
-- user conversation;
-- artifacts;
-- diagnostics logs;
-- backups.
-
-Recommended defaults:
+Portable restore follows:
 
 ```text
-critical audit events: 365 days minimum
-worker detailed events: 90 days
-rotating diagnostic logs: bounded by size/time
-conversation history: user-configurable
-completed-task transient artifacts: policy-based cleanup
-backups: per retention policy above
+select package
+→ parse bounded authenticated metadata
+→ choose portable key slot
+→ derive/unlock BackupDEK
+→ authenticate/decrypt outer payload
+→ recover SnapshotDBKey transiently
+→ open + integrity-check SQLCipher snapshot
+→ verify schema/application compatibility
+→ preserve current state when possible
+→ restore under exclusive maintenance lock
+→ generate a fresh local DB_DEK
+→ re-key restored database from SnapshotDBKey to new DB_DEK
+→ protect new DB_DEK through current Windows secure storage
+→ mark unavailable integration credentials REAUTH_REQUIRED
+→ restart in recovery mode
+→ reconcile external/live state
 ```
 
-Security-relevant retention settings SHALL not permit silent deletion of evidence required to explain recent consequential actions.
+The old live `DB_DEK` is not required on a clean machine.
+
+Wrong/unavailable recovery factor fails closed without modifying the only backup or partially activating unauthenticated contents.
+
+After restore, old provider sessions/approvals/leases/external effects are reconciled under normal recovery policy rather than blindly resumed/replayed.
 
 ---
 
-# 34. DATA EXPORT/IMPORT
+# 30. LOCAL RESTORE
 
-JARVIS SHOULD provide a versioned user export format for non-secret portable state including projects, preferences, memories, and selected history.
+Local rollback may use a local DPAPI key slot to obtain `BackupDEK` without repeatedly asking for the portable recovery factor.
 
-Export manifests SHALL include schema/contract version.
+It still authenticates/decrypts the package, opens/verifies the snapshot, and restores under exclusive maintenance rules.
 
-Import SHALL validate before mutation and SHALL not overwrite existing projects/memories without an explicit merge/conflict policy.
+A local-only backup is never labeled portable merely because its encrypted file can be copied elsewhere.
 
-Secrets remain a separate explicit export path.
+---
+
+# 31. SESSION PASSWORD AND STATE RECOVERY
+
+Session password verifier and state-encryption recovery are separate.
+
+A verified portable JARVIS recovery factor MAY authorize an explicit recovery flow that establishes a new JARVIS session password after successful recovery-factor verification and required state/recovery checks.
+
+Without an applicable recovery factor, the old password is not derived from/recovered from its Argon2id verifier.
+
+A clean-machine portable restore always creates a new session password after state is authenticated/decrypted/validated.
+
+Integration credentials remain separate and are re-authenticated as needed.
+
+---
+
+# 32. DATABASE MIGRATIONS
+
+Every schema change has a monotonic migration identity.
+
+Startup migration flow:
+
+1. read schema version;
+2. reject newer unsupported schema;
+3. create/verify pre-migration backup;
+4. acquire exclusive migration lock;
+5. apply deterministic migrations;
+6. validate schema/integrity;
+7. record success;
+8. release lock;
+9. continue startup.
+
+Failure enters Recovery Mode and preserves pre-migration backup.
+
+Rollback to an older binary with incompatible schema restores the paired pre-update database snapshot rather than relying on unsafe reverse SQL.
+
+Migrations affecting money precision, data policy, approval material, provider/module identities, encryption/backup formats, or recovery semantics require explicit compatibility fixtures.
+
+---
+
+# 33. CORRUPTION RESPONSE
+
+If database integrity cannot be established:
+
+- stop normal consequential execution;
+- enter Recovery Mode;
+- preserve damaged files for diagnostics;
+- identify newest compatible verified backup;
+- require explicit restore approval unless a narrow existing recovery policy permits otherwise;
+- do not speculative-write-repair the only production copy;
+- reconcile recovered external state before resumed consequential work.
+
+WAL-related corruption is a persistence incident even if some higher-level records remain readable.
+
+---
+
+# 34. RETENTION AND EXPORT
+
+Retention distinguishes audit, worker events, conversation, artifacts, logs, backups, and transient cache.
+
+Retention SHALL not delete the last known-good backup for a protected state solely to satisfy count/space preferences without an explicit safety policy.
+
+User export/import is versioned and non-secret by default. Credential export, if implemented, is a separate high-risk encrypted/confirmed workflow.
 
 ---
 
 # 35. DATA INVARIANTS
 
-The persistence implementation SHALL enforce these invariants:
-
-1. Every task belongs to a project/workspace context when execution can affect files/systems.
-2. Every task attempt belongs to exactly one task.
-3. Every active mission points to exactly one active graph version.
-4. Activated graph versions are immutable.
-5. Every consequential tool execution has an authority/permission decision reference.
-6. Every destructive tool execution has a consumed final-confirmation approval reference.
-7. Every completed task has verification evidence or an explicit completion policy indicating why independent verification was not required.
-8. Every worker checkpoint references its task/attempt.
-9. Credential rows contain handles, not raw secrets.
-10. Terminal states do not silently return to running.
-11. Invalidated outputs remain auditable.
-12. External event deduplication survives restart.
-13. Budget usage cannot be reduced by deleting a task record.
-14. Migration history is append-only.
-15. Restore/recovery actions are auditable.
+1. Every executable task has exactly one valid ExecutionScope.
+2. Filesystem/repository mutation requires `PROJECT_WORKSPACE`.
+3. Every attempt belongs to exactly one task.
+4. Every active mission points to exactly one immutable active graph version.
+5. Every consequential tool execution has a PermissionDecision reference.
+6. Every destructive execution has a consumed unexpired final confirmation bound to the current canonical action descriptor.
+7. Every completed task has required verification evidence.
+8. Credential rows contain opaque handles, not raw secrets.
+9. Terminal states do not silently return to running.
+10. `PAUSED` tasks enter durable `RESUMING` before new execution.
+11. Invalidated outputs remain historical/auditable.
+12. Event deduplication survives restart.
+13. Budget/accounting facts cannot be erased by deleting task history and use exact money.
+14. Concurrent hard-budget admission is reservation-safe.
+15. DataSensitivity and DataLocality are independent and conservatively propagated.
+16. Provider-reported usage/quota provenance is not rewritten as local estimate or vice versa.
+17. Provider resume handles are not the sole durable task state.
+18. Module support is rooted in authenticated release/catalog provenance.
+19. A portable backup can be restored without the historical live `DB_DEK`.
+20. `SnapshotDBKey` is never stored outside the authenticated encrypted backup payload as plaintext.
+21. Restored integrations without credentials become `REAUTH_REQUIRED`.
+22. WAL activation/fix/connection safety state is release-qualified and observable.
+23. Historical contracts/ADRs do not create a second persistence/schema definition.
 
 ---
 
-**END — JARVIS DATA & STATE CONTRACT v1.0**
+**END — JARVIS DATA & STATE CONTRACT v1.0.2**
