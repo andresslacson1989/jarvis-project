@@ -15,8 +15,9 @@ Read the active suite in this order:
 5. [`docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`](docs/implementation/JARVIS-DATA-STATE-CONTRACT.md) — SQLite/SQLCipher state, state machines, transactions, events, budgets, backups, restore, and migrations.
 6. [`docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`](docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md) — threat model, session trust, permission precedence, IPC/WebView/worker/tool/module/integration security, and recovery-key rules.
 7. [`docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`](docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md) — normative coding, package-boundary, validation, Rust/TypeScript, database, security, testing, and CI rules.
-8. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — Definition of Done, conformance, adversarial, recovery, performance, voice, packaging, and release gates.
-9. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria.
+8. [`docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`](docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md) — queue/dashboard truth, worker/recovery visibility, event/notification/focus behavior, configuration/import safety, memory retrieval, module/integration UX, voice identity/responsiveness, diagnostics/audit behavior, vulnerability policy, and architecture decision escalation.
+9. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — Definition of Done, conformance, adversarial, recovery, performance, voice, packaging, and release gates.
+10. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria.
 
 Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. [`docs/JARVIS-CONTRACT-LINEAGE.md`](docs/JARVIS-CONTRACT-LINEAGE.md) explains how prior branches/ADRs were reconciled.
 
@@ -24,7 +25,9 @@ Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. [`docs/JARVIS-CONT
 
 Accepted ADRs under `docs/decisions/` and `docs/adr/` preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.2 suite.
 
-A future architectural ADR is incomplete until the same change also updates every affected active normative document. Implementation SHALL NOT rely on a new ADR while contradictory canonical wording remains.
+The active implementation suite now includes explicit current normative operational/user-facing requirements that historically lived in ADRs, including queue transparency, work-dashboard truth, notification/focus policy, safe configuration activation/import behavior, scoped ranked memory retrieval, module lifecycle UX, persistent voice identity/fallback, diagnostic-export privacy, audit retention/integrity claims, dependency-vulnerability release policy, and architecture escalation.
+
+A future architectural ADR is incomplete until the same change also updates every affected active normative document. Implementation SHALL NOT rely on a new ADR while contradictory or incomplete canonical wording remains.
 
 If an ADR and an active v1.0.2 normative document appear to conflict, stop and correct the canonical contract; do not choose an interpretation silently.
 
@@ -42,12 +45,14 @@ The divergent branch `codex/contract-implementation-lock` is historical/non-auth
 
 > **Be autonomous inside the user's intent. Ask before materially expanding it.**
 
+> **Escalate product judgment. Resolve engineering judgment.**
+
 > **Build the control plane first, prove recoverability early, then give intelligence access to it.**
 
 > **History explains the contract. The current contract defines the product.**
 
 ## Status semantics
 
-`Implementation-locked` means the active contract defines foundational security, state, recovery, packaging, protocol, provider, integration, and release behavior tightly enough that implementation does not invent architecture ad hoc.
+`Implementation-locked` means the active contract defines foundational security, state, recovery, packaging, protocol, provider, integration, operational/user-visible behavior, and release behavior tightly enough that implementation does not invent architecture or require ADR overlay interpretation.
 
-`Production Complete` is different. It may be declared only for an implemented, signed release that passes every mandatory gate in `JARVIS-VERIFICATION-RELEASE-CONTRACT.md` for the active Release Profile. Documentation alone can never satisfy that product status.
+`Production Complete` is different. It may be declared only for an implemented, signed release that passes every mandatory gate in `JARVIS-VERIFICATION-RELEASE-CONTRACT.md` and every mandatory qualification requirement in the active normative suite for the active Release Profile. Documentation alone can never satisfy that product status.
