@@ -1,8 +1,8 @@
 # JARVIS Security Hardening Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
-**Version:** 1.0.2  
-**Date:** August 11, 2026
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
+**Version:** 1.0.3  
+**Date:** August 12, 2026
 
 ---
 
@@ -20,12 +20,13 @@ JARVIS is a high-trust desktop assistant capable of reading private data, modify
 4. External content is data, not policy.
 5. Historical precedent is evidence, not a permission grant.
 6. Destructive/materially unrecoverable actions always require fresh final confirmation.
-7. Least privilege applies to renderer, Core, providers, workers, tools, modules, integrations, credentials, and IPC.
+7. Least privilege applies to renderer, Core, providers, workers, tools, modules, integrations, credentials, IPC, and elevation helpers.
 8. Unknown security-critical identity/target/scope/policy/integrity fails closed.
 9. No sandbox/OS guarantee may be described as stronger than qualified behavior.
 10. Secrets are excluded by design before redaction.
 11. Recoverability is part of data-protection correctness.
 12. A provider's technical ability does not expand JARVIS authority.
+13. Setup/install elevation does not become runtime authority.
 
 ---
 
@@ -39,7 +40,7 @@ V1 explicitly addresses:
 - accidental ambiguous/destructive instructions;
 - target/account/environment confusion;
 - credential/key leakage through prompts/env/logs/journals/artifacts/crashes;
-- tampered modules/application updates;
+- tampered modules/application/provider setup/update artifacts;
 - compromised/untrusted external API responses;
 - runaway workers/resource exhaustion;
 - permissive local IPC/filesystem mistakes;
@@ -48,6 +49,7 @@ V1 explicitly addresses:
 - unsafe retry after uncertain external effects;
 - worker shell escaping intended JARVIS authority;
 - renderer/WebView injection or remote-origin privilege exposure;
+- provider setup/UAC confused-deputy or elevation leakage;
 - offline database/backup theft;
 - original Windows profile/machine loss;
 - locked-session voice/private-data leakage.
@@ -64,11 +66,31 @@ DPAPI/Credential Manager/ACLs materially protect at rest and across principals b
 
 ---
 
-# 4. SESSION PASSWORD AND RECOVERY
+# 4. SESSION PASSWORD, ARGON2ID, AND RECOVERY
 
 The session password exists only to establish JARVIS session trust. It is not an integration credential or DB key.
 
-The verifier uses Argon2id or an equivalent reviewed memory-hard construction with random salt, versioned/calibrated parameters, meaningful memory cost, rate limiting, and progressive cooldown. Plaintext password/verifier-derived secret material is not logged.
+V1 JARVIS-managed password/recovery KDF profiles SHALL use Argon2id version `0x13`.
+
+Minimum production floor:
+
+```text
+memory:      >= 65536 KiB
+passes:      >= 3
+parallelism: 4
+salt:        >= 16 cryptographically random bytes
+output:      >= 32 bytes
+```
+
+Session-password and portable-recovery profiles SHALL be separate, versioned profiles. Release calibration MAY raise memory/time cost but SHALL NOT silently reduce below this floor without a new reviewed security-contract revision.
+
+The exact KDF profile/parameters and salt needed to verify an existing verifier/key slot SHALL be stored with or immutably referenced by that verifier/key slot. The plaintext password/recovery factor and derived working key are not stored.
+
+After successful authentication using an older still-supported profile, JARVIS MAY atomically re-hash under the current stronger profile. Verification comparison SHALL use a constant-time primitive where the selected library/runtime exposes one appropriate to the representation. Secret working buffers SHOULD be zeroized/cleared as soon as practical where the language/library provides reliable support.
+
+Portable recovery SHOULD use materially higher memory than the session-password floor when the qualified hardware baseline keeps recovery practical, because it is an infrequent operation.
+
+Unlock attempts use rate limiting and progressive cooldown. Plaintext password/verifier-derived secret material is not logged.
 
 Changing the password requires an unlocked session and explicit confirmation.
 
@@ -116,13 +138,15 @@ AI/UI/provider code cannot enumerate all secrets. Secret handles supplied by unt
 
 Secrets are excluded from normal environment inheritance, logs, journals, artifacts, UI state, AI context, and ordinary backups.
 
+Provider-internal Windows sandbox-account credentials created/managed by a qualified provider setup process are not imported into JARVIS as general Credential Broker secrets unless a future explicit integration contract requires it.
+
 ---
 
 # 7. DATABASE/BACKUP SECRET BOUNDARY
 
 The live database uses a random local `DB_DEK` protected through Windows secure storage.
 
-Backup packages use independent per-backup `BackupDEK` and backup-specific SQLCipher snapshot key semantics from the Data Contract. The portable recovery factor wraps/unlocks `BackupDEK`; it does not become the live DB key.
+Backup packages use independent per-backup `BackupDEK` and backup-specific SQLCipher snapshot key semantics from the Data Contract. The portable recovery factor derives a key using the exact recorded qualified KDF profile and wraps/unlocks `BackupDEK`; it does not become the live DB key.
 
 A clean-profile restore obtains the backup snapshot key only after authenticating/decrypting the backup package, then re-keys restored state under a fresh local `DB_DEK`.
 
@@ -164,6 +188,7 @@ Untrusted content cannot:
 - alter authority envelope/execution scope;
 - waive final confirmation;
 - retrieve raw credentials;
+- request elevation/provider setup as a trusted action by text alone;
 - change DataLocality/DataSensitivity;
 - expand project/environment/account scope;
 - bypass budget/resource policy;
@@ -185,7 +210,7 @@ Potential scoped instruction sources after deterministic resolution include:
 - global JARVIS policy;
 - registered project policy such as `AGENTS.md` located inside the resolved project root.
 
-Project policy remains subordinate to global security, locality, permission, budget, destructive-confirmation, credential, and update policy.
+Project policy remains subordinate to global security, locality, permission, budget, destructive-confirmation, credential, provider-setup, and update policy.
 
 Path traversal/reparse behavior cannot make an out-of-root file become trusted project policy.
 
@@ -229,12 +254,12 @@ PermissionEngine is the authoritative action-admission algorithm.
 
 It SHALL evaluate in this order:
 
-1. **Mandatory system invariant.** Destructive-final-confirmation rules, local-only routing, secret-protection, renderer/Core separation, required integrity checks, and other non-waivable safety rules are evaluated first.
+1. **Mandatory system invariant.** Destructive-final-confirmation rules, local-only routing, secret-protection, renderer/Core separation, provider-setup/elevation separation, required integrity checks, and other non-waivable safety rules are evaluated first.
 2. **Explicit applicable DENY.** A matching deny blocks normal execution. Changing/revoking the policy is a separate explicitly authorized policy action; a conflicting ordinary instruction does not silently override the deny.
 3. **Session/automation eligibility.** Establish a valid authenticated session or already-approved automation/event authority as applicable.
 4. **Authority-envelope containment.** Concrete action/scope/external system must fit the immutable envelope.
 5. **Capability and identity resolution.** Required tool/integration/provider capability and canonical target/account/environment identities must be valid.
-6. **Locality, budget, resource, integrity, and precondition gates.** Any mandatory failure blocks/queues/requires recovery as defined.
+6. **Locality, budget, resource, integrity, provider setup, and precondition gates.** Any mandatory failure blocks/queues/requires recovery/setup as defined.
 7. **Current explicit instruction authority.** Determine whether the user's current instruction directly authorizes the resolved action class/target/scope.
 8. **Standing permission.** If current instruction is not sufficient by itself, an explicit matching non-expired standing permission may provide authority within its exact scope.
 9. **Risk/approval gate.** Apply the risk-class rule below.
@@ -382,7 +407,7 @@ Production SHALL:
 - disable production devtools unless a separately gated developer/diagnostic policy permits them;
 - qualify Tauri/runtime versions for relevant security fixes.
 
-Renderer cannot resolve secure-store handles, spawn arbitrary native processes, open privileged Core IPC, or make authoritative PermissionDecisions.
+Renderer cannot resolve secure-store handles, spawn arbitrary native processes, open privileged Core IPC, invoke arbitrary elevated operations, or make authoritative PermissionDecisions.
 
 ---
 
@@ -416,23 +441,45 @@ Job Objects are lifecycle/resource containment only; prompts are not a sandbox.
 
 ---
 
-# 22. PROVIDER SECURITY AND COMPATIBILITY
+# 22. CODEX WINDOWS SETUP / ELEVATION SECURITY
 
-A provider is production-supported only after exact version/interface/sandbox/error/cancellation/conformance qualification.
+A qualified Codex Windows sandbox may require one-time or repair-time elevated setup. That setup is a **provider setup operation**, not worker authority.
+
+JARVIS SHALL:
+
+- surface setup/repair as an explicit authenticated user action;
+- invoke only the release-qualified Codex distribution/setup helper identity through a narrow Rust native operation;
+- use UAC only when the qualified provider setup path requires it;
+- pass only bounded provider-defined/qualified setup arguments;
+- wait for and independently verify setup readiness/conformance before marking the profile supported;
+- treat cancellation/failure as `SETUP_REQUIRED`, `REPAIR_REQUIRED`, or `SETUP_FAILED` rather than silently degrading;
+- never use setup elevation to launch ordinary workers elevated;
+- never expose a generic elevated command/path surface to AI/Core;
+- not import provider-owned sandbox-account passwords/credentials into normal JARVIS state;
+- sanitize provider setup output before logs/diagnostics;
+- invalidate setup/conformance readiness after a provider update when the qualified policy cannot prove continued validity.
+
+Untrusted content/AI cannot directly authorize an elevation helper. The setup workflow is initiated by an authenticated JARVIS control path and bounded to the exact known provider setup operation.
+
+---
+
+# 23. PROVIDER SECURITY AND COMPATIBILITY
+
+A provider is production-supported only after required setup readiness, exact version/interface/sandbox/error/cancellation/conformance qualification, and current health/auth/capability checks.
 
 Provider-native configuration/output is untrusted until adapter normalization/validation.
 
 Unsupported/new unqualified versions are excluded from automatic production routing.
 
-Provider self-update does not grant support.
+Provider self-update does not grant support and may invalidate setup/conformance readiness.
 
 Provider session-resume handles are sensitive when they confer access to hosted session state and do not imply authorization for new actions.
 
-No provider fallback may violate `LOCAL_ONLY`, permission, budget, or capability policy.
+No provider fallback may violate setup, `LOCAL_ONLY`, permission, budget, or capability policy.
 
 ---
 
-# 23. CREDENTIAL/INTEGRATION USE
+# 24. CREDENTIAL/INTEGRATION USE
 
 An adapter may obtain a credential only after integration/account/capability identity, action authority, environment/scope, and required credential capability are resolved.
 
@@ -442,9 +489,11 @@ Connection/authentication does not authorize all supported actions.
 
 OAuth integrations use PKCE where supported and request minimal capability-driven scopes. Temporary loopback callbacks bind narrowly, validate state/PKCE, accept only expected callback flow, and close after completion.
 
+For GitHub V1, credentials/scopes SHALL be limited to the exact enabled Release Profile capability matrix. Mandatory V1 support does not require repository administration, secret administration, branch-protection administration, membership administration, repository deletion, or ref deletion.
+
 ---
 
-# 24. PROXMOX SECURITY
+# 25. PROXMOX SECURITY
 
 V1 Proxmox is API-first and capability-scoped.
 
@@ -456,17 +505,20 @@ Required controls:
 - durable connection/environment identity;
 - node/VMID/pool allowlists when configured;
 - typed operations only, no arbitrary raw API request tool;
+- exact active Release Profile capability matrix enforced;
 - no silent SSH/`qm`/`pct`/`pvesh`/root/direct `/etc/pve` fallback;
 - guest OS shell access is separately registered/authorized;
 - asynchronous Proxmox tasks are tracked to observed outcome;
 - destructive actions use exact final confirmation;
 - ambiguous writes become `UNCERTAIN`, not blind replay.
 
+`PROXMOX_GUEST_CREATE` is not generic storage administration; `PROXMOX_GUEST_CONFIG` is not host/network/storage administration; `PROXMOX_BACKUP` is not direct PBS administration. `PROXMOX_STORAGE_WRITE` and `PROXMOX_NETWORK_WRITE` are optional/non-mandatory V1 capabilities and require full qualification if enabled by a concrete release.
+
 Direct Proxmox Backup Server administration is a separate connection boundary.
 
 ---
 
-# 25. MODULE SECURITY
+# 26. MODULE SECURITY
 
 A supported module requires authenticated release/catalog provenance, artifact integrity, manifest/schema validation, compatibility, requested-capability review, staged health/conformance, and lifecycle policy.
 
@@ -488,7 +540,7 @@ V1 need not expose an open arbitrary executable-module marketplace.
 
 ---
 
-# 26. APPLICATION UPDATE / SUPPLY CHAIN
+# 27. APPLICATION UPDATE / SUPPLY CHAIN
 
 Application updates are signed/integrity-verified, staged, and paired with schema/backup/recovery compatibility.
 
@@ -496,19 +548,21 @@ Tampered/unverified artifacts are never activated and never trigger fallback to 
 
 Production pipeline uses pinned lockfiles/toolchains, secret/dependency/vulnerability/license review as appropriate, clean builds, release manifest, SBOM, and provenance linking artifacts to source/CI.
 
-Node Core/runtime assets and module catalog trust metadata are part of signed release integrity.
+Node Core/runtime assets, canonical brand/font/icon assets, and module catalog trust metadata are part of release integrity. Third-party fonts/icons/visual assets SHALL have recorded source/license/provenance and required notices.
 
 ---
 
-# 27. LOGGING / DIAGNOSTICS / CRASH DATA
+# 28. LOGGING / DIAGNOSTICS / CRASH DATA
 
 Logs/journals/audit/diagnostics exclude by construction where possible:
 
 - passwords/recovery factors;
 - live DB/backup/snapshot keys;
+- KDF-derived working keys;
 - OAuth/API tokens;
 - authorization headers;
 - private keys;
+- provider-internal sandbox-account credentials;
 - complete environment dumps;
 - arbitrary full AI context.
 
@@ -518,7 +572,7 @@ Full memory dumps are not collected/uploaded automatically. User-requested suppo
 
 ---
 
-# 28. EVENT / NETWORK EXPOSURE
+# 29. EVENT / NETWORK EXPOSURE
 
 Authenticated external events establish source authenticity, not action authority. They enter Event Gateway and normal permission/locality/budget/resource processing with durable replay/dedup protection.
 
@@ -530,9 +584,11 @@ OAuth loopback listeners are temporary/narrow and are not a general network cont
 
 ---
 
-# 29. RATE / RESOURCE ABUSE
+# 30. RATE / RESOURCE ABUSE
 
 The runtime rate-limits unlock/recovery-factor attempts, repeated approval submissions, automation storms, provider retries, and failing tool calls where applicable.
+
+KDF calibration SHALL not permit attacker-controlled unbounded memory/iteration values; production profiles come from validated bounded configuration/schema.
 
 Emergency stop/cancel remains available.
 
@@ -542,18 +598,19 @@ Disk use for logs/artifacts/cache/backups/modules is bounded and disk-full condi
 
 ---
 
-# 30. AUDIT EVENTS
+# 31. AUDIT EVENTS
 
 Security audit includes at least:
 
 - session unlock/lock/password change/recovery attempt (without secrets);
+- KDF profile activation/upgrade where security-relevant;
 - recovery-factor setup/verification;
 - standing permission/policy change;
 - approval issue/decision/expiry/consumption;
 - high/critical tool execution;
 - integration connect/disconnect/capability change;
 - credential rotation/revocation;
-- provider compatibility/fallback security events;
+- provider setup/repair/elevation result and compatibility/fallback security events;
 - Proxmox destructive/high-risk operations;
 - module catalog/install/update/rollback;
 - DataLocality/security setting change;
@@ -565,27 +622,27 @@ Audit is append-oriented and sufficient to explain consequential authorization w
 
 ---
 
-# 31. FAILURE BEHAVIOR
+# 32. FAILURE BEHAVIOR
 
 Security-critical validation never guesses or silently weakens policy.
 
 On failure:
 
-- block/queue/recover as appropriate;
+- block/queue/setup/repair/recover as appropriate;
 - record sanitized diagnostic/audit evidence;
 - surface an actionable reason;
 - never ask AI whether bypassing a hard security invariant is acceptable.
 
-Examples include invalid action digest, changed target/version, permission deny, incompatible scope, locality-compliant provider unavailable, credential capability missing, pipe DACL/auth failure, WebView capability/CSP misconfiguration, provider sandbox mismatch, module signature failure, backup authentication failure, and unsupported database schema.
+Examples include invalid action digest, changed target/version, permission deny, incompatible scope, locality-compliant provider unavailable, provider setup not ready, credential capability missing, pipe DACL/auth failure, WebView capability/CSP misconfiguration, provider sandbox mismatch, module signature failure, backup authentication failure, under-floor KDF profile, and unsupported database schema.
 
 ---
 
-# 32. REQUIRED SECURITY VERIFICATION
+# 33. REQUIRED SECURITY VERIFICATION
 
 Production tests SHALL include:
 
 - prompt injection from every major untrusted-content source;
-- attempts to exfiltrate secret/recovery material;
+- attempts to exfiltrate secret/recovery/KDF-derived material;
 - path/reparse/UNC escape;
 - deterministic PermissionEngine conflict/deny/risk scenarios;
 - HIGH precedent proving insufficient authority;
@@ -597,12 +654,15 @@ Production tests SHALL include:
 - wrong bootstrap secret;
 - Tauri remote-origin capability denial;
 - CSP/navigation/untrusted-rendering negative cases;
+- production KDF profile floor/metadata/upgrade tests;
+- Codex setup required/cancel/failure/repair/update invalidation and normal-worker non-elevation;
 - provider/engineering sandbox write/network behavior and honest read-isolation reporting;
 - shell attempt to perform external consequential operation outside typed JARVIS path;
-- provider fallback violating locality;
+- provider fallback violating locality/setup;
 - module external-in-process rejection;
 - module/update/catalog tamper;
-- Proxmox raw API/shell fallback rejection;
+- GitHub capability/scope overreach rejection;
+- Proxmox raw API/shell/optional-capability overreach rejection;
 - backup/package tamper and wrong recovery factor;
 - clean-profile portable restore/re-key;
 - integration credentials absent after restore and `REAUTH_REQUIRED` behavior;
@@ -611,11 +671,11 @@ Production tests SHALL include:
 
 ---
 
-# 33. SECURITY INVARIANTS
+# 34. SECURITY INVARIANTS
 
 1. Renderer cannot directly obtain secure-store secrets or Core authority.
 2. Orchestrator has no unrestricted shell.
-3. External content cannot grant permission.
+3. External content cannot grant permission or request trusted elevation directly.
 4. Explicit DENY/mandatory invariant cannot be bypassed by ordinary instruction/precedent/AI confidence.
 5. Precedent cannot independently authorize HIGH/CRITICAL work.
 6. Destructive execution cannot occur without fresh bound final confirmation.
@@ -627,14 +687,16 @@ Production tests SHALL include:
 12. Privileged Tauri commands are not exposed to remote-origin WebViews.
 13. Worker shell/provider native capability cannot widen JARVIS authority.
 14. Job Objects are not described as filesystem/network isolation.
-15. Provider sandbox claims match conformance evidence.
-16. Uncertain consequential execution is not blindly retried.
-17. Conditional target/version conflict does not reuse stale authorization silently.
-18. External executable modules never run in authoritative Core.
-19. Portable state restore does not require historical live `DB_DEK` or export integration credentials.
-20. Session-password recovery requires explicit recovery authority and cannot reverse the verifier by design.
-21. Production/provider/module support claims are evidence-backed.
+15. Provider sandbox/setup claims match conformance evidence.
+16. Provider setup elevation never grants elevated ordinary worker execution.
+17. Uncertain consequential execution is not blindly retried.
+18. Conditional target/version conflict does not reuse stale authorization silently.
+19. External executable modules never run in authoritative Core.
+20. Portable state restore does not require historical live `DB_DEK` or export integration credentials.
+21. Session-password recovery requires explicit recovery authority and cannot reverse the verifier by design.
+22. JARVIS-managed production KDF profiles never fall below the current contract floor.
+23. Production/provider/module/integration capability support claims are evidence-backed.
 
 ---
 
-**END — JARVIS SECURITY HARDENING CONTRACT v1.0.2**
+**END — JARVIS SECURITY HARDENING CONTRACT v1.0.3**
