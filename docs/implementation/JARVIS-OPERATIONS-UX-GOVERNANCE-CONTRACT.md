@@ -1,24 +1,24 @@
 # JARVIS Operations, User Experience & Governance Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
-**Version:** 1.0.2  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
+**Version:** 1.0.3  
 **Date:** August 12, 2026
 
 ---
 
 # 1. PURPOSE
 
-This document defines current normative operational, user-visible, configuration, observability, and architecture-governance behavior that complements the Runtime, Protocol, Data, Security, Coding, Verification, and Release Profile contracts.
+This document defines current normative operational, user-visible, configuration, observability, and architecture-governance behavior that complements the Runtime, Protocol, Data, Security, Coding, UI Identity, Verification, and Release Profile contracts.
 
-It is part of the current v1.0.2 implementation source of truth. It is not an ADR overlay. Implementation SHALL NOT require historical contracts or ADRs to reconstruct any behavior defined here.
+It is part of the current v1.0.3 implementation source of truth. It is not an ADR overlay. Implementation SHALL NOT require historical contracts or ADRs to reconstruct any behavior defined here.
 
-Requirements in this document are cumulative with the rest of the current normative suite and use the same canonical state machines, schemas, authority rules, DataPolicy, exact money, provider qualification, and release semantics.
+Requirements in this document are cumulative with the rest of the current normative suite and use the same canonical state machines, schemas, authority rules, DataPolicy, exact money, provider setup/qualification, and release semantics.
 
 ---
 
 # 2. OPERATIONAL TRUTHFULNESS
 
-JARVIS SHALL prefer explicit degraded, queued, blocked, paused, uncertain, or recovery state over fabricated continuity.
+JARVIS SHALL prefer explicit degraded, queued, blocked, paused, uncertain, setup-required, repair-required, or recovery state over fabricated continuity.
 
 JARVIS SHALL NOT:
 
@@ -26,7 +26,8 @@ JARVIS SHALL NOT:
 - represent acknowledgement as completion;
 - report an unverified consequential effect as success;
 - imply a task stopped immediately while it is still reaching an integrity-safe interruption point;
-- silently weaken quality, locality, privacy, permission, budget, support, or recovery policy to keep working;
+- represent a provider as supported/ready while required setup or repair is incomplete;
+- silently weaken quality, locality, privacy, permission, budget, support, sandbox, or recovery policy to keep working;
 - reconstruct worker history from AI speculation when authoritative state/events exist.
 
 When accepted work cannot proceed, the user SHALL be able to determine its current state and material reason.
@@ -52,7 +53,7 @@ The dashboard SHALL expose, as applicable:
 
 If accepted work cannot start immediately, JARVIS SHALL tell the user it is queued and expose the queue state. Tasks introduced by replanning are subject to the same rule.
 
-Queue ordering changes and dependency, workspace, resource, budget, approval, provider, recovery, or other material start blockers SHALL remain observable.
+Queue ordering changes and dependency, workspace, resource, budget, approval, provider setup/repair, provider availability, recovery, or other material start blockers SHALL remain observable.
 
 Routine worker activity SHALL remain available in the dashboard/journal without repetitive spoken interruption.
 
@@ -124,7 +125,7 @@ After `PAUSED`, all new execution follows canonical durable `RESUMING` validatio
 
 Accepted queued/pending work SHALL survive restart according to durability policy and remain visible after recovery.
 
-After crash/restart/provider/runtime interruption, JARVIS SHALL accurately surface materially interrupted, resumed, queued, blocked, uncertain, approval-revalidation-required, or user-action-required work.
+After crash/restart/provider/runtime interruption, JARVIS SHALL accurately surface materially interrupted, resumed, queued, blocked, uncertain, setup/repair-required, approval-revalidation-required, or user-action-required work.
 
 Recovery messaging SHALL reflect live reconciliation rather than merely repeating pre-crash assumptions.
 
@@ -220,7 +221,7 @@ parse candidate
 
 Failure before activation leaves the previous valid configuration authoritative. Unknown flags/settings SHALL NOT silently enable behavior.
 
-Security/permission/privacy/locality/credential/budget/update/module/integration policy changes SHALL be auditable where material.
+Security/permission/privacy/locality/credential/budget/update/module/integration/provider-setup/KDF policy changes SHALL be auditable where material.
 
 Dashboard, voice, and other control surfaces SHALL mutate the same underlying configuration authority rather than parallel settings stores.
 
@@ -254,13 +255,23 @@ Consequential ambiguity that cannot be resolved reliably SHALL clarify/block rat
 
 ---
 
-# 14. PROVIDER LIFECYCLE AND RESPONSIVENESS CAPABILITY
+# 14. PROVIDER LIFECYCLE, SETUP, AND RESPONSIVENESS CAPABILITY
 
 Provider abstractions SHALL NOT require a fresh one-shot process/session for every interaction.
 
 Adapters MAY use one-shot execution when that is the provider's qualified interface, but the architecture SHALL support warm, persistent, streaming, session-oriented, resumable, local-server, cloud, and future LAN provider models without redesigning Core.
 
-Where safely supported, provider contracts SHOULD expose normalized lifecycle/capabilities for discovery, readiness/health, start/warm, execute/submit, streaming events, cancellation/interruption, restart, and stop/unload.
+Provider UI/state SHALL distinguish installation/discovery, setup/repair readiness, compatibility/support, authentication/health, and capability availability. A provider needing setup or repair SHALL be presented honestly as unavailable for the affected profile rather than as a generic ready provider.
+
+Where a qualified provider requires explicit setup/repair:
+
+- the dashboard SHALL show why it is required;
+- setup requiring UAC SHALL be a deliberate user action, not silent background focus/elevation;
+- cancellation/failure SHALL remain visible/actionable;
+- successful helper completion alone SHALL NOT be displayed as ready before setup/conformance verification;
+- normal workers SHALL not inherit setup elevation.
+
+Where safely supported, provider contracts SHOULD expose normalized lifecycle/capabilities for discovery, setup/repair, readiness/health, start/warm, execute/submit, streaming events, cancellation/interruption, restart, and stop/unload.
 
 Latency-critical lightweight components SHOULD remain warm while their feature is active where resource policy permits. Heavy RAM/VRAM/CPU/GPU providers SHOULD be warmed/unloaded according to measured resource pressure and latency requirements rather than assuming every provider can remain resident.
 
@@ -325,6 +336,8 @@ Each supported integration exposes normalized identity, capabilities/operations,
 
 Connecting/configuring an integration SHALL NOT imply every service capability is enabled or authorized. Where upstream permits, service capabilities are independently enabled/authorized.
 
+The dashboard SHALL expose the active Release Profile support matrix so users can distinguish `modeled`, `available`, `enabled`, and `production-supported` capabilities. Optional GitHub Actions dispatch and optional Proxmox storage/network-write capabilities SHALL not appear as mandatory V1 support merely because their schemas exist.
+
 Revoked/expired authentication or removed capability scope SHALL immediately prevent new dependent actions after authoritative integration state changes while leaving unrelated integration capabilities usable when independently valid.
 
 The dashboard SHALL distinguish support, connection/configuration, enabled capabilities, authorization, and health without exposing secret material.
@@ -372,7 +385,7 @@ Cloud speech fallback SHALL NOT violate DataLocality.
 
 # 20. VOICE REFLEX, ACKNOWLEDGEMENT, AND CONTINUITY
 
-The deterministic low-latency reflex path SHALL remain independent of remote AI reasoning for established controls/state transitions including, as applicable, listening feedback, PTT state, wake/session acknowledgement when enabled, immediate TTS interruption, stop, cancel current voice generation, mute/unmute, sleep/lock, and unambiguous task pause/cancel after target resolution.
+The deterministic low-latency reflex path SHALL remain independent of remote AI reasoning for established controls/state transitions including, as applicable, listening feedback, PTT state, wake/session acknowledgement when enabled, immediate TTS interruption, stop, cancel current voice generation, mute/unmute, sleep/lock, show/hide JARVIS presentation, and unambiguous task pause/cancel after target resolution.
 
 Immediate acknowledgement MAY use visual state, local earcon, or a small fixed/pre-generated phrase bank rendered in the exact configured voice.
 
@@ -432,9 +445,9 @@ Human-readable summaries never replace the canonical action descriptor/digest.
 
 # 24. DIAGNOSTICS UX AND EXPORT PRIVACY
 
-Diagnostics SHALL make common failure/degraded causes actionable and distinguish healthy, degraded, unavailable, blocked, uncertain, and recovery-required state where applicable.
+Diagnostics SHALL make common failure/degraded causes actionable and distinguish healthy, setup-required, repair-required, degraded, unavailable, blocked, uncertain, and recovery-required state where applicable.
 
-Recorded diagnostic/audit evidence SHALL be sufficient, subject to retention/DataPolicy, to establish non-secret request summary, relevant project/mission/task/attempt, provider/worker/tool/integration, permission/approval result, important transitions, outcome, verification evidence, and fallback/retry/recovery behavior.
+Recorded diagnostic/audit evidence SHALL be sufficient, subject to retention/DataPolicy, to establish non-secret request summary, relevant project/mission/task/attempt, provider/worker/tool/integration, provider setup/qualification state, permission/approval result, important transitions, outcome, verification evidence, and fallback/retry/recovery behavior.
 
 This SHALL NOT require private chain-of-thought or raw credentials.
 
@@ -442,7 +455,7 @@ Before diagnostic/support export, JARVIS SHALL show the information categories i
 
 Diagnostic export SHALL default to excluding conversation bodies/private user content unless explicitly selected for that export and allowed by DataPolicy.
 
-Secret/recovery-key/credential material remains excluded by construction and cannot be opted into an ordinary diagnostic export.
+Secret/recovery-key/credential/KDF-derived/provider-internal sandbox credential material remains excluded by construction and cannot be opted into an ordinary diagnostic export.
 
 ---
 
@@ -474,7 +487,7 @@ A Critical finding is not converted into a production pass merely by relabeling 
 
 # 27. UPGRADE / UNINSTALL USER-STATE PRESERVATION
 
-Upgrade qualification SHALL prove preservation or explicit migration of compatible durable user state including applicable projects/workspaces/environments, memories/history policy state, mission/task/worker history, settings, module/integration metadata, compatible approvals/standing permissions, and backup/recovery availability.
+Upgrade qualification SHALL prove preservation or explicit migration of compatible durable user state including applicable projects/workspaces/environments, memories/history policy state, mission/task/worker history, settings, provider setup/qualification state, module/integration metadata, compatible approvals/standing permissions, KDF profile/verifier metadata, and backup/recovery availability.
 
 Invalid/obsolete persisted states SHALL be migrated, invalidated, or surfaced explicitly; they SHALL NOT silently disappear because a new version no longer understands them.
 
@@ -513,12 +526,12 @@ Consequential ambiguity or material expansion of goal, project, environment, tar
 Production qualification SHALL prove at minimum:
 
 1. delayed accepted work is queued visibly and never shown running before start;
-2. dependency/workspace/resource/budget/provider/approval/recovery queue reasons are visible;
+2. dependency/workspace/resource/budget/provider/setup/approval/recovery queue reasons are visible;
 3. replanned queued work is visible;
 4. dashboard worker/current/history answers come from authoritative records;
 5. delayed safe-point pause/cancel is visible and audited;
 6. explicit user reprioritization is not silently overridden by AI priority;
-7. recovery accurately reports interrupted/resumed/blocked/uncertain/user-action-required work;
+7. recovery accurately reports interrupted/resumed/blocked/uncertain/setup-required/user-action-required work;
 8. standing permissions are scoped/revocable/non-transitive and revocation blocks new dependent work;
 9. event disposition cannot bypass normal authority and queued event work remains visible;
 10. notification grouping/focus modes behave without deleting authoritative events;
@@ -527,25 +540,27 @@ Production qualification SHALL prove at minimum:
 13. conflicting import does not overwrite durable state without merge/conflict policy;
 14. ranked memory retrieval respects scope/confidence/provenance/live-state authority;
 15. trivial deterministic actions are not forced into unnecessary worker missions;
-16. provider abstraction supports qualified warm/persistent/streaming lifecycle without mandating one-shot cold start;
-17. resource scheduling can unload/defer heavy providers while preserving interactive controls;
-18. module install does not implicitly enable/authorize/prefer;
-19. module update is staged and rollback does not depend on overwritten files;
-20. module dashboard exposes qualified lifecycle/update state;
-21. integration connection does not imply all capabilities and revocation blocks dependent actions;
-22. budget/usage UI preserves unknown provenance and queue reason;
-23. TTS fallback does not silently change JARVIS voice identity;
-24. acknowledgement never falsely implies completion;
-25. UI/reflex stop/mute/cancel remains responsive during slow AI/provider work;
-26. destructive approval UI shows target/consequence and UI confirmation remains available;
-27. diagnostic export defaults to excluding conversation/private content and displays included categories;
-28. audit retention preserves required recent consequential evidence;
-29. High reachable vulnerability waiver requires mandatory fields/expiry;
-30. Critical reachable vulnerability blocks release;
-31. upgrade preserves/migrates durable compatible user state without silent disappearance;
-32. uninstall does not silently delete durable user data contrary to explicit policy;
-33. operational explanations identify request/work/provider/authorization/state/verification/recovery without chain-of-thought/secrets;
-34. significant autonomously resolved architecture decisions are documented and summarized to the user where appropriate.
+16. provider abstraction supports qualified setup/warm/persistent/streaming lifecycle without mandating one-shot cold start;
+17. provider setup failure/repair remains explicit and does not silently downgrade sandbox/elevation policy;
+18. resource scheduling can unload/defer heavy providers while preserving interactive controls;
+19. module install does not implicitly enable/authorize/prefer;
+20. module update is staged and rollback does not depend on overwritten files;
+21. module dashboard exposes qualified lifecycle/update state;
+22. integration connection does not imply all capabilities and revocation blocks dependent actions;
+23. integration dashboard distinguishes mandatory vs optional current Release Profile capabilities;
+24. budget/usage UI preserves unknown provenance and queue reason;
+25. TTS fallback does not silently change JARVIS voice identity;
+26. acknowledgement never falsely implies completion;
+27. UI/reflex stop/mute/cancel remains responsive during slow AI/provider work;
+28. destructive approval UI shows target/consequence and UI confirmation remains available;
+29. diagnostic export defaults to excluding conversation/private content and displays included categories;
+30. audit retention preserves required recent consequential evidence;
+31. High reachable vulnerability waiver requires mandatory fields/expiry;
+32. Critical reachable vulnerability blocks release;
+33. upgrade preserves/migrates durable compatible user state without silent disappearance;
+34. uninstall does not silently delete durable user data contrary to explicit policy;
+35. operational explanations identify request/work/provider/setup/authorization/state/verification/recovery without chain-of-thought/secrets;
+36. significant autonomously resolved architecture decisions are documented and summarized to the user where appropriate.
 
 Failure of any applicable mandatory production behavior above blocks `Production Complete` for the active Release Profile.
 
@@ -561,7 +576,7 @@ Failure of any applicable mandatory production behavior above blocks `Production
 
 > **Configuration changes become active only after they are valid.**
 
-> **Install, enable, authorize, prefer, and healthy are different states.**
+> **Install, setup, enable, authorize, prefer, healthy, and supported are different facts.**
 
 > **JARVIS keeps one voice identity; provider failure does not license impersonation by a different voice.**
 
@@ -571,4 +586,4 @@ Failure of any applicable mandatory production behavior above blocks `Production
 
 ---
 
-**END — JARVIS OPERATIONS, USER EXPERIENCE & GOVERNANCE CONTRACT v1.0.2**
+**END — JARVIS OPERATIONS, USER EXPERIENCE & GOVERNANCE CONTRACT v1.0.3**
