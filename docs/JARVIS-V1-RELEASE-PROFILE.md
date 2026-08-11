@@ -1,9 +1,9 @@
 # JARVIS V1 Production Release Profile
 
-**Profile Version:** 1.0.3  
+**Profile Version:** 1.0.4  
 **Status:** Canonical production-support target  
 **Date:** August 12, 2026  
-**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`
+**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.4.md`
 
 ---
 
@@ -11,15 +11,19 @@
 
 The architecture describes what JARVIS may support over time. This Release Profile defines what a concrete V1 production release must actually ship, qualify, and support.
 
-A capability that exists only in an ADR, experimental code, historical contract, or unqualified module is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after full qualification.
+A capability that exists only in an ADR, experimental code, historical contract, or unqualified module/platform is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after full qualification.
+
+V1 is intentionally **Windows-only as a production FULL_HOST release**. The v1.0.4 architecture preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden.
 
 ---
 
-# 2. SUPPORTED PLATFORM
+# 2. SUPPORTED PLATFORM AND RUNTIME ROLE
 
 Initial production target:
 
 ```text
+PlatformFamily: WINDOWS
+RuntimeRole:    FULL_HOST
 Operating system: Windows 11
 Minimum normal release baseline: 25H2
 CPU architecture: x86-64 (x64)
@@ -31,16 +35,29 @@ Each production release SHALL qualify every Windows release/build family it clai
 
 Windows ARM64 is not part of the initial V1 guarantee and requires full native/provider/voice/SQLite/installer/update/UI conformance before promotion.
 
----
-
-# 3. DESKTOP, UI, AND RUNTIME BASELINE
+Future platform intent is:
 
 ```text
-Tauri 2 / Rust Native Host
+LINUX   + FULL_HOST  → explicit future target, not V1-supported
+ANDROID + COMPANION  → future non-authoritative client, not V1-supported
+```
+
+A Linux build, Tauri launch, Node launch, or provider executable presence SHALL NOT be represented as production support. Linux requires a future Release Profile that selects and qualifies its native secure-storage, IPC, process-supervision, filesystem/path, session, packaging/update, provider, voice, persistence, recovery, and UI runtime behavior.
+
+V1 implementation SHALL preserve the Platform Portability Contract's architecture/import boundaries even though Linux runtime tests are not part of V1 Production Complete.
+
+---
+
+# 3. DESKTOP, UI, RUNTIME, AND PLATFORM BACKEND BASELINE
+
+V1 Windows topology:
+
+```text
+Tauri 2 / Rust Windows Platform Host
         ↓
 React + TypeScript bundled-local WebView UI
         ↓
-ACL-restricted + authenticated Windows named pipe
+restrictive authenticated Windows named pipe
         ↓
 application-owned Node.js + TypeScript JARVIS Core
 ```
@@ -51,14 +68,34 @@ Required runtime properties:
 - authoritative WebView loads local bundled application content;
 - explicit Tauri capabilities and restrictive production CSP;
 - no privileged remote-origin Tauri capability;
-- selected Tauri/runtime build includes upstream fixes equivalent to or newer than the security corrections shipped in Tauri 2.11.1 for remote-origin custom-command ACL enforcement and Windows local-origin classification;
+- selected Tauri/runtime build includes relevant upstream security fixes and is explicitly qualified;
 - installer does not require system Node;
 - exact release-owned Node/Core pair is pinned and verified;
-- named pipe uses restrictive explicit DACL, local-only behavior, unpredictable endpoint, and bootstrap authentication;
+- Windows local Core transport uses restrictive explicit DACL, local-only behavior, unpredictable endpoint, and bootstrap authentication;
 - no privileged localhost/LAN HTTP control plane;
 - Windows Job Object containment is mandatory for managed executable child trees except narrowly qualified exceptions;
 - signed installer/update artifacts;
-- protocol major `1` using v1.0.3 schemas.
+- protocol major `1` using v1.0.4 protocol/domain schemas.
+
+The implementation SHALL expose native responsibilities through explicit semantic platform-capability/composition boundaries equivalent to:
+
+```text
+PlatformSecureStorage
+PlatformLocalIpc
+PlatformProcessSupervisor
+PlatformSessionObserver
+PlatformWindowController
+PlatformNotificationBackend
+PlatformPathsAndIdentity
+PlatformAudioBackend
+PlatformUpdateBackend
+PlatformPrivilegeMediator
+PlatformSystemInfo
+```
+
+Exact interface names may differ. Shared Core/domain/policy code SHALL NOT directly depend on Win32, DPAPI, Windows named-pipe, Job Object, HWND, SID, registry, or UAC implementation APIs.
+
+This abstraction requirement SHALL NOT weaken the Windows backend. V1 Windows still uses the strongest qualified Windows mechanisms required by the Runtime, Security, Data, and Platform Portability contracts.
 
 Required V1 UI identity properties:
 
@@ -67,9 +104,11 @@ Required V1 UI identity properties:
 - canonical mark, lockup, and application-icon master assets from `assets/brand/`;
 - dedicated primary dashboard window with deterministic `HIDDEN`, `WINDOWED`, `MAXIMIZED`, `FULLSCREEN`, and `FOCUSED_CONTEXT`-equivalent presentation modes;
 - adaptive layout across standard desktop, compact resizable window, ultrawide, high-DPI, text scaling, and multi-monitor conditions;
-- no unrelated per-integration visual shells;
+- no unrelated per-integration or per-platform visual shell;
 - accessibility and state-language qualification under the UI Identity & Design System Contract;
 - release-owned/offline-safe primary font and recorded license/provenance for packaged fonts/icons/third-party visual assets.
+
+Mission Control design tokens/component semantics SHALL be reusable by a future Linux full-host UI. Only Windows UI/runtime qualification is required by V1.
 
 Exact Rust/Node/TypeScript/Tauri/package-manager versions are release-manifest facts and SHALL be pinned/qualified per release.
 
@@ -85,14 +124,14 @@ V1 SHALL use:
 - `synchronous=FULL` for authoritative state by default;
 - foreign keys on every connection;
 - bounded busy handling and WAL/checkpoint diagnostics;
-- random local `DB_DEK` protected by Windows secure storage;
+- random local `DB_DEK` protected by the Windows PlatformSecureStorage backend;
 - SQLite-safe online backup/snapshot;
 - independent per-backup DEK;
 - backup-specific SQLCipher snapshot key inside authenticated encrypted backup payload;
 - `LOCAL_RECOVERY` and `PORTABLE_STATE` backup classes;
-- DPAPI current-user local key slot;
-- Argon2id portable recovery slot;
-- clean-profile restore followed by fresh local `DB_DEK` generation/re-key;
+- DPAPI/current-user Windows local key slot for Windows-local recovery;
+- Argon2id portable recovery slot independent of historical DPAPI/local secure-store material;
+- clean-profile Windows restore followed by fresh local `DB_DEK` generation/re-key;
 - forward migrations and paired binary/database rollback.
 
 JARVIS-managed session-password and portable-recovery KDF profiles SHALL use Argon2id version `0x13` and SHALL NOT fall below:
@@ -107,26 +146,29 @@ output:      32 bytes
 
 Release calibration MAY strengthen these parameters. The exact versioned profile used for each verifier/key slot SHALL be persisted and included in migration/upgrade qualification. Portable recovery SHOULD use a materially higher memory cost when practical on the qualified hardware baseline.
 
-A specific Node SQLite/SQLCipher binding becomes `SUPPORTED` only after the persistence/packaging proof passes on the exact packaged application.
+The `PORTABLE_STATE` cryptographic envelope SHALL NOT require the historical Windows DPAPI key. Cross-platform Windows↔Linux state restoration is **not** a V1 guarantee and must later qualify platform-specific path/provider/setup/artifact migration semantics.
+
+A specific Node SQLite/SQLCipher binding becomes `SUPPORTED` only after the persistence/packaging proof passes on the exact packaged Windows application.
 
 ---
 
 # 5. REQUIRED AI PROVIDER SUPPORT
 
-V1 SHALL production-qualify **Codex/OpenAI** as the initial AI provider family for at least:
+V1 SHALL production-qualify **Codex/OpenAI on Windows** as the initial AI provider family for at least:
 
 - GENERALIST/orchestrator behavior;
 - SOFTWARE_ENGINEER worker behavior;
 - verifier/synthesis behavior when the selected model/profile satisfies requirements.
 
-The supported Codex adapter SHALL:
+The supported Windows Codex adapter SHALL:
 
 - resolve exact executable/distribution identity/version;
 - enforce the release compatibility policy;
+- bind support evidence to `WINDOWS + FULL_HOST`;
 - use a stable structured/non-interactive interface when available;
 - validate structured output;
 - support bounded timeout/cancellation;
-- run ordinary workers non-elevated under mandatory process-tree containment;
+- run ordinary workers non-elevated under mandatory Windows process-tree containment;
 - model provider setup/repair independently from compatibility/health;
 - support explicit first-class elevated Windows sandbox setup/repair when required by the qualified Codex version;
 - verify setup readiness before declaring the engineering profile supported;
@@ -151,6 +193,8 @@ If setup needs UAC, elevation is confined to the qualified provider setup/repair
 
 Newer/unqualified Codex versions are not automatically `SUPPORTED` merely because they launch.
 
+Windows Codex qualification does not qualify a future Linux Codex adapter. Linux must independently prove setup, process containment, filesystem behavior, network behavior, environment/credential exposure, cancellation, and provider-specific security limitations.
+
 No local LLM is required for V1.
 
 ---
@@ -169,9 +213,11 @@ V1 SHALL include production-qualified:
 - isolated writable worktrees for parallel writers;
 - task/mission pause/resume/cancel/priority;
 - backup/restore/recovery maintenance actions;
-- provider/module/integration diagnostics.
+- provider/module/integration/platform diagnostics.
 
 The orchestrator never gets a generic unrestricted shell.
+
+Filesystem/path handling SHALL go through platform-aware canonical path/resource abstractions. Windows-specific traversal/reparse/UNC/drive behavior remains mandatory for V1 without becoming the universal shared path model.
 
 ---
 
@@ -186,9 +232,9 @@ V1 SHALL ship and qualify:
 - worker journals/checkpoints without private chain-of-thought;
 - queue transparency;
 - durable `RESUMING` state and live-state revalidation;
-- resource/provider/budget-aware scheduler;
+- resource/provider/budget/platform-capability-aware scheduler;
 - exact budget reservations/settlement;
-- provider fallback that preserves policy;
+- provider fallback that preserves policy/platform support;
 - crash recovery and uncertain-side-effect reconciliation;
 - deterministic/live verification before completion.
 
@@ -200,11 +246,12 @@ V1 SHALL ship and qualify:
 
 - start-locked session;
 - versioned Argon2id session-password verifier meeting the production KDF floor;
-- Windows lock/sign-out integration;
+- Windows lock/sign-out integration through the platform session observer;
 - explicit portable recovery-factor workflow for session/data recovery;
-- Windows secure-store Credential Broker;
-- explicit named-pipe DACL/local-only/bootstrap authentication;
+- Windows PlatformSecureStorage/Credential Broker backend;
+- explicit Windows named-pipe DACL/local-only/bootstrap authentication backend;
 - authoritative local-only WebView/Tauri capability/CSP/navigation boundary;
+- Windows PlatformProcessSupervisor using Job Objects as required;
 - authority envelopes;
 - deterministic PermissionEngine precedence with mandatory safety/deny dominance;
 - standing permission and limited precedent semantics;
@@ -212,23 +259,24 @@ V1 SHALL ship and qualify:
 - mandatory final destructive confirmation;
 - independent `DataSensitivity` + `DataLocality`;
 - prompt-injection/content-authority boundary;
-- canonical path/resource resolution;
+- canonical platform-aware path/resource resolution;
 - conditional external mutation when supported;
 - secret-minimizing logs/journals/diagnostics;
-- explicit same-user-malware limitation.
+- explicit same-user-malware limitation;
+- platform-capability failure that blocks/degrades dependent behavior rather than unsafe fallback.
 
 ---
 
 # 9. REQUIRED V1 INTEGRATION SET
 
-JARVIS V1 SHALL NOT be declared Production Complete until these integration families are implemented and production-qualified:
+JARVIS V1 SHALL NOT be declared Production Complete until these integration families are implemented and production-qualified on the Windows FULL_HOST release:
 
 1. **Local filesystem + Git**
 2. **GitHub**
 3. **Codex/OpenAI provider integration**
 4. **Proxmox VE**
 
-Every required integration must pass credential, capability, schema, permission, failure/recovery, retry/idempotency, secret, version/compatibility, and negative conformance tests.
+Every required integration must pass credential, capability, schema, permission, failure/recovery, retry/idempotency, secret, version/compatibility, platform-support, and negative conformance tests.
 
 ## 9.1 GitHub V1 capability matrix
 
@@ -314,6 +362,8 @@ EXTERNAL_MANAGED
 
 Separately installed executable code cannot run inside Core.
 
+Module support SHALL be platform/runtime-role qualified when native execution or dependencies differ. A module supported on Windows is not automatically supported on Linux.
+
 An open arbitrary third-party executable-module marketplace is **not** a V1 Production Complete requirement. An `EXTERNAL_MANAGED` module is supported only when explicitly present in the signed release/catalog support matrix and fully qualified.
 
 ---
@@ -344,13 +394,15 @@ AEC: WebRTC APM AEC3-compatible qualified adapter or accepted equivalent
 TTS: one local production-qualified provider meeting identity/latency/interruption/privacy/licensing requirements
 ```
 
+These are Windows V1 qualification requirements. Future Linux voice support must independently qualify actual Linux device lifecycle, AEC, acceleration/runtime, privacy, latency, and packaging behavior while preserving the same voice/product semantics.
+
 Wake word may remain disabled/unqualified and is not required for V1.
 
 ---
 
 # 12. UI IDENTITY / ACCESSIBILITY QUALIFICATION PROFILE
 
-V1 Production Complete requires the UI Identity & Design System Contract to pass on the exact Release Candidate.
+V1 Production Complete requires the UI Identity & Design System Contract to pass on the exact Windows Release Candidate.
 
 Qualification SHALL cover at minimum:
 
@@ -377,11 +429,13 @@ Qualification SHALL cover at minimum:
 - voice idle/listening/processing/speaking/degraded states;
 - canonical mark/lockup/icon usage and design-token consistency.
 
+Shared design-system components SHALL avoid unnecessary Windows-only semantics so a future Linux full-host/companion presentation can reuse the JARVIS identity. This is an architecture check, not a V1 Linux UI runtime test.
+
 ---
 
 # 13. HARDWARE QUALIFICATION BASELINE
 
-Initial qualification baseline:
+Initial Windows qualification baseline:
 
 ```text
 CPU: Intel Core i7 13th-generation class
@@ -412,15 +466,53 @@ Direct public inbound Internet listeners remain outside the required V1/post-V1 
 
 ---
 
-# 15. RELEASE MANIFEST
+# 15. FUTURE PLATFORM TARGETS
+
+## 15.1 Linux FULL_HOST
+
+Linux is an explicit future full-host product target but is **not** a V1 support claim.
+
+Promotion requires a future synchronous contract/Release Profile that defines and qualifies at minimum:
+
+- supported distributions/releases and CPU architectures;
+- supported desktop/session environments where applicable;
+- secure-storage backend;
+- local IPC/peer-identity backend;
+- process-tree containment/resource-control backend;
+- filesystem/path identity and escape protections;
+- installer/package/update model;
+- Tauri/WebView runtime;
+- provider support/setup/sandbox matrices;
+- voice/device/audio behavior;
+- SQLite/SQLCipher/native dependency packaging;
+- tool/module/integration platform differences;
+- clean install, update, rollback, backup/restore, recovery, performance, security, and soak.
+
+## 15.2 Future COMPANION
+
+A future Android or other companion is non-authoritative. It may later provide dashboard/read state, conversation/prompting, notifications, approvals, mission monitoring, and selected policy-permitted controls.
+
+It does not own the authoritative mission database, host credentials, engineering workers, general providers/tools, or infrastructure adapters.
+
+Companion networking is not a V1 requirement. It requires a future separately qualified Remote Access Gateway; direct unrestricted privileged Core exposure is prohibited.
+
+---
+
+# 16. RELEASE MANIFEST
 
 Every production release SHALL record at least:
 
 ```text
 jarvis_version
 contract_suite_version
+contract_component_revisions
 release_profile_version
 source_commit_sha
+platform_family
+runtime_role
+cpu_architecture
+platform_backend_profile
+platform_capability_matrix
 windows_support_matrix
 installer/signing identity metadata
 Tauri/Rust/Node/TypeScript/package-manager versions
@@ -430,10 +522,10 @@ database/SQLCipher/SQLite identity and WAL-fix evidence
 migration set
 session_password_kdf_profile
 portable_recovery_kdf_profiles
-supported provider versions/ranges/setup-state requirements
+supported provider versions/ranges/setup-state requirements + platform binding
 supported integration capability matrix
-supported module versions/ranges
-voice provider versions/ranges
+supported module versions/ranges + platform binding
+voice provider versions/ranges + platform binding
 brand asset/source identities
 font/icon/visual-asset license/provenance references
 module catalog trust key ids
@@ -447,7 +539,7 @@ No raw credentials/private user data appear in the manifest.
 
 ---
 
-# 16. REPOSITORY GOVERNANCE GATE
+# 17. REPOSITORY GOVERNANCE GATE
 
 Before Phase 0 may be declared complete, authoritative `master` SHALL have an active GitHub ruleset/branch-protection equivalent that:
 
@@ -460,12 +552,13 @@ A pull-request requirement is strongly preferred once implementation changes beg
 
 ---
 
-# 17. PRODUCTION-COMPLETE GATE
+# 18. PRODUCTION-COMPLETE GATE
 
-For this profile, Production Complete requires the same source commit and signed release artifacts to pass:
+For this profile, Production Complete requires the same source commit and signed **Windows FULL_HOST** release artifacts to pass:
 
 - all required functionality and current mandatory contract rules;
 - platform/clean-install qualification;
+- platform-capability/composition/import-boundary architecture checks;
 - Mission Control UI identity/adaptive/accessibility/window-state qualification;
 - Tauri/WebView and named-pipe security gates;
 - self-contained Core/runtime package gate;
@@ -476,7 +569,7 @@ For this profile, Production Complete requires the same source commit and signed
 - Local Git + exact GitHub capability-matrix conformance;
 - exact Proxmox capability-matrix conformance;
 - destructive-action/PermissionEngine safety gates;
-- process containment/orphan cleanup;
+- Windows Job Object process containment/orphan cleanup;
 - module/catalog/update integrity;
 - crash/recovery/uncertain-side-effect tests;
 - budget/resource/performance/voice tests;
@@ -487,14 +580,18 @@ For this profile, Production Complete requires the same source commit and signed
 - zero open P0/P1 defects;
 - Critical/High vulnerability policy from the Operations Contract satisfied.
 
+Linux runtime tests and Android/companion networking are not V1 release gates. Their absence SHALL NOT permit violations of the platform-boundary architecture rules.
+
 Documentation completion alone never satisfies this gate.
 
 ---
 
-# 18. GOVERNING DISTINCTION
+# 19. GOVERNING DISTINCTION
 
 > **The contract defines the architecture. The Release Profile defines what V1 guarantees. The qualification report proves that exact signed release.**
 
+> **Windows is the V1 product; Linux is a preserved future full-host path, not a pretend current capability.**
+
 ---
 
-**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.3**
+**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.4**

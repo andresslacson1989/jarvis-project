@@ -1,7 +1,7 @@
 # JARVIS Protocol & Schema Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
-**Contract Version:** 1.0.3  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.4.md`  
+**Contract Version:** 1.0.4  
 **Protocol Major:** 1  
 **Date:** August 12, 2026
 
@@ -9,7 +9,7 @@
 
 # 1. PURPOSE
 
-This document defines the canonical cross-boundary types and representations for JARVIS. All data crossing process, AI/provider, tool, integration, module, persistence-event, approval, artifact, import/export, configuration, authentication, or security-material boundaries SHALL be runtime validated against versioned schemas.
+This document defines the canonical cross-boundary types and representations for JARVIS. All data crossing process, AI/provider, tool, integration, module, persistence-event, approval, artifact, import/export, configuration, authentication, platform-capability, or security-material boundaries SHALL be runtime validated against versioned schemas.
 
 The schemas below are the effective V1 definitions. Older schema shapes in ADRs or historical contracts are rationale/history only.
 
@@ -28,10 +28,11 @@ Rules:
 - Unknown optional fields may be ignored only where compatibility rules explicitly permit it.
 - Security-material and money fields SHALL not be permissively coerced.
 - Arrays, maps, strings, object depth, frame sizes, and arbitrary JSON fields SHALL be bounded.
+- Shared domain schemas SHALL not encode an OS-native implementation object where a semantic platform-independent identity is sufficient.
 
 ---
 
-# 3. COMMON TYPES
+# 3. COMMON TYPES AND PLATFORM IDENTITY
 
 ```ts
 type UUIDv7 = string;
@@ -52,9 +53,33 @@ type ModuleId = string;
 type IntegrationId = string;
 type IntegrationAccountId = UUIDv7;
 type ConnectionId = UUIDv7;
+
+type PlatformFamily = 'WINDOWS' | 'LINUX' | 'ANDROID';
+type RuntimeRole = 'FULL_HOST' | 'COMPANION';
+
+interface PlatformRuntimeIdentity {
+  platform: PlatformFamily;
+  runtimeRole: RuntimeRole;
+  architecture: string;
+  backendProfileId: string;
+}
+
+interface PlatformCompatibility {
+  platform: PlatformFamily;
+  runtimeRoles: RuntimeRole[];
+  osVersionRange?: string;
+  architecture?: string[];
+}
+
+interface PlatformPathRef {
+  platform: PlatformFamily;
+  value: string;
+}
 ```
 
 Identifiers are opaque and SHALL be validated before use. Display names are never authoritative identity for consequential execution.
+
+V1 production identity is `WINDOWS + FULL_HOST`. Modeling `LINUX`/`ANDROID` does not itself grant support.
 
 ---
 
@@ -81,7 +106,9 @@ interface DataPolicy {
 
 `SECRET` is reserved for credentials/key material and normally exists only in secure storage or transient trusted adapter memory.
 
-`LOCAL_ONLY` prohibits sending the protected content to cloud/LAN/remote AI or speech providers.
+`LOCAL_ONLY` prohibits sending protected content to cloud/LAN/remote AI or speech providers.
+
+A future companion transport requires a separate remote-device data-delivery policy contract; this V1 enum SHALL NOT be interpreted as silently authorizing `LOCAL_ONLY` content to leave the host.
 
 Derived context/artifacts SHALL inherit the strictest applicable policy unless an explicit deterministic audited declassification/export decision changes it.
 
@@ -93,11 +120,11 @@ Authoritative monetary values SHALL not use binary floating point.
 
 ```ts
 interface MoneyAmount {
-  currency: string;  // validated currency identifier, normally ISO 4217
-  nanoUnits: string; // signed base-10 integer: major unit × 1,000,000,000
+  currency: string;
+  nanoUnits: string;
 }
 
-type CanonicalQuantity = string; // schema-specific canonical integer/decimal string
+type CanonicalQuantity = string;
 ```
 
 Examples:
@@ -114,12 +141,8 @@ TypeScript SHOULD use `bigint` after parsing; Rust SHALL use a checked exact int
 
 # 6. KDF PROFILES
 
-JARVIS-managed password/recovery derivation uses versioned KDF profiles rather than implicit library defaults.
-
 ```ts
-type KdfPurpose =
-  | 'SESSION_PASSWORD'
-  | 'PORTABLE_RECOVERY';
+type KdfPurpose = 'SESSION_PASSWORD' | 'PORTABLE_RECOVERY';
 
 interface Argon2idProfile {
   profileId: string;
@@ -146,7 +169,7 @@ outputBytes >= 32
 
 Exact parameter metadata used to create a verifier/key slot SHALL be retained with that verifier/key slot so future releases can verify/derive historical values and then upgrade them deliberately.
 
-Schema validation rejects unsupported Argon2 version, under-floor production profile, out-of-range resource values, or missing profile identity. Test/development-only weaker fixtures SHALL be unmistakably non-production and SHALL never be accepted by production configuration.
+Schema validation rejects unsupported Argon2 version, under-floor production profile, out-of-range resource values, or missing profile identity. Test/development-only weaker fixtures SHALL never be accepted by production configuration.
 
 ---
 
@@ -185,6 +208,8 @@ One accepted request id receives at most one terminal response. Long-running pro
 
 Malformed frames/envelopes whose identity cannot be trusted may be rejected by closing the transport without fabricating an application response.
 
+The envelope is transport-neutral. Windows V1 uses it over the qualified local named-pipe framing. A future Linux full host may use the same logical protocol over a separately qualified local transport without changing semantic message shapes.
+
 ---
 
 # 8. ERROR MODEL
@@ -216,14 +241,16 @@ interface JarvisError {
   category: ErrorCategory;
   message: string;
   retryable: boolean;
-  details?: Record<string, unknown>; // separately bounded and secret-safe
+  details?: Record<string, unknown>;
   correlationId: UUIDv7;
 }
 ```
 
 `retryable` is advisory only. Idempotency, uncertainty, approval, budget, and recovery policy still govern replay.
 
-Raw provider/Windows/SQLite stack traces or secret-bearing payloads SHALL be normalized before crossing generic boundaries.
+Raw provider/native/SQLite stack traces or secret-bearing payloads SHALL be normalized before crossing generic boundaries.
+
+Platform errors use stable codes such as `PLATFORM_CAPABILITY_UNAVAILABLE`, `PLATFORM_BACKEND_UNQUALIFIED`, `PLATFORM_IPC_SECURITY_FAILED`, or more specific registered equivalents rather than exposing native error text as policy input.
 
 ---
 
@@ -232,26 +259,30 @@ Raw provider/Windows/SQLite stack traces or secret-bearing payloads SHALL be nor
 ```ts
 type SessionTrustState = 'LOCKED' | 'UNLOCKING' | 'UNLOCKED' | 'LOCKING';
 
+type SessionLockedReason =
+  | 'STARTUP'
+  | 'USER'
+  | 'OS_SESSION_LOCK'
+  | 'OS_SESSION_END'
+  | 'IDLE'
+  | 'SECURITY';
+
 interface SessionState {
   state: SessionTrustState;
   sessionId: UUIDv7 | null;
   unlockedAt: UtcTimestamp | null;
-  lockedReason:
-    | 'STARTUP'
-    | 'USER'
-    | 'WINDOWS_LOCK'
-    | 'SIGN_OUT'
-    | 'IDLE'
-    | 'SECURITY'
-    | null;
+  lockedReason: SessionLockedReason | null;
 }
 
 type InputModality = 'TEXT' | 'VOICE';
+
+type InstructionOrigin = 'LOCAL_UI' | 'LOCAL_VOICE' | 'AUTOMATION' | 'EVENT_GATEWAY';
 
 interface UserInstruction {
   id: UUIDv7;
   sessionId: UUIDv7;
   modality: InputModality;
+  origin: InstructionOrigin;
   text: string;
   receivedAt: UtcTimestamp;
   conversationId: UUIDv7;
@@ -266,6 +297,8 @@ interface UserInstruction {
 No password, verifier, recovery factor, database key, token, or other secret appears in session state.
 
 Voice confidence is informational and never authorizes an action or target.
+
+A future companion origin is deliberately not added in V1. Remote-device instruction provenance requires the future Remote Access Gateway/security contract rather than being inferred from generic input.
 
 ---
 
@@ -304,7 +337,7 @@ interface Project {
   projectId: ProjectId;
   name: string;
   aliases: string[];
-  rootPath: string;
+  rootPath: PlatformPathRef;
   defaultEnvironmentId?: EnvironmentId;
   defaultBranch?: string;
   enabled: boolean;
@@ -333,7 +366,7 @@ interface IntegrationBinding {
 interface IntegrationScope {
   kind: 'INTEGRATION';
   bindings: IntegrationBinding[];
-  projectId?: ProjectId; // context only; not filesystem authority
+  projectId?: ProjectId;
   environmentId?: EnvironmentId;
 }
 
@@ -353,7 +386,8 @@ Rules:
 - filesystem/repository/project-write tools require `PROJECT_WORKSPACE`;
 - `INTEGRATION`, `SYSTEM`, and `GLOBAL` do not gain filesystem authority implicitly;
 - `GLOBAL` itself grants no consequential tool authority;
-- project/workspace/environment/account identities are stable IDs, never display-name guesses.
+- project/workspace/environment/account identities are stable IDs, never display-name guesses;
+- a `PlatformPathRef` SHALL be interpreted only by the matching platform-aware path service or an explicit migration/import process.
 
 ---
 
@@ -471,6 +505,7 @@ interface TaskAttempt {
   providerId: ProviderId;
   providerVersion?: string;
   modelId?: string;
+  platform: PlatformRuntimeIdentity;
   startedAt?: UtcTimestamp;
   endedAt?: UtcTimestamp;
   retryOfAttemptId?: AttemptId;
@@ -497,7 +532,7 @@ interface AcceptanceCriterion {
   type: CriterionType;
   description: string;
   required: boolean;
-  verifier: Record<string, unknown>; // revalidated by type-specific schema
+  verifier: Record<string, unknown>;
 }
 
 interface CriterionResult {
@@ -652,6 +687,8 @@ interface ToolManifest {
   allowedScopeKinds: ExecutionScope['kind'][];
   secretCapabilities: string[];
   networkRequired: boolean;
+  requiredPlatformCapabilities: string[];
+  platformCompatibility?: PlatformCompatibility[];
   idempotency:
     | 'IDEMPOTENT'
     | 'IDEMPOTENCY_KEY'
@@ -673,12 +710,7 @@ interface ToolRequest {
   idempotencyKey?: string;
 }
 
-type ToolOutcome =
-  | 'SUCCEEDED'
-  | 'FAILED'
-  | 'DENIED'
-  | 'CANCELLED'
-  | 'UNCERTAIN';
+type ToolOutcome = 'SUCCEEDED' | 'FAILED' | 'DENIED' | 'CANCELLED' | 'UNCERTAIN';
 
 interface ToolResult {
   toolExecutionId: UUIDv7;
@@ -694,6 +726,8 @@ interface ToolResult {
 ```
 
 A missing/invalid manifest blocks AI execution. Consequential success requires declared postcondition evidence or explicit `UNCERTAIN` semantics.
+
+Platform compatibility/technical availability is not action authority.
 
 ---
 
@@ -722,8 +756,6 @@ Only deterministic Core policy produces an authoritative PermissionDecision.
 ---
 
 # 18. CANONICAL ACTION DESCRIPTOR AND APPROVAL
-
-One canonical descriptor governs V1 approval material:
 
 ```ts
 interface CanonicalTargetRef {
@@ -772,20 +804,18 @@ type ApprovalStatus =
   | 'EXPIRED' | 'CANCELLED' | 'CONSUMED';
 ```
 
-Material identity SHALL be resolved before descriptor construction. Display strings are descriptive only.
-
-The exact digest pipeline is:
+The digest pipeline is exactly:
 
 ```text
 CanonicalActionDescriptorV1
-  → schema validation
-  → RFC 8785 JCS canonical JSON
-  → UTF-8 bytes
-  → SHA-256
-  → base64url without padding
+→ schema validation
+→ RFC 8785 JCS canonical JSON
+→ UTF-8 bytes
+→ SHA-256
+→ base64url without padding
 ```
 
-Canonicalization SHALL reject duplicate object keys before materialization, non-finite numbers, negative zero, invalid Unicode, and numeric values whose precision cannot be represented safely/interoperably. High-precision domain values use schema-defined integer/decimal strings.
+Canonicalization rejects duplicate object keys before materialization, non-finite numbers, negative zero, invalid Unicode, and unsafe numeric ambiguity. High-precision domain values use schema-defined integer/decimal strings.
 
 Immediately before approval consumption JARVIS freshly resolves material identities/arguments, rebuilds the descriptor, recomputes the digest, and rejects any mismatch. Digest equality never bypasses expiry, single-use, session/policy, or transactional consumption checks.
 
@@ -793,7 +823,7 @@ Raw credentials never enter the descriptor.
 
 ---
 
-# 19. PROVIDER SETUP, COMPATIBILITY, HEALTH, RESOURCES
+# 19. PROVIDER SETUP, COMPATIBILITY, HEALTH, RESOURCES, PLATFORM
 
 ```ts
 type ProviderSetupState =
@@ -846,6 +876,7 @@ interface ProviderProfile {
   adapterVersion: string;
   providerVersion?: string;
   modelId?: string;
+  platform: PlatformRuntimeIdentity;
   setup: ProviderSetupState;
   compatibility: ProviderCompatibilityState;
   capabilities: ProviderCapabilities;
@@ -858,6 +889,7 @@ interface ProviderProfile {
 interface ProviderCompatibilityPolicy {
   providerId: ProviderId;
   adapterVersion: string;
+  platformCompatibility: PlatformCompatibility[];
   acceptedVersions: Array<
     | { kind: 'EXACT'; version: string }
     | { kind: 'RANGE'; range: string }
@@ -869,7 +901,7 @@ interface ProviderCompatibilityPolicy {
 }
 ```
 
-`SUPPORTED` requires compatible version/interface, required setup ready, current health/auth/capabilities, and conformance evidence. Executable presence alone is insufficient.
+`SUPPORTED` requires compatible version/interface, required setup ready, current health/auth/capabilities, matching platform/runtime role, and platform-specific conformance evidence where native behavior matters. Executable presence alone is insufficient.
 
 ---
 
@@ -901,7 +933,7 @@ interface ModuleManifest {
   executionClass: ModuleExecutionClass;
   compatibility: {
     jarvis: string;
-    windows?: string;
+    platforms: PlatformCompatibility[];
   };
   capabilities: string[];
   requestedPermissions: string[];
@@ -937,6 +969,8 @@ interface ModuleCapabilityEnvelope {
 ```
 
 There is no untrusted-in-process execution class. `HTTP_LOCAL_PROBE.endpointId` resolves only to a supervisor-registered local endpoint, never an arbitrary URL.
+
+Platform compatibility does not itself enable/install/authorize a module.
 
 ---
 
@@ -1005,7 +1039,7 @@ interface ProxmoxGuestIdentity {
 }
 ```
 
-GitHub/Proxmox capability support claims are governed by the active Release Profile. Modeling a capability does not mean the current release supports it.
+GitHub/Proxmox capability support claims are governed by the active Release Profile and platform support matrix. Modeling a capability does not mean the current release/platform supports it.
 
 Proxmox control-plane identity is separate from guest OS connection/credential identity.
 
@@ -1018,10 +1052,7 @@ type ProviderQuotaType =
   | 'MONETARY' | 'TOKENS' | 'REQUESTS'
   | 'COMPUTE' | 'SUBSCRIPTION_ALLOWANCE' | 'OTHER';
 
-type ProviderQuotaSource =
-  | 'PROVIDER_REPORTED'
-  | 'JARVIS_CALCULATED'
-  | 'UNKNOWN';
+type ProviderQuotaSource = 'PROVIDER_REPORTED' | 'JARVIS_CALCULATED' | 'UNKNOWN';
 
 interface ProviderQuotaSnapshot {
   snapshotId: UUIDv7;
@@ -1133,7 +1164,7 @@ interface NotificationDecision {
 }
 ```
 
-Configuration domains are typed/versioned and include at least startup, session security, voice, providers, privacy, permissions, budgets, projects, modules, integrations, notifications, retention, updates, and developer mode. Normal configuration never accepts raw secrets.
+Configuration domains are typed/versioned and include at least startup, session security, voice, providers, privacy, permissions, budgets, projects, modules, integrations, notifications, retention, updates, platform backend profile, and developer mode. Normal configuration never accepts raw secrets.
 
 ---
 
@@ -1176,6 +1207,8 @@ Host and Core SHALL establish a mutually supported protocol major before normal 
 
 Contract-suite version changes do not automatically require an IPC protocol-major change when wire compatibility is preserved.
 
+The v1.0.4 contract changes occur before the first production protocol-major-1 release, so platform-neutralizing the pre-production schema does not require protocol major 2.
+
 ---
 
 # 27. SCHEMA QUALIFICATION
@@ -1185,13 +1218,16 @@ CI/release qualification SHALL prove:
 - positive and negative fixtures for every boundary schema;
 - Rust/TypeScript round-trip compatibility;
 - explicit IpcResponse union behavior;
+- PlatformFamily/RuntimeRole/PlatformRuntimeIdentity validation;
+- PlatformPathRef cannot be interpreted by the wrong platform path backend without explicit migration/import;
+- provider/module/tool platform compatibility schemas;
 - one durable `RESUMING` enum meaning;
 - execution-scope enforcement;
 - sensitivity/locality propagation;
 - exact money arithmetic/serialization;
 - Argon2id profile validation and under-floor production rejection;
-- provider setup/compatibility/health separation;
-- module execution-class/health/lifecycle validation;
+- provider setup/compatibility/health/platform separation;
+- module execution-class/health/lifecycle/platform validation;
 - approval canonicalization/digest vectors;
 - GitHub/Proxmox capability schemas;
 - Proxmox identity schemas;
@@ -1206,8 +1242,10 @@ CI/release qualification SHALL prove:
 
 > **Authorize the canonical resolved action, not ambiguous display text.**
 
-> **Provider setup, compatibility, health, capability, and authorization are different facts.**
+> **Provider setup, compatibility, health, capability, platform support, and authorization are different facts.**
+
+> **Platform identity belongs in typed compatibility/state, not scattered native assumptions.**
 
 ---
 
-**END — JARVIS PROTOCOL & SCHEMA CONTRACT v1.0.3**
+**END — JARVIS PROTOCOL & SCHEMA CONTRACT v1.0.4**
