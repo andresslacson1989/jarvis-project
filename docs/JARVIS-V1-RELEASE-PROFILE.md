@@ -1,9 +1,9 @@
 # JARVIS V1 Production Release Profile
 
-**Profile Version:** 1.0.2  
+**Profile Version:** 1.0.3  
 **Status:** Canonical production-support target  
-**Date:** August 11, 2026  
-**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`
+**Date:** August 12, 2026  
+**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`
 
 ---
 
@@ -11,7 +11,7 @@
 
 The architecture describes what JARVIS may support over time. This Release Profile defines what a concrete V1 production release must actually ship, qualify, and support.
 
-A capability that exists only in an ADR, experimental code, or an unqualified module is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after qualification.
+A capability that exists only in an ADR, experimental code, historical contract, or unqualified module is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after full qualification.
 
 ---
 
@@ -29,11 +29,11 @@ Normal privilege: standard non-Administrator user
 
 Each production release SHALL qualify every Windows release/build family it claims to support. Windows 26H1 or later MAY be added when explicitly qualified; no architecture change is required merely to add another supported Windows 11 release.
 
-Windows ARM64 is not part of the initial V1 guarantee and requires full native/provider/voice/SQLite/installer/update conformance before promotion.
+Windows ARM64 is not part of the initial V1 guarantee and requires full native/provider/voice/SQLite/installer/update/UI conformance before promotion.
 
 ---
 
-# 3. DESKTOP AND RUNTIME BASELINE
+# 3. DESKTOP, UI, AND RUNTIME BASELINE
 
 ```text
 Tauri 2 / Rust Native Host
@@ -45,7 +45,7 @@ ACL-restricted + authenticated Windows named pipe
 application-owned Node.js + TypeScript JARVIS Core
 ```
 
-Required properties:
+Required runtime properties:
 
 - renderer is unprivileged;
 - authoritative WebView loads local bundled application content;
@@ -58,13 +58,24 @@ Required properties:
 - no privileged localhost/LAN HTTP control plane;
 - Windows Job Object containment is mandatory for managed executable child trees except narrowly qualified exceptions;
 - signed installer/update artifacts;
-- protocol major `1` using v1.0.2 schemas.
+- protocol major `1` using v1.0.3 schemas.
+
+Required V1 UI identity properties:
+
+- one unified dark-theme **JARVIS Mission Control** shell;
+- canonical brand colors `#2D7BFF`, `#FFFFFF`, and `#0B0F14`;
+- canonical mark, lockup, and application-icon master assets from `assets/brand/`;
+- dedicated primary dashboard window with deterministic `HIDDEN`, `WINDOWED`, `MAXIMIZED`, `FULLSCREEN`, and `FOCUSED_CONTEXT`-equivalent presentation modes;
+- adaptive layout across standard desktop, compact resizable window, ultrawide, high-DPI, text scaling, and multi-monitor conditions;
+- no unrelated per-integration visual shells;
+- accessibility and state-language qualification under the UI Identity & Design System Contract;
+- release-owned/offline-safe primary font and recorded license/provenance for packaged fonts/icons/third-party visual assets.
 
 Exact Rust/Node/TypeScript/Tauri/package-manager versions are release-manifest facts and SHALL be pinned/qualified per release.
 
 ---
 
-# 4. PERSISTENCE BASELINE
+# 4. PERSISTENCE AND CRYPTOGRAPHIC BASELINE
 
 V1 SHALL use:
 
@@ -80,9 +91,21 @@ V1 SHALL use:
 - backup-specific SQLCipher snapshot key inside authenticated encrypted backup payload;
 - `LOCAL_RECOVERY` and `PORTABLE_STATE` backup classes;
 - DPAPI current-user local key slot;
-- Argon2id portable passphrase slot for portable backups;
+- Argon2id portable recovery slot;
 - clean-profile restore followed by fresh local `DB_DEK` generation/re-key;
 - forward migrations and paired binary/database rollback.
+
+JARVIS-managed session-password and portable-recovery KDF profiles SHALL use Argon2id version `0x13` and SHALL NOT fall below:
+
+```text
+memory:      65536 KiB
+passes:      3
+parallelism: 4
+salt:        16 random bytes
+output:      32 bytes
+```
+
+Release calibration MAY strengthen these parameters. The exact versioned profile used for each verifier/key slot SHALL be persisted and included in migration/upgrade qualification. Portable recovery SHOULD use a materially higher memory cost when practical on the qualified hardware baseline.
 
 A specific Node SQLite/SQLCipher binding becomes `SUPPORTED` only after the persistence/packaging proof passes on the exact packaged application.
 
@@ -98,16 +121,33 @@ V1 SHALL production-qualify **Codex/OpenAI** as the initial AI provider family f
 
 The supported Codex adapter SHALL:
 
-- resolve exact executable identity/version;
+- resolve exact executable/distribution identity/version;
 - enforce the release compatibility policy;
 - use a stable structured/non-interactive interface when available;
 - validate structured output;
 - support bounded timeout/cancellation;
-- run under mandatory process-tree containment;
+- run ordinary workers non-elevated under mandatory process-tree containment;
+- model provider setup/repair independently from compatibility/health;
+- support explicit first-class elevated Windows sandbox setup/repair when required by the qualified Codex version;
+- verify setup readiness before declaring the engineering profile supported;
+- never silently downgrade to an unqualified or less-restrictive sandbox after setup/repair failure;
 - conformance-test provider-native Windows sandbox behavior, including actual write and network restrictions;
 - never claim workspace-only read isolation unless the qualified provider implementation actually enforces it;
 - treat provider session resume as optional optimization only;
 - expose provider quota/usage provenance where available.
+
+Required setup-state semantics are equivalent to:
+
+```text
+NOT_REQUIRED
+SETUP_REQUIRED
+SETUP_IN_PROGRESS
+SETUP_READY
+REPAIR_REQUIRED
+SETUP_FAILED
+```
+
+If setup needs UAC, elevation is confined to the qualified provider setup/repair helper. Ordinary Codex worker execution SHALL NOT inherit elevation. Provider-internal sandbox-account passwords remain provider-owned and are not imported into JARVIS credential state.
 
 Newer/unqualified Codex versions are not automatically `SUPPORTED` merely because they launch.
 
@@ -159,7 +199,7 @@ V1 SHALL ship and qualify:
 V1 SHALL ship and qualify:
 
 - start-locked session;
-- Argon2id session-password verifier;
+- versioned Argon2id session-password verifier meeting the production KDF floor;
 - Windows lock/sign-out integration;
 - explicit portable recovery-factor workflow for session/data recovery;
 - Windows secure-store Credential Broker;
@@ -190,7 +230,61 @@ JARVIS V1 SHALL NOT be declared Production Complete until these integration fami
 
 Every required integration must pass credential, capability, schema, permission, failure/recovery, retry/idempotency, secret, version/compatibility, and negative conformance tests.
 
-### Proxmox VE V1 requirements
+## 9.1 GitHub V1 capability matrix
+
+The following capability families are mandatory for V1 Production Complete:
+
+```text
+GITHUB_REPOSITORY_READ
+GITHUB_REF_READ
+GITHUB_REF_WRITE
+GITHUB_PULL_REQUEST_READ
+GITHUB_PULL_REQUEST_WRITE
+GITHUB_ISSUE_READ
+GITHUB_COMMENT_WRITE
+GITHUB_CHECKS_READ
+GITHUB_ACTIONS_READ
+```
+
+`GITHUB_ACTIONS_DISPATCH` MAY be supported and qualified but does not block V1 Production Complete.
+
+The mandatory matrix does **not** include:
+
+- repository administration;
+- repository deletion;
+- repository/Actions secret administration;
+- Actions permission administration;
+- branch-protection/ruleset administration;
+- organization/member/team administration;
+- ref deletion.
+
+`GITHUB_REF_WRITE` means typed creation/update of permitted non-protected refs with expected-ref/conditional semantics. Later ref deletion requires a separately defined risk/action contract.
+
+## 9.2 Proxmox VE V1 capability matrix
+
+The following capabilities are mandatory for V1 Production Complete:
+
+```text
+PROXMOX_READ
+PROXMOX_POWER_CONTROL
+PROXMOX_SNAPSHOT
+PROXMOX_BACKUP
+PROXMOX_GUEST_CONFIG
+PROXMOX_GUEST_CREATE
+PROXMOX_MIGRATE
+PROXMOX_DESTROY
+```
+
+The following remain modeled but do not block V1 Production Complete:
+
+```text
+PROXMOX_STORAGE_WRITE
+PROXMOX_NETWORK_WRITE
+```
+
+If a release enables either optional capability, that exact release SHALL fully qualify and list it in the signed support matrix.
+
+Proxmox V1 requirements:
 
 - REST/HTTPS API first-class control path;
 - scoped API identity/token; no routine root password requirement;
@@ -203,6 +297,8 @@ Every required integration must pass credential, capability, schema, permission,
 - destructive exact-action confirmation;
 - guest OS shell authority remains separate;
 - direct PBS administration remains separate.
+
+`PROXMOX_GUEST_CREATE` may allocate guest disks on allowed existing storage but is not arbitrary datastore administration. `PROXMOX_GUEST_CONFIG` is typed guest-level configuration, not host/network/storage administration. `PROXMOX_BACKUP` starts/tracks guest backup against allowed configured targets and does not imply direct PBS administration.
 
 ---
 
@@ -252,7 +348,38 @@ Wake word may remain disabled/unqualified and is not required for V1.
 
 ---
 
-# 12. HARDWARE QUALIFICATION BASELINE
+# 12. UI IDENTITY / ACCESSIBILITY QUALIFICATION PROFILE
+
+V1 Production Complete requires the UI Identity & Design System Contract to pass on the exact Release Candidate.
+
+Qualification SHALL cover at minimum:
+
+- standard 1920×1080 desktop;
+- 2560×1440 and representative 4K class display;
+- ultrawide layout;
+- compact resizable window;
+- multi-monitor with monitor removal/reconnect;
+- Windows scaling at 100%, 125%, 150%, and 200%;
+- keyboard-only primary workflows;
+- assistive-technology semantic names/roles/states for primary workflows;
+- Windows High Contrast / CSS forced-colors behavior where supported by the WebView stack;
+- reduced-motion preference;
+- text resizing to 200% without loss of required functionality;
+- reflow equivalent to a 320 CSS-pixel viewport / 400% zoom for primary linear workflows, excluding content whose meaning intrinsically requires two-dimensional layout;
+- normal text contrast >= 4.5:1 and qualifying large text >= 3:1;
+- meaningful non-text controls/indicators contrast >= 3:1 against adjacent colors where required;
+- pointer target size >= 24×24 CSS px or a WCAG 2.2-equivalent spacing/exception condition;
+- visible focus and focused controls not obscured by sticky UI;
+- no consequential state communicated by color alone;
+- high mission/queue/notification counts;
+- blocked/waiting/uncertain/recovery states;
+- exact destructive approval presentation;
+- voice idle/listening/processing/speaking/degraded states;
+- canonical mark/lockup/icon usage and design-token consistency.
+
+---
+
+# 13. HARDWARE QUALIFICATION BASELINE
 
 Initial qualification baseline:
 
@@ -270,7 +397,7 @@ The release SHALL remain usable without a permanently loaded large local LLM and
 
 ---
 
-# 13. POST-V1 REQUIRED INTEGRATIONS
+# 14. POST-V1 REQUIRED INTEGRATIONS
 
 The following remain binding product requirements but do not block V1 Production Complete:
 
@@ -285,13 +412,13 @@ Direct public inbound Internet listeners remain outside the required V1/post-V1 
 
 ---
 
-# 14. RELEASE MANIFEST
+# 15. RELEASE MANIFEST
 
 Every production release SHALL record at least:
 
 ```text
 jarvis_version
-contract_version
+contract_suite_version
 release_profile_version
 source_commit_sha
 windows_support_matrix
@@ -301,9 +428,14 @@ Core packaging/runtime identity
 protocol/schema version
 database/SQLCipher/SQLite identity and WAL-fix evidence
 migration set
-supported provider versions/ranges
-supported integration/module versions/ranges
+session_password_kdf_profile
+portable_recovery_kdf_profiles
+supported provider versions/ranges/setup-state requirements
+supported integration capability matrix
+supported module versions/ranges
 voice provider versions/ranges
+brand asset/source identities
+font/icon/visual-asset license/provenance references
 module catalog trust key ids
 SBOM reference/hash
 qualification report reference/hash
@@ -315,36 +447,54 @@ No raw credentials/private user data appear in the manifest.
 
 ---
 
-# 15. PRODUCTION-COMPLETE GATE
+# 16. REPOSITORY GOVERNANCE GATE
+
+Before Phase 0 may be declared complete, authoritative `master` SHALL have an active GitHub ruleset/branch-protection equivalent that:
+
+- prevents branch deletion;
+- blocks force pushes;
+- requires mandatory CI status checks once those checks exist;
+- uses narrowly controlled and auditable bypass permissions.
+
+A pull-request requirement is strongly preferred once implementation changes begin. No second long-lived branch becomes an alternate source of truth.
+
+---
+
+# 17. PRODUCTION-COMPLETE GATE
 
 For this profile, Production Complete requires the same source commit and signed release artifacts to pass:
 
 - all required functionality and current mandatory contract rules;
 - platform/clean-install qualification;
+- Mission Control UI identity/adaptive/accessibility/window-state qualification;
 - Tauri/WebView and named-pipe security gates;
 - self-contained Core/runtime package gate;
 - SQLite/SQLCipher/WAL fix and persistence gates;
+- KDF-profile floor/migration tests;
 - portable clean-profile encrypted restore;
-- Codex provider/version/sandbox conformance;
-- Local Git/GitHub/Proxmox integration conformance;
+- Codex setup/repair + provider/version/sandbox conformance;
+- Local Git + exact GitHub capability-matrix conformance;
+- exact Proxmox capability-matrix conformance;
 - destructive-action/PermissionEngine safety gates;
 - process containment/orphan cleanup;
 - module/catalog/update integrity;
 - crash/recovery/uncertain-side-effect tests;
 - budget/resource/performance/voice tests;
+- event/automation tests;
 - upgrade/rollback;
 - soak/stability;
-- signed installer/update, SBOM, and provenance;
-- zero open P0/P1 defects.
+- signed installer/update, SBOM, licensing, and provenance;
+- zero open P0/P1 defects;
+- Critical/High vulnerability policy from the Operations Contract satisfied.
 
 Documentation completion alone never satisfies this gate.
 
 ---
 
-# 16. GOVERNING DISTINCTION
+# 18. GOVERNING DISTINCTION
 
 > **The contract defines the architecture. The Release Profile defines what V1 guarantees. The qualification report proves that exact signed release.**
 
 ---
 
-**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.2**
+**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.3**
