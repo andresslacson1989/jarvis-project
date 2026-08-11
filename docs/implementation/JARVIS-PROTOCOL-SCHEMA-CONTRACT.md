@@ -1,15 +1,15 @@
 # JARVIS Protocol & Schema Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
-**Contract Version:** 1.0.2  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
+**Contract Version:** 1.0.3  
 **Protocol Major:** 1  
-**Date:** August 11, 2026
+**Date:** August 12, 2026
 
 ---
 
 # 1. PURPOSE
 
-This document defines the canonical cross-boundary types and representations for JARVIS. All data crossing process, AI/provider, tool, integration, module, persistence-event, approval, artifact, import/export, or security-material boundaries SHALL be runtime validated against versioned schemas.
+This document defines the canonical cross-boundary types and representations for JARVIS. All data crossing process, AI/provider, tool, integration, module, persistence-event, approval, artifact, import/export, configuration, authentication, or security-material boundaries SHALL be runtime validated against versioned schemas.
 
 The schemas below are the effective V1 definitions. Older schema shapes in ADRs or historical contracts are rationale/history only.
 
@@ -112,7 +112,45 @@ TypeScript SHOULD use `bigint` after parsing; Rust SHALL use a checked exact int
 
 ---
 
-# 6. IPC ENVELOPE AND RESPONSE UNION
+# 6. KDF PROFILES
+
+JARVIS-managed password/recovery derivation uses versioned KDF profiles rather than implicit library defaults.
+
+```ts
+type KdfPurpose =
+  | 'SESSION_PASSWORD'
+  | 'PORTABLE_RECOVERY';
+
+interface Argon2idProfile {
+  profileId: string;
+  purpose: KdfPurpose;
+  algorithm: 'ARGON2ID';
+  version: 0x13;
+  memoryKiB: number;
+  iterations: number;
+  parallelism: 4;
+  saltBytes: number;
+  outputBytes: number;
+}
+```
+
+A production V1 profile SHALL satisfy at least:
+
+```text
+memoryKiB  >= 65536
+iterations >= 3
+parallelism = 4
+saltBytes  >= 16
+outputBytes >= 32
+```
+
+Exact parameter metadata used to create a verifier/key slot SHALL be retained with that verifier/key slot so future releases can verify/derive historical values and then upgrade them deliberately.
+
+Schema validation rejects unsupported Argon2 version, under-floor production profile, out-of-range resource values, or missing profile identity. Test/development-only weaker fixtures SHALL be unmistakably non-production and SHALL never be accepted by production configuration.
+
+---
+
+# 7. IPC ENVELOPE AND RESPONSE UNION
 
 ```ts
 type IpcKind = 'request' | 'response' | 'event';
@@ -149,7 +187,7 @@ Malformed frames/envelopes whose identity cannot be trusted may be rejected by c
 
 ---
 
-# 7. ERROR MODEL
+# 8. ERROR MODEL
 
 ```ts
 type ErrorCategory =
@@ -189,7 +227,7 @@ Raw provider/Windows/SQLite stack traces or secret-bearing payloads SHALL be nor
 
 ---
 
-# 8. SESSION AND USER INPUT
+# 9. SESSION AND USER INPUT
 
 ```ts
 type SessionTrustState = 'LOCKED' | 'UNLOCKING' | 'UNLOCKED' | 'LOCKING';
@@ -231,7 +269,7 @@ Voice confidence is informational and never authorizes an action or target.
 
 ---
 
-# 9. ORCHESTRATOR DECISION
+# 10. ORCHESTRATOR DECISION
 
 ```ts
 type OrchestratorAction =
@@ -259,7 +297,7 @@ interface OrchestratorDecision {
 
 ---
 
-# 10. PROJECT AND EXECUTION SCOPE
+# 11. PROJECT AND EXECUTION SCOPE
 
 ```ts
 interface Project {
@@ -319,7 +357,7 @@ Rules:
 
 ---
 
-# 11. AUTHORITY ENVELOPE
+# 12. AUTHORITY ENVELOPE
 
 ```ts
 type ActionClass =
@@ -351,7 +389,7 @@ An envelope is immutable for an active attempt. A broader scope requires a new v
 
 ---
 
-# 12. MISSIONS, TASKS, ATTEMPTS
+# 13. MISSIONS, TASKS, ATTEMPTS
 
 ```ts
 type Priority = 'CRITICAL' | 'HIGH' | 'NORMAL' | 'LOW' | 'BACKGROUND';
@@ -445,7 +483,7 @@ interface TaskAttempt {
 
 ---
 
-# 13. ACCEPTANCE AND GRAPH VERSIONING
+# 14. ACCEPTANCE AND GRAPH VERSIONING
 
 ```ts
 type CriterionType =
@@ -508,7 +546,7 @@ Activated graph versions are immutable. Core validates acyclicity, dependencies,
 
 ---
 
-# 14. CHECKPOINTS, ARTIFACTS, RESULTS
+# 15. CHECKPOINTS, ARTIFACTS, RESULTS
 
 ```ts
 interface ArtifactRef {
@@ -572,7 +610,7 @@ Provider resume handles are opaque potentially expiring capability material. The
 
 ---
 
-# 15. TOOL MANIFEST AND OUTCOMES
+# 16. TOOL MANIFEST AND OUTCOMES
 
 ```ts
 type RiskClass = 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
@@ -631,7 +669,7 @@ interface ToolRequest {
   taskId?: TaskId;
   executionScope: ExecutionScope;
   authorityEnvelopeId: AuthorityEnvelopeId;
-  arguments: Record<string, unknown>; // action-specific validation required
+  arguments: Record<string, unknown>;
   idempotencyKey?: string;
 }
 
@@ -659,7 +697,7 @@ A missing/invalid manifest blocks AI execution. Consequential success requires d
 
 ---
 
-# 16. PERMISSION DECISION
+# 17. PERMISSION DECISION
 
 ```ts
 type PermissionOutcome = 'ALLOW' | 'DENY' | 'REQUIRE_APPROVAL';
@@ -683,7 +721,7 @@ Only deterministic Core policy produces an authoritative PermissionDecision.
 
 ---
 
-# 17. CANONICAL ACTION DESCRIPTOR AND APPROVAL
+# 18. CANONICAL ACTION DESCRIPTOR AND APPROVAL
 
 One canonical descriptor governs V1 approval material:
 
@@ -755,9 +793,17 @@ Raw credentials never enter the descriptor.
 
 ---
 
-# 18. PROVIDER COMPATIBILITY, HEALTH, RESOURCES
+# 19. PROVIDER SETUP, COMPATIBILITY, HEALTH, RESOURCES
 
 ```ts
+type ProviderSetupState =
+  | 'NOT_REQUIRED'
+  | 'SETUP_REQUIRED'
+  | 'SETUP_IN_PROGRESS'
+  | 'SETUP_READY'
+  | 'REPAIR_REQUIRED'
+  | 'SETUP_FAILED';
+
 type ProviderCompatibilityState =
   | 'NOT_DETECTED'
   | 'VERSION_UNKNOWN'
@@ -800,6 +846,7 @@ interface ProviderProfile {
   adapterVersion: string;
   providerVersion?: string;
   modelId?: string;
+  setup: ProviderSetupState;
   compatibility: ProviderCompatibilityState;
   capabilities: ProviderCapabilities;
   costClass: 'FREE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
@@ -818,14 +865,15 @@ interface ProviderCompatibilityPolicy {
   deniedVersions?: string[];
   requiredCapabilities: string[];
   conformanceProfileId: string;
+  setupPolicyId?: string;
 }
 ```
 
-`SUPPORTED` requires compatibility plus current required health/auth/capability state; executable presence alone is insufficient.
+`SUPPORTED` requires compatible version/interface, required setup ready, current health/auth/capabilities, and conformance evidence. Executable presence alone is insufficient.
 
 ---
 
-# 19. MODULE EXECUTION AND MANIFEST
+# 20. MODULE EXECUTION AND MANIFEST
 
 ```ts
 type ModuleExecutionClass =
@@ -892,7 +940,7 @@ There is no untrusted-in-process execution class. `HTTP_LOCAL_PROBE.endpointId` 
 
 ---
 
-# 20. INTEGRATION ACCOUNT AND PROXMOX
+# 21. INTEGRATION ACCOUNT, GITHUB, AND PROXMOX
 
 ```ts
 interface IntegrationAccount {
@@ -906,6 +954,18 @@ interface IntegrationAccount {
   status: 'CONNECTED' | 'DEGRADED' | 'REAUTH_REQUIRED' | 'DISABLED' | 'ERROR';
   lastVerifiedAt?: UtcTimestamp;
 }
+
+type GitHubCapability =
+  | 'GITHUB_REPOSITORY_READ'
+  | 'GITHUB_REF_READ'
+  | 'GITHUB_REF_WRITE'
+  | 'GITHUB_PULL_REQUEST_READ'
+  | 'GITHUB_PULL_REQUEST_WRITE'
+  | 'GITHUB_ISSUE_READ'
+  | 'GITHUB_COMMENT_WRITE'
+  | 'GITHUB_CHECKS_READ'
+  | 'GITHUB_ACTIONS_READ'
+  | 'GITHUB_ACTIONS_DISPATCH';
 
 type ProxmoxCapability =
   | 'PROXMOX_READ'
@@ -945,11 +1005,13 @@ interface ProxmoxGuestIdentity {
 }
 ```
 
+GitHub/Proxmox capability support claims are governed by the active Release Profile. Modeling a capability does not mean the current release supports it.
+
 Proxmox control-plane identity is separate from guest OS connection/credential identity.
 
 ---
 
-# 21. PROVIDER QUOTA, USAGE, BUDGET RESERVATION
+# 22. PROVIDER QUOTA, USAGE, BUDGET RESERVATION
 
 ```ts
 type ProviderQuotaType =
@@ -1004,7 +1066,7 @@ interface BudgetPolicy {
   scopeType: 'GLOBAL' | 'PROJECT' | 'MISSION' | 'PROVIDER';
   scopeId?: string;
   limit: MoneyAmount;
-  warningAtBasisPoints: number; // integer 0..10000
+  warningAtBasisPoints: number;
   hardLimit: boolean;
   period: 'MISSION' | 'DAY' | 'MONTH' | 'CUSTOM';
 }
@@ -1030,7 +1092,7 @@ Different currencies SHALL not be added without a separately defined conversion 
 
 ---
 
-# 22. DOMAIN EVENTS
+# 23. DOMAIN EVENTS
 
 ```ts
 interface DomainEvent<T = unknown> {
@@ -1054,7 +1116,7 @@ Event payloads are independently versioned. Authoritative events use stable dot-
 
 ---
 
-# 23. NOTIFICATION AND CONFIGURATION
+# 24. NOTIFICATION AND CONFIGURATION
 
 ```ts
 type NotificationSeverity = 'CRITICAL' | 'IMPORTANT' | 'NORMAL' | 'LOW_VALUE';
@@ -1075,7 +1137,7 @@ Configuration domains are typed/versioned and include at least startup, session 
 
 ---
 
-# 24. CRYPTOGRAPHIC CANONICALIZATION RULES
+# 25. CRYPTOGRAPHIC CANONICALIZATION RULES
 
 Security-material canonicalization is one shared implementation contract.
 
@@ -1098,7 +1160,7 @@ No adapter/tool chooses its own approval material field set.
 
 ---
 
-# 25. PROTOCOL COMPATIBILITY
+# 26. PROTOCOL COMPATIBILITY
 
 After the first production protocol-major 1 release:
 
@@ -1112,34 +1174,40 @@ After the first production protocol-major 1 release:
 
 Host and Core SHALL establish a mutually supported protocol major before normal operation.
 
+Contract-suite version changes do not automatically require an IPC protocol-major change when wire compatibility is preserved.
+
 ---
 
-# 26. SCHEMA QUALIFICATION
+# 27. SCHEMA QUALIFICATION
 
 CI/release qualification SHALL prove:
 
 - positive and negative fixtures for every boundary schema;
 - Rust/TypeScript round-trip compatibility;
 - explicit IpcResponse union behavior;
-- one durable `RESUMING` meaning;
+- one durable `RESUMING` enum meaning;
 - execution-scope enforcement;
 - sensitivity/locality propagation;
 - exact money arithmetic/serialization;
+- Argon2id profile validation and under-floor production rejection;
+- provider setup/compatibility/health separation;
 - module execution-class/health/lifecycle validation;
-- provider compatibility/health separation;
 - approval canonicalization/digest vectors;
-- Proxmox identity/capability schemas;
+- GitHub/Proxmox capability schemas;
+- Proxmox identity schemas;
 - unbounded arbitrary AI/external fields are not introduced;
 - secret-bearing fields are absent from AI/UI-safe views.
 
 ---
 
-# 27. GOVERNING RULES
+# 28. GOVERNING RULES
 
 > **Cross a boundary only with a versioned, validated, bounded contract.**
 
 > **Authorize the canonical resolved action, not ambiguous display text.**
 
+> **Provider setup, compatibility, health, capability, and authorization are different facts.**
+
 ---
 
-**END — JARVIS PROTOCOL & SCHEMA CONTRACT v1.0.2**
+**END — JARVIS PROTOCOL & SCHEMA CONTRACT v1.0.3**
