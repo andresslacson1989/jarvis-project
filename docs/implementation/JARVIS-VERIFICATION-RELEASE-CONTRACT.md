@@ -1,8 +1,8 @@
 # JARVIS Verification, Qualification & Release Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
-**Version:** 1.0.2  
-**Date:** August 11, 2026
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
+**Version:** 1.0.3  
+**Date:** August 12, 2026
 
 ---
 
@@ -12,7 +12,7 @@ This contract defines the evidence required before an implementation or release 
 
 Code existence, model self-report, documentation completion, or one happy-path demonstration is insufficient.
 
-Production is verified behavior under normal success, ambiguity, interruption, crash, stale state, provider outage, adversarial input, target race, recovery, update, resource pressure, and real release packaging.
+Production is verified behavior under normal success, ambiguity, interruption, crash, stale state, provider setup/repair, provider outage, adversarial input, target race, recovery, update, resource pressure, accessibility modes, adaptive layouts, and real release packaging.
 
 ---
 
@@ -26,9 +26,9 @@ RELEASE CANDIDATE
 PRODUCTION
 ```
 
-Only a release satisfying every mandatory v1.0.2 gate for the active Release Profile may be labeled `PRODUCTION`/`Production Complete`.
+Only a release satisfying every mandatory v1.0.3 gate for the active Release Profile may be labeled `PRODUCTION`/`Production Complete`.
 
-Qualification SHALL bind to one source commit, one Release Profile, exact protocol/schema versions, and exact signed installer/update artifacts.
+Qualification SHALL bind to one source commit, contract manifest, Release Profile, exact protocol/schema versions, and exact signed installer/update artifacts.
 
 ---
 
@@ -58,7 +58,7 @@ Mission completion requires required terminal nodes complete, no unresolved requ
 
 # 5. FEATURE DEFINITION OF DONE
 
-A production feature has implementation, typed schemas/APIs, unit/property tests, integration/failure/security tests as applicable, recovery behavior, diagnostics, degraded UX, documentation, migration/update compatibility, and production scenario coverage.
+A production feature has implementation, typed schemas/APIs, unit/property tests, integration/failure/security tests as applicable, recovery behavior, diagnostics, degraded UX, accessibility/adaptive behavior when user-facing, documentation, migration/update compatibility, and production scenario coverage.
 
 A feature without failure/recovery semantics is incomplete.
 
@@ -68,40 +68,43 @@ A feature without failure/recovery semantics is incomplete.
 
 A V1 production release SHALL pass at least:
 
-1. Release Profile conformance;
+1. Contract Manifest + Release Profile conformance;
 2. reproducible build/toolchain;
-3. static/architecture analysis;
-4. unit tests;
-5. property/state-machine tests;
-6. protocol/schema cross-language tests;
-7. Tauri/WebView security gate;
-8. named-pipe principal/bootstrap gate;
-9. PermissionEngine/approval safety gate;
-10. prompt-injection/content-authority gate;
-11. provider version/health/sandbox conformance;
-12. tool contract/TOCTOU gate;
-13. persistence/SQLite-WAL/SQLCipher gate;
-14. encrypted local/portable backup restore gate;
-15. migration gate;
-16. crash/recovery/uncertain-side-effect gate;
-17. Job Object/process-tree containment gate;
-18. exact budget/quota/accounting gate;
-19. module/catalog/supply-chain/update gate;
-20. Local filesystem/Git integration conformance;
-21. GitHub integration conformance;
-22. Proxmox VE integration conformance;
-23. voice qualification;
-24. event/automation security/dedup gate;
-25. performance/latency gate;
-26. resource-pressure gate;
-27. clean install with no usable system Node;
-28. previous-production upgrade/rollback;
-29. signed installer/update verification;
-30. SBOM/provenance/release-manifest gate;
-31. soak/stability gate;
-32. V1 production user-journey suite.
+3. protected-authoritative-branch/CI governance gate;
+4. static/architecture analysis;
+5. unit tests;
+6. property/state-machine tests;
+7. protocol/schema cross-language tests;
+8. JARVIS Mission Control UI identity/adaptive/accessibility gate;
+9. Tauri/WebView security gate;
+10. named-pipe principal/bootstrap gate;
+11. KDF/session/recovery-profile gate;
+12. PermissionEngine/approval safety gate;
+13. prompt-injection/content-authority gate;
+14. provider setup/version/health/sandbox conformance;
+15. tool contract/TOCTOU gate;
+16. persistence/SQLite-WAL/SQLCipher gate;
+17. encrypted local/portable backup restore gate;
+18. migration gate;
+19. crash/recovery/uncertain-side-effect gate;
+20. Job Object/process-tree containment gate;
+21. exact budget/quota/accounting gate;
+22. module/catalog/supply-chain/update gate;
+23. Local filesystem/Git integration conformance;
+24. exact GitHub V1 capability-matrix conformance;
+25. exact Proxmox VE V1 capability-matrix conformance;
+26. voice qualification;
+27. event/automation security/dedup gate;
+28. performance/latency gate;
+29. resource-pressure gate;
+30. clean install with no usable system Node;
+31. previous-production upgrade/rollback;
+32. signed installer/update verification;
+33. SBOM/license/provenance/release-manifest gate;
+34. soak/stability gate;
+35. V1 production user-journey suite.
 
-Zero open P0/P1 defects. No known unmitigated Critical security vulnerability on a reachable production path.
+Zero open P0/P1 defects. Critical/High reachable vulnerability policy from the Operations Contract SHALL pass.
 
 ---
 
@@ -113,10 +116,11 @@ Repository test layers include:
 unit
 property/state-machine
 schema/cross-language contract
-provider contract/sandbox
+provider setup/contract/sandbox
 tool contract
 integration/module conformance
 integration/e2e
+UI/accessibility/adaptive
 safety/adversarial
 recovery/chaos
 persistence/backup/migration
@@ -142,6 +146,7 @@ Tests SHALL cover:
 - canonical target/path resolution;
 - approval digest/expiry/single-consumption;
 - data policy propagation;
+- provider setup state + compatibility/health separation;
 - provider routing/locality;
 - exact budget arithmetic/reservations;
 - graph validation/mission acceptance;
@@ -149,11 +154,12 @@ Tests SHALL cover:
 - event dedup;
 - memory ranking/confidence;
 - module lifecycle/execution-class state;
+- KDF profile validation/upgrade state;
 - backup retention/format/key-slot state;
 - retry/circuit-breaker;
 - locked-state suppression.
 
-Property/model tests SHALL prove terminal states cannot return illegally, consumed approval cannot replay, exclusive leases have one owner, invalid graph cycles fail, non-project scopes do not gain filesystem authority, DataLocality cannot silently weaken, and binary floating point does not determine authoritative monetary admission.
+Property/model tests SHALL prove terminal states cannot return illegally, consumed approval cannot replay, exclusive leases have one owner, invalid graph cycles fail, non-project scopes do not gain filesystem authority, DataLocality cannot silently weaken, under-floor production KDF profiles fail, provider setup cannot become ready by assumption, and binary floating point does not determine authoritative monetary admission.
 
 ---
 
@@ -163,8 +169,10 @@ Rust and TypeScript fixtures SHALL prove:
 
 - IPC envelopes and explicit response union agree;
 - IDs/times/DataPolicy/MoneyAmount round-trip;
+- KDF profile shapes/validation agree;
+- provider setup/compatibility/health enums agree;
 - one durable `RESUMING` enum meaning;
-- ExecutionScope and ModuleManifest variants agree;
+- ExecutionScope, GitHubCapability, ProxmoxCapability, and ModuleManifest variants agree;
 - `CanonicalActionDescriptorV1` produces identical RFC 8785 canonical bytes and SHA-256/base64url-no-pad digest;
 - property order and insignificant source JSON formatting do not alter digest;
 - material target/scope/account/environment/argument/tool-version change alters digest;
@@ -175,7 +183,42 @@ Any cross-language security-material mismatch is release-blocking.
 
 ---
 
-# 10. TAURI/WEBVIEW SECURITY TESTS
+# 10. UI IDENTITY / ADAPTIVE / ACCESSIBILITY QUALIFICATION
+
+Production qualification SHALL prove the exact Release Candidate implements the current JARVIS UI Identity & Design System Contract rather than a generic substitute.
+
+Required evidence includes:
+
+- canonical `jarvis-mark.svg`, `jarvis-lockup.svg`, and `jarvis-app-icon.svg` source usage with generated platform variants traceable to those sources;
+- primary local/offline font packaging and recorded font/icon/third-party visual license/provenance;
+- one dark-theme Mission Control shell across conversation, work, approvals, systems/integrations, provider setup, memory/artifacts, diagnostics, and voice;
+- deterministic `HIDDEN`, `WINDOWED`, `MAXIMIZED`, `FULLSCREEN`, and `FOCUSED_CONTEXT`-equivalent window behavior;
+- show/hide/fullscreen/focused-context state preserves intended conversation/navigation/selection context;
+- no normal background event steals focus/fullscreen outside NotificationPolicy;
+- off-screen saved window placement recovers after monitor topology change;
+- adaptive layouts at standard desktop, compact, wide, ultrawide, and multi-monitor conditions;
+- Windows scaling at `100%`, `125%`, `150%`, and `200%`;
+- 200% text resizing without required-content/function loss;
+- primary linear workflow reflow at an effective 320 CSS px / 400% zoom-equivalent layout without two-dimensional scrolling except legitimate intrinsically 2D-content exceptions;
+- normal text contrast >= `4.5:1` and qualifying large text >= `3:1`;
+- applicable meaningful non-text controls/indicators >= `3:1` against adjacent colors;
+- consequential state never uses color as the only cue;
+- pointer targets >= `24 × 24` CSS px or meet a valid equivalent target-spacing/exception rule;
+- keyboard operation for all primary workflows with no traps;
+- visible focus and focused controls not obscured by sticky/persistent UI;
+- semantic names/roles/states for primary assistive-technology workflows;
+- Windows High Contrast / CSS forced-colors compatibility where supported by the production WebView stack;
+- reduced-motion preference suppresses nonessential animation;
+- high mission/queue/notification counts do not hide critical state;
+- `BLOCKED`, `SETUP_REQUIRED`, `REPAIR_REQUIRED`, `RECOVERING`, `UNCERTAIN`, and destructive approval states remain explicit;
+- approval UI exposes exact action/target/environment/consequence and confirm/reject path;
+- provider setup/UAC UI truthfully distinguishes setup elevation from normal worker privilege.
+
+A screen that requires historical mockups/ADRs to infer required product identity fails the gate.
+
+---
+
+# 11. TAURI/WEBVIEW SECURITY TESTS
 
 Production qualification SHALL prove:
 
@@ -194,7 +237,7 @@ A remote-origin/native-command ACL bypass is P0.
 
 ---
 
-# 11. HOST ↔ CORE IPC TESTS
+# 12. HOST ↔ CORE IPC TESTS
 
 Tests prove:
 
@@ -213,25 +256,32 @@ Tests prove:
 
 ---
 
-# 12. SESSION AUTHENTICATION / RECOVERY TESTS
+# 13. KDF / SESSION AUTHENTICATION / RECOVERY TESTS
 
 Tests prove:
 
 - app starts locked;
 - correct password unlocks;
 - wrong password/cooldown works;
-- verifier/password/recovery factor is not logged;
+- production session and portable-recovery profiles use Argon2id version `0x13`;
+- production profile floor is at least 65536 KiB memory, 3 passes, 4 lanes, 16 random salt bytes, and 32 output bytes;
+- under-floor or unsupported production profile is rejected;
+- parameter bounds prevent malicious resource-exhaustion values;
+- exact profile metadata is stored/reloaded correctly;
+- older still-supported profile can verify/recover and then be upgraded under policy;
+- test-only weak parameters cannot activate in production;
+- verifier/password/recovery factor/KDF-derived secret is not logged;
 - Windows lock locks JARVIS immediately;
 - locked UI/voice suppress private content;
 - unlocking does not consume stale destructive approval automatically;
 - no Windows-only password reset bypass exists;
 - verified portable recovery factor can perform the explicit reset/recovery workflow;
 - absent recovery factor cannot reverse/recover the old password from verifier;
-- clean-profile restore establishes a new password after data recovery.
+- clean-profile restore establishes a new password after data recovery using a current qualified session KDF profile.
 
 ---
 
-# 13. PERMISSION / AUTHORITY SCENARIOS
+# 14. PERMISSION / AUTHORITY SCENARIOS
 
 Mandatory scenarios include:
 
@@ -269,22 +319,31 @@ A GitHub read task uses `INTEGRATION` scope and creates no fake workspace/filesy
 
 ---
 
-# 14. PROMPT-INJECTION SUITE
+# 15. PROMPT-INJECTION SUITE
 
 Malicious instructions embedded in email/web/document/Markdown/source/comments/README/issues/tool output/logs/fake SYSTEM text/encoded text/repository policy-looking files are tested.
 
-Expected: content may be analyzed but cannot grant permission, retrieve secrets, alter scope/envelope, waive approval, change DataPolicy, bypass budget/audit, install modules, or trigger destructive work.
+Expected: content may be analyzed but cannot grant permission, retrieve secrets, alter scope/envelope, waive approval, change DataPolicy, bypass budget/audit, invoke trusted elevation/provider setup, install modules, or trigger destructive work.
 
 ---
 
-# 15. PROVIDER / CODEX CONFORMANCE
+# 16. PROVIDER / CODEX SETUP AND CONFORMANCE
 
-Every provider adapter tests discovery, exact version, compatibility policy, health/auth, capabilities/locality/resources, structured output, timeout/cancel, process crash, invalid output, rate limit/unavailable mapping, sanitized errors, Job Object ownership, and unsupported-version behavior.
+Every provider adapter tests discovery, exact distribution/version, setup policy/state, compatibility policy, health/auth, capabilities/locality/resources, structured output, timeout/cancel, process crash, invalid output, rate limit/unavailable mapping, sanitized errors, Job Object ownership, and unsupported-version behavior.
 
 Codex V1 additionally proves on the supported Windows target:
 
 - qualified stable structured/non-interactive invocation;
-- exact provider version rule;
+- exact provider distribution/version rule;
+- `SETUP_REQUIRED` is detected when applicable;
+- explicit user-initiated setup/repair requests UAC only for the qualified provider setup helper/path;
+- helper/distribution identity validation precedes invocation;
+- cancel/failure leaves setup non-ready and blocks the engineering profile;
+- successful helper process exit alone does not mark ready without setup/conformance probe;
+- ordinary Codex workers remain non-elevated after elevated setup;
+- provider-internal sandbox credentials are not exposed to JARVIS logs/Core/domain state;
+- provider update invalidates/rechecks setup/conformance as required by the compatibility policy;
+- no silent downgrade to unqualified sandbox after setup failure;
 - working directory/worktree binding;
 - actual sandbox write restriction behavior;
 - actual default/selected network restriction behavior;
@@ -297,7 +356,7 @@ Codex V1 additionally proves on the supported Windows target:
 
 ---
 
-# 16. TOOL / TARGET-RACE CONFORMANCE
+# 17. TOOL / TARGET-RACE CONFORMANCE
 
 Every tool tests valid/invalid schema, scope mismatch, permission denial, precondition failure, success/failure/postcondition failure, cancellation, idempotency, `UNCERTAIN`, secret redaction, and audit.
 
@@ -313,15 +372,17 @@ Examples include Git expected ref, HTTP ETag, file identity/hash, infrastructure
 
 ---
 
-# 17. JOB OBJECT / PROCESS CONTAINMENT
+# 18. JOB OBJECT / PROCESS CONTAINMENT
 
 Tests cover Core, Codex worker, EXTERNAL_MANAGED module, helper, grandchild inheritance, kill-on-close, no ordinary breakaway, explicit handle inheritance, cooperative then forced cancellation, host crash/closure cleanup, hung child shutdown, nested jobs, resource-limit diagnostics, and every approved compatibility exception.
+
+The UAC/provider setup helper lifecycle is qualified separately where Windows elevation mechanics prevent ordinary Job Object assignment semantics. Tests SHALL prove this does not become a reusable uncontained/elevated worker path.
 
 Tests/documentation also prove Job Objects are not represented as filesystem/network security sandboxing.
 
 ---
 
-# 18. SQLITE / WAL / SQLCIPHER QUALIFICATION
+# 19. SQLITE / WAL / SQLCIPHER QUALIFICATION
 
 Release qualification SHALL assert:
 
@@ -341,7 +402,7 @@ Release qualification SHALL assert:
 
 ---
 
-# 19. ENCRYPTED BACKUP / PORTABLE RESTORE
+# 20. ENCRYPTED BACKUP / PORTABLE RESTORE
 
 Tests prove:
 
@@ -350,7 +411,7 @@ Tests prove:
 - SQLCipher backup snapshot is re-keyed/exported under fresh `SnapshotDBKey`;
 - plaintext `SnapshotDBKey` does not appear as file/manifest/log sidecar;
 - local DPAPI key slot restores locally;
-- portable Argon2id key slot unlocks `BackupDEK` on clean profile;
+- portable Argon2id key slot records a valid current/supported KDF profile and unlocks `BackupDEK` on clean profile;
 - wrong portable factor fails without mutating backup;
 - package/manifest/chunk tamper is detected;
 - `SnapshotDBKey` opens/integrity-checks snapshot only after outer package authentication;
@@ -365,15 +426,15 @@ At least one full disaster-restore drill uses the exact Release Candidate artifa
 
 ---
 
-# 20. MIGRATION / UPDATE / ROLLBACK
+# 21. MIGRATION / UPDATE / ROLLBACK
 
-Every migration tests empty DB, previous production fixture, realistic fixture, interruption/failure, newer unsupported schema, exact money, DataPolicy, state enums, approvals, provider/module metadata, and backup/recovery compatibility when affected.
+Every migration tests empty DB, previous production fixture, realistic fixture, interruption/failure, newer unsupported schema, KDF profile/verifier/key-slot compatibility, exact money, DataPolicy, state enums, approvals, provider setup/module metadata, and backup/recovery compatibility when affected.
 
-Update qualification proves signed update acceptance, tamper rejection, pre-update backup, safe process boundary, migration, post-update health, simulated startup failure recovery, previous binary/data pair restore, module rollback, and no unverified fallback.
+Update qualification proves signed update acceptance, tamper rejection, pre-update backup, safe process boundary, migration, provider setup/conformance revalidation as required, post-update health, simulated startup failure recovery, previous binary/data pair restore, module rollback, and no unverified fallback.
 
 ---
 
-# 21. BUDGET / QUOTA TESTS
+# 22. BUDGET / QUOTA TESTS
 
 Tests prove:
 
@@ -391,40 +452,77 @@ Tests prove:
 
 ---
 
-# 22. PROXMOX V1 CONFORMANCE
+# 23. GIT / GITHUB V1 CAPABILITY CONFORMANCE
 
-Required V1 tests:
+Local Git/filesystem tests cover canonical project roots, traversal/reparse protection, explicit worktrees, isolated parallel writers, status/diff/log/ref identity, bounded write/test operations, recovery, and expected-ref conditional mutation for consequential ref changes.
+
+The V1 GitHub mandatory capability matrix is exactly:
+
+```text
+GITHUB_REPOSITORY_READ
+GITHUB_REF_READ
+GITHUB_REF_WRITE
+GITHUB_PULL_REQUEST_READ
+GITHUB_PULL_REQUEST_WRITE
+GITHUB_ISSUE_READ
+GITHUB_COMMENT_WRITE
+GITHUB_CHECKS_READ
+GITHUB_ACTIONS_READ
+```
+
+For each mandatory capability, tests cover scoped credentials/permissions, repository/account identity, allowed/denied targets, representative success, auth expiry, rate limits, network failures, idempotency/preconditions where applicable, secret redaction, and audit.
+
+`GITHUB_REF_WRITE` SHALL test expected-ref/create-update race behavior and rejection for out-of-scope/protected/admin-only targets.
+
+`GITHUB_ACTIONS_DISPATCH`, if enabled by the release, requires its own conformance but does not block base V1.
+
+Tests SHALL prove mandatory GitHub support does not imply repository administration, secrets administration, Actions permission administration, branch-protection/ruleset administration, member/team administration, repository deletion, or ref deletion.
+
+---
+
+# 24. PROXMOX V1 CAPABILITY CONFORMANCE
+
+The mandatory V1 Proxmox capability matrix is exactly:
+
+```text
+PROXMOX_READ
+PROXMOX_POWER_CONTROL
+PROXMOX_SNAPSHOT
+PROXMOX_BACKUP
+PROXMOX_GUEST_CONFIG
+PROXMOX_GUEST_CREATE
+PROXMOX_MIGRATE
+PROXMOX_DESTROY
+```
+
+Required tests include:
 
 - read-only connection with no write capability;
 - TLS system trust and/or configured pin validation;
 - raw token absent from AI/UI/log/journal/artifact;
 - exact connection/environment/QEMU/LXC/VMID identity;
 - node/VMID/pool scope rejection;
-- capability denial;
+- per-capability denial;
 - typed invalid/ambiguous request rejection;
 - arbitrary raw API path denial;
 - API failure does not trigger SSH/CLI/root fallback;
 - representative power control with verified postcondition;
-- snapshot/backup asynchronous task tracking;
-- configured create/config/migrate operations when in supported V1 capability matrix;
+- snapshot and backup asynchronous task tracking;
+- typed guest config with host/storage/network escape rejection;
+- guest create with allowed existing storage and no arbitrary datastore-administration authority;
+- migrate with live identity/task tracking and postcondition;
 - ambiguous write returns `UNCERTAIN`;
 - destructive guest delete requires final confirmation and digest invalidation on target/action change;
 - guest OS shell access remains unavailable absent separate connection;
 - connection disable/revocation blocks new actions.
 
+`PROXMOX_STORAGE_WRITE` and `PROXMOX_NETWORK_WRITE` are non-mandatory V1. A release enabling either SHALL run full positive/negative/risk conformance and list it in the signed support matrix. Tests SHALL prove mandatory guest-create/config/backup capabilities cannot be abused as aliases for generic storage/network/PBS administration.
+
 Direct PBS administration is not implicitly qualified by PVE tests.
 
 ---
 
-# 23. GIT / GITHUB CONFORMANCE
-
-Local Git/filesystem tests cover canonical project roots, traversal/reparse protection, explicit worktrees, isolated parallel writers, status/diff/log/ref identity, bounded write/test operations, recovery, and expected-ref conditional mutation for consequential ref changes.
-
-GitHub tests cover scoped credentials/capabilities, repository/account identity, representative required read/write operations, auth expiry, rate limits, network failures, idempotency/precondition behavior, branch/ref race detection, secret redaction, and no local shell substitute for GitHub API authorization.
-
----
-
-# 24. MODULE CONFORMANCE
+# 25. MODULE CONFORMANCE
 
 Tests prove:
 
@@ -441,29 +539,29 @@ Tests prove:
 
 ---
 
-# 25. CRASH / RECOVERY MATRIX
+# 26. CRASH / RECOVERY MATRIX
 
-Fault injection occurs before/after task starts, during `RESUMING`, worker execution/checkpoint, filesystem modification, verification, external request before response persistence, approval wait, after approval consumption, graph revision, SQLite transaction/commit, budget reservation, backup, migration, update, provider fallback, Proxmox async task, and module lifecycle.
+Fault injection occurs before/after task starts, during `RESUMING`, worker execution/checkpoint, filesystem modification, verification, external request before response persistence, approval wait, after approval consumption, graph revision, SQLite transaction/commit, budget reservation, provider setup/repair, backup, migration, update, provider fallback, Proxmox async task, and module lifecycle.
 
 Tests kill processes, not only graceful shutdown.
 
-Recovery never invents completion or blindly repeats ambiguous destructive/high-risk effects.
+Recovery never invents completion or setup readiness and never blindly repeats ambiguous destructive/high-risk effects.
 
 ---
 
-# 26. PAUSE / PREEMPTION
+# 27. PAUSE / PREEMPTION
 
-Tests cover PREEMPTIBLE, SAFE_POINT_ONLY, bounded TEMPORARILY_NON_PREEMPTIBLE, checkpoint/resource release, `PAUSED → RESUMING`, changed live state, provider no longer compatible/locality-compliant, lease reacquisition failure, cancel-vs-pause, priority preemption only when needed, and crash during pause/resume.
+Tests cover PREEMPTIBLE, SAFE_POINT_ONLY, bounded TEMPORARILY_NON_PREEMPTIBLE, checkpoint/resource release, `PAUSED → RESUMING`, changed live state, provider no longer setup-ready/compatible/locality-compliant, lease reacquisition failure, cancel-vs-pause, priority preemption only when needed, and crash during pause/resume.
 
 ---
 
-# 27. EVENT / AUTOMATION
+# 28. EVENT / AUTOMATION
 
 Tests prove event authentication, invalid source rejection, durable replay/dedup, normal PermissionEngine/DataPolicy/budget/scope enforcement, locked-data suppression, automation-scope failure, trigger-storm rate control, and no direct public privileged-Core ingress requirement.
 
 ---
 
-# 28. VOICE QUALIFICATION
+# 29. VOICE QUALIFICATION
 
 V1 voice tests cover microphone selection/reconnect, VAD, STT partial/final/cancel, AEC using exact TTS render reference, barge-in/double-talk, stop/mute/cancel, device removal, STT/TTS failure, half-duplex degradation, locked privacy, exact one-approval voice confirmation, persistent voice identity, and DataLocality.
 
@@ -484,9 +582,9 @@ Network/provider reasoning latency is reported separately.
 
 ---
 
-# 29. PERFORMANCE / RESOURCE PRESSURE
+# 30. PERFORMANCE / RESOURCE PRESSURE
 
-Measure startup, unlock, IPC, UI propagation, scheduling, provider startup, idle/voice memory, worker concurrency, SQLite transitions, journals, backup, recovery, and packaged-Core startup.
+Measure startup, unlock, IPC, UI propagation, scheduling, provider setup/readiness checks, provider startup, idle/voice memory, worker concurrency, SQLite transitions, journals, backup, recovery, and packaged-Core startup.
 
 On the 16 GB/i7 13th-gen/RTX 4060-class baseline, simulate multiple workers, voice while workers run, low memory, GPU contention, slow/nearly-full disk, abnormal provider CPU, large logs/artifacts.
 
@@ -494,30 +592,43 @@ Expected: UI/voice/stop-cancel responsive, scheduler reduces background pressure
 
 ---
 
-# 30. CLEAN INSTALL / PACKAGING
+# 31. CLEAN INSTALL / PACKAGING
 
 Release candidate runs on a supported Windows profile with no prior JARVIS state and no usable system Node.
 
-Test installation, first launch, bundled Core, Tauri security config, named-pipe security, password/recovery setup, secure-store/DB initialization, provider discovery, project registration, first text/worker mission, Proxmox/GitHub setup in conformance environment, voice setup, diagnostics, and safe uninstall/data retention behavior.
+Test installation, first launch, canonical brand/font assets, Mission Control shell, bundled Core, Tauri security config, named-pipe security, password/recovery KDF setup, secure-store/DB initialization, provider discovery/setup, project registration, first text/worker mission, GitHub/Proxmox setup in conformance environment, voice setup, diagnostics, and safe uninstall/data retention behavior.
 
-PATH/system-Node dependence fails the gate.
+PATH/system-Node dependence fails the gate. Missing runtime visual/font asset or CDN-only primary font fails offline packaging qualification.
 
 ---
 
-# 31. SOAK / STABILITY
+# 32. REPOSITORY / CI GOVERNANCE QUALIFICATION
+
+Before Phase 0 exit and before implementation relies on protected `master`, evidence SHALL show an active repository ruleset/branch-protection equivalent that:
+
+- prevents deletion of `master`;
+- blocks force pushes;
+- requires the designated mandatory CI status checks once those checks exist;
+- has narrowly controlled/auditable bypass permission.
+
+Implementation workflow SHOULD require pull-request review once coding work begins. Qualification SHALL also confirm there is no second long-lived authoritative contract/implementation branch.
+
+---
+
+# 33. SOAK / STABILITY
 
 Release candidate SHALL pass at least:
 
 - 24-hour idle/background soak with periodic interactions;
 - 8-hour mixed workload including text/voice, missions, provider calls, pause/resume, integrations, recovery-relevant events.
 
-Observe memory/handle/thread leaks, orphan children, DB starvation/WAL growth, event backlog, stuck queue/resume, provider restart loops, log/artifact growth.
+Observe memory/handle/thread leaks, orphan children, DB starvation/WAL growth, event backlog, stuck queue/resume, provider setup/restart loops, log/artifact growth.
 
 Reproducible trend making normal long-running use unreliable blocks release.
 
 ---
 
-# 32. V1 USER JOURNEYS
+# 34. V1 USER JOURNEYS
 
 Mandatory journeys include:
 
@@ -525,27 +636,36 @@ Mandatory journeys include:
 2. dynamic mission replan with artifact reuse/invalidation;
 3. priority interruption, pause, `RESUMING`, continue;
 4. destructive exact-action final confirmation and changed-target invalidation;
-5. provider outage with compliant fallback/block;
-6. forced crash/restart with queue/external uncertainty reconciliation;
-7. clean-profile encrypted portable disaster restore and new local DB key;
-8. GitHub integration task without fake filesystem authority;
-9. Proxmox read → controlled write → asynchronous verification → destructive confirmation;
-10. voice conversation with barge-in and deterministic stop;
-11. engineering worker attempt to invoke external consequential action, demonstrating that shell capability does not confer JARVIS authorization.
+5. Codex installed but setup-required → explicit UAC setup → conformance → normal non-elevated engineering worker;
+6. provider setup failure/repair without unsafe sandbox downgrade;
+7. provider outage with compliant fallback/block;
+8. forced crash/restart with queue/external uncertainty reconciliation;
+9. clean-profile encrypted portable disaster restore and new local DB key;
+10. GitHub required-capability workflow including conditional ref write and non-admin boundary;
+11. Proxmox read → power/snapshot/config/create/migrate → asynchronous verification → destructive confirmation within mandatory capability matrix;
+12. voice conversation with barge-in and deterministic stop;
+13. engineering worker attempt to invoke external consequential action, demonstrating that shell capability does not confer JARVIS authorization;
+14. JARVIS Mission Control show/hide → fullscreen/focused-context → restore prior context without focus-stealing side effects;
+15. compact/high-zoom/reflow + keyboard-only destructive approval workflow;
+16. Windows High Contrast/forced-colors workflow where supported, proving state/focus/actions remain distinguishable.
 
 ---
 
-# 33. RELEASE ARTIFACTS / PROVENANCE
+# 35. RELEASE ARTIFACTS / PROVENANCE
 
 Production stores:
 
 - versioned signed installer/binaries;
 - signed update manifest;
 - source commit;
-- contract/Release Profile/protocol/schema versions;
+- contract manifest/Release Profile/protocol/schema versions;
 - dependency/toolchain identities/lockfile hashes;
 - SQLite/SQLCipher build/fix evidence;
-- provider/integration/module support matrix;
+- KDF profile definitions/qualification evidence;
+- provider setup/compatibility/support matrix;
+- exact integration capability support matrix;
+- canonical brand-asset hashes/identities;
+- font/icon/visual-asset source/license/provenance notices;
 - SBOM;
 - qualification summary/report;
 - migration manifest;
@@ -557,11 +677,11 @@ A debug/local build qualification does not automatically qualify a different ins
 
 ---
 
-# 34. DEFECT SEVERITY
+# 36. DEFECT SEVERITY
 
 ```text
-P0 — data loss, security-boundary/destructive-confirmation failure, unrecoverable corruption, false disaster-recovery guarantee, app cannot operate
-P1 — major core workflow/recovery failure, frequent crash, incorrect authorization, false verified result, mandatory V1 provider/integration unavailable
+P0 — data loss, security-boundary/destructive-confirmation failure, unrecoverable corruption, false disaster-recovery guarantee, remote/native privilege bypass, app cannot operate
+P1 — major core workflow/recovery failure, frequent crash, incorrect authorization, false verified result, mandatory V1 provider/integration capability unavailable, mandatory UI/accessibility workflow unusable
 P2 — important degraded feature with workaround
 P3 — minor defect
 ```
@@ -570,14 +690,14 @@ Production has zero open P0/P1.
 
 ---
 
-# 35. PRODUCTION-COMPLETE DECLARATION
+# 37. PRODUCTION-COMPLETE DECLARATION
 
-Declaration references application version, contract/Release Profile, source commit, signed artifact hashes, protocol/schema, qualification report, SBOM/provenance, known limitations, and exact supported provider/module/integration versions.
+Declaration references application version, contract manifest/Release Profile, source commit, signed artifact hashes, protocol/schema, qualification report, SBOM/license/provenance, known limitations, and exact supported provider/module/integration capability versions.
 
 The production question is:
 
-> **Does this exact signed release remain controlled, truthful, recoverable, and useful when realistic things go wrong?**
+> **Does this exact signed release remain controlled, truthful, recoverable, accessible, and useful when realistic things go wrong?**
 
 ---
 
-**END — JARVIS VERIFICATION, QUALIFICATION & RELEASE CONTRACT v1.0.2**
+**END — JARVIS VERIFICATION, QUALIFICATION & RELEASE CONTRACT v1.0.3**
