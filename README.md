@@ -2,6 +2,14 @@
 
 JARVIS is a Windows-first, voice-capable AI operating companion built around deterministic authorization, bounded AI workers, durable mission orchestration, replaceable providers, secure integrations, verified execution, and tested recovery.
 
+## Branch authority
+
+**`master` is the only authoritative and latest repository branch.**
+
+Temporary feature/review branches MAY exist while work is in progress, but they SHALL start from the current live `master` and SHALL NOT become parallel implementation sources of truth. After their accepted work is incorporated into `master`, they are historical/disposable branch pointers and MUST NOT be used as the base for new implementation work.
+
+In particular, legacy `codex/contract-*` review branches are non-authoritative. Their useful work has already been reconciled into `master`. Branch names do not override the current contract on `master`.
+
 ## Current implementation source of truth
 
 **There is one current implementation contract: JARVIS v1.0.2.**
