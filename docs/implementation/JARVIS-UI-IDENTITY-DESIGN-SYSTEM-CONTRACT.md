@@ -1,19 +1,19 @@
 # JARVIS UI Identity & Design System Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
-**Version:** 1.0.2  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
+**Version:** 1.0.3  
 **Date:** August 12, 2026  
-**Adopted by:** ADR-070
+**Adopted by:** ADR-070; production closure by ADR-071
 
 ---
 
 # 1. PURPOSE
 
-This document defines the production visual identity, interaction tone, adaptive layout, desktop-window presentation behavior, component language, accessibility, and qualification requirements for JARVIS.
+This document defines the production visual identity, interaction tone, adaptive layout, desktop-window presentation behavior, component language, accessibility, brand-asset governance, and qualification requirements for JARVIS.
 
-It is part of the current v1.0.2 normative implementation source of truth. ADRs/mockups preserve rationale and design exploration; implementation SHALL follow this contract rather than reconstructing UI rules from historical images or discussions.
+It is part of the current v1.0.3 normative implementation source of truth. ADRs/mockups preserve rationale and design exploration; implementation SHALL follow this contract rather than reconstructing UI rules from historical images or discussions.
 
-The goal is not maximum visual novelty. The goal is a recognizable, calm, precise, high-information interface that remains coherent during ordinary conversation, deep technical work, approvals, infrastructure operations, recovery, and degraded conditions.
+The goal is not maximum visual novelty. The goal is a recognizable, calm, precise, high-information interface that remains coherent during ordinary conversation, deep technical work, approvals, infrastructure operations, provider setup, recovery, and degraded conditions.
 
 > **One system. One identity. Any screen.**
 
@@ -91,11 +91,13 @@ Dark theme is a product decision, not an unfinished light-theme toggle.
 
 The dark system SHALL use layered dark surfaces with restrained luminance differences instead of pure-black panels separated only by glow.
 
+Windows High Contrast/forced-colors modes MAY override brand/surface colors when required for platform accessibility. Such override is accessibility behavior, not a second JARVIS theme, and SHALL preserve semantics, focus, control visibility, and action differentiation.
+
 A future light theme requires a deliberate design-system extension and qualification; it is not automatically inherited by inversion.
 
 ---
 
-# 4. LOGO AND BRAND MARK
+# 4. LOGO, LOCKUP, APP ICON, AND BRAND ASSET SOURCES
 
 ## 4.1 Symbol
 
@@ -117,7 +119,20 @@ center core → stable authority / identity / verified center
 segmentation → openness / active system / non-monolithic intelligence
 ```
 
-## 4.2 Wordmark
+## 4.2 Canonical source files
+
+Production brand source assets SHALL be:
+
+```text
+assets/brand/jarvis-mark.svg
+assets/brand/jarvis-lockup.svg
+assets/brand/jarvis-app-icon.svg
+assets/brand/README.md
+```
+
+Generated PNG/ICO/installer/taskbar/start-menu variants SHALL derive from these sources. Screens SHALL NOT redraw approximate variants.
+
+## 4.3 Wordmark
 
 The primary lockup is:
 
@@ -127,9 +142,9 @@ The primary lockup is:
 
 The wordmark is uppercase, geometric, clean, and horizontally balanced. It SHALL not use ornamental sci-fi glyph substitutions that reduce legibility.
 
-UI navigation MAY render `JARVIS` using the application type system when the canonical lockup asset is not appropriate, but branded surfaces/app icons/startup assets SHALL use canonical vector assets.
+UI navigation MAY render `JARVIS` using the application type system when the canonical lockup asset is not appropriate, but branded surfaces/app icons/startup assets SHALL use canonical source assets or generated derivatives.
 
-## 4.3 Usage
+## 4.4 Usage
 
 The brand mark SHALL remain recognizable at small application/status sizes.
 
@@ -153,7 +168,7 @@ Voice/listening animation may appear adjacent to or around a UI instance of the 
 
 ---
 
-# 5. TYPOGRAPHY
+# 5. TYPOGRAPHY AND FONT PROVENANCE
 
 ## 5.1 Typeface
 
@@ -173,6 +188,8 @@ Inter
 → Segoe UI
 → sans-serif
 ```
+
+Packaged font files, icon libraries, and other third-party visual assets SHALL have source/version/license/provenance recorded and any required notices included in release artifacts. JARVIS SHALL NOT redistribute an asset without a license permitting the intended distribution.
 
 ## 5.2 Scale
 
@@ -269,7 +286,7 @@ Icons SHALL remain understandable without decorative detail at compact sizes.
 
 Where an icon represents a consequential action or state, a text/accessible label SHALL exist.
 
-Different integrations MAY use their official marks where permitted, but surrounding controls/layout remain JARVIS-native rather than adopting each integration's visual system.
+Different integrations MAY use their official marks where permitted by their license/brand terms, but surrounding controls/layout remain JARVIS-native rather than adopting each integration's visual system.
 
 ---
 
@@ -287,6 +304,7 @@ Mission Control unifies:
 - queue;
 - approvals;
 - systems/integrations;
+- provider setup/repair/status;
 - project/context;
 - data/memory/artifacts;
 - notifications;
@@ -346,6 +364,7 @@ It may show:
 - queue;
 - requested analysis/information;
 - system/integration detail;
+- provider setup/repair flow;
 - artifact/data view.
 
 Conversation SHALL feel native to this workspace, not like an embedded third-party chat widget.
@@ -358,6 +377,7 @@ The context pane surfaces secondary but actionable information, for example:
 - selected mission/task detail;
 - Proxmox/system status;
 - GitHub activity;
+- provider support/setup state;
 - memory/context references;
 - artifact preview;
 - environment/account scope;
@@ -393,6 +413,7 @@ The dashboard MAY be shown/focused when:
 - user asks for visual information best presented in the dashboard;
 - user selects JARVIS from taskbar/tray/application controls;
 - deterministic approval/notification policy explicitly calls for visual escalation;
+- provider setup/repair needs explicit user action;
 - recovery/security state requires user interaction.
 
 The dashboard MAY be hidden when:
@@ -416,7 +437,7 @@ JARVIS SHALL NOT routinely steal focus because:
 
 Visual escalation SHALL respect NotificationPolicy, current focus mode, current full-screen activity, locked-session privacy, and severity.
 
-Critical/security/destructive approval states may request stronger presentation only under deterministic policy.
+Critical/security/destructive approval states or an explicit setup action initiated by the user may request stronger presentation only under deterministic policy.
 
 `FULLSCREEN` is not the default attention mechanism.
 
@@ -478,7 +499,13 @@ Shall:
 - convert dense tables to compact rows/cards where required;
 - remove low-priority simultaneous metrics before shrinking essential text.
 
-## 10.4 Touch-oriented/future smaller screens
+## 10.4 Reflow and high zoom
+
+Primary linear workflows SHALL remain usable at an effective layout equivalent to approximately **320 CSS px width / 400% zoom** without requiring simultaneous horizontal and vertical scrolling, except for content whose meaning intrinsically requires two-dimensional layout such as certain diagrams, maps, large code/data canvases, or equivalent WCAG-defined exceptions.
+
+At high zoom/reflow, supporting detail may move behind drawers/details, but required primary actions and state SHALL remain reachable.
+
+## 10.5 Touch-oriented/future smaller screens
 
 Touch-optimized layout SHALL increase target size and vertical flow while preserving the same brand, hierarchy, state language, and component semantics.
 
@@ -493,11 +520,11 @@ The interface normally prioritizes:
 1. what the user is currently asking/doing;
 2. what JARVIS is doing now;
 3. what requires user attention;
-4. what is blocked/queued/waiting/uncertain;
+4. what is blocked/queued/waiting/setup-required/uncertain;
 5. relevant system/environment health;
 6. supporting evidence/history/details.
 
-Secondary metrics SHALL NOT visually outrank a pending approval, blocked mission, failed verification, or active user question.
+Secondary metrics SHALL NOT visually outrank a pending approval, blocked mission, failed verification, setup requirement, or active user question.
 
 Dashboards SHALL be contextual, not metric collections built merely because data exists.
 
@@ -565,21 +592,25 @@ Approval language SHALL be plain, candid, and specific.
 
 ---
 
-# 15. SYSTEM / INTEGRATION PANELS
+# 15. SYSTEM / INTEGRATION / PROVIDER PANELS
 
-System panels such as Proxmox/GitHub status SHALL answer useful operational questions first:
+System panels such as Proxmox/GitHub/provider status SHALL answer useful operational questions first:
 
 ```text
 Is it healthy?
+Is required setup/repair complete?
 What changed?
 What needs attention?
 What is JARVIS allowed to do?
+Which capabilities are production-supported by this release?
 What is the current environment/account scope?
 ```
 
 Raw metrics are secondary unless requested or diagnostically important.
 
 Integration-specific branding SHALL not break JARVIS component/layout hierarchy.
+
+Mandatory vs optional/unsupported capability status SHALL be explicit rather than inferred from whether a button or schema exists.
 
 ---
 
@@ -617,6 +648,8 @@ IN_PROGRESS
 WARNING
 ERROR
 WAITING
+SETUP_REQUIRED
+REPAIR_REQUIRED
 BLOCKED
 PAUSED
 RESUMING
@@ -634,7 +667,7 @@ Every consequential state SHALL provide at least two of:
 
 Color alone is insufficient.
 
-State terms used in UI SHALL map cleanly to canonical domain/runtime state and SHALL NOT invent optimistic synonyms that hide `BLOCKED`, `RECOVERING`, or `UNCERTAIN`.
+State terms used in UI SHALL map cleanly to canonical domain/runtime state and SHALL NOT invent optimistic synonyms that hide `BLOCKED`, `SETUP_REQUIRED`, `RECOVERING`, or `UNCERTAIN`.
 
 ---
 
@@ -699,6 +732,12 @@ For failure:
 "The deploy did not complete. GitHub accepted the workflow request, but the runner result is still unknown. I’m treating the outcome as uncertain."
 ```
 
+For setup:
+
+```text
+"Codex is installed, but its qualified Windows sandbox is not ready. Setup requires Windows approval before engineering workers can run."
+```
+
 Never use confident success language without authoritative evidence.
 
 ---
@@ -711,7 +750,7 @@ Mandatory minimums:
 
 - normal text contrast >= `4.5:1`;
 - qualifying large text >= `3:1`;
-- meaningful non-text UI indicators/controls use qualified contrast;
+- meaningful non-text UI indicators/controls use >= `3:1` contrast against adjacent colors where required by the applicable criterion;
 - state is not color-only;
 - keyboard access for primary workflows;
 - no keyboard traps;
@@ -719,12 +758,17 @@ Mandatory minimums:
 - focused controls are not obscured by sticky surfaces;
 - semantic names/roles/states for assistive technology;
 - user text/content scaling to 200% without losing required content/function;
+- primary workflow reflow at an effective 320 CSS px / 400% zoom-equivalent layout subject only to intrinsic two-dimensional content exceptions;
+- pointer targets at least `24 × 24` CSS px or satisfy an equivalent WCAG 2.2 target-spacing/exception rule;
 - Windows DPI scaling/high-DPI multi-monitor scenarios qualified;
+- Windows High Contrast / CSS forced-colors behavior qualified where supported by the production WebView stack;
 - reduced-motion preference honored;
-- touch-oriented interactive targets are enlarged appropriately;
+- touch-oriented interactive targets enlarged appropriately;
 - important content remains understandable without relying on hover alone.
 
 The app SHALL remain usable with Windows display scaling at least across qualified `100%`, `125%`, `150%`, and `200%` profiles on representative hardware.
+
+High Contrast/forced-colors qualification SHALL verify focus, disabled/enabled distinction, selected state, warning/destructive action distinction, approval controls, status icons/text, and essential borders remain perceptible even when normal JARVIS colors are overridden.
 
 ---
 
@@ -739,12 +783,16 @@ Sensitive/private content SHALL obey current DataPolicy and locked-session notif
 The dashboard SHALL NOT expose:
 
 - raw credentials;
-- recovery keys;
+- recovery keys/factors;
+- KDF-derived working keys;
+- provider-internal sandbox-user credentials;
 - hidden model chain-of-thought;
 - unrestricted environment dumps;
 - secret values in debug UI.
 
 External/untrusted HTML remains sanitized/inert under the WebView contract even when displayed in polished cards or previews.
+
+A UAC/provider-setup prompt SHALL identify the provider/setup purpose clearly and SHALL NOT imitate a JARVIS approval for unrelated consequential work.
 
 ---
 
@@ -766,6 +814,7 @@ typography
 motion
 focus
 z-order/layout
+forced-colors/high-contrast adaptation
 ```
 
 Components consume tokens. Screens SHALL NOT create parallel undocumented theme systems.
@@ -788,6 +837,7 @@ Reusable design-system components SHALL own common visual/interaction semantics 
 - status chips;
 - mission/task cards;
 - approval panels;
+- provider setup/repair panels;
 - tables/list rows;
 - system health blocks;
 - message blocks;
@@ -812,7 +862,7 @@ Entering/exiting full screen SHALL preserve:
 - unsent draft where safe;
 - context-pane selection where applicable.
 
-A focused presentation MAY temporarily remove navigation/secondary panels to show requested information, a graph, artifact, terminal/log view, presentation, approval, or system overview.
+A focused presentation MAY temporarily remove navigation/secondary panels to show requested information, a graph, artifact, terminal/log view, presentation, approval, provider setup/repair flow, or system overview.
 
 Dismissal returns to the previous shell state without losing context.
 
@@ -820,17 +870,19 @@ JARVIS SHALL be able to present requested information visually without forcing t
 
 ---
 
-# 25. EMPTY, DEGRADED, RECOVERY, AND ERROR STATES
+# 25. EMPTY, DEGRADED, SETUP, RECOVERY, AND ERROR STATES
 
 Empty states SHALL be useful and restrained. They may explain what can be done next but SHALL NOT fill the screen with marketing content.
 
-Degraded/recovery/error states SHALL:
+Degraded/setup/recovery/error states SHALL:
 
 - name the affected capability;
 - state what remains available;
-- state whether data/work is safe/queued/uncertain;
+- state whether data/work is safe/queued/uncertain/setup-required;
 - provide the next useful action when known;
 - preserve access to diagnostics/recovery where policy permits.
+
+Provider setup requiring UAC SHALL explain why elevation is needed and that normal workers remain non-elevated.
 
 A polished dark screen with no explanation is not an acceptable failure state.
 
@@ -847,13 +899,18 @@ ultrawide layout
 compact resizable window
 multi-monitor including monitor removal/reconnect
 100% / 125% / 150% / 200% Windows scaling
+200% text resizing
+320 CSS px / 400% zoom-equivalent reflow for primary linear workflows
 keyboard-only primary workflows
+assistive-technology semantic navigation of primary workflows
+Windows High Contrast / forced-colors where supported
 reduced-motion preference
 long text / long IDs / localization-safe expansion behavior
 high mission/queue/notification counts
 empty state
-blocked/waiting/uncertain/recovery state
+blocked/waiting/setup-required/uncertain/recovery state
 voice idle/listening/processing/speaking/degraded state
+provider setup/repair flow
 approval states including destructive confirmation
 ```
 
@@ -877,24 +934,29 @@ V1 SHALL NOT require:
 - full-screen takeover for ordinary notifications;
 - dense telemetry simply because data is available.
 
+High Contrast/forced-colors is an accessibility adaptation and is not excluded by the dark-theme-only product decision.
+
 ---
 
 # 28. DEFINITION OF UI IDENTITY COMPLETE
 
 UI identity implementation is complete only when:
 
-1. canonical logo/vector assets are used consistently;
-2. three-color brand identity is preserved;
-3. design tokens are centralized;
-4. Mission Control shell exists and is consistent across major sections;
-5. dedicated window show/hide/windowed/maximized/fullscreen/focused behavior is deterministic and tested;
-6. layouts adapt across required viewport/DPI conditions without parallel visual systems;
-7. operational state is glanceable and truthful;
-8. conversation/mission/approval/system views feel like one product;
-9. keyboard/focus/contrast/scaling requirements pass;
-10. reduced-motion behavior passes;
-11. destructive/uncertain/degraded states remain visually explicit;
-12. no major screen requires historical mockups/ADRs to infer its design language.
+1. canonical mark/lockup/app-icon source assets are used consistently;
+2. generated platform variants derive from canonical sources;
+3. three-color brand identity is preserved outside accessibility/system forced-color overrides;
+4. design tokens are centralized;
+5. Mission Control shell exists and is consistent across major sections;
+6. dedicated window show/hide/windowed/maximized/fullscreen/focused behavior is deterministic and tested;
+7. layouts adapt across required viewport/DPI/zoom/reflow conditions without parallel visual systems;
+8. operational state is glanceable and truthful;
+9. conversation/mission/approval/system/provider-setup views feel like one product;
+10. keyboard/focus/contrast/target-size/reflow/scaling requirements pass;
+11. High Contrast/forced-colors behavior passes where supported;
+12. reduced-motion behavior passes;
+13. destructive/setup/uncertain/degraded states remain visually explicit;
+14. packaged fonts/icons/visual assets have required source/license/provenance;
+15. no major screen requires historical mockups/ADRs to infer its design language.
 
 ---
 
@@ -912,4 +974,4 @@ UI identity implementation is complete only when:
 
 ---
 
-**END — JARVIS UI IDENTITY & DESIGN SYSTEM CONTRACT v1.0.2**
+**END — JARVIS UI IDENTITY & DESIGN SYSTEM CONTRACT v1.0.3**
