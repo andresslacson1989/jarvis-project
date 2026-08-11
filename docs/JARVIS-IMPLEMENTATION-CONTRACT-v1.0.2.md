@@ -256,7 +256,7 @@ PermissionEngine SHALL apply this decision precedence:
 6. data locality, budget, resource, precondition, and integrity checks;
 7. authority established by the current explicit instruction;
 8. matching standing permission;
-9. required HIGH/CRITICAL approval/final-confirmation rule;
+9. risk/approval rule: a recoverable HIGH action requires a new approval unless the exact resolved action/target/scope is directly and unambiguously authorized by the current authenticated instruction or an explicit matching standing permission under policy; CRITICAL/destructive/materially unrecoverable always requires fresh final confirmation;
 10. `ALLOW` only if every prior gate permits it.
 
 Mandatory safety invariants and explicit DENY dominate grants.
