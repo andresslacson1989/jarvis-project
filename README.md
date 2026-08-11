@@ -1,22 +1,38 @@
 # JARVIS Project
 
-JARVIS is a Windows-first, voice-capable AI operating companion built around deterministic authorization, bounded AI workers, durable mission orchestration, replaceable providers, secure integrations, and verified execution.
+JARVIS is a Windows-first, voice-capable AI operating companion built around deterministic authorization, bounded AI workers, durable mission orchestration, replaceable providers, secure integrations, verified execution, and tested recovery.
 
-## Canonical implementation contract
+## Current implementation source of truth
 
-Implementation SHALL follow the v1.0 production contract suite:
+**There is one current implementation contract: JARVIS v1.0.2.**
 
-1. [`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.md`](docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.md) — top-level product, architecture, and implementation contract.
-2. [`docs/implementation/JARVIS-RUNTIME-CONTRACT.md`](docs/implementation/JARVIS-RUNTIME-CONTRACT.md) — process topology, IPC, worker/provider runtime, scheduling, pause/resume, recovery.
-3. [`docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`](docs/implementation/JARVIS-DATA-STATE-CONTRACT.md) — SQLite schema domains, state machines, graph versions, checkpoints, events, backups, restore, migrations.
-4. [`docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`](docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md) — session trust, credential protection, prompt-injection boundary, worker/tool security, supply-chain hardening.
-5. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — Definition of Done, failure/recovery testing, security gates, performance/voice qualification, release acceptance.
-6. [`docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md`](docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md) — canonical versioned cross-process/domain schemas and compatibility rules.
-7. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered build plan from control-plane foundation through Production Complete qualification.
+Read the active suite in this order:
 
-`docs/JARVIS-TECHNICAL-CONTRACT.md` is preserved as the original architecture baseline. Where the v1.0 suite is more specific, v1.0 governs implementation.
+1. [`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`](docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md) — canonical product, architecture, security, operations, and production contract.
+2. [`docs/JARVIS-V1-RELEASE-PROFILE.md`](docs/JARVIS-V1-RELEASE-PROFILE.md) — exact V1 production support/release target.
+3. [`docs/implementation/JARVIS-RUNTIME-CONTRACT.md`](docs/implementation/JARVIS-RUNTIME-CONTRACT.md) — process topology, Tauri/WebView boundary, application-owned Core runtime, IPC, worker/provider supervision, scheduling, cancellation, and recovery.
+4. [`docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md`](docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md) — canonical protocol/domain schemas and exact cross-language representations.
+5. [`docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`](docs/implementation/JARVIS-DATA-STATE-CONTRACT.md) — SQLite/SQLCipher state, state machines, transactions, events, budgets, backups, restore, and migrations.
+6. [`docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`](docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md) — threat model, session trust, permission precedence, IPC/WebView/worker/tool/module/integration security, and recovery-key rules.
+7. [`docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`](docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md) — normative coding, package-boundary, validation, Rust/TypeScript, database, security, testing, and CI rules.
+8. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — Definition of Done, conformance, adversarial, recovery, performance, voice, packaging, and release gates.
+9. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria.
 
-Accepted ADRs under `docs/decisions/` and `docs/adr/` preserve the architectural decision history and are binding where they explicitly refine or supersede earlier contract clauses. [`ADR-054`](docs/decisions/ADR-054-contract-consistency-and-schema-normalization.md) is the binding v1.0 consistency correction. [`ADR-055`](docs/decisions/ADR-055-windows-core-ipc-access-control.md) hardens the Windows Host ↔ Core control-plane IPC boundary with explicit session-scoped named-pipe access control and remote-client rejection. [`ADR-056`](docs/decisions/ADR-056-same-user-compromise-boundary.md) defines the V1 same-user compromise boundary: JARVIS continues strong exposure-minimization and deterministic hardening, but does not claim a hard isolation guarantee against arbitrary malicious code already executing with the same effective Windows user/logon identity. [`ADR-057`](docs/decisions/ADR-057-module-execution-isolation.md) defines module execution isolation: declarative modules are data-only, first-party release code may be built-in trusted, and separately installable executable modules must run as supervised external processes behind a typed capability-scoped protocol rather than inside the authoritative Core. [`ADR-058`](docs/decisions/ADR-058-deterministic-approval-action-digests.md) defines deterministic approval binding using a versioned material-action schema, RFC 8785 JCS canonicalization, SHA-256, and mandatory digest revalidation immediately before single-use approval consumption. [`ADR-059`](docs/decisions/ADR-059-proxmox-ve-integration-boundary.md) adds Proxmox VE as a first-class infrastructure connection using a verified HTTPS API path, secure API-token handling, capability-scoped authority, deterministic resource identity, live-state verification, and destructive-action binding without automatic SSH or guest-shell authority. [`ADR-060`](docs/decisions/ADR-060-provider-authoritative-usage-and-exact-budget-accounting.md) defines provider-authoritative usage/quota ingestion, exact fixed-point JARVIS monetary accounting, and atomic budget reservations so concurrent workers cannot oversubscribe user-defined hard limits. [`ADR-061`](docs/decisions/ADR-061-application-owned-core-runtime.md) requires production JARVIS to ship and verify its own release-pinned Node.js runtime and bundled Core, launch it by exact application-owned path with a controlled environment, and fail closed rather than falling back to arbitrary system Node installations. [`ADR-062`](docs/decisions/ADR-062-backup-recovery-key-semantics.md) separates same-machine local recovery from portable disaster recovery using per-backup envelope encryption, Windows current-user protection for local backups, and an independent Argon2id-derived portable recovery key slot while keeping credential export separate. [`ADR-063`](docs/decisions/ADR-063-mandatory-windows-job-object-containment.md) makes Windows Job Object containment mandatory for JARVIS-managed executable process trees, requires kill-on-close ownership and creation-time containment where possible, and prohibits ordinary breakaway so shutdown, cancellation, and crash cleanup remain deterministic. [`ADR-064`](docs/decisions/ADR-064-explicit-ipc-response-error-union.md) makes IPC request outcomes structurally unambiguous through an explicit success/error union, deterministic request/response identity invariants, normalized errors, and fail-closed handling when malformed transport input cannot safely produce an application response. [`ADR-065`](docs/decisions/ADR-065-provider-version-qualification-and-codex-compatibility.md) requires evidence-backed provider compatibility: detected versions are checked against JARVIS-shipped qualification rules, release-time conformance must pass before a provider version is marked supported, and Codex/provider self-updates trigger revalidation rather than inheriting trust automatically. [`ADR-066`](docs/decisions/ADR-066-provider-session-resume-is-optimization-not-durability.md) makes provider-native session resume an optional continuity/performance optimization rather than a durability dependency: accepted work must remain recoverable from JARVIS-owned checkpoints, artifacts, workspace/live state, and verified evidence even when a provider session cannot be resumed. [`ADR-067`](docs/decisions/ADR-067-v1-integration-release-boundary-and-next-update-requirements.md) fixes the integration release boundary: V1 Production Complete requires qualified Local filesystem/Git, GitHub, Codex/OpenAI, and Proxmox VE; SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding contract requirements and gate the first feature-bearing post-V1 release, while emergency maintenance/security patches may ship earlier and direct public inbound Internet listeners remain outside the V1 privileged-desktop boundary. [`ADR-068`](docs/decisions/ADR-068-sqlite-wal-safety-and-operational-diagnostics.md) hardens authoritative SQLite/SQLCipher persistence by requiring a WAL-reset-fix-qualified runtime, verified WAL activation on a local filesystem, `synchronous=FULL` durability for authoritative state, bounded contention handling, and observable checkpoint/WAL-growth/integrity health. These accepted refinements SHALL be applied with the contract suite until they are consolidated into a later clean contract revision.
+Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. [`docs/JARVIS-CONTRACT-LINEAGE.md`](docs/JARVIS-CONTRACT-LINEAGE.md) explains how prior branches/ADRs were reconciled.
+
+## No overlay interpretation
+
+Accepted ADRs under `docs/decisions/` and `docs/adr/` preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.2 suite.
+
+A future architectural ADR is incomplete until the same change also updates every affected active normative document. Implementation SHALL NOT rely on a new ADR while contradictory canonical wording remains.
+
+If an ADR and an active v1.0.2 normative document appear to conflict, stop and correct the canonical contract; do not choose an interpretation silently.
+
+## Historical material
+
+Earlier top-level contracts are retained under [`docs/history/`](docs/history/) for provenance only. They are not current implementation instructions.
+
+The divergent branch `codex/contract-implementation-lock` is historical/non-authoritative. Useful work from it was incorporated into v1.0.2, but its colliding ADR-054/055/056 identifiers are **not** part of the canonical ADR lineage.
 
 ## Governing principles
 
@@ -26,6 +42,12 @@ Accepted ADRs under `docs/decisions/` and `docs/adr/` preserve the architectural
 
 > **Be autonomous inside the user's intent. Ask before materially expanding it.**
 
-> **Build the control plane first, then give intelligence access to it.**
+> **Build the control plane first, prove recoverability early, then give intelligence access to it.**
 
-> **Build JARVIS so the finished system is useful on the good day, controlled on the dangerous day, and recoverable on the bad day.**
+> **History explains the contract. The current contract defines the product.**
+
+## Status semantics
+
+`Implementation-locked` means the active contract defines foundational security, state, recovery, packaging, protocol, provider, integration, and release behavior tightly enough that implementation does not invent architecture ad hoc.
+
+`Production Complete` is different. It may be declared only for an implemented, signed release that passes every mandatory gate in `JARVIS-VERIFICATION-RELEASE-CONTRACT.md` for the active Release Profile. Documentation alone can never satisfy that product status.
