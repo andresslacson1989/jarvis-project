@@ -2,6 +2,14 @@
 
 These instructions apply to all human and AI contributors.
 
+## Branch authority
+
+`master` is the only authoritative/latest repository branch.
+
+Before creating or continuing implementation work, re-fetch live `master` and base the work from that tip. Temporary feature/review branches MAY exist while a change is in progress, but they SHALL NOT become parallel sources of truth. Once accepted work is incorporated into `master`, the old branch is historical/disposable and MUST NOT be used as the base for new work.
+
+Legacy `codex/contract-*` branches are non-authoritative even if they remain visible as remote branch pointers. Their accepted semantics have already been reconciled into `master`.
+
 ## Source of truth
 
 Before implementation or architecture work, read:
@@ -68,8 +76,8 @@ Do not:
 
 ## Engineering workflow
 
-- Work on a feature branch/worktree rather than directly on `master` unless explicitly instructed otherwise.
-- Re-fetch the live branch tip before repository writes when concurrent changes may exist.
+- Work on a temporary feature branch/worktree rather than directly on `master` unless explicitly instructed otherwise, but always create/refresh it from the current live `master` tip.
+- Re-fetch `master` and the working branch tip before repository writes when concurrent changes may exist.
 - Preserve valid concurrent work.
 - Keep commits scoped and reviewable.
 - Contract/schema changes must include compatibility/migration implications.
