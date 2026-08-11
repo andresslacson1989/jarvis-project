@@ -1,14 +1,14 @@
 # JARVIS Data & State Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
-**Version:** 1.0.2  
-**Date:** August 11, 2026
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
+**Version:** 1.0.3  
+**Date:** August 12, 2026
 
 ---
 
 # 1. PURPOSE
 
-This document defines authoritative persistence, transactions, state machines, events, scopes, memory, artifacts, approvals, provider usage, budgets, SQLite/SQLCipher operation, encrypted backups, migrations, restore, and recovery.
+This document defines authoritative persistence, transactions, state machines, events, scopes, memory, artifacts, approvals, provider setup/usage, budgets, KDF metadata, SQLite/SQLCipher operation, encrypted backups, migrations, restore, and recovery.
 
 UI, providers, workers, tools, integrations, and modules SHALL NOT invent their own authoritative state semantics.
 
@@ -73,7 +73,42 @@ SQLite storage MAY use checked INTEGER only where the full `nanoUnits` range is 
 
 ---
 
-# 5. LOGICAL TABLE GROUPS
+# 5. KDF PROFILE PERSISTENCE
+
+Session-password verifiers and portable-recovery key slots SHALL retain the exact versioned KDF profile required to verify/derive them.
+
+JARVIS-managed V1 production profiles are Argon2id version `0x13` and SHALL meet at least:
+
+```text
+memoryKiB  >= 65536
+iterations >= 3
+parallelism = 4
+saltBytes  >= 16
+outputBytes >= 32
+```
+
+Persistence SHALL retain, directly or through immutable profile reference:
+
+```text
+profile id
+purpose: SESSION_PASSWORD | PORTABLE_RECOVERY
+algorithm/version
+memoryKiB
+iterations
+parallelism
+salt length and actual random salt where required by the verifier/key slot
+output length
+created/activated timestamps
+replacement/supersession metadata where applicable
+```
+
+The password/recovery secret itself is never stored.
+
+A later release MAY strengthen parameters. Existing valid verifier/key slots remain interpretable using their recorded profile; after successful authentication/recovery, policy MAY atomically re-hash/re-wrap under the current stronger profile. Downgrade below the current production floor requires an explicit future security-contract revision and is not an automatic compatibility fallback.
+
+---
+
+# 6. LOGICAL TABLE GROUPS
 
 The schema SHALL provide logical ownership equivalent to:
 
@@ -84,10 +119,12 @@ System
   settings
   feature_flags
   release_profile_state
+  kdf_profiles
 
 Session/Conversation
   user_profile
   trusted_sessions
+  session_auth_verifiers
   conversations
   messages
   conversation_context
@@ -135,6 +172,7 @@ Permissions/Approvals
 Providers/Modules/Integrations
   providers
   provider_profiles
+  provider_setup_state
   provider_qualification_state
   provider_health_history
   modules
@@ -171,7 +209,7 @@ Exact physical normalization may evolve before first production schema freeze as
 
 ---
 
-# 6. TRANSACTIONAL STATE CHANGES
+# 7. TRANSACTIONAL STATE CHANGES
 
 Authoritative transitions SHALL persist state and causative event/audit evidence atomically where they are within one SQLite transaction boundary.
 
@@ -188,13 +226,13 @@ compute/resolve/validate outside transaction
 → publish in-memory event
 ```
 
-Long-running AI, network, user-wait, filesystem, backup, or external API work SHALL NOT hold an SQLite write transaction open.
+Long-running AI, network, user-wait, filesystem, backup, provider setup, or external API work SHALL NOT hold an SQLite write transaction open.
 
-SQLite and an external service are never modeled as one atomic transaction. External effects use attempts, idempotency, preconditions, postconditions, and `UNCERTAIN` recovery.
+SQLite and an external service/provider setup helper are never modeled as one atomic transaction. External effects use attempts, setup states, idempotency, preconditions, postconditions, and `UNCERTAIN`/repair recovery where appropriate.
 
 ---
 
-# 7. OPTIMISTIC CONCURRENCY
+# 8. OPTIMISTIC CONCURRENCY
 
 Authoritative mutable records SHALL use a monotonic `version`/equivalent token.
 
@@ -204,7 +242,7 @@ Consequential policy/action records retain the policy snapshot/version used for 
 
 ---
 
-# 8. MISSION STATE MACHINE
+# 9. MISSION STATE MACHINE
 
 Canonical mission states:
 
@@ -247,7 +285,7 @@ Mission resume does not bypass task-level `RESUMING` validation.
 
 ---
 
-# 9. TASK STATE MACHINE
+# 10. TASK STATE MACHINE
 
 Canonical task states:
 
@@ -279,7 +317,7 @@ PAUSED → RESUMING | CANCELLED
 RESUMING → RUNNING | QUEUED | BLOCKED | RECOVERING | FAILED | CANCELLED
 ```
 
-`RESUMING` revalidates live state, scope, target, leases, provider compatibility/health/locality, budget, approvals, and relevant preconditions.
+`RESUMING` revalidates live state, scope, target, leases, provider setup/compatibility/health/locality, budget, approvals, and relevant preconditions.
 
 `INVALIDATED` preserves historical completed output but marks it unusable by the active graph.
 
@@ -287,7 +325,7 @@ A task becomes `COMPLETED` only when its required acceptance/verification policy
 
 ---
 
-# 10. ATTEMPT STATE MACHINE
+# 11. ATTEMPT STATE MACHINE
 
 Attempt states:
 
@@ -312,7 +350,7 @@ UNCERTAIN
 
 ---
 
-# 11. EXECUTION SCOPE PERSISTENCE
+# 12. EXECUTION SCOPE PERSISTENCE
 
 Every executable task stores exactly one:
 
@@ -337,7 +375,7 @@ Scope expansion after attempt start requires a new validated authority/revision;
 
 ---
 
-# 12. AUTHORITY ENVELOPES AND PERMISSION RECORDS
+# 13. AUTHORITY ENVELOPES AND PERMISSION RECORDS
 
 Authority envelopes are immutable for active attempts and persist:
 
@@ -369,7 +407,7 @@ The deterministic precedence itself is defined by the Security Contract and must
 
 ---
 
-# 13. APPROVALS AND CANONICAL ACTION MATERIAL
+# 14. APPROVALS AND CANONICAL ACTION MATERIAL
 
 Approval states are exactly:
 
@@ -406,7 +444,7 @@ Approval is single-use. Approval consumption is transactionally guarded against 
 
 ---
 
-# 14. GRAPH VERSIONING AND ACCEPTANCE
+# 15. GRAPH VERSIONING AND ACCEPTANCE
 
 Activated mission graph versions are immutable and include:
 
@@ -433,7 +471,7 @@ Bounded iteration belongs inside tasks/workers, not unbounded graph cycles.
 
 ---
 
-# 15. TASK INPUTS, OUTPUTS, ARTIFACTS
+# 16. TASK INPUTS, OUTPUTS, ARTIFACTS
 
 Task inputs persist goal, criteria, scope, authority, data policy, context/artifact references, role/capability requirements, and resource/budget policy.
 
@@ -447,7 +485,7 @@ Artifacts derived from `LOCAL_ONLY` remain `LOCAL_ONLY` absent explicit determin
 
 ---
 
-# 16. WORKER CHECKPOINTS AND PROVIDER RESUME
+# 17. WORKER CHECKPOINTS AND PROVIDER RESUME
 
 A checkpoint SHALL be sufficient for a qualified fresh worker to continue without provider-private transcript history. It includes goal summary, completed work, decisions/findings, artifacts, verification state, current activity, next step, blockers, and live-state assumptions.
 
@@ -457,7 +495,7 @@ Provider resume references may be persisted as sensitive opaque metadata when us
 
 ---
 
-# 17. EVENTS AND DEDUPLICATION
+# 18. EVENTS AND DEDUPLICATION
 
 Durable domain events are append-oriented, versioned, and sufficient to explain authoritative transitions without AI reconstruction.
 
@@ -469,7 +507,7 @@ A duplicate/replayed event does not create duplicate consequential work.
 
 ---
 
-# 18. RESOURCE/WORKSPACE LEASES
+# 19. RESOURCE/WORKSPACE LEASES
 
 Exclusive resources use durable/recoverable lease records including owner instance/task/attempt, acquisition/heartbeat, resource identity, and lease type.
 
@@ -481,7 +519,7 @@ A lease is reclaimed only after owner death is established or the resource-speci
 
 ---
 
-# 19. MEMORY AND CONVERSATION
+# 20. MEMORY AND CONVERSATION
 
 Memory scopes include user/global, project, mission, task, and session as appropriate.
 
@@ -504,7 +542,7 @@ Retrieving stored `LOCAL_ONLY` conversation/memory does not make it remotely rou
 
 ---
 
-# 20. PRECEDENT RECORDS
+# 21. PRECEDENT RECORDS
 
 Precedent records contain action class, scope/environment/target/account class, reversibility, consequence, prior user decision, timestamps, and confidence/relevance metadata.
 
@@ -512,7 +550,30 @@ Precedent is evidence only. It does not directly authorize HIGH/CRITICAL action,
 
 ---
 
-# 21. PROVIDER QUOTA AND USAGE FACTS
+# 22. PROVIDER SETUP / QUALIFICATION STATE
+
+Provider setup state is durable logical state distinct from compatibility and health:
+
+```text
+NOT_REQUIRED
+SETUP_REQUIRED
+SETUP_IN_PROGRESS
+SETUP_READY
+REPAIR_REQUIRED
+SETUP_FAILED
+```
+
+Persistence SHALL retain at least provider/distribution/version identity, setup policy/profile identity, current setup state, last setup/repair attempt timestamp/outcome, sanitized failure reason, last setup verification time, and conformance evidence reference where applicable.
+
+A provider version/distribution change invalidates setup/conformance state according to its compatibility policy. JARVIS SHALL NOT carry `SETUP_READY` across a version change when the policy cannot prove the setup remains valid.
+
+`SETUP_IN_PROGRESS` after crash/restart is reconciled through provider-specific setup probing; it does not become `SETUP_READY` by timeout or assumption.
+
+Provider-owned internal sandbox credentials are not persisted by JARVIS as general secrets.
+
+---
+
+# 23. PROVIDER QUOTA AND USAGE FACTS
 
 Provider quota/usage snapshots preserve source provenance:
 
@@ -532,7 +593,7 @@ Deleting a task does not erase accounting facts required for budget/audit histor
 
 ---
 
-# 22. BUDGETS AND ATOMIC RESERVATIONS
+# 24. BUDGETS AND ATOMIC RESERVATIONS
 
 A hard monetary budget SHALL atomically consider:
 
@@ -560,9 +621,9 @@ Different currencies are not added without an explicit versioned FX conversion c
 
 ---
 
-# 23. PROVIDERS, MODULES, INTEGRATIONS
+# 25. PROVIDERS, MODULES, INTEGRATIONS
 
-Provider records separate installation/discovery, compatibility, health/auth state, qualification evidence, model/capability availability, and current profile.
+Provider records separate installation/discovery, setup, compatibility, health/auth state, qualification evidence, model/capability availability, and current profile.
 
 Module records separate:
 
@@ -577,13 +638,13 @@ HEALTHY
 
 and store authenticated catalog/provenance metadata. Installed external code does not become `BUILT_IN_TRUSTED` through signature alone.
 
-Integration account rows contain metadata and opaque credential handles only. After state restore without local credential-store secrets, affected accounts become `REAUTH_REQUIRED`.
+Integration account rows contain metadata and opaque credential handles only. Enabled/supported capability IDs are explicit. After state restore without local credential-store secrets, affected accounts become `REAUTH_REQUIRED`.
 
 Proxmox connections persist stable connection/environment IDs, endpoint/trust configuration, capability/scope allowlists, status, and opaque credential handle. VM display names are not authoritative target identity.
 
 ---
 
-# 24. SQLITE WAL OPERATIONAL RULES
+# 26. SQLITE WAL OPERATIONAL RULES
 
 Every connection passes the owned initialization path that verifies required settings such as:
 
@@ -602,7 +663,7 @@ The `-wal`/`-shm` files are part of live database state. Backup SHALL use SQLite
 
 ---
 
-# 25. BACKUP CLASSES AND CRYPTOGRAPHIC ENVELOPE
+# 27. BACKUP CLASSES AND CRYPTOGRAPHIC ENVELOPE
 
 Backup protection classes are:
 
@@ -629,13 +690,13 @@ The `SnapshotDBKey` SHALL never be emitted as plaintext sidecar or normal manife
 
 ---
 
-# 26. BACKUP KEY SLOTS
+# 28. BACKUP KEY SLOTS
 
 `LOCAL_RECOVERY` SHALL contain a Windows current-user DPAPI/local-secure-store key slot suitable for unattended same-profile local restore.
 
-`PORTABLE_STATE` SHALL contain an independent portable key slot based on a user-controlled recovery factor. The V1 passphrase path uses Argon2id with fresh salt, versioned parameters, and a strong baseline calibrated for interactive restore. The derived key encrypts/wraps `BackupDEK`; it does not directly encrypt the entire package.
+`PORTABLE_STATE` SHALL contain an independent portable key slot based on a user-controlled recovery factor. The V1 passphrase path uses Argon2id version `0x13`, fresh random salt, versioned parameters meeting the current production KDF floor, and preferably a materially stronger memory cost when interactive restore remains practical. The derived key encrypts/wraps `BackupDEK`; it does not directly encrypt the entire package.
 
-A portable package MAY contain both local DPAPI and portable key slots.
+The key slot SHALL record its exact KDF profile/parameters needed for future recovery. A portable package MAY contain both local DPAPI and portable key slots.
 
 The portable recovery passphrase/factor is never stored.
 
@@ -643,7 +704,7 @@ A package is labeled portable only after JARVIS verifies a non-DPAPI key slot ca
 
 ---
 
-# 27. BACKUP CONTENT POLICY
+# 29. BACKUP CONTENT POLICY
 
 Normal backups may contain:
 
@@ -657,16 +718,16 @@ They SHALL NOT contain raw long-lived integration/provider credentials by defaul
 
 External Git repositories are not duplicated by ordinary JARVIS backup unless explicitly selected by a separate feature/policy.
 
-The authenticated backup manifest records format/version, protection class, JARVIS/schema/protocol versions, content identities/hashes/sizes, encryption algorithm metadata, and key-slot types without exposing secret key material.
+The authenticated backup manifest records format/version, protection class, JARVIS/schema/protocol versions, content identities/hashes/sizes, encryption algorithm metadata, and key-slot/KDF profile metadata without exposing secret key material.
 
 ---
 
-# 28. BACKUP VERIFICATION
+# 30. BACKUP VERIFICATION
 
 A backup is `VERIFIED` only after applicable checks prove:
 
 - bounded/versioned container parses correctly;
-- applicable key slot unwraps `BackupDEK`;
+- applicable key slot and recorded KDF profile are valid and unwrap `BackupDEK`;
 - AEAD payload authentication succeeds;
 - content hashes/manifest match;
 - `SnapshotDBKey` can open the SQLCipher snapshot in validation flow;
@@ -678,7 +739,7 @@ Portable disaster-recovery readiness additionally requires qualification of clea
 
 ---
 
-# 29. CLEAN-PROFILE RESTORE
+# 31. CLEAN-PROFILE RESTORE
 
 Portable restore follows:
 
@@ -686,6 +747,7 @@ Portable restore follows:
 select package
 → parse bounded authenticated metadata
 → choose portable key slot
+→ validate recorded KDF profile
 → derive/unlock BackupDEK
 → authenticate/decrypt outer payload
 → recover SnapshotDBKey transiently
@@ -705,11 +767,11 @@ The old live `DB_DEK` is not required on a clean machine.
 
 Wrong/unavailable recovery factor fails closed without modifying the only backup or partially activating unauthenticated contents.
 
-After restore, old provider sessions/approvals/leases/external effects are reconciled under normal recovery policy rather than blindly resumed/replayed.
+After restore, old provider sessions/setup states/approvals/leases/external effects are revalidated/reconciled under normal recovery policy rather than blindly resumed/replayed.
 
 ---
 
-# 30. LOCAL RESTORE
+# 32. LOCAL RESTORE
 
 Local rollback may use a local DPAPI key slot to obtain `BackupDEK` without repeatedly asking for the portable recovery factor.
 
@@ -719,7 +781,7 @@ A local-only backup is never labeled portable merely because its encrypted file 
 
 ---
 
-# 31. SESSION PASSWORD AND STATE RECOVERY
+# 33. SESSION PASSWORD AND STATE RECOVERY
 
 Session password verifier and state-encryption recovery are separate.
 
@@ -727,13 +789,13 @@ A verified portable JARVIS recovery factor MAY authorize an explicit recovery fl
 
 Without an applicable recovery factor, the old password is not derived from/recovered from its Argon2id verifier.
 
-A clean-machine portable restore always creates a new session password after state is authenticated/decrypted/validated.
+A clean-machine portable restore always creates a new session password after state is authenticated/decrypted/validated, using the current qualified session-password KDF profile.
 
 Integration credentials remain separate and are re-authenticated as needed.
 
 ---
 
-# 32. DATABASE MIGRATIONS
+# 34. DATABASE MIGRATIONS
 
 Every schema change has a monotonic migration identity.
 
@@ -753,11 +815,11 @@ Failure enters Recovery Mode and preserves pre-migration backup.
 
 Rollback to an older binary with incompatible schema restores the paired pre-update database snapshot rather than relying on unsafe reverse SQL.
 
-Migrations affecting money precision, data policy, approval material, provider/module identities, encryption/backup formats, or recovery semantics require explicit compatibility fixtures.
+Migrations affecting KDF profiles/verifiers, money precision, data policy, approval material, provider setup/module identities, encryption/backup formats, or recovery semantics require explicit compatibility fixtures.
 
 ---
 
-# 33. CORRUPTION RESPONSE
+# 35. CORRUPTION RESPONSE
 
 If database integrity cannot be established:
 
@@ -773,7 +835,7 @@ WAL-related corruption is a persistence incident even if some higher-level recor
 
 ---
 
-# 34. RETENTION AND EXPORT
+# 36. RETENTION AND EXPORT
 
 Retention distinguishes audit, worker events, conversation, artifacts, logs, backups, and transient cache.
 
@@ -783,7 +845,7 @@ User export/import is versioned and non-secret by default. Credential export, if
 
 ---
 
-# 35. DATA INVARIANTS
+# 37. DATA INVARIANTS
 
 1. Every executable task has exactly one valid ExecutionScope.
 2. Filesystem/repository mutation requires `PROJECT_WORKSPACE`.
@@ -802,13 +864,15 @@ User export/import is versioned and non-secret by default. Credential export, if
 15. DataSensitivity and DataLocality are independent and conservatively propagated.
 16. Provider-reported usage/quota provenance is not rewritten as local estimate or vice versa.
 17. Provider resume handles are not the sole durable task state.
-18. Module support is rooted in authenticated release/catalog provenance.
-19. A portable backup can be restored without the historical live `DB_DEK`.
-20. `SnapshotDBKey` is never stored outside the authenticated encrypted backup payload as plaintext.
-21. Restored integrations without credentials become `REAUTH_REQUIRED`.
-22. WAL activation/fix/connection safety state is release-qualified and observable.
-23. Historical contracts/ADRs do not create a second persistence/schema definition.
+18. Provider setup readiness is distinct from compatibility/health and is not inferred after crash/version change.
+19. Module support is rooted in authenticated release/catalog provenance.
+20. A portable backup can be restored without the historical live `DB_DEK`.
+21. `SnapshotDBKey` is never stored outside the authenticated encrypted backup payload as plaintext.
+22. Restored integrations without credentials become `REAUTH_REQUIRED`.
+23. WAL activation/fix/connection safety state is release-qualified and observable.
+24. Every production KDF verifier/key slot records a supported profile meeting the applicable floor at creation time.
+25. Historical contracts/ADRs do not create a second persistence/schema definition.
 
 ---
 
-**END — JARVIS DATA & STATE CONTRACT v1.0.2**
+**END — JARVIS DATA & STATE CONTRACT v1.0.3**
