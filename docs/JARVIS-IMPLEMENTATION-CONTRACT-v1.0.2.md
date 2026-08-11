@@ -3,7 +3,7 @@
 
 **Contract Version:** 1.0.2  
 **Status:** Canonical Implementation-Locked Baseline  
-**Date:** August 11, 2026  
+**Date:** August 12, 2026  
 **Primary Platform:** Microsoft Windows 11  
 **Adopted by:** ADR-069
 
@@ -51,6 +51,7 @@ The current production contract consists of this file plus:
 - `docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`;
 - `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`;
 - `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`;
+- `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`;
 - `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`;
 - `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` as authoritative dependency sequencing and exit criteria.
 
@@ -505,6 +506,10 @@ V1 does not require:
 > **AI decides. Software authorizes. Software verifies.**
 
 > **Workers own the loop. JARVIS owns the graph. Verification decides done.**
+
+> **Be autonomous inside the user's intent. Ask before materially expanding it.**
+
+> **Escalate product judgment. Resolve engineering judgment.**
 
 > **Build the control plane first, prove recoverability early, then give intelligence access to it.**
 
