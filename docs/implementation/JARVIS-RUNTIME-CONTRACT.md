@@ -1,64 +1,82 @@
 # JARVIS Runtime Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.md`  
-**Version:** 1.0  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
+**Version:** 1.0.2  
 **Date:** August 11, 2026
 
 ---
 
 # 1. PURPOSE
 
-This document defines the executable runtime architecture of JARVIS: process ownership, startup/shutdown, IPC, worker/provider supervision, mission execution, scheduling, cancellation, and degraded behavior.
-
-The purpose is to prevent the implementation from inventing these semantics ad hoc.
+This document defines executable runtime ownership: production packaging, Tauri/WebView operation, startup/shutdown, IPC, provider/worker/module process supervision, delegated engineering execution, scheduling, cancellation, recovery, and degraded operation.
 
 ---
 
 # 2. PROCESS TREE
 
-The production process tree SHALL be equivalent to:
+Production is equivalent to:
 
 ```text
 jarvis-desktop.exe (Tauri/Rust host)
-├── WebView2/React renderer
-├── jarvis-core (Node.js sidecar/service process)
-│   ├── provider execution requests
-│   ├── task/mission runtime
-│   └── integration/tool orchestration
-└── native Process Broker children
-    ├── Codex CLI workers
-    ├── voice sidecars/providers
-    ├── optional integration helpers
-    └── future provider processes
+├── WebView2 / React bundled-local renderer
+├── application-owned Node.js JARVIS Core
+└── Rust Native Process Broker managed jobs
+    ├── Codex / AI worker processes
+    ├── voice/STT/TTS/AEC helpers when separate
+    ├── integration helpers
+    ├── EXTERNAL_MANAGED modules
+    └── typed tool helper processes
 ```
 
-The Rust host SHALL be the root native supervisor.
+Rust is the native root supervisor. Node Core owns authoritative application state/policy. Managed children do not become independent authorities.
 
-The Core SHALL NOT independently create detached process trees that cannot be terminated by the host.
-
-Where practical, native child processes SHALL be assigned to Windows Job Objects so app shutdown/crash cleanup can terminate descendant processes reliably.
-
-Child processes SHALL run without elevation unless a separately defined administrative capability explicitly requires elevation and passes the Permission Engine.
-
-The normal JARVIS application SHALL NOT require Administrator privileges.
+The normal app runs non-elevated. A narrowly defined capability requiring elevation needs its own contract/PermissionEngine path; ordinary provider/worker execution does not inherit elevation.
 
 ---
 
-# 3. SINGLE INSTANCE
+# 3. APPLICATION-OWNED CORE PACKAGING
 
-Only one authoritative desktop/Core pair SHALL operate against the production data directory at a time.
+Production SHALL package one qualified release unit containing:
 
-The Rust host SHALL obtain a single-instance lock before opening the production database/Core channel.
+```text
+Rust/Tauri host
+React/WebView application
+JARVIS Core application
+Node.js runtime
+protocol/schema compatibility metadata
+required native assets
+```
 
-A second launch SHALL activate/focus the existing instance rather than starting another authoritative Core.
+Rust SHALL launch Core from the exact active release-owned path. It SHALL NOT locate `node`, `node.exe`, or an unrelated developer runtime through PATH/registry/shell discovery.
 
-Recovery/maintenance tooling MAY open the data directory only under an explicit exclusive maintenance lock.
+The release declares the exact Node version/architecture. End users do not run `npm install`, `pnpm install`, or similar dependency installation during normal first launch/startup.
+
+The host constructs an explicit Core environment and removes/controls execution modifiers such as `NODE_OPTIONS` and `NODE_PATH` unless JARVIS intentionally supplies them.
+
+Core working directory and immutable runtime/resource paths are explicit. Mutable data lives under the JARVIS user data directory.
+
+Missing/corrupt/incompatible runtime produces typed repair/recovery state such as:
+
+```text
+CORE_RUNTIME_MISSING
+CORE_RUNTIME_INTEGRITY_FAILED
+CORE_RUNTIME_INCOMPATIBLE
+CORE_ENTRYPOINT_MISSING
+CORE_START_FAILED
+CORE_PROTOCOL_INCOMPATIBLE
+```
+
+No system-runtime fallback is permitted.
 
 ---
 
-# 4. FILESYSTEM LOCATIONS
+# 4. SINGLE INSTANCE AND DATA DIRECTORY
 
-Mutable application state SHALL live beneath a stable per-user directory equivalent to:
+One authoritative desktop/Core pair operates against one production data directory.
+
+Rust obtains the single-instance/native ownership lock before Core opens authoritative state. A second launch activates/focuses the existing instance.
+
+Mutable application state is rooted under a stable per-user location equivalent to:
 
 ```text
 %LOCALAPPDATA%\JARVIS\
@@ -72,429 +90,361 @@ Mutable application state SHALL live beneath a stable per-user directory equival
   recovery\
 ```
 
-The installed application binaries SHALL NOT rely on writing mutable state into the installation directory.
-
-Temporary worker files SHOULD use task-scoped temporary directories and SHALL be cleaned after successful terminal completion unless retained as an artifact.
-
-Paths stored in the database SHALL use canonical absolute Windows paths where path identity matters.
+Maintenance/recovery access requires an exclusive maintenance lock.
 
 ---
 
-# 5. BOOTSTRAP SEQUENCE
+# 5. TAURI/WEBVIEW RUNTIME BOUNDARY
+
+The authoritative JARVIS UI SHALL be bundled/local application content, not a privileged browser for arbitrary remote sites.
+
+Production configuration SHALL:
+
+- define explicit Tauri capability allowlists per window/WebView;
+- grant no privileged command/plugin capability to remote origins;
+- enable restrictive CSP;
+- avoid remote executable JavaScript/CDN dependencies by default;
+- block unexpected navigation of the privileged WebView;
+- open ordinary external links outside that WebView;
+- render untrusted HTML/Markdown as sanitized inert content;
+- disable production devtools except a separately gated developer/diagnostic build policy;
+- use a release-qualified Tauri/runtime version with relevant upstream security fixes.
+
+React communicates only through typed Tauri commands/events. It never opens the Core named pipe directly.
+
+UI caches/read models are non-authoritative. Optimistic UI never represents consequential work as complete before Core confirmation.
+
+---
+
+# 6. BOOTSTRAP SEQUENCE
 
 Startup SHALL occur in this order:
 
-1. acquire single-instance lock;
-2. initialize crash-safe native logging;
-3. establish initial JARVIS state as `LOCKED`;
-4. load non-secret bootstrap settings;
-5. open Windows secure-store broker;
-6. verify required application files and compatible runtime prerequisites;
-7. create an unpredictable per-launch Core IPC endpoint;
-8. create a bootstrap authentication secret using a cryptographically secure RNG;
-9. launch the Core under process supervision;
-10. transfer the bootstrap secret through an inherited/anonymous secure bootstrap channel, not a command-line argument;
-11. complete protocol handshake;
-12. Core opens persistence and performs schema/version validation;
-13. Core performs recovery scan for interrupted work;
-14. start always-warm providers/services according to policy;
-15. publish diagnostics/provider states;
-16. render UI as operational but locked;
-17. after successful session unlock, expose private state and permit authenticated commands.
+1. acquire single-instance ownership;
+2. initialize crash-safe native diagnostics;
+3. set application session state `LOCKED`;
+4. load/validate non-secret bootstrap configuration and active Release Profile;
+5. open native Windows secure-store broker;
+6. verify signed release/runtime manifest and packaged Core/runtime integrity;
+7. create unpredictable local Core IPC endpoint with restrictive security descriptor;
+8. generate cryptographically random per-launch bootstrap secret;
+9. create the required Windows Job Object containment for Core;
+10. launch Core using the exact application-owned runtime path and controlled environment;
+11. transfer bootstrap material through an inherited/anonymous secure channel rather than command-line/log output;
+12. complete authenticated protocol handshake;
+13. Core opens persistence and validates SQLite/SQLCipher build, WAL/safety settings, schema, and recovery state;
+14. Core scans transient task/tool/provider states for recovery;
+15. discover/qualify configured providers/integrations/modules;
+16. publish diagnostics/degraded states;
+17. render operational but locked UI;
+18. after native session authentication succeeds, permit authenticated user commands.
 
-If any mandatory bootstrap step fails, the UI SHALL enter an explicit recovery/diagnostics mode rather than presenting a normal ready state.
+Failure of a mandatory step produces explicit recovery/diagnostic state rather than a false ready state.
 
 ---
 
-# 6. CORE IPC
+# 7. PRIVILEGED CORE IPC
 
-The V1 Core transport SHALL be a Windows named pipe or equivalent non-network local IPC transport.
+V1 uses a Windows named pipe or equivalent non-network local transport. It SHALL NOT expose the privileged Core control plane on ordinary localhost TCP/HTTP.
 
-It SHALL NOT bind a normal localhost TCP port for its privileged control plane.
+Named-pipe requirements:
 
-The endpoint name SHALL include a cryptographically random nonce and SHALL NOT be predictable solely from username/PID.
+- explicit `SECURITY_DESCRIPTOR` / restrictive DACL;
+- current intended JARVIS logon/session identity as primary interactive principal;
+- only narrowly required OS principals in addition;
+- no `Everyone`, anonymous, unrelated session/user, or network-origin access;
+- local-only/remote-client rejection;
+- unpredictable per-launch endpoint name;
+- independent bootstrap authentication;
+- framed bounded protocol.
 
-The host and Core SHALL authenticate during bootstrap before accepting normal messages.
-
-The channel SHALL use framed messages:
+Normal framing:
 
 ```text
 uint32_le payload_length
 UTF-8 JSON payload
 ```
 
-Maximum normal frame size SHALL be bounded; the default limit SHOULD be 1 MiB.
+Default normal frame ceiling SHOULD be 1 MiB; large data uses artifact references.
 
-Payloads larger than the limit SHALL use an artifact/blob reference instead of increasing the control-channel limit.
+Every message uses protocol-major 1 and runtime schema validation. Unsupported protocol or security establishment fails closed.
 
-Every envelope SHALL include at least:
-
-```json
-{
-  "protocolVersion": 1,
-  "kind": "request|response|event",
-  "id": "uuidv7-or-null",
-  "name": "method.or.event.name",
-  "correlationId": "uuidv7",
-  "payload": {}
-}
-```
-
-Unknown protocol versions SHALL fail closed.
-
-Unknown mandatory message types SHALL be rejected with a typed protocol error.
-
-Messages SHALL be schema-validated on both sides of a trust boundary.
+OS object security is defense layer one; bootstrap authentication and schema/protocol validation remain independent layers.
 
 ---
 
-# 7. UI COMMUNICATION
+# 8. NATIVE PROCESS/CREDENTIAL BROKER
 
-React SHALL communicate with the Rust host using typed Tauri commands/events.
+The Rust host exposes narrow typed native capabilities such as:
 
-React SHALL NOT open the Core named pipe directly.
-
-The Rust host SHALL proxy authorized UI requests to the Core and SHALL relay Core events to the UI.
-
-The UI MAY maintain a read-model/cache for rendering, but authoritative mission/task/approval state remains in Core.
-
-Optimistic UI updates SHALL NOT represent consequential operations as complete before Core confirmation.
-
----
-
-# 8. NATIVE BROKER
-
-The Rust host SHALL provide a narrow Native Broker to Core for OS-bound functions that should not be spread through Node packages.
-
-The broker SHALL include capabilities equivalent to:
-
-- secure secret get/put/delete by opaque handle;
-- process spawn/terminate/status under supervision;
-- Windows session lock state events;
+- secure secret put/get/rotate/delete by opaque handle and scoped requesting context;
+- managed process spawn/terminate/status;
+- Windows session lock events;
 - app activation/single-instance routing;
-- signed updater staging/activation;
-- optional native audio/device enumeration helpers;
-- future privileged Windows operations exposed only as typed capabilities.
+- signed update staging/activation;
+- native audio/device helpers where appropriate;
+- future privileged Windows operations only through explicit typed capabilities.
 
-The broker SHALL NOT expose a generic `execute_any_command` operation to the orchestrator.
+There is no generic `execute_any_command` broker operation for the orchestrator.
+
+Secure-store requests use resolved requesting component/capability context. Raw secret enumeration is not a normal Core/provider API.
 
 ---
 
-# 9. SESSION LOCK RUNTIME
+# 9. MANDATORY WINDOWS JOB OBJECT CONTAINMENT
 
-Core SHALL track session trust state:
+Every JARVIS-managed executable process tree on supported Windows 11 SHALL be assigned to an explicitly owned Job Object hierarchy unless a narrow separately documented/verified incompatibility meets the approved exception criteria.
+
+Covered processes include Core, AI/provider workers, engineering workers, voice helpers, integration helpers, EXTERNAL_MANAGED modules, and tool helpers.
+
+Requirements:
+
+- `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` or verified equivalent for subtrees that terminate with JARVIS;
+- host retains controlling handles;
+- creation-time job assignment is preferred; otherwise create suspended, assign before untrusted code executes, then resume;
+- ordinary breakaway flags are prohibited;
+- handle inheritance defaults to none and uses an explicit allowlist where required;
+- containment-establishment failure blocks consequential child start rather than silently launching uncontained;
+- cancellation escalates cooperative request → bounded grace → job/subtree termination → termination verification.
+
+Job Objects provide lifecycle/resource containment and accounting. They do **not** prove filesystem, network, credential, or same-user memory isolation.
+
+---
+
+# 10. CORE SERVICES
+
+Core SHALL have explicit owning services equivalent to:
 
 ```text
-LOCKED
-UNLOCKING
-UNLOCKED
-LOCKING
+ConversationService
+ContextManager
+MemoryService
+ProjectRegistry
+MissionManager
+TaskManager
+GraphPlanner
+Scheduler
+PermissionEngine
+ApprovalService
+AuthorityEnvelopeService
+ToolRegistry / ToolExecutor
+ProviderRegistry / ProviderRouter / ProviderSupervisor
+WorkerManager
+EventBus / durable event publisher
+CredentialBrokerClient
+ModuleRegistry
+IntegrationRegistry
+BudgetService
+NotificationPolicyEngine
+AutomationService
+BackupCoordinator
+DiagnosticsService
 ```
 
-Only the Rust host may assert Windows lock/unlock OS events.
-
-A JARVIS password unlock request SHALL pass through the Rust host/native authentication component.
-
-Core receives only an authenticated session-state result/token, not the stored password verifier.
-
-On transition to `LOCKED`:
-
-- new private conversation retrieval SHALL stop;
-- new consequential tasks SHALL not start from unauthenticated input;
-- sensitive notifications SHALL be suppressed/redacted;
-- active background tasks MAY continue if already authorized;
-- spoken output containing private data SHALL stop;
-- voice reflex controls MAY remain available.
+Direct imports/calls SHALL not bypass owning policy/state services for convenience.
 
 ---
 
-# 10. CORE SERVICE MODULES
+# 11. INPUT/COMMAND PIPELINE
 
-Core SHALL be composed into explicit services with narrow interfaces, including at minimum:
-
-- `ConversationService`;
-- `ContextManager`;
-- `MemoryService`;
-- `ProjectRegistry`;
-- `MissionManager`;
-- `TaskManager`;
-- `GraphPlanner`;
-- `Scheduler`;
-- `PermissionEngine`;
-- `ApprovalService`;
-- `AuthorityEnvelopeService`;
-- `ToolRegistry`;
-- `ProviderRegistry`;
-- `ProviderRouter`;
-- `ProviderSupervisor`;
-- `WorkerManager`;
-- `EventBus` / durable event publisher;
-- `CredentialBrokerClient`;
-- `ModuleRegistry`;
-- `IntegrationRegistry`;
-- `BudgetService`;
-- `NotificationPolicyEngine`;
-- `AutomationService`;
-- `BackupCoordinator`;
-- `DiagnosticsService`.
-
-Direct imports SHALL NOT be used to bypass policy services for convenience.
-
----
-
-# 11. COMMAND HANDLING PIPELINE
-
-Authenticated text/voice input SHALL flow through:
+Authenticated text/voice work flows through:
 
 ```text
-Input
-  ↓
-Conversation/session binding
-  ↓
-Context construction
-  ↓
-AI orchestrator or deterministic reflex path
-  ↓
-Structured decision validation
-  ↓
-Action/task/mission proposal
-  ↓
-Authority + permission + budget validation
-  ↓
-Scheduler / Tool Executor
-  ↓
-Observed result
-  ↓
-Verification
-  ↓
-Persisted state/event
-  ↓
-User response
+input/session binding
+→ scoped context construction
+→ AI orchestrator or deterministic reflex path
+→ structured decision validation
+→ task/mission/tool proposal
+→ execution-scope + canonical-target resolution
+→ authority envelope
+→ deterministic PermissionEngine
+→ locality/budget/resource/precondition checks
+→ scheduler/tool/integration adapter
+→ observed outcome
+→ postcondition/verification
+→ transactional state/event
+→ user-visible result
 ```
 
-No step MAY skip authorization merely because the AI response was confident.
+No AI confidence or provider capability skips a deterministic gate.
 
 ---
 
-# 12. REFLEX PATH
+# 12. DETERMINISTIC REFLEX PATH
 
-The deterministic reflex path SHALL handle low-latency controls whose semantics are already established, including at least:
+Low-latency reflexes may handle established commands such as:
 
 - stop speaking;
-- mute/unmute JARVIS audio;
+- mute/unmute;
 - cancel current voice generation;
 - push-to-talk state;
-- wake/sleep/listening indicators;
-- explicit task cancel/pause commands after unambiguous target resolution;
-- app/session lock command.
+- lock;
+- unambiguous task pause/cancel after target resolution.
 
-The reflex path SHALL NOT generate substantive factual answers or infer broad user intent.
+The reflex path does not generate substantive factual answers, broaden authority, authorize tools, or invent completion.
 
 ---
 
-# 13. MISSION EXECUTION
+# 13. DELEGATED WORKSPACE ENGINEERING PROFILE
 
-A mission SHALL reference one active immutable graph version.
+A shell-capable AI engineering provider is a delegated executor, not a collection of JARVIS typed tools.
 
-Only the Mission Manager may activate a new graph version.
+Before launch Core SHALL resolve:
 
-Runnable tasks are nodes whose mandatory dependencies are satisfied and whose policy/precondition checks pass.
+- `PROJECT_WORKSPACE` scope and exact assigned worktree;
+- worker role/attempt identity;
+- immutable authority envelope;
+- data policy;
+- provider/version/profile;
+- approved sandbox mode;
+- resource/time/iteration limits;
+- network policy;
+- secret/capability inputs.
 
-The Scheduler SHALL select runnable tasks according to:
+V1 `WORKSPACE_ENGINEERING` defaults:
 
-- priority;
-- dependency readiness;
-- project/workspace locks;
-- provider availability;
-- CPU/RAM/GPU constraints;
-- provider concurrency limits;
-- user focus/foreground mission preference;
-- budget;
+```text
+workspace writes:    allowed only inside assigned writable worktree under qualified sandbox
+workspace reads:     required
+other-user-file read isolation: not claimed unless provider/OS conformance proves it
+network:             denied by default
+integration secrets: none by default
+external side effects: not delegated
+admin/elevation:     prohibited by default
+```
+
+The provider may run local development commands required to inspect/edit/build/test the assigned project according to the qualified sandbox profile.
+
+The existence of Git/GitHub/SSH/cloud/Proxmox client binaries inside the worker process does not authorize external writes. Push, publish, deploy, email/send, infrastructure mutation, credential administration, and similar consequential remote operations SHALL cross a registered JARVIS tool/integration/PermissionEngine boundary.
+
+Provider-native sandbox behavior is tested as an actual technical boundary. Prompt text such as “stay in the project” is not a sandbox.
+
+---
+
+# 14. PROVIDER DISCOVERY, COMPATIBILITY, AND SUPERVISION
+
+Every provider adapter defines discovery, exact version identity, authentication state, compatibility policy, startup timeout, execution timeout, cancel semantics, health probe, capability/locality/resource metadata, output normalization, sanitized errors, and process containment behavior.
+
+States distinguish compatibility from health:
+
+```text
+NOT_DETECTED / VERSION_UNKNOWN / VERSION_UNSUPPORTED /
+CONFORMANCE_UNQUALIFIED / COMPATIBLE
+
+STARTING / READY / DEGRADED / UNAVAILABLE / FAILED
+```
+
+A provider becomes production `SUPPORTED` only when the selected version/range has release-time conformance evidence and runtime identity/health/auth/capability checks pass.
+
+A newly released provider version outside the qualified policy is not optimistically trusted.
+
+For Codex, the V1 adapter SHALL prefer the qualified stable non-interactive/structured interface rather than scraping an interactive TUI. Its Windows sandbox conformance tests SHALL observe actual write/network restrictions and SHALL not claim workspace-only read isolation unless technically proven.
+
+Provider self-update invalidates cached compatibility until revalidated.
+
+---
+
+# 15. PROVIDER SESSION RESUME
+
+Provider session/conversation resume handles are optional optimizations.
+
+Durable recovery state belongs to JARVIS:
+
+```text
+task input + acceptance criteria
+authority/scope/data policy
+checkpoint summaries
+artifacts/worktree state
+tool/audit results
+verification state
+live-state assumptions
+remaining work
+```
+
+Recovery first loads/reconciles JARVIS-owned state. It may attempt provider resume only after compatibility/auth/privacy/authority checks. Resume failure falls back to a fresh provider session reconstructed from durable JARVIS state.
+
+No completion evidence may exist only inside an inaccessible provider session.
+
+---
+
+# 16. WORKER LOOP AND CHECKPOINTS
+
+Worker loops are bounded and emit observable progress equivalent to:
+
+```text
+plan/next step
+→ action request(s)
+→ observation(s)
+→ progress assessment
+→ checkpoint/completion proposal/replan/block
+```
+
+No private chain-of-thought is required or persisted.
+
+Recommended initial iteration ceilings remain:
+
+```text
+GENERALIST        12
+RESEARCHER        16
+SOFTWARE_ENGINEER 20
+VERIFIER           8
+SYNTHESIZER        6
+DATA_ANALYST      12
+```
+
+Three consecutive no-material-progress iterations SHOULD cause reconsideration then `REPLAN_REQUESTED`/`BLOCKED` rather than blind continuation.
+
+---
+
+# 17. TOOL EXECUTION
+
+All JARVIS typed tools execute through ToolExecutor.
+
+Before consequential execution it SHALL:
+
+1. resolve tool/version/schema;
+2. validate scope and canonical target/account/environment;
+3. evaluate manifest preconditions;
+4. apply authority/PermissionEngine/approval/locality/budget/resource rules;
+5. build/recompute the canonical action descriptor where approval-bound;
+6. re-resolve mutable live target state;
+7. use conditional/versioned mutation when supported;
+8. execute the registered adapter;
+9. validate output;
+10. evaluate postconditions;
+11. record durable audit/state/events.
+
+Conditional mutation includes mechanisms such as ETag/If-Match, expected Git ref/SHA, filesystem identity/hash, provider version/generation tokens, or equivalent compare-and-set behavior.
+
+A precondition/version mismatch is not silently retried against changed state. It returns to resolution/authorization/approval as required.
+
+Unverifiable consequence is `UNCERTAIN`.
+
+---
+
+# 18. MISSION GRAPH AND SCHEDULER
+
+A mission points to one active immutable graph version. Only owning mission services activate validated graph revisions.
+
+Scheduler considers:
+
+- priority/dependency readiness;
+- execution-scope/workspace/resource leases;
+- provider compatibility/health/locality/concurrency;
+- CPU/RAM/GPU pressure;
+- foreground interaction/voice responsiveness;
+- exact budget reservations;
 - fairness/starvation prevention.
 
-A task SHALL never start merely because an AI worker says it is ready.
+AI determines logical parallelism; deterministic scheduling determines actual concurrency.
+
+Parallel writable engineering tasks never share one worktree.
 
 ---
 
-# 14. TASK EXECUTION ATTEMPTS
+# 19. PAUSE, PREEMPTION, RESUME
 
-Each provider/worker invocation SHALL create a `task_attempt` record.
-
-A task MAY have multiple attempts due to retries, fallback, interruption, or verification failure.
-
-Attempts SHALL be individually auditable.
-
-Attempt identity SHALL NOT be reused.
-
-A retry SHALL create a new attempt linked to the prior attempt and reason.
-
----
-
-# 15. WORKER LOOP
-
-Each AI worker SHALL implement a bounded control loop at the adapter/runtime level.
-
-A logical iteration SHALL produce observable state equivalent to:
-
-```text
-PLAN/DECIDE NEXT STEP
-ACTION REQUEST(S)
-OBSERVATION(S)
-PROGRESS ASSESSMENT
-CHECKPOINT OR COMPLETION PROPOSAL
-```
-
-The implementation SHALL NOT require storage or exposure of private model chain-of-thought.
-
-The worker adapter SHALL record only useful, user-auditable summaries, tool requests/results, findings, changed artifacts, and verification evidence.
-
-Role defaults SHALL be configurable.
-
-Recommended initial defaults:
-
-```text
-GENERALIST       max 12 iterations
-RESEARCHER       max 16 iterations
-SOFTWARE_ENGINEER max 20 iterations
-VERIFIER         max 8 iterations
-SYNTHESIZER      max 6 iterations
-DATA_ANALYST     max 12 iterations
-```
-
-These are safety/resource ceilings, not targets.
-
-A worker SHOULD finish earlier when acceptance criteria pass.
-
-Three consecutive iterations without material progress SHOULD trigger local reconsideration and then `REPLAN_REQUESTED` or `BLOCKED` rather than continuing blindly.
-
----
-
-# 16. STRUCTURED WORKER OUTPUT
-
-Every task SHALL define an output schema when downstream automation consumes the result.
-
-Core schemas SHOULD include reusable result types equivalent to:
-
-```text
-InvestigationResult
-ImplementationResult
-VerificationResult
-ResearchResult
-AnalysisResult
-SynthesisResult
-ReplanRequest
-BlockedResult
-```
-
-An implementation result SHALL identify changed artifacts and verification performed.
-
-A research result SHALL retain source/evidence references where applicable.
-
-A verifier result SHALL identify each acceptance criterion and pass/fail/unknown evidence.
-
-Invalid output SHALL not be silently accepted as task completion.
-
----
-
-# 17. PROVIDER PROCESS SUPERVISION
-
-Provider adapters SHALL define:
-
-- discovery/installation check;
-- version check;
-- authentication check where possible;
-- startup timeout;
-- execution timeout policy;
-- cancel semantics;
-- health probe;
-- capability advertisement;
-- resource metadata;
-- sanitized error mapping.
-
-Provider execution SHALL be cancellable where the underlying provider permits.
-
-If cancellation cannot be confirmed, the task state SHALL reflect uncertainty until the process is verified terminated or isolated.
-
-The host SHALL be able to terminate the provider process tree during app shutdown.
-
----
-
-# 18. RETRY AND CIRCUIT BREAKING
-
-Retries SHALL distinguish infrastructure/transient failure from semantic/task failure.
-
-Automatic retry MAY occur for transient failures such as startup race, temporary provider unavailability, or explicitly retryable network errors.
-
-Consequential external tool calls SHALL not be automatically replayed unless their idempotency semantics are known.
-
-Recommended provider circuit-breaker baseline:
-
-- 3 consecutive infrastructure failures within a short rolling window → provider `DEGRADED`/circuit open;
-- cooldown before probe;
-- successful probe closes the circuit;
-- repeated failure increases backoff up to a bounded maximum.
-
-Exact time constants MAY be tuned by provider adapter, but retries MUST be bounded and observable.
-
----
-
-# 19. TOOL EXECUTOR
-
-Tools SHALL execute through a central Tool Executor.
-
-Tool execution SHALL have an immutable `tool_execution_id` and idempotency key where supported.
-
-The executor SHALL emit:
-
-```text
-tool.requested
-tool.validated
-tool.approval_required (if any)
-tool.started
-tool.completed | tool.failed | tool.uncertain
-```
-
-The executor SHALL distinguish:
-
-- validation failure;
-- permission denial;
-- precondition failure;
-- provider/tool unavailable;
-- execution failure;
-- postcondition failure;
-- uncertain outcome.
-
-Uncertain outcome SHALL NOT be reported as success.
-
----
-
-# 20. PROCESS AND WORKSPACE CONTAINMENT
-
-Engineering workers SHALL operate inside an explicitly resolved project workspace.
-
-For Git repositories:
-
-- one writable worker per working tree;
-- parallel writers require isolated worktrees/branches;
-- worktree creation/deletion SHALL be managed by JARVIS and journaled;
-- a worker SHALL not silently change to another repository;
-- repository root SHALL be canonicalized before execution.
-
-Worker environment variables SHALL be constructed from an allowlist.
-
-Long-lived secrets SHALL NOT be injected wholesale into worker environments.
-
-Workers SHALL run without Administrator elevation.
-
-Provider-native sandbox features SHOULD be enabled where compatible with the task.
-
-The contract does not pretend that a normal user-mode CLI process is a perfect security sandbox; therefore secret minimization, workspace scoping, permission gates, process containment, and postcondition verification are mandatory defense layers.
-
----
-
-# 21. PREEMPTION
-
-A running task SHALL expose one of:
+Preemption policy is exactly:
 
 ```text
 PREEMPTIBLE
@@ -502,62 +452,142 @@ SAFE_POINT_ONLY
 TEMPORARILY_NON_PREEMPTIBLE
 ```
 
-When pause is requested:
+Temporary non-preemptibility is narrow/bounded and cannot deny cancellation indefinitely.
 
-- PREEMPTIBLE → checkpoint and pause promptly;
-- SAFE_POINT_ONLY → finish/rollback current atomic unit, then checkpoint;
-- TEMPORARILY_NON_PREEMPTIBLE → complete the narrow integrity-sensitive section, then checkpoint.
+Task pause uses:
 
-The user SHALL be informed when pause is delayed for integrity.
+```text
+RUNNING → PAUSING → PAUSED
+PAUSED → RESUMING
+RESUMING → RUNNING | QUEUED | BLOCKED | RECOVERING | FAILED | CANCELLED
+```
 
-A temporarily non-preemptible region SHALL never become an excuse for indefinite execution.
+`RESUMING` verifies live/external state, execution scope, workspace/resource leases, provider capability/version/health/locality, budget, approvals, and relevant preconditions before new execution.
+
+---
+
+# 20. BUDGET ADMISSION
+
+Before new chargeable work subject to a hard monetary budget, BudgetService atomically evaluates:
+
+```text
+settled spend
++ outstanding reservations
++ requested reservation
+<= applicable hard limit
+```
+
+Only after reservation commit may the metered attempt start when a monetary reservation can be determined.
+
+Provider-reported usage/quota facts retain provenance and may differ from local estimates. Unknown values remain unknown rather than fabricated as zero.
+
+If actual cost exceeds reservation, the actual provider-reported/settled cost is recorded; a hard budget is an admission-control guarantee, not a promise that an external invoice can never exceed an estimate.
+
+---
+
+# 21. CRASH RECOVERY
+
+Startup identifies transient mission/task/attempt/tool/provider states and enters `RECOVERING` before retry/resume.
+
+Recovery examines:
+
+- last checkpoint/event;
+- process death/Job Object cleanup;
+- workspace/resource leases;
+- execution scope and authority envelope;
+- current provider compatibility/auth/locality;
+- approval expiry/digest/current target;
+- budget reservations;
+- live external state when side effects may have occurred.
+
+Stale leases are reclaimed only after ownership is proven dead or policy permits it.
+
+Ambiguous consequential/destructive side effects are never blindly replayed. They become `UNCERTAIN`/blocked/`REQUIRES_USER` according to recovery policy until live state is reconciled.
 
 ---
 
 # 22. SHUTDOWN
 
-Normal app shutdown SHALL:
+Normal shutdown SHALL:
 
-1. stop accepting new missions/tool requests;
+1. stop admitting new consequential work;
 2. stop/finish speech safely;
-3. request task pause/cancel according to shutdown policy;
-4. checkpoint resumable workers;
-5. flush durable state/events;
-6. stop provider processes;
-7. terminate remaining supervised process trees after bounded grace period;
-8. close database cleanly;
-9. close IPC;
-10. release single-instance lock.
+3. request worker/task pause/cancel according to policy;
+4. checkpoint resumable work;
+5. flush authoritative state/events;
+6. request provider/module/helper cooperative shutdown;
+7. after bounded grace, terminate remaining managed jobs/subtrees;
+8. verify intended child termination;
+9. close persistence/IPC;
+10. release instance ownership.
 
-Forced OS termination may prevent the full sequence; therefore persistence/recovery SHALL assume crashes can happen between any two steps.
-
----
-
-# 23. CRASH RECOVERY
-
-On startup, Core SHALL identify records left in transient states.
-
-They SHALL enter `RECOVERING` before any retry/resume.
-
-Recovery SHALL inspect:
-
-- last durable checkpoint;
-- last tool/provider event;
-- external/live state if side effects may have occurred;
-- workspace state;
-- resource leases;
-- pending approval validity;
-- provider/session resumability.
-
-Stale leases SHALL be reclaimed only after their owning process/instance is proven dead.
-
-Tasks with ambiguous destructive/high-risk side effects SHALL move to `REQUIRES_USER`/blocked recovery rather than auto-retry.
+Crash semantics assume termination can occur between any two steps.
 
 ---
 
-# 24. DEGRADED MODES
+# 23. INTEGRATIONS AND PROXMOX RUNTIME
 
-The runtime SHALL support explicit degraded modes:
+Integration requests use typed registered adapters and Credential Broker handles; they do not execute arbitrary endpoint strings from AI output.
+
+The V1 Proxmox adapter uses HTTPS REST API as the normal control path. It SHALL:
+
+- verify TLS/system trust or configured SHA-256 pin;
+- resolve connection/environment/resource identity before consequential work;
+- enforce connection capabilities and node/VMID/pool scopes;
+- keep raw token out of AI/UI/journals/logs;
+- track asynchronous Proxmox task identifiers through terminal outcome;
+- re-resolve live target state before consequential execution;
+- use provider-supported conflict/precondition semantics where available;
+- return `UNCERTAIN` rather than blind replay after ambiguous writes;
+- never silently fall back to SSH/`qm`/`pct`/`pvesh`/root shell/direct `/etc/pve` editing;
+- keep guest OS access a separate connection/authority domain.
+
+---
+
+# 24. MODULE RUNTIME
+
+Every module is `DATA_ONLY`, `BUILT_IN_TRUSTED`, or `EXTERNAL_MANAGED`.
+
+`DATA_ONLY` never causes embedded executable content to run.
+
+`BUILT_IN_TRUSTED` is first-party executable code shipped/qualified as part of the signed JARVIS release.
+
+`EXTERNAL_MANAGED` runs out of Core through versioned typed IPC under a capability envelope and its own supervised process/Job Object boundary. It cannot receive Core database handles, blanket secure-store access, or arbitrary direct authoritative-state mutation.
+
+Typed health checks are supervisor mechanisms, not arbitrary manifest commands.
+
+Module crash degrades the module, not Core.
+
+---
+
+# 25. VOICE RUNTIME
+
+Canonical voice path:
+
+```text
+Microphone
+→ Audio Input Manager
+→ AEC Provider ← exact TTS render reference
+→ cleaned microphone
+→ VAD / optional Wake / streaming STT
+→ physical + semantic Turn Detector
+→ Realtime Conversation Engine
+→ Core / Orchestrator
+→ interruptible TTS persistent voice
+→ Speaker
+```
+
+Full-duplex keeps microphone available for barge-in when AEC is healthy. AEC failure may degrade to half-duplex without losing deterministic stop/mute/cancel.
+
+Stale/cancelled transcripts cannot submit after cancel/lock/session reset.
+
+Speech provider routing obeys the same DataLocality policy as AI providers.
+
+---
+
+# 26. DEGRADED MODES
+
+Runtime exposes explicit states equivalent to:
 
 ```text
 CORE_READY
@@ -568,59 +598,33 @@ RECOVERY_MODE
 OFFLINE_CAPABLE_LIMITED
 ```
 
-A degraded subsystem SHALL not mark unrelated healthy subsystems failed.
-
-The UI SHALL show which capabilities remain available.
-
----
-
-# 25. VOICE RUNTIME
-
-Voice components SHALL communicate through provider abstractions and typed audio/session events.
-
-The audio path SHALL preserve an exact speaker/TTS render reference for AEC.
-
-The microphone SHALL remain available for barge-in during active TTS when full-duplex mode is healthy.
-
-If AEC becomes unreliable, the voice engine MAY degrade to a safer half-duplex mode while preserving deterministic stop/mute/cancel controls.
-
-STT/TTS provider failure SHALL not prevent typed interaction.
-
-The voice session manager SHALL prevent stale partial transcripts from being submitted after cancel/lock/session reset.
-
----
-
-# 26. PROVIDER ROUTING BOUNDARY
-
-The planner requests capabilities. The router assigns providers.
-
-A provider assignment SHALL be recorded at attempt start with a routing reason summary.
-
-Fallback SHALL normally occur only after a checkpoint/safe boundary.
-
-Replacement workers SHALL reconstruct context from authoritative task input, artifacts, checkpoints, and scoped memory—not hidden state from a prior model session.
+Failure of one optional/degraded subsystem does not fabricate failure/success in another. UI states what remains usable and why capabilities are blocked.
 
 ---
 
 # 27. RUNTIME INVARIANTS
 
-The implementation SHALL preserve these invariants:
-
-1. UI state cannot directly authorize execution.
-2. AI output cannot directly authorize execution.
-3. A queued task is not a running task.
-4. A task is not completed without acceptance evidence.
-5. A mission graph version is immutable after activation.
-6. A worker cannot broaden its own authority envelope.
-7. A provider fallback cannot weaken privacy/permission policy.
-8. A destructive action cannot bypass final confirmation.
-9. An uncertain external result cannot be reported as success.
-10. A crash cannot silently erase accepted queued/running mission state.
-11. A provider crash cannot crash Core by design.
-12. A worker must be killable or isolatable by the native supervisor.
-13. Secrets are not normal AI context.
-14. Live verified state outranks stale persisted assumptions.
+1. UI state cannot authorize execution.
+2. AI output cannot authorize execution.
+3. Provider native capability cannot widen JARVIS scope.
+4. A queued task is not running.
+5. A task is not completed without acceptance evidence.
+6. Activated mission graph versions are immutable.
+7. A worker cannot widen its authority/scope.
+8. Provider fallback cannot weaken locality/permission/budget/security policy.
+9. Destructive execution cannot bypass final confirmation.
+10. Uncertain external result is not success.
+11. Crash cannot silently erase accepted queued/running mission state.
+12. Managed executable trees are OS-contained/owned or blocked.
+13. Job Objects are not represented as filesystem/network sandboxing.
+14. Production Core does not depend on system Node.
+15. Privileged Core IPC is restrictive local-only + authenticated.
+16. `PAUSED` work does not resume execution without durable `RESUMING` validation.
+17. Non-project tasks do not gain fake project authority.
+18. Delegated engineering shell cannot directly gain consequential integration authority.
+19. Provider resume metadata is not task durability.
+20. External conditional-write conflicts cause reconciliation rather than silent retargeting.
 
 ---
 
-**END — JARVIS RUNTIME CONTRACT v1.0**
+**END — JARVIS RUNTIME CONTRACT v1.0.2**

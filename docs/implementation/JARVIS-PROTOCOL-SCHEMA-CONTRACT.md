@@ -1,34 +1,45 @@
 # JARVIS Protocol & Schema Contract
 
-**Status:** Normative implementation reference  
-**Version:** 1.0  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
+**Contract Version:** 1.0.2  
+**Protocol Major:** 1  
 **Date:** August 11, 2026
 
-This document defines canonical cross-boundary data contracts for JARVIS. Runtime code MAY use generated/inferred language types, but all messages crossing process, persistence-event, provider, tool, or module boundaries SHALL be validated against versioned schemas.
+---
+
+# 1. PURPOSE
+
+This document defines the canonical cross-boundary types and representations for JARVIS. All data crossing process, AI/provider, tool, integration, module, persistence-event, approval, artifact, import/export, or security-material boundaries SHALL be runtime validated against versioned schemas.
+
+The schemas below are the effective V1 definitions. Older schema shapes in ADRs or historical contracts are rationale/history only.
 
 ---
 
-# 1. SCHEMA POLICY
+# 2. SCHEMA POLICY
 
-Canonical runtime schemas SHALL live in `packages/schemas` and protocol/event types in `packages/protocol`.
+Canonical validators SHALL live in `packages/schemas`; protocol/domain boundary types SHALL live in `packages/protocol` or generated equivalents.
 
-JSON-compatible schemas SHALL be authoritative at trust boundaries.
+Rules:
 
-TypeScript types SHALL be generated from or declared alongside runtime validators so compile-time and runtime shapes cannot silently diverge.
-
-Rust/Tauri IPC types SHALL map explicitly to the same protocol version.
-
-Unknown optional fields MAY be ignored only when protocol compatibility rules allow it. Unknown required message kinds/versions SHALL fail closed.
+- TypeScript compile-time types never substitute for runtime validation.
+- Rust boundary structs map explicitly to the same protocol definitions.
+- Untrusted input enters as `unknown`/unparsed bytes and becomes a domain type only after bounded validation.
+- Unknown required message/version semantics fail closed.
+- Unknown optional fields may be ignored only where compatibility rules explicitly permit it.
+- Security-material and money fields SHALL not be permissively coerced.
+- Arrays, maps, strings, object depth, frame sizes, and arbitrary JSON fields SHALL be bounded.
 
 ---
 
-# 2. COMMON TYPES
+# 3. COMMON TYPES
 
 ```ts
 type UUIDv7 = string;
 type UtcTimestamp = string; // ISO-8601 UTC
 
 type ProjectId = UUIDv7;
+type WorkspaceId = UUIDv7;
+type EnvironmentId = UUIDv7;
 type MissionId = UUIDv7;
 type TaskId = UUIDv7;
 type AttemptId = UUIDv7;
@@ -39,13 +50,69 @@ type AuthorityEnvelopeId = UUIDv7;
 type ProviderId = string;
 type ModuleId = string;
 type IntegrationId = string;
+type IntegrationAccountId = UUIDv7;
+type ConnectionId = UUIDv7;
 ```
 
-All IDs SHALL be validated before use.
+Identifiers are opaque and SHALL be validated before use. Display names are never authoritative identity for consequential execution.
 
 ---
 
-# 3. IPC ENVELOPE
+# 4. DATA POLICY
+
+Sensitivity and routing locality are independent.
+
+```ts
+type DataSensitivity =
+  | 'PUBLIC'
+  | 'PRIVATE'
+  | 'SENSITIVE'
+  | 'SECRET';
+
+type DataLocality =
+  | 'LOCAL_ONLY'
+  | 'ANY_APPROVED_PROVIDER';
+
+interface DataPolicy {
+  sensitivity: DataSensitivity;
+  locality: DataLocality;
+}
+```
+
+`SECRET` is reserved for credentials/key material and normally exists only in secure storage or transient trusted adapter memory.
+
+`LOCAL_ONLY` prohibits sending the protected content to cloud/LAN/remote AI or speech providers.
+
+Derived context/artifacts SHALL inherit the strictest applicable policy unless an explicit deterministic audited declassification/export decision changes it.
+
+---
+
+# 5. EXACT MONEY AND QUANTITIES
+
+Authoritative monetary values SHALL not use binary floating point.
+
+```ts
+interface MoneyAmount {
+  currency: string;  // validated currency identifier, normally ISO 4217
+  nanoUnits: string; // signed base-10 integer: major unit × 1,000,000,000
+}
+
+type CanonicalQuantity = string; // schema-specific canonical integer/decimal string
+```
+
+Examples:
+
+```text
+USD 1.00      => 1000000000
+USD 0.10      => 100000000
+USD 0.0000025 => 2500
+```
+
+TypeScript SHOULD use `bigint` after parsing; Rust SHALL use a checked exact integer/decimal representation. Overflow, malformed integer text, unsupported precision, or currency mismatch fails authoritative budget decisions closed.
+
+---
+
+# 6. IPC ENVELOPE AND RESPONSE UNION
 
 ```ts
 type IpcKind = 'request' | 'response' | 'event';
@@ -58,17 +125,31 @@ interface IpcEnvelope<T = unknown> {
   correlationId: UUIDv7;
   payload: T;
 }
+
+type IpcResponse<T> =
+  | { ok: true; result: T }
+  | { ok: false; error: JarvisError };
 ```
 
-Responses SHALL use the request `id`.
+For a request/response pair:
 
-Events SHALL use `id: null` unless a transport implementation chooses to assign an event-message id in addition to the domain event id inside payload.
+```text
+response.id            = request.id
+response.name          = request.name
+response.correlationId = request.correlationId
+```
+
+Events use `id: null` and carry domain identity in their payload.
+
+A success response SHALL NOT contain `error`; a failure response SHALL NOT contain `result`. Missing/nullable/ad-hoc status conventions do not substitute for this union.
+
+One accepted request id receives at most one terminal response. Long-running progress uses events or operation/task identifiers.
+
+Malformed frames/envelopes whose identity cannot be trusted may be rejected by closing the transport without fabricating an application response.
 
 ---
 
-# 4. ERROR ENVELOPE
-
-All cross-boundary errors SHALL normalize to:
+# 7. ERROR MODEL
 
 ```ts
 type ErrorCategory =
@@ -78,6 +159,7 @@ type ErrorCategory =
   | 'NOT_FOUND'
   | 'CONFLICT'
   | 'PRECONDITION'
+  | 'POSTCONDITION'
   | 'PROVIDER_UNAVAILABLE'
   | 'PROVIDER_FAILED'
   | 'TOOL_FAILED'
@@ -94,18 +176,20 @@ type ErrorCategory =
 interface JarvisError {
   code: string;
   category: ErrorCategory;
-  message: string;          // sanitized user/developer-safe message
+  message: string;
   retryable: boolean;
-  details?: Record<string, unknown>; // MUST be secret-safe
+  details?: Record<string, unknown>; // separately bounded and secret-safe
   correlationId: UUIDv7;
 }
 ```
 
-Provider-native raw errors SHALL be mapped before crossing into generic Core/UI layers.
+`retryable` is advisory only. Idempotency, uncertainty, approval, budget, and recovery policy still govern replay.
+
+Raw provider/Windows/SQLite stack traces or secret-bearing payloads SHALL be normalized before crossing generic boundaries.
 
 ---
 
-# 5. SESSION STATE
+# 8. SESSION AND USER INPUT
 
 ```ts
 type SessionTrustState = 'LOCKED' | 'UNLOCKING' | 'UNLOCKED' | 'LOCKING';
@@ -114,17 +198,16 @@ interface SessionState {
   state: SessionTrustState;
   sessionId: UUIDv7 | null;
   unlockedAt: UtcTimestamp | null;
-  lockedReason: 'STARTUP' | 'USER' | 'WINDOWS_LOCK' | 'SIGN_OUT' | 'IDLE' | 'SECURITY' | null;
+  lockedReason:
+    | 'STARTUP'
+    | 'USER'
+    | 'WINDOWS_LOCK'
+    | 'SIGN_OUT'
+    | 'IDLE'
+    | 'SECURITY'
+    | null;
 }
-```
 
-No secret/verifier material SHALL appear in this structure.
-
----
-
-# 6. USER INPUT
-
-```ts
 type InputModality = 'TEXT' | 'VOICE';
 
 interface UserInstruction {
@@ -142,13 +225,13 @@ interface UserInstruction {
 }
 ```
 
-Voice transcript confidence is informational and SHALL NOT replace target/permission validation.
+No password, verifier, recovery factor, database key, token, or other secret appears in session state.
+
+Voice confidence is informational and never authorizes an action or target.
 
 ---
 
-# 7. ORCHESTRATOR DECISION
-
-The orchestrator SHALL return one normalized decision:
+# 9. ORCHESTRATOR DECISION
 
 ```ts
 type OrchestratorAction =
@@ -166,47 +249,79 @@ interface OrchestratorDecision {
   schemaVersion: 1;
   action: OrchestratorAction;
   userMessage?: string;
-  rationaleSummary?: string; // concise decision summary, not chain-of-thought
+  rationaleSummary?: string;
   confidence?: number;
   payload: Record<string, unknown>;
 }
 ```
 
-`payload` SHALL be revalidated against an action-specific schema before Core uses it.
+`payload` is validated again against the selected action-specific schema. AI confidence is not an authorization field.
 
 ---
 
-# 8. PROJECT
+# 10. PROJECT AND EXECUTION SCOPE
 
 ```ts
-interface ProjectRef {
-  projectId: ProjectId;
-  name: string;
-  workspaceId?: UUIDv7;
-  environmentId?: UUIDv7;
-}
-
 interface Project {
   projectId: ProjectId;
   name: string;
   aliases: string[];
   rootPath: string;
-  defaultEnvironmentId?: UUIDv7;
+  defaultEnvironmentId?: EnvironmentId;
   defaultBranch?: string;
   enabled: boolean;
   version: number;
 }
+
+type ExecutionScope =
+  | ProjectWorkspaceScope
+  | IntegrationScope
+  | SystemScope
+  | GlobalScope;
+
+interface ProjectWorkspaceScope {
+  kind: 'PROJECT_WORKSPACE';
+  projectId: ProjectId;
+  workspaceId: WorkspaceId;
+  environmentId?: EnvironmentId;
+}
+
+interface IntegrationBinding {
+  integrationId: IntegrationId;
+  accountId: IntegrationAccountId;
+  capabilityIds: string[];
+}
+
+interface IntegrationScope {
+  kind: 'INTEGRATION';
+  bindings: IntegrationBinding[];
+  projectId?: ProjectId; // context only; not filesystem authority
+  environmentId?: EnvironmentId;
+}
+
+interface SystemScope {
+  kind: 'SYSTEM';
+  capabilityIds: string[];
+  environmentId?: EnvironmentId;
+}
+
+interface GlobalScope {
+  kind: 'GLOBAL';
+}
 ```
 
-Paths SHALL be canonicalized by trusted runtime code before use.
+Rules:
+
+- filesystem/repository/project-write tools require `PROJECT_WORKSPACE`;
+- `INTEGRATION`, `SYSTEM`, and `GLOBAL` do not gain filesystem authority implicitly;
+- `GLOBAL` itself grants no consequential tool authority;
+- project/workspace/environment/account identities are stable IDs, never display-name guesses.
 
 ---
 
-# 9. AUTHORITY ENVELOPE
+# 11. AUTHORITY ENVELOPE
 
 ```ts
-type PrivacyClass = 'PUBLIC' | 'PRIVATE' | 'SENSITIVE' | 'LOCAL_ONLY';
-
 type ActionClass =
   | 'READ'
   | 'LOCAL_WRITE'
@@ -220,84 +335,43 @@ type ActionClass =
 interface AuthorityEnvelope {
   id: AuthorityEnvelopeId;
   originatingInstructionId: UUIDv7;
-  projectIds: ProjectId[];
-  workspaceIds: UUIDv7[];
-  environmentIds: UUIDv7[];
+  scopes: ExecutionScope[];
   allowedActionClasses: ActionClass[];
   deniedActionClasses: ActionClass[];
   externalSystems: string[];
-  privacyClass: PrivacyClass;
-  maxBudget?: {
-    amount: number;
-    currency: string;
-  };
+  dataPolicy: DataPolicy;
+  maxBudget?: MoneyAmount;
   createdAt: UtcTimestamp;
   expiresAt?: UtcTimestamp;
   policySnapshotVersion: number;
 }
 ```
 
-Workers receive this as immutable input.
+An envelope is immutable for an active attempt. A broader scope requires a new validated authority/revision record.
 
 ---
 
-# 10. MISSION
+# 12. MISSIONS, TASKS, ATTEMPTS
 
 ```ts
-type MissionState =
-  | 'CREATED'
-  | 'PLANNING'
-  | 'QUEUED'
-  | 'RUNNING'
-  | 'WAITING_FOR_USER'
-  | 'WAITING_FOR_APPROVAL'
-  | 'PAUSING'
-  | 'PAUSED'
-  | 'BLOCKED'
-  | 'VERIFYING'
-  | 'RECOVERING'
-  | 'COMPLETED'
-  | 'FAILED'
-  | 'CANCELLED';
-
-interface Mission {
-  missionId: MissionId;
-  title: string;
-  goal: string;
-  state: MissionState;
-  projectIds: ProjectId[];
-  activeGraphVersion: number | null;
-  authorityEnvelopeId: AuthorityEnvelopeId;
-  priority: Priority;
-  createdAt: UtcTimestamp;
-  updatedAt: UtcTimestamp;
-  version: number;
-}
-```
-
----
-
-# 11. TASK
-
-```ts
-type TaskState =
-  | 'CREATED'
-  | 'WAITING_FOR_DEPENDENCY'
-  | 'QUEUED'
-  | 'STARTING'
-  | 'RUNNING'
-  | 'WAITING_FOR_APPROVAL'
-  | 'PAUSING'
-  | 'PAUSED'
-  | 'BLOCKED'
-  | 'VERIFYING'
-  | 'RECOVERING'
-  | 'COMPLETED'
-  | 'FAILED'
-  | 'CANCELLED'
-  | 'INVALIDATED';
-
 type Priority = 'CRITICAL' | 'HIGH' | 'NORMAL' | 'LOW' | 'BACKGROUND';
+
+type MissionState =
+  | 'CREATED' | 'PLANNING' | 'QUEUED' | 'RUNNING'
+  | 'WAITING_FOR_USER' | 'WAITING_FOR_APPROVAL'
+  | 'PAUSING' | 'PAUSED' | 'BLOCKED' | 'VERIFYING'
+  | 'RECOVERING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+
+type TaskState =
+  | 'CREATED' | 'WAITING_FOR_DEPENDENCY' | 'QUEUED' | 'STARTING'
+  | 'RUNNING' | 'WAITING_FOR_APPROVAL' | 'PAUSING' | 'PAUSED'
+  | 'RESUMING' | 'BLOCKED' | 'VERIFYING' | 'RECOVERING'
+  | 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'INVALIDATED';
+
+type AttemptState =
+  | 'QUEUED' | 'STARTING' | 'RUNNING' | 'CHECKPOINTING'
+  | 'WAITING_FOR_APPROVAL' | 'PAUSING' | 'PAUSED'
+  | 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'TIMED_OUT' | 'UNCERTAIN';
 
 type WorkerRole =
   | 'GENERALIST'
@@ -318,6 +392,20 @@ type PreemptionPolicy =
   | 'SAFE_POINT_ONLY'
   | 'TEMPORARILY_NON_PREEMPTIBLE';
 
+interface Mission {
+  missionId: MissionId;
+  title: string;
+  goal: string;
+  state: MissionState;
+  projectIds: ProjectId[];
+  activeGraphVersion: number | null;
+  authorityEnvelopeId: AuthorityEnvelopeId;
+  priority: Priority;
+  createdAt: UtcTimestamp;
+  updatedAt: UtcTimestamp;
+  version: number;
+}
+
 interface Task {
   taskId: TaskId;
   missionId: MissionId;
@@ -326,9 +414,8 @@ interface Task {
   goal: string;
   state: TaskState;
   role: WorkerRole;
-  projectId: ProjectId;
-  workspaceId: UUIDv7;
-  environmentId?: UUIDv7;
+  executionScope: ExecutionScope;
+  dataPolicy: DataPolicy;
   priority: Priority;
   authorityEnvelopeId: AuthorityEnvelopeId;
   recoveryPolicy: RecoveryPolicy;
@@ -338,31 +425,42 @@ interface Task {
   updatedAt: UtcTimestamp;
   version: number;
 }
+
+interface TaskAttempt {
+  attemptId: AttemptId;
+  taskId: TaskId;
+  state: AttemptState;
+  providerId: ProviderId;
+  providerVersion?: string;
+  modelId?: string;
+  startedAt?: UtcTimestamp;
+  endedAt?: UtcTimestamp;
+  retryOfAttemptId?: AttemptId;
+  routingReason: string;
+  error?: JarvisError;
+}
 ```
+
+`RESUMING` is one durable TaskState. It is not a transient alias outside the state model.
 
 ---
 
-# 12. ACCEPTANCE CRITERION
+# 13. ACCEPTANCE AND GRAPH VERSIONING
 
 ```ts
 type CriterionType =
-  | 'TEST'
-  | 'COMMAND'
-  | 'FILE_STATE'
-  | 'LIVE_STATE'
-  | 'SCHEMA'
-  | 'REVIEW'
-  | 'CUSTOM';
+  | 'TEST' | 'COMMAND' | 'FILE_STATE' | 'LIVE_STATE'
+  | 'SCHEMA' | 'REVIEW' | 'CUSTOM';
+
+type CriterionVerdict = 'PASS' | 'FAIL' | 'UNKNOWN' | 'NOT_APPLICABLE';
 
 interface AcceptanceCriterion {
   id: string;
   type: CriterionType;
   description: string;
   required: boolean;
-  verifier: Record<string, unknown>;
+  verifier: Record<string, unknown>; // revalidated by type-specific schema
 }
-
-type CriterionVerdict = 'PASS' | 'FAIL' | 'UNKNOWN' | 'NOT_APPLICABLE';
 
 interface CriterionResult {
   criterionId: string;
@@ -370,17 +468,13 @@ interface CriterionResult {
   evidence: ArtifactRef[];
   summary: string;
   verifiedAt: UtcTimestamp;
-  verifierType: 'DETERMINISTIC' | 'LIVE_STATE' | 'INDEPENDENT_AI' | 'PRODUCER_SELF_CHECK';
+  verifierType:
+    | 'DETERMINISTIC'
+    | 'LIVE_STATE'
+    | 'INDEPENDENT_AI'
+    | 'PRODUCER_SELF_CHECK';
 }
-```
 
-Required `UNKNOWN` criteria prevent normal completion unless an explicit policy states otherwise.
-
----
-
-# 13. GRAPH
-
-```ts
 type DependencyType =
   | 'REQUIRES_SUCCESS'
   | 'REQUIRES_COMPLETION'
@@ -394,6 +488,10 @@ interface TaskDependency {
   outputKey?: string;
 }
 
+interface MissionAcceptancePolicy {
+  criteria: AcceptanceCriterion[];
+}
+
 interface MissionGraphVersion {
   missionId: MissionId;
   version: number;
@@ -402,49 +500,35 @@ interface MissionGraphVersion {
   causationEventId: EventId;
   taskIds: TaskId[];
   edges: TaskDependency[];
+  acceptancePolicy: MissionAcceptancePolicy;
 }
 ```
 
-Core SHALL validate acyclicity before activation.
+Activated graph versions are immutable. Core validates acyclicity, dependencies, scope coherence, acceptance policy, and authority before activation.
 
 ---
 
-# 14. TASK ATTEMPT
+# 14. CHECKPOINTS, ARTIFACTS, RESULTS
 
 ```ts
-type AttemptState =
-  | 'QUEUED'
-  | 'STARTING'
-  | 'RUNNING'
-  | 'CHECKPOINTING'
-  | 'WAITING_FOR_APPROVAL'
-  | 'PAUSING'
-  | 'PAUSED'
-  | 'SUCCEEDED'
-  | 'FAILED'
-  | 'CANCELLED'
-  | 'TIMED_OUT'
-  | 'UNCERTAIN';
+interface ArtifactRef {
+  artifactId: ArtifactId;
+  logicalType: string;
+  contentType: string;
+  size: number;
+  sha256?: string;
+  dataPolicy: DataPolicy;
+}
 
-interface TaskAttempt {
-  attemptId: AttemptId;
-  taskId: TaskId;
-  state: AttemptState;
+interface ProviderResumeReference {
   providerId: ProviderId;
+  providerVersion?: string;
   modelId?: string;
-  startedAt?: UtcTimestamp;
-  endedAt?: UtcTimestamp;
-  retryOfAttemptId?: AttemptId;
-  routingReason: string;
-  error?: JarvisError;
+  handle: string;
+  createdAt: UtcTimestamp;
+  lastVerifiedAt?: UtcTimestamp;
 }
-```
 
----
-
-# 15. WORKER CHECKPOINT
-
-```ts
 interface WorkerCheckpoint {
   checkpointId: UUIDv7;
   taskId: TaskId;
@@ -461,34 +545,9 @@ interface WorkerCheckpoint {
   nextStep?: string;
   blockers: string[];
   liveStateAssumptions: string[];
-  providerResumeHandle?: string;
+  providerResume?: ProviderResumeReference;
 }
-```
 
-This SHALL not contain private chain-of-thought.
-
----
-
-# 16. ARTIFACT
-
-```ts
-interface ArtifactRef {
-  artifactId: ArtifactId;
-  logicalType: string;
-  contentType: string;
-  size: number;
-  sha256?: string;
-  sensitivity: 'PUBLIC' | 'PRIVATE' | 'SENSITIVE';
-}
-```
-
-Direct file paths SHOULD remain internal where possible; workers/UI receive an artifact reference and request resolved access through Core.
-
----
-
-# 17. WORKER RESULT
-
-```ts
 type WorkerResultKind =
   | 'COMPLETION_PROPOSAL'
   | 'BLOCKED'
@@ -509,15 +568,37 @@ interface WorkerResult {
 }
 ```
 
-Core decides final task state.
+Provider resume handles are opaque potentially expiring capability material. They are optional continuity optimizations, not durable task truth.
 
 ---
 
-# 18. TOOL MANIFEST
+# 15. TOOL MANIFEST AND OUTCOMES
 
 ```ts
 type RiskClass = 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
-type SideEffectClass = 'READ_ONLY' | 'REVERSIBLE_WRITE' | 'EXTERNAL_WRITE' | 'DESTRUCTIVE';
+
+type SideEffectClass =
+  | 'READ_ONLY'
+  | 'REVERSIBLE_WRITE'
+  | 'EXTERNAL_WRITE'
+  | 'DESTRUCTIVE';
+
+type ToolCheckKind =
+  | 'STATE_QUERY'
+  | 'FILE_STATE'
+  | 'PROCESS_STATE'
+  | 'INTEGRATION_STATE'
+  | 'CUSTOM_VERIFIER';
+
+interface ToolCheckSpec {
+  checkId: string;
+  kind: ToolCheckKind;
+  verifierId: string;
+  parametersSchemaId: string;
+  required: boolean;
+  timeoutMs?: number;
+  onUnknown: 'FAIL' | 'UNCERTAIN';
+}
 
 interface ToolManifest {
   toolId: string;
@@ -530,34 +611,43 @@ interface ToolManifest {
   reversible: boolean;
   requiredPermissionIds: string[];
   allowedEnvironments: string[];
+  allowedScopeKinds: ExecutionScope['kind'][];
   secretCapabilities: string[];
   networkRequired: boolean;
-  idempotency: 'IDEMPOTENT' | 'IDEMPOTENCY_KEY' | 'NON_IDEMPOTENT' | 'UNKNOWN';
+  idempotency:
+    | 'IDEMPOTENT'
+    | 'IDEMPOTENCY_KEY'
+    | 'NON_IDEMPOTENT'
+    | 'UNKNOWN';
+  preconditions: ToolCheckSpec[];
+  postconditions: ToolCheckSpec[];
   preemptionPolicy: PreemptionPolicy;
 }
-```
 
----
-
-# 19. TOOL REQUEST AND RESULT
-
-```ts
 interface ToolRequest {
   toolExecutionId: UUIDv7;
   toolId: string;
+  toolVersion: number;
   taskId?: TaskId;
+  executionScope: ExecutionScope;
   authorityEnvelopeId: AuthorityEnvelopeId;
-  arguments: Record<string, unknown>;
+  arguments: Record<string, unknown>; // action-specific validation required
   idempotencyKey?: string;
 }
 
-type ToolOutcome = 'SUCCEEDED' | 'FAILED' | 'DENIED' | 'CANCELLED' | 'UNCERTAIN';
+type ToolOutcome =
+  | 'SUCCEEDED'
+  | 'FAILED'
+  | 'DENIED'
+  | 'CANCELLED'
+  | 'UNCERTAIN';
 
 interface ToolResult {
   toolExecutionId: UUIDv7;
   outcome: ToolOutcome;
   output?: Record<string, unknown>;
   artifacts?: ArtifactRef[];
+  preconditions?: CriterionResult[];
   postconditions?: CriterionResult[];
   error?: JarvisError;
   startedAt: UtcTimestamp;
@@ -565,9 +655,11 @@ interface ToolResult {
 }
 ```
 
+A missing/invalid manifest blocks AI execution. Consequential success requires declared postcondition evidence or explicit `UNCERTAIN` semantics.
+
 ---
 
-# 20. PERMISSION DECISION
+# 16. PERMISSION DECISION
 
 ```ts
 type PermissionOutcome = 'ALLOW' | 'DENY' | 'REQUIRE_APPROVAL';
@@ -587,17 +679,48 @@ interface PermissionDecision {
 }
 ```
 
-AI SHALL never produce an authoritative `PermissionDecision`.
+Only deterministic Core policy produces an authoritative PermissionDecision.
 
 ---
 
-# 21. APPROVAL
+# 17. CANONICAL ACTION DESCRIPTOR AND APPROVAL
+
+One canonical descriptor governs V1 approval material:
 
 ```ts
+interface CanonicalTargetRef {
+  system: string;
+  accountId?: string;
+  environmentId?: string;
+  resourceType: string;
+  resourceId: string;
+}
+
+interface CanonicalActionDescriptorV1 {
+  domain: 'jarvis.approval.action.v1';
+  descriptorVersion: 1;
+  toolId: string;
+  toolVersion: number;
+  actionClass: ActionClass;
+  sideEffectClass: SideEffectClass;
+  executionScope: ExecutionScope;
+  targets: CanonicalTargetRef[];
+  arguments: Record<string, unknown>;
+  integrationBindings?: Array<{
+    integrationId: IntegrationId;
+    accountId: IntegrationAccountId;
+  }>;
+  authorityEnvelopeId: AuthorityEnvelopeId;
+  policySnapshotVersion: number;
+}
+
 interface ApprovalRequest {
   approvalId: ApprovalId;
   kind: 'HIGH_RISK' | 'DESTRUCTIVE_FINAL_CONFIRMATION';
-  actionDigest: string; // SHA-256 over canonical material action data
+  descriptorVersion: 1;
+  actionDigestAlgorithm: 'SHA-256';
+  actionDigestEncoding: 'BASE64URL_NOPAD';
+  actionDigest: string;
   actionSummary: string;
   targetSummary: string;
   environmentSummary?: string;
@@ -606,22 +729,48 @@ interface ApprovalRequest {
   expiresAt: UtcTimestamp;
 }
 
-type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED' | 'CONSUMED';
-
-interface ApprovalDecision {
-  approvalId: ApprovalId;
-  status: ApprovalStatus;
-  decidedAt?: UtcTimestamp;
-  sessionId?: UUIDv7;
-}
+type ApprovalStatus =
+  | 'PENDING' | 'APPROVED' | 'REJECTED'
+  | 'EXPIRED' | 'CANCELLED' | 'CONSUMED';
 ```
+
+Material identity SHALL be resolved before descriptor construction. Display strings are descriptive only.
+
+The exact digest pipeline is:
+
+```text
+CanonicalActionDescriptorV1
+  → schema validation
+  → RFC 8785 JCS canonical JSON
+  → UTF-8 bytes
+  → SHA-256
+  → base64url without padding
+```
+
+Canonicalization SHALL reject duplicate object keys before materialization, non-finite numbers, negative zero, invalid Unicode, and numeric values whose precision cannot be represented safely/interoperably. High-precision domain values use schema-defined integer/decimal strings.
+
+Immediately before approval consumption JARVIS freshly resolves material identities/arguments, rebuilds the descriptor, recomputes the digest, and rejects any mismatch. Digest equality never bypasses expiry, single-use, session/policy, or transactional consumption checks.
+
+Raw credentials never enter the descriptor.
 
 ---
 
-# 22. PROVIDER PROFILE
+# 18. PROVIDER COMPATIBILITY, HEALTH, RESOURCES
 
 ```ts
-type ProviderHealth = 'STARTING' | 'READY' | 'DEGRADED' | 'UNAVAILABLE' | 'FAILED';
+type ProviderCompatibilityState =
+  | 'NOT_DETECTED'
+  | 'VERSION_UNKNOWN'
+  | 'VERSION_UNSUPPORTED'
+  | 'CONFORMANCE_UNQUALIFIED'
+  | 'COMPATIBLE';
+
+type ProviderHealth =
+  | 'STARTING'
+  | 'READY'
+  | 'DEGRADED'
+  | 'UNAVAILABLE'
+  | 'FAILED';
 
 interface ProviderCapabilities {
   naturalLanguage?: boolean;
@@ -636,68 +785,72 @@ interface ProviderCapabilities {
   locality: 'LOCAL' | 'CLOUD' | 'LAN';
 }
 
+interface ProviderResourceProfile {
+  memoryMb?: number;
+  gpuVramMb?: number;
+  cpuClass?: 'LOW' | 'MEDIUM' | 'HIGH';
+  gpuRequired?: boolean;
+  warmupMs?: number;
+  unloadable?: boolean;
+}
+
 interface ProviderProfile {
   providerId: ProviderId;
   adapterType: string;
+  adapterVersion: string;
+  providerVersion?: string;
   modelId?: string;
+  compatibility: ProviderCompatibilityState;
   capabilities: ProviderCapabilities;
   costClass: 'FREE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
   latencyClass: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
   health: ProviderHealth;
+  resources?: ProviderResourceProfile;
+}
+
+interface ProviderCompatibilityPolicy {
+  providerId: ProviderId;
+  adapterVersion: string;
+  acceptedVersions: Array<
+    | { kind: 'EXACT'; version: string }
+    | { kind: 'RANGE'; range: string }
+  >;
+  deniedVersions?: string[];
+  requiredCapabilities: string[];
+  conformanceProfileId: string;
 }
 ```
 
+`SUPPORTED` requires compatibility plus current required health/auth/capability state; executable presence alone is insufficient.
+
 ---
 
-# 23. DOMAIN EVENT
+# 19. MODULE EXECUTION AND MANIFEST
 
 ```ts
-interface DomainEvent<T = unknown> {
-  eventId: EventId;
-  occurredAt: UtcTimestamp;
-  type: string;
-  payloadVersion: number;
-  aggregateType: string;
-  aggregateId: string;
-  correlationId: UUIDv7;
-  causationId?: UUIDv7;
-  actorType: 'USER' | 'CORE' | 'WORKER' | 'PROVIDER' | 'INTEGRATION' | 'SYSTEM';
-  actorId?: string;
-  payload: T;
+type ModuleExecutionClass =
+  | 'DATA_ONLY'
+  | 'BUILT_IN_TRUSTED'
+  | 'EXTERNAL_MANAGED';
+
+type ModuleHealthCheck =
+  | { kind: 'PROCESS_READY'; timeoutMs: number }
+  | { kind: 'IPC_PROBE'; method: string; timeoutMs: number }
+  | { kind: 'HTTP_LOCAL_PROBE'; endpointId: string; timeoutMs: number };
+
+interface ModuleLifecycleMetadata {
+  activationBoundary: 'SAFE_BOUNDARY' | 'APP_RESTART';
+  rollbackSupported: boolean;
+  retainsPreviousVersion: boolean;
 }
-```
 
-Event type names SHALL use stable dot notation, for example:
-
-```text
-session.locked
-mission.created
-mission.graph_revised
-task.queued
-task.started
-task.paused
-task.completed
-worker.activity_changed
-worker.checkpoint_created
-provider.health_changed
-tool.approval_required
-tool.completed
-budget.hard_limit_reached
-backup.completed
-recovery.action_required
-```
-
----
-
-# 24. MODULE MANIFEST
-
-```ts
 interface ModuleManifest {
   moduleId: ModuleId;
   version: string;
   displayName: string;
   publisher: string;
   source: string;
+  executionClass: ModuleExecutionClass;
   compatibility: {
     jarvis: string;
     windows?: string;
@@ -710,39 +863,126 @@ interface ModuleManifest {
     gpuVramMb?: number;
     cpuClass?: 'LOW' | 'MEDIUM' | 'HIGH';
   };
-  healthCheck: string;
+  healthCheck: ModuleHealthCheck;
   integrity: {
     sha256: string;
     signature?: string;
+    catalogEntryId: string;
+    catalogSignature: string;
+    catalogKeyId: string;
   };
+  lifecycle: ModuleLifecycleMetadata;
+}
+
+interface ModuleCapabilityEnvelope {
+  moduleId: ModuleId;
+  moduleVersion: string;
+  allowedApiIds: string[];
+  projectIds: ProjectId[];
+  environmentIds: EnvironmentId[];
+  credentialCapabilities: string[];
+  networkPolicyId?: string;
+  sensitivity: DataSensitivity;
+  locality: DataLocality;
+  resourcePolicyId?: string;
 }
 ```
 
+There is no untrusted-in-process execution class. `HTTP_LOCAL_PROBE.endpointId` resolves only to a supervisor-registered local endpoint, never an arbitrary URL.
+
 ---
 
-# 25. INTEGRATION ACCOUNT
+# 20. INTEGRATION ACCOUNT AND PROXMOX
 
 ```ts
 interface IntegrationAccount {
   integrationId: IntegrationId;
-  accountId: UUIDv7;
+  accountId: IntegrationAccountId;
   displayName: string;
   tenantOrDomain?: string;
   credentialHandle: string;
   enabledCapabilities: string[];
   grantedScopes: string[];
-  status: 'CONNECTED' | 'REAUTH_REQUIRED' | 'DISABLED' | 'ERROR';
+  status: 'CONNECTED' | 'DEGRADED' | 'REAUTH_REQUIRED' | 'DISABLED' | 'ERROR';
   lastVerifiedAt?: UtcTimestamp;
+}
+
+type ProxmoxCapability =
+  | 'PROXMOX_READ'
+  | 'PROXMOX_POWER_CONTROL'
+  | 'PROXMOX_SNAPSHOT'
+  | 'PROXMOX_BACKUP'
+  | 'PROXMOX_GUEST_CONFIG'
+  | 'PROXMOX_GUEST_CREATE'
+  | 'PROXMOX_MIGRATE'
+  | 'PROXMOX_STORAGE_WRITE'
+  | 'PROXMOX_NETWORK_WRITE'
+  | 'PROXMOX_DESTROY';
+
+interface ProxmoxConnection {
+  connectionId: ConnectionId;
+  displayName: string;
+  endpoint: string;
+  credentialHandle: string;
+  tlsTrust:
+    | { mode: 'SYSTEM_CA' }
+    | { mode: 'PINNED_SHA256'; fingerprint: string };
+  environmentId: EnvironmentId;
+  enabledCapabilities: ProxmoxCapability[];
+  allowedNodes?: string[];
+  allowedVmids?: number[];
+  allowedPools?: string[];
+  status: 'CONNECTED' | 'DEGRADED' | 'REAUTH_REQUIRED' | 'DISABLED' | 'ERROR';
+  lastVerifiedAt?: UtcTimestamp;
+}
+
+interface ProxmoxGuestIdentity {
+  connectionId: ConnectionId;
+  environmentId: EnvironmentId;
+  nodeId: string;
+  guestType: 'QEMU' | 'LXC';
+  vmid: number;
 }
 ```
 
-`credentialHandle` is opaque and SHALL not resolve inside AI context/UI.
+Proxmox control-plane identity is separate from guest OS connection/credential identity.
 
 ---
 
-# 26. USAGE/BUDGET
+# 21. PROVIDER QUOTA, USAGE, BUDGET RESERVATION
 
 ```ts
+type ProviderQuotaType =
+  | 'MONETARY' | 'TOKENS' | 'REQUESTS'
+  | 'COMPUTE' | 'SUBSCRIPTION_ALLOWANCE' | 'OTHER';
+
+type ProviderQuotaSource =
+  | 'PROVIDER_REPORTED'
+  | 'JARVIS_CALCULATED'
+  | 'UNKNOWN';
+
+interface ProviderQuotaSnapshot {
+  snapshotId: UUIDv7;
+  providerId: ProviderId;
+  modelId?: string;
+  accountId?: UUIDv7;
+  quotaType: ProviderQuotaType;
+  unit: string;
+  limit?: CanonicalQuantity;
+  used?: CanonicalQuantity;
+  remaining?: CanonicalQuantity;
+  resetsAt?: UtcTimestamp;
+  observedAt: UtcTimestamp;
+  source: ProviderQuotaSource;
+}
+
+type CostConfidence =
+  | 'ESTIMATED'
+  | 'PROVIDER_REPORTED'
+  | 'JARVIS_CALCULATED'
+  | 'SETTLED'
+  | 'UNKNOWN';
+
 interface UsageRecord {
   usageId: UUIDv7;
   providerId: ProviderId;
@@ -751,10 +991,11 @@ interface UsageRecord {
   missionId?: MissionId;
   taskId?: TaskId;
   attemptId?: AttemptId;
-  units?: Record<string, number>;
-  estimatedCost?: number;
-  actualCost?: number;
-  currency?: string;
+  units?: Record<string, CanonicalQuantity>;
+  estimatedCost?: MoneyAmount;
+  actualCost?: MoneyAmount;
+  costConfidence: CostConfidence;
+  pricingSnapshotId?: UUIDv7;
   occurredAt: UtcTimestamp;
 }
 
@@ -762,17 +1003,58 @@ interface BudgetPolicy {
   budgetId: UUIDv7;
   scopeType: 'GLOBAL' | 'PROJECT' | 'MISSION' | 'PROVIDER';
   scopeId?: string;
-  amount: number;
-  currency: string;
-  warningAtPercent: number;
+  limit: MoneyAmount;
+  warningAtBasisPoints: number; // integer 0..10000
   hardLimit: boolean;
   period: 'MISSION' | 'DAY' | 'MONTH' | 'CUSTOM';
 }
+
+type BudgetReservationState =
+  | 'RESERVED' | 'SETTLED' | 'RELEASED' | 'EXPIRED' | 'UNCERTAIN';
+
+interface BudgetReservation {
+  reservationId: UUIDv7;
+  budgetId: UUIDv7;
+  providerId: ProviderId;
+  taskId?: TaskId;
+  attemptId?: AttemptId;
+  amount: MoneyAmount;
+  state: BudgetReservationState;
+  createdAt: UtcTimestamp;
+  expiresAt?: UtcTimestamp;
+  settledUsageId?: UUIDv7;
+}
 ```
+
+Different currencies SHALL not be added without a separately defined conversion policy.
 
 ---
 
-# 27. NOTIFICATION
+# 22. DOMAIN EVENTS
+
+```ts
+interface DomainEvent<T = unknown> {
+  eventId: EventId;
+  occurredAt: UtcTimestamp;
+  type: string;
+  payloadVersion: number;
+  aggregateType: string;
+  aggregateId: string;
+  correlationId: UUIDv7;
+  causationId?: UUIDv7;
+  actorType:
+    | 'USER' | 'CORE' | 'WORKER' | 'PROVIDER'
+    | 'INTEGRATION' | 'MODULE' | 'SYSTEM';
+  actorId?: string;
+  payload: T;
+}
+```
+
+Event payloads are independently versioned. Authoritative events use stable dot-notation names.
+
+---
+
+# 23. NOTIFICATION AND CONFIGURATION
 
 ```ts
 type NotificationSeverity = 'CRITICAL' | 'IMPORTANT' | 'NORMAL' | 'LOW_VALUE';
@@ -784,101 +1066,80 @@ interface NotificationDecision {
   channels: NotificationChannel[];
   title: string;
   body: string;
-  sensitive: boolean;
+  dataPolicy: DataPolicy;
   deferUntilUnlocked: boolean;
 }
 ```
 
----
-
-# 28. CONFIGURATION
-
-User configuration SHALL be divided into typed domains rather than one arbitrary free-form object:
-
-```text
-startup
-session_security
-voice
-providers
-privacy
-permissions
-budgets
-projects
-modules
-integrations
-notifications
-retention
-updates
-developer_mode
-```
-
-Every configuration domain SHALL carry a schema version.
-
-Invalid changed configuration SHALL be rejected atomically and the last valid configuration retained.
-
-Secrets SHALL never be accepted in normal configuration schemas.
+Configuration domains are typed/versioned and include at least startup, session security, voice, providers, privacy, permissions, budgets, projects, modules, integrations, notifications, retention, updates, and developer mode. Normal configuration never accepts raw secrets.
 
 ---
 
-# 29. PROTOCOL COMPATIBILITY
+# 24. CRYPTOGRAPHIC CANONICALIZATION RULES
 
-Protocol evolution rules:
+Security-material canonicalization is one shared implementation contract.
 
-- adding optional fields is backward-compatible within a protocol major version;
-- renaming/removing required fields is breaking;
-- changing meaning of an existing enum value is breaking;
-- adding enum values requires consumers to handle unknown/future values safely or protocol version negotiation;
+Required Rust/TypeScript golden vectors cover:
+
+- property order invariance;
+- Unicode;
+- optional/empty fields;
+- canonical IDs/paths/resources;
+- integration/account bindings;
+- target/environment/argument/tool-version changes;
+- duplicate-key rejection;
+- NaN/infinity/negative-zero rejection;
+- unsafe numeric precision rejection/string representation;
+- expired approval rejection despite matching digest;
+- second consumption/replay rejection;
+- secret exclusion.
+
+No adapter/tool chooses its own approval material field set.
+
+---
+
+# 25. PROTOCOL COMPATIBILITY
+
+After the first production protocol-major 1 release:
+
+- adding optional fields is compatible only if receivers safely ignore them;
+- removing/renaming required fields is breaking;
+- changing the meaning of an enum value is breaking;
+- adding enum values requires safe unknown handling or version negotiation;
 - breaking IPC changes require protocol-major bump;
-- persisted event payloads SHALL keep their own `payloadVersion` independent of IPC version.
+- persisted events retain independent `payloadVersion`;
+- persistence schema changes follow migration rules even if IPC is unchanged.
 
-The host and Core SHALL negotiate exact supported protocol-major version at startup.
-
----
-
-# 30. VALIDATION LIMITS
-
-Schemas SHALL include bounded limits for attacker-controlled or AI-controlled strings, arrays, and object depth where practical.
-
-Examples:
-
-- names/titles: bounded length;
-- tool argument arrays: bounded;
-- IPC frame: bounded;
-- event payload: bounded;
-- artifact upload/reference size: checked separately;
-- recursive arbitrary JSON from AI: disallowed unless an explicitly bounded schema requires it.
-
-Validation SHALL occur before expensive processing.
+Host and Core SHALL establish a mutually supported protocol major before normal operation.
 
 ---
 
-# 31. CANONICALIZATION
+# 26. SCHEMA QUALIFICATION
 
-Action digests, idempotency keys, signatures, and approval binding SHALL use deterministic canonical serialization of material fields.
+CI/release qualification SHALL prove:
 
-Filesystem targets SHALL be canonicalized before digest/authorization.
-
-Environment/project IDs, not display names, SHALL be used in consequential action digests.
-
----
-
-# 32. SCHEMA TESTING
-
-CI SHALL verify:
-
-- every schema has positive/negative fixtures;
-- TypeScript types and runtime validators agree;
-- Rust IPC structs serialize compatibly for shared messages;
-- breaking changes cause protocol/schema version updates;
-- unbounded AI/external fields are not introduced accidentally;
-- secret-bearing fields are absent from AI-visible event/view models.
+- positive and negative fixtures for every boundary schema;
+- Rust/TypeScript round-trip compatibility;
+- explicit IpcResponse union behavior;
+- one durable `RESUMING` meaning;
+- execution-scope enforcement;
+- sensitivity/locality propagation;
+- exact money arithmetic/serialization;
+- module execution-class/health/lifecycle validation;
+- provider compatibility/health separation;
+- approval canonicalization/digest vectors;
+- Proxmox identity/capability schemas;
+- unbounded arbitrary AI/external fields are not introduced;
+- secret-bearing fields are absent from AI/UI-safe views.
 
 ---
 
-# 33. GOVERNING RULE
+# 27. GOVERNING RULES
 
 > **Cross a boundary only with a versioned, validated, bounded contract.**
 
+> **Authorize the canonical resolved action, not ambiguous display text.**
+
 ---
 
-**END — JARVIS PROTOCOL & SCHEMA CONTRACT v1.0**
+**END — JARVIS PROTOCOL & SCHEMA CONTRACT v1.0.2**
