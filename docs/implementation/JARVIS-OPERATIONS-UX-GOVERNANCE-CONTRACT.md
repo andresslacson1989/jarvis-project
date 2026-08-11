@@ -10,26 +10,26 @@
 
 This document defines current normative operational, user-visible, configuration, observability, and architecture-governance behavior that complements the Runtime, Protocol, Data, Security, Coding, Verification, and Release Profile contracts.
 
-It is part of the current v1.0.2 implementation source of truth. It is not an ADR overlay and does not require implementers to reconstruct behavior from historical contracts or decision records.
+It is part of the current v1.0.2 implementation source of truth. It is not an ADR overlay. Implementation SHALL NOT require historical contracts or ADRs to reconstruct any behavior defined here.
 
-Where this document describes behavior already constrained by another current normative contract, the requirements are cumulative and SHALL use the same canonical types, state machines, authority rules, data policy, and release semantics.
+Requirements in this document are cumulative with the rest of the current normative suite and use the same canonical state machines, schemas, authority rules, DataPolicy, exact money, provider qualification, and release semantics.
 
 ---
 
 # 2. OPERATIONAL TRUTHFULNESS
 
-JARVIS SHALL prefer explicit degraded, queued, blocked, uncertain, or recovery state over fabricated continuity.
+JARVIS SHALL prefer explicit degraded, queued, blocked, paused, uncertain, or recovery state over fabricated continuity.
 
 JARVIS SHALL NOT:
 
 - represent queued or paused work as running;
-- represent an acknowledgement as completion;
+- represent acknowledgement as completion;
 - report an unverified consequential effect as success;
-- imply a task stopped immediately when it is still reaching an integrity-safe interruption point;
-- silently substitute an unavailable capability with one that violates required quality, locality, privacy, permission, budget, or support policy;
+- imply a task stopped immediately while it is still reaching an integrity-safe interruption point;
+- silently weaken quality, locality, privacy, permission, budget, support, or recovery policy to keep working;
 - reconstruct worker history from AI speculation when authoritative state/events exist.
 
-When work is accepted but cannot proceed, the user SHALL be able to determine what state it is in and why.
+When accepted work cannot proceed, the user SHALL be able to determine its current state and material reason.
 
 ---
 
@@ -37,44 +37,34 @@ When work is accepted but cannot proceed, the user SHALL be able to determine wh
 
 JARVIS SHALL provide a live work dashboard derived from authoritative state/events.
 
-The dashboard SHALL make visible, as applicable:
+The dashboard SHALL expose, as applicable:
 
-- active work;
-- queued work;
-- blocked work;
-- work waiting for user input;
-- work waiting for approval;
-- paused/resuming/recovering work;
-- recently completed/failed/cancelled work;
+- active, queued, blocked, waiting-for-user, waiting-for-approval, paused, resuming, recovering, and recently terminal work;
 - current worker activity;
 - mission/task identity and project/environment where applicable;
-- assigned worker role and provider/model where safe/useful;
+- assigned worker role/provider where safe/useful;
 - meaningful checkpoints/progress;
-- queue/block/wait reason;
-- queue position when deterministically known;
+- queue/block/wait reason and queue position when deterministically known;
 - blockers/pending approvals;
-- findings and verification results;
-- changed artifacts/resources;
-- start time, last activity, and terminal result;
+- findings/verification results and changed artifacts/resources;
+- start/last-activity/completion information;
 - pause/cancel/reprioritize controls where policy permits.
 
-If accepted work cannot start immediately, JARVIS SHALL tell the user that it is queued and expose the queue state.
+If accepted work cannot start immediately, JARVIS SHALL tell the user it is queued and expose the queue state. Tasks introduced by replanning are subject to the same rule.
 
-Tasks introduced by graph revision that cannot start immediately SHALL also appear as queued.
+Queue ordering changes and dependency, workspace, resource, budget, approval, provider, recovery, or other material start blockers SHALL remain observable.
 
-Queue ordering changes, resource/budget constraints, approval waits, provider waits, dependency waits, recovery waits, and other material start blockers SHALL be observable.
+Routine worker activity SHALL remain available in the dashboard/journal without repetitive spoken interruption.
 
-Routine worker activity SHALL remain available in the dashboard/journal without creating repetitive spoken interruptions.
-
-JARVIS SHALL answer questions such as `What is that worker doing?`, `What did it do?`, `What is queued?`, and `Why is this blocked?` primarily from authoritative recorded task/worker/event state rather than AI reconstruction.
+Questions such as `What is that worker doing?`, `What did it do?`, `What is queued?`, and `Why is this blocked?` SHALL be answered primarily from recorded authoritative state/events rather than model reconstruction.
 
 ---
 
-# 4. WORKER JOURNAL AND ACTIVITY EVENTS
+# 4. WORKER JOURNAL AND ACTIVITY EVIDENCE
 
-Every active worker SHALL expose a concise current-activity state and maintain durable structured evidence sufficient to explain meaningful work without private chain-of-thought.
+Every active worker SHALL expose concise current activity and durable structured evidence sufficient to explain meaningful work without private chain-of-thought.
 
-Recorded worker activity SHALL cover equivalents of:
+Recorded semantics SHALL cover equivalents of:
 
 ```text
 WORK_STARTED
@@ -90,62 +80,73 @@ COMPLETED
 FAILED
 ```
 
-Exact event names MAY be normalized by the current DomainEvent schema, but the observable semantics above SHALL remain available.
+Exact DomainEvent names may be normalized, but these observable semantics SHALL remain available.
 
-Worker journals record observable actions, findings, changes, blockers, verification, and results. They SHALL NOT require or expose private model reasoning.
+Worker journals record observable actions, findings, changes, blockers, verification, and results. They SHALL NOT require or expose hidden model reasoning.
 
-Completed worker history remains accessible according to retention policy and may feed scoped authoritative task/project memory.
+Completed worker history remains accessible according to retention policy and may feed scoped authoritative project/task memory.
 
 ---
 
-# 5. PRIORITY, PREEMPTION, PAUSE, RESUME, AND USER CONTROL
+# 5. MISSION PLANNING AND CONCURRENCY UX
+
+The planner determines logical decomposition/parallelism; deterministic runtime policy determines actual concurrency.
+
+The planner SHALL distinguish genuinely dependent, sequential, conditional, and parallel work. It SHOULD remove fake ordering dependencies when outputs are independent.
+
+Trivial deterministic operations SHALL NOT be decomposed into unnecessary missions/workers merely because AI workers are available. Small bounded deterministic work SHOULD remain actions/tools.
+
+Excess logical parallelism that cannot run because of resource, provider, budget, workspace, permission, locality, or responsiveness constraints SHALL queue transparently rather than overload the machine or disappear.
+
+Consequential ambiguity in decomposition or material scope expansion SHALL follow clarification/authorization policy rather than guessing.
+
+---
+
+# 6. PRIORITY, PREEMPTION, PAUSE, RESUME, AND USER CONTROL
 
 Explicit authenticated user instructions to reprioritize, pause, cancel, or focus work SHALL receive strong precedence over AI-generated priority recommendations, subject to mandatory integrity/safety constraints.
 
-Priority alone SHALL NOT force unnecessary preemption when both old and new work can execute safely within resource, budget, workspace, provider, and responsiveness constraints.
+Priority alone SHALL NOT force unnecessary preemption when both workloads can run safely.
 
-When preemption is required, JARVIS SHALL preserve integrity by reaching the earliest appropriate interruption boundary, checkpointing durable state, releasing unnecessary resources, and making the resulting state visible.
+When preemption is required, JARVIS SHALL reach the earliest safe interruption boundary, checkpoint durable state, release unnecessary resources, and make the transition visible.
 
-If an operation is temporarily unsafe to interrupt, JARVIS SHALL surface that pause/cancel is pending at an integrity-safe boundary rather than pretending execution has already stopped.
+If interruption is temporarily unsafe, JARVIS SHALL surface that pause/cancel is pending at an integrity-safe boundary instead of pretending work has stopped.
 
-Temporary non-preemptibility SHALL remain narrow and bounded and SHALL NOT indefinitely defeat legitimate user cancellation.
+Temporary non-preemptibility SHALL be narrow/bounded and SHALL NOT indefinitely defeat legitimate user cancellation.
 
-Meaningful scheduling transitions SHALL be auditable, including where applicable:
+Meaningful scheduling transitions SHALL be auditable, including task/mission identity, old/new state or priority, reason, triggering instruction/policy event, checkpoint where applicable, and interruption outcome.
 
-- task/mission identity;
-- old/new priority or state;
-- reason;
-- triggering authenticated instruction or policy event;
-- checkpoint reference;
-- safe-point/interruption outcome.
-
-After `PAUSED`, all new task execution follows the canonical durable `RESUMING` validation defined by the Runtime/Data contracts.
+After `PAUSED`, all new execution follows canonical durable `RESUMING` validation.
 
 ---
 
-# 6. RECOVERY VISIBILITY
+# 7. RECOVERY VISIBILITY
 
 Accepted queued/pending work SHALL survive restart according to durability policy and remain visible after recovery.
 
-After crash/restart or provider/runtime interruption, JARVIS SHALL inform the user of materially:
+After crash/restart/provider/runtime interruption, JARVIS SHALL accurately surface materially interrupted, resumed, queued, blocked, uncertain, approval-revalidation-required, or user-action-required work.
 
-- interrupted work;
-- resumed work;
-- queued work;
-- blocked work;
-- uncertain effects;
-- expired/revalidation-required approvals;
-- user-action-required recovery.
-
-Recovery messaging SHALL reflect live reconciliation, not merely the state that existed before interruption.
+Recovery messaging SHALL reflect live reconciliation rather than merely repeating pre-crash assumptions.
 
 ---
 
-# 7. EVENT DISPOSITION AND AUTOMATION POLICY
+# 8. STANDING PERMISSION GOVERNANCE
 
-All external/local events enter the current Event Gateway and remain subject to source validation, normalization, durable dedup/replay protection, normal authority, DataPolicy, budget, resource, and task/mission controls.
+Standing permissions SHALL be explicit, scoped, revocable, non-transitive across unrelated targets/environments/action classes, and auditable.
 
-For each supported integration/event class, user policy SHALL be able to distinguish applicable dispositions equivalent to:
+A standing permission SHALL identify sufficient canonical scope to prevent accidental expansion across projects, accounts, environments, resource classes, or materially different actions.
+
+Revocation SHALL prevent new dependent execution immediately after authoritative policy state is updated. Revoking one capability SHALL NOT implicitly revoke unrelated independent capabilities unless policy explicitly couples them.
+
+A development standing permission SHALL NOT become production authority. No standing permission waives mandatory destructive final confirmation.
+
+---
+
+# 9. EVENT DISPOSITION AND AUTOMATION POLICY
+
+External/local events enter Event Gateway and remain subject to source validation, normalization, durable replay/dedup protection, authority, DataPolicy, budget, resource, and task/mission controls.
+
+Per supported integration/event class, policy SHALL distinguish dispositions equivalent to:
 
 ```text
 IGNORE
@@ -155,32 +156,21 @@ CREATE_OR_UPDATE_TRACKED_WORK
 ALLOW_APPROVED_AUTOMATION_POLICY
 ```
 
-An event source being authenticated never grants action authority by itself.
+Authenticated source identity is not action authorization.
 
-Event-triggered work that cannot start immediately SHALL obey the same queue-transparency contract as interactive work.
+Event-created work obeys normal queue transparency.
 
-Push/subscription/event mechanisms SHOULD be preferred where reliable and safely supportable. Polling MAY be used with service-appropriate interval, backoff, quota/rate-limit awareness, and trigger-storm controls.
+Push/subscription/event mechanisms SHOULD be preferred where reliable and safely supportable. Polling MAY be used with appropriate intervals, backoff, quota/rate-limit awareness, and trigger-storm controls.
 
-No event path creates direct unrestricted tool execution.
+No event path creates direct unrestricted tool authority.
 
 ---
 
-# 8. NOTIFICATION POLICY AND FOCUS MODES
+# 10. NOTIFICATION POLICY AND FOCUS MODES
 
-NotificationPolicyEngine is the single policy authority for deciding whether an event is spoken, shown visually, grouped, deferred, dashboard-only, or silent.
+NotificationPolicyEngine is the single policy authority for whether an event is spoken, displayed, grouped, deferred, dashboard-only, or silent.
 
-Notification decisions SHALL consider, where relevant:
-
-- severity;
-- source;
-- project/integration scope;
-- DataPolicy;
-- user-configured policy;
-- current interaction/focus state;
-- actionability;
-- duplication/repetition;
-- grouping opportunity;
-- locked-session privacy.
+Decisions SHALL consider relevant severity, source, project/integration scope, DataPolicy, preferences, interaction/focus state, actionability, repetition/grouping, and locked-session privacy.
 
 Severity classes remain equivalent to:
 
@@ -191,13 +181,13 @@ NORMAL
 LOW_VALUE
 ```
 
-Voice notification is reserved for information important enough to justify interruption under current policy. Routine worker lifecycle noise SHALL default to dashboard/journal rather than repetitive speech.
+Voice is reserved for events important enough to interrupt under current policy. Routine worker lifecycle noise defaults to dashboard/journal.
 
-Related repetitive events SHOULD be aggregated into a meaningful notification where practical.
+Related repetitive events SHOULD be aggregated where practical.
 
 Users SHALL be able to configure notification policy globally and, where applicable, per integration/project/event class.
 
-V1 SHALL support user-selectable focus modes equivalent to:
+V1 SHALL support focus modes equivalent to:
 
 ```text
 NORMAL
@@ -206,23 +196,19 @@ DO_NOT_DISTURB
 CRITICAL_ONLY
 ```
 
-Focus modes alter delivery, not underlying authoritative/audit events.
+Focus modes alter delivery, not underlying authoritative/audit events. Critical safety/security events MAY override quiet policy only where deterministic policy explicitly defines the override.
 
-Critical safety/security notifications MAY override quiet policy only where the override is explicitly defined by deterministic policy.
-
-`SENSITIVE` content SHOULD be excluded from verbose notifications and spoken notification bodies by default unless the user explicitly selects an appropriate trusted delivery policy.
+`SENSITIVE` content SHOULD be excluded from verbose/spoken notifications by default unless an explicit trusted delivery policy permits it.
 
 ---
 
-# 9. CONFIGURATION ACTIVATION AND ONE CONFIGURATION AUTHORITY
+# 11. CONFIGURATION ACTIVATION AND ONE CONFIGURATION AUTHORITY
 
-Configuration domains remain typed, versioned, runtime-validated, and non-secret as defined by Protocol/Coding contracts.
+Configuration remains typed, versioned, runtime-validated, and non-secret.
 
-A changed configuration SHALL be validated before activation.
+A candidate configuration SHALL be validated before activation. Invalid configuration SHALL be rejected atomically and preserve the prior active valid configuration.
 
-Invalid candidate configuration SHALL be rejected atomically and SHALL preserve the prior active valid configuration.
-
-Configuration persistence/activation SHALL use a deterministic lifecycle equivalent to:
+The lifecycle is equivalent to:
 
 ```text
 parse candidate
@@ -232,58 +218,63 @@ parse candidate
 → atomically activate
 ```
 
-Failure before activation leaves the previous valid configuration authoritative.
+Failure before activation leaves the previous valid configuration authoritative. Unknown flags/settings SHALL NOT silently enable behavior.
 
-Unknown flags/settings SHALL NOT silently activate behavior.
+Security/permission/privacy/locality/credential/budget/update/module/integration policy changes SHALL be auditable where material.
 
-Configuration that materially changes permission, privacy/locality, credentials, budget, update, module, integration, or other security-relevant policy SHALL be auditable.
-
-Dashboard, voice, and other control surfaces SHALL modify the same underlying configuration authority rather than maintaining divergent parallel settings systems.
+Dashboard, voice, and other control surfaces SHALL mutate the same underlying configuration authority rather than parallel settings stores.
 
 ---
 
-# 10. IMPORT / MERGE SAFETY
+# 12. IMPORT / MERGE SAFETY
 
 User state import SHALL be versioned, schema-validated, bounded, and staged before mutation.
 
-An import SHALL NOT silently overwrite existing projects, memories, settings, histories, module/integration records, or other durable user state when identities/content conflict.
+Import SHALL NOT silently overwrite existing projects, memories, settings, histories, module/integration records, or other durable user state on conflict.
 
-Conflicts SHALL follow an explicit versioned merge/conflict policy. Where deterministic safe merge is not defined, JARVIS SHALL surface the conflict for user resolution rather than guess.
+Conflicts SHALL use an explicit versioned merge/conflict policy. If deterministic safe merge is undefined, JARVIS SHALL surface the conflict for user resolution instead of guessing.
 
-Credential import, if ever implemented, remains a separate high-risk encrypted/confirmed workflow and is not implied by normal state import.
+Credential import, if ever implemented, remains a separate high-risk encrypted/confirmed workflow.
 
 ---
 
-# 11. SCOPED RANKED MEMORY RETRIEVAL
+# 13. SCOPED RANKED MEMORY RETRIEVAL
 
-JARVIS SHALL retrieve memory through scoped, ranked, metadata-aware policy rather than unrestricted conversation-history retrieval or raw semantic similarity alone.
+JARVIS SHALL retrieve memory through scoped, ranked, metadata-aware policy rather than unrestricted history retrieval or raw semantic similarity alone.
 
-Memory ranking SHOULD consider, as applicable:
-
-- user/global, project, mission, task, and session scope match;
-- memory type;
-- confidence and provenance;
-- verification/staleness state;
-- recency;
-- semantic relevance;
-- importance;
-- relationship to the current authoritative project/environment/task.
+Ranking SHOULD consider applicable scope match, memory type, confidence/provenance, verification/staleness, recency, semantic relevance, importance, and relationship to the authoritative current project/environment/task.
 
 Confirmed decisions and verified facts SHOULD rank above weak inference when otherwise relevant.
 
-The Context Manager SHALL send only the smallest useful memory/context set required for the current interaction.
+Context Manager SHALL provide the smallest useful context/memory set for the current interaction.
 
-For current-state questions/actions, freshly verified live state remains authoritative over stored memory.
+For current-state questions/actions, freshly verified live state remains authoritative over memory.
 
-Consequential ambiguity that cannot be resolved reliably from current authoritative context SHALL result in clarification or blocking rather than cross-project/target guessing.
+Consequential ambiguity that cannot be resolved reliably SHALL clarify/block rather than cross-project/target guess.
 
 ---
 
-# 12. MODULE REGISTRY, DASHBOARD, AND STATE SEPARATION
+# 14. PROVIDER LIFECYCLE AND RESPONSIVENESS CAPABILITY
 
-JARVIS SHALL provide one centralized Module Registry and user-facing module-management dashboard.
+Provider abstractions SHALL NOT require a fresh one-shot process/session for every interaction.
 
-The normal supported catalog/dashboard SHALL show only modules/providers explicitly supported for the applicable JARVIS/platform/release context. Supported modules MAY be visible before installation so available capabilities are discoverable.
+Adapters MAY use one-shot execution when that is the provider's qualified interface, but the architecture SHALL support warm, persistent, streaming, session-oriented, resumable, local-server, cloud, and future LAN provider models without redesigning Core.
+
+Where safely supported, provider contracts SHOULD expose normalized lifecycle/capabilities for discovery, readiness/health, start/warm, execute/submit, streaming events, cancellation/interruption, restart, and stop/unload.
+
+Latency-critical lightweight components SHOULD remain warm while their feature is active where resource policy permits. Heavy RAM/VRAM/CPU/GPU providers SHOULD be warmed/unloaded according to measured resource pressure and latency requirements rather than assuming every provider can remain resident.
+
+Provider lifecycle/resource scheduling SHALL preserve UI/voice/stop-cancel responsiveness on the qualified 16 GB baseline and SHALL prefer graceful degradation over resource exhaustion.
+
+Streaming SHOULD be used where it improves responsiveness and remains semantically/safely valid; downstream work may begin before complete upstream output only when the partial information is sufficient and does not create premature authority/success claims.
+
+---
+
+# 15. MODULE REGISTRY, DASHBOARD, AND STATE SEPARATION
+
+JARVIS SHALL provide one centralized Module Registry and module-management dashboard.
+
+The normal supported catalog/dashboard shows only modules/providers explicitly supported for the applicable JARVIS/platform/release context. Supported modules MAY be visible before installation.
 
 States remain distinct:
 
@@ -296,90 +287,59 @@ PREFERRED
 HEALTHY
 ```
 
-Installing a module SHALL NOT by itself:
+Installing a module SHALL NOT itself enable it, grant private-data access, authorize consequential actions, make it preferred, or change standing permissions.
 
-- enable it;
-- grant permission to receive private/sensitive data;
-- authorize privileged/consequential actions;
-- make it preferred;
-- change standing permissions.
+Applicable actions MAY include Install, Enable/Disable, Configure, Set/Clear Preferred, Test/Health, Update, Remove, and Pin/Unpin.
 
-User actions MAY include, when applicable:
+Unsupported/manual mechanisms, if later permitted, SHALL remain clearly distinguished from officially supported modules.
 
-```text
-Install
-Enable / Disable
-Configure
-Set / clear preferred
-Test / health check
-Update
-Remove
-Pin / unpin version
-```
-
-Unsupported/manual extension mechanisms, if enabled by a future qualified feature, SHALL be clearly separated from officially supported choices and SHALL NOT be represented as supported merely because they can be loaded.
-
-Controlled module installation/update uses defined verified installer/update paths, not arbitrary AI-generated shell commands.
+Controlled installation/update uses defined verified paths, never arbitrary AI-generated shell as the standard installer mechanism.
 
 ---
 
-# 13. MODULE VERSIONING, UPDATE POLICY, AND ROLLBACK UX
+# 16. MODULE VERSIONING, UPDATE POLICY, AND ROLLBACK UX
 
-Module/provider versions are immutable installation units. Updating does not destructively overwrite the active version in place.
+Module/provider versions are immutable installation units. Update does not destructively overwrite the active version in place.
 
-Activation points to one validated installed version. Rollback changes activation state/pointer to a retained qualified version; it does not depend on reconstructing overwritten previous files.
+Activation points to one validated installed version. Rollback changes activation state/pointer to a retained version rather than reconstructing overwritten files.
 
-A new version SHALL be staged, provenance/integrity checked, compatibility checked, and health/conformance tested before activation according to module policy.
+New versions SHALL be staged, provenance/integrity checked, compatibility checked, and health/conformance tested before activation under policy.
 
-Users MAY pin versions and configure supported update policy such as manual, notify-only, or qualified automatic update for permitted low-risk classes.
+Users MAY pin versions and choose supported manual, notify-only, or qualified automatic update policy for allowed classes.
 
 Breaking/security-sensitive updates SHALL surface material impact before activation. Core voice, AI, security, credential, and infrastructure providers SHOULD default to explicit notification/approval for materially risky replacement rather than silent activation.
 
-An active task SHOULD NOT have its provider/module replaced underneath it outside a qualified safe lifecycle boundary.
+Active tasks SHOULD NOT have their provider/module replaced underneath them outside a qualified safe lifecycle boundary.
 
-Where technically promised/possible, the prior known-working version SHALL remain available until the replacement is proven healthy.
+Where rollback is promised/technically possible, the previous known-working version SHALL remain available until replacement is proven healthy.
 
-The module dashboard SHOULD distinguish, when applicable:
-
-- active version;
-- available approved version;
-- staged version;
-- previous/rollback version;
-- pinned version;
-- validation/update failure.
+Dashboard SHOULD distinguish active, approved-available, staged, previous/rollback, pinned, and failed-validation/update state when applicable.
 
 ---
 
-# 14. INTEGRATION CATALOG UX
+# 17. INTEGRATION CATALOG UX AND REVOCATION
 
-JARVIS SHALL maintain an official Supported Integration Catalog consistent with the V1 Release Profile and binding post-V1 integration requirements.
+JARVIS SHALL maintain an official Supported Integration Catalog consistent with the V1 Release Profile and binding post-V1 requirements.
 
-Each supported integration exposes normalized identity, capability/operation set, authentication method, least-privilege credential scopes, health behavior, compatibility/support state, permission/risk rules, and DataPolicy behavior.
+Each supported integration exposes normalized identity, capabilities/operations, authentication method, least-privilege credential scopes, health, compatibility/support, permission/risk, and DataPolicy behavior.
 
-Connecting/configuring an integration SHALL NOT imply that all service capabilities are enabled or authorized.
+Connecting/configuring an integration SHALL NOT imply every service capability is enabled or authorized. Where upstream permits, service capabilities are independently enabled/authorized.
 
-Where upstream platforms permit it, service capabilities are independently enabled/authorized. For example, connecting one Google or Microsoft account does not automatically authorize mail, files, calendar, contacts, messaging, and administration together.
+Revoked/expired authentication or removed capability scope SHALL immediately prevent new dependent actions after authoritative integration state changes while leaving unrelated integration capabilities usable when independently valid.
 
-The integration dashboard SHALL distinguish support, connection/configuration, enabled capabilities, authorization, and health without exposing secret material.
+The dashboard SHALL distinguish support, connection/configuration, enabled capabilities, authorization, and health without exposing secret material.
 
-Manual/unsupported extensions SHALL remain clearly distinct from the official supported catalog.
+Manual/unsupported extensions remain clearly distinct from official support.
 
 ---
 
-# 15. BUDGET / QUOTA USER EXPERIENCE
+# 18. BUDGET / QUOTA USER EXPERIENCE
 
-Exact accounting/admission remains governed by the canonical MoneyAmount/quota/reservation contracts.
+Exact accounting/admission is governed by canonical MoneyAmount/quota/reservation contracts.
 
-The dashboard SHALL expose understandable budget/quota state where applicable, including:
+Dashboard SHALL expose understandable applicable settled/provider-reported usage, reservations where useful, warning threshold, hard limit, attribution, provider quota/reset state, and provenance.
 
-- current settled/provider-reported usage as available;
-- outstanding reservations where useful;
-- warning threshold;
-- hard limit;
-- attribution by provider/project/mission/task where available and meaningful;
-- provider quota/reset state and provenance where reported.
-
-User-facing states SHALL support equivalents of:
+User-facing states support equivalents of:
 
 ```text
 NORMAL
@@ -388,72 +348,57 @@ HARD_LIMIT
 UNKNOWN
 ```
 
-Unknown provider cost/quota SHALL remain visibly unknown rather than represented as zero.
+Unknown provider cost/quota remains visibly unknown rather than zero.
 
-When budget/quota/resource limits reduce concurrency, affected work SHALL queue/block transparently and expose the reason.
+When budget/quota/resource limits reduce concurrency, affected work SHALL queue/block transparently with the reason.
 
-A hard limit blocks new governed chargeable work unless an explicitly authorized policy change/override permits it.
+Hard limit blocks new governed chargeable work unless explicitly authorized policy change/override permits it.
 
 ---
 
-# 16. VOICE IDENTITY AND FALLBACK
+# 19. VOICE IDENTITY AND FALLBACK
 
 JARVIS SHALL maintain one persistent configured human-quality voice identity across normal spoken interaction.
 
-Voice identity is a product profile independent from any specific TTS implementation. Provider replacement SHALL preserve configured perceptual identity/naturalness within the qualified threshold.
+Voice identity is independent from a specific TTS implementation. Provider replacement SHALL preserve configured perceptual identity/naturalness within the qualified threshold.
 
-Latency SHALL NOT be improved by silently switching to a substantially different or lower-quality generic voice.
+Latency SHALL NOT be improved by silently switching to a substantially different/lower-quality generic voice.
 
-If no available policy-compliant TTS provider can preserve the configured voice identity adequately, JARVIS SHALL degrade to text/UI with explicit voice-degraded status rather than silently impersonating the configured voice poorly.
+If no policy-compliant TTS can preserve identity adequately, JARVIS SHALL degrade to text/UI with explicit `VOICE_DEGRADED`-equivalent state rather than poorly impersonating the configured voice.
 
-Cloud speech fallback SHALL NOT occur when DataLocality/policy requires local-only processing.
-
----
-
-# 17. VOICE REFLEX, ACKNOWLEDGEMENT, AND CONTINUITY
-
-The deterministic low-latency reflex path SHALL remain independent of remote AI reasoning for established controls/state transitions, including as applicable:
-
-- listening-state feedback;
-- push-to-talk state;
-- wake/session acknowledgement when wake is enabled;
-- stop speaking / immediate TTS interruption;
-- cancel current voice generation;
-- mute/unmute;
-- sleep/lock where semantics are deterministic;
-- unambiguous task pause/cancel after target resolution.
-
-Immediate acknowledgement MAY use visual state, a subtle local earcon, or a small bank of fixed/pre-generated phrases rendered in the exact approved JARVIS voice.
-
-Acknowledgement SHALL mean only that input was received/listening started/processing started. It SHALL NOT imply task success unless completion is already authoritatively verified.
-
-The fixed acknowledgement phrase bank SHALL remain intentionally small and semantically deterministic.
-
-After a spoken response, the voice session MAY remain active for a configurable short conversational window so the user can continue without repeating a wake word when policy/device state permits.
+Cloud speech fallback SHALL NOT violate DataLocality.
 
 ---
 
-# 18. SLOW-OPERATION RESPONSIVENESS
+# 20. VOICE REFLEX, ACKNOWLEDGEMENT, AND CONTINUITY
 
-AI/provider/network/worker latency SHALL NOT freeze the local UI, voice-session controls, or deterministic safety controls.
+The deterministic low-latency reflex path SHALL remain independent of remote AI reasoning for established controls/state transitions including, as applicable, listening feedback, PTT state, wake/session acknowledgement when enabled, immediate TTS interruption, stop, cancel current voice generation, mute/unmute, sleep/lock, and unambiguous task pause/cancel after target resolution.
 
-When work is not immediate, JARVIS SHALL remain truthfully responsive through state such as `THINKING`, `WORKING`, `QUEUED`, `BLOCKED`, or equivalent.
+Immediate acknowledgement MAY use visual state, local earcon, or a small fixed/pre-generated phrase bank rendered in the exact configured voice.
 
-Where useful JARVIS SHOULD:
+Acknowledgement means only received/listening/processing-started and SHALL NOT imply task success unless completion was already verified.
 
-- acknowledge accepted work promptly;
-- stream meaningful progress events when authoritative progress exists;
-- avoid repetitive verbal status chatter;
-- speak only useful milestones according to NotificationPolicy;
-- keep stop/mute/cancel controls responsive.
+The fixed phrase bank SHALL remain intentionally small and deterministic.
 
-Routine deterministic controls SHALL NOT invoke AI after intent is already established when deterministic execution is sufficient.
+After a spoken response, a configurable short conversation window MAY remain active so the user can continue without repeating a wake word when policy/device state permits.
 
 ---
 
-# 19. VOICE/PERFORMANCE TELEMETRY
+# 21. SLOW-OPERATION RESPONSIVENESS
 
-Diagnostic/developer performance instrumentation SHALL support measurements sufficient to explain voice responsiveness, including as applicable:
+AI/provider/network/worker latency SHALL NOT freeze local UI, voice controls, or deterministic safety controls.
+
+Longer work SHALL remain truthfully visible through `THINKING`, `WORKING`, `QUEUED`, `BLOCKED`, or equivalent state.
+
+JARVIS SHOULD acknowledge accepted longer work promptly, stream meaningful authoritative progress, avoid repetitive verbal chatter, speak useful milestones according to NotificationPolicy, and keep stop/mute/cancel responsive.
+
+Routine deterministic controls SHALL NOT invoke AI unnecessarily after intent is established.
+
+---
+
+# 22. VOICE/PERFORMANCE TELEMETRY
+
+Diagnostic/developer instrumentation SHALL support applicable measures equivalent to:
 
 ```text
 wake/ack latency
@@ -469,166 +414,150 @@ stop/mute/cancel latency
 end-to-end first-response latency
 ```
 
-Telemetry SHALL NOT require retention of sensitive speech content merely to compute latency.
-
-The canonical latency targets remain those in the Verification Contract. Measurements distinguish local responsiveness from remote/provider reasoning/network latency.
+Telemetry SHALL NOT require retention of sensitive speech content to compute latency. Measurements distinguish local responsiveness from provider/network reasoning latency.
 
 ---
 
-# 20. DIAGNOSTICS UX AND EXPORT PRIVACY
+# 23. DESTRUCTIVE APPROVAL USER EXPERIENCE
+
+Final destructive confirmation SHALL present user-understandable exact target, environment where applicable, action, expected destructive/materially unrecoverable consequence, and whether a verified rollback/backup is known to exist when that information is available.
+
+Voice approval MAY be accepted only in an unlocked authoritative session and only when it unambiguously maps to exactly one pending approval under current policy.
+
+A UI confirmation path SHALL remain available for final destructive approval even when voice confirmation is supported.
+
+Human-readable summaries never replace the canonical action descriptor/digest.
+
+---
+
+# 24. DIAGNOSTICS UX AND EXPORT PRIVACY
 
 Diagnostics SHALL make common failure/degraded causes actionable and distinguish healthy, degraded, unavailable, blocked, uncertain, and recovery-required state where applicable.
 
-For production scenarios, recorded diagnostic/audit evidence SHALL make it possible, subject to retention/data policy, to establish:
+Recorded diagnostic/audit evidence SHALL be sufficient, subject to retention/DataPolicy, to establish non-secret request summary, relevant project/mission/task/attempt, provider/worker/tool/integration, permission/approval result, important transitions, outcome, verification evidence, and fallback/retry/recovery behavior.
 
-- what the user requested at a non-secret summary level;
-- relevant project/mission/task/attempt;
-- provider/worker/tool/integration involved;
-- permission/approval result;
-- important state transitions;
-- failure/success outcome;
-- verification evidence determining completion;
-- fallback/retry/recovery behavior.
+This SHALL NOT require private chain-of-thought or raw credentials.
 
-This SHALL NOT require private chain-of-thought or raw long-lived credentials.
+Before diagnostic/support export, JARVIS SHALL show the information categories included.
 
-Before generating a diagnostic/support export, JARVIS SHALL show the user the categories of information that will be included.
-
-Diagnostic export SHALL default to excluding conversation bodies and private user content unless explicitly selected by the user for that export and allowed by DataPolicy.
+Diagnostic export SHALL default to excluding conversation bodies/private user content unless explicitly selected for that export and allowed by DataPolicy.
 
 Secret/recovery-key/credential material remains excluded by construction and cannot be opted into an ordinary diagnostic export.
 
 ---
 
-# 21. AUDIT RETENTION AND INTEGRITY CLAIMS
+# 25. AUDIT RETENTION AND INTEGRITY CLAIMS
 
 Audit records SHALL be append-oriented and retained according to policy sufficient to explain recent consequential/security-relevant actions.
 
-Retention policy SHALL NOT silently delete evidence still required by the configured security/audit explanation window merely to satisfy generic log cleanup preferences.
+Retention SHALL NOT silently delete evidence still required by the configured security/audit explanation window merely to satisfy generic cleanup preferences.
 
-Audit/persistence integrity mechanisms SHOULD detect corruption, sequence discontinuity, unexpected truncation, or casual modification to the extent supported by the local architecture and qualified implementation.
+Integrity mechanisms SHOULD detect corruption, sequence discontinuity, unexpected truncation, or casual modification to the extent supported and qualified.
 
-JARVIS SHALL NOT claim that local audit history remains cryptographically trustworthy after compromise by arbitrary code with equivalent same-user rights and sufficient storage/process access, or after Administrator/kernel compromise. Such compromise is outside the V1 hard isolation claim.
-
-Tamper/corruption diagnostics are defense-in-depth and operational evidence, not a claim of an independently trusted remote audit system.
+JARVIS SHALL NOT claim cryptographically trustworthy local audit history after equivalent same-user compromise with sufficient access or Administrator/kernel compromise. Tamper/corruption diagnostics are defense-in-depth, not an independently trusted remote audit system.
 
 ---
 
-# 22. DEPENDENCY / VULNERABILITY RELEASE POLICY
+# 26. DEPENDENCY / VULNERABILITY RELEASE POLICY
 
-Production CI/release qualification SHALL review dependency and known-vulnerability results for reachable production paths.
+Production CI/release qualification SHALL review dependency/known-vulnerability results for reachable production paths.
 
 A known unmitigated **Critical** vulnerability affecting a reachable production path SHALL block production release.
 
-A known **High** vulnerability affecting a reachable production path SHALL also block production release unless an exceptional explicit risk acceptance records at least:
+A known **High** vulnerability affecting a reachable production path SHALL also block release unless exceptional explicit risk acceptance records at least affected component/version/path, reachability assessment, temporary-acceptance rationale, mitigation/compensating controls, accountable owner, expiry/mandatory review date, and remediation/tracking reference.
 
-- affected component/version/path;
-- exposure/reachability assessment;
-- rationale for temporary acceptance;
-- mitigation/compensating controls;
-- accountable owner;
-- expiry or mandatory review date;
-- remediation/tracking reference.
+A High waiver is exceptional, auditable, time-bounded, and SHALL NOT waive a mandatory JARVIS security invariant.
 
-A High-severity waiver is exceptional, auditable, time-bounded, and SHALL NOT waive a mandatory JARVIS security invariant such as destructive confirmation, secret protection, locality, IPC/WebView privilege separation, or credential authorization.
-
-A Critical finding is not converted into a normal production pass merely by relabeling it as accepted risk.
+A Critical finding is not converted into a production pass merely by relabeling it accepted risk.
 
 ---
 
-# 23. UPGRADE / UNINSTALL USER-STATE PRESERVATION
+# 27. UPGRADE / UNINSTALL USER-STATE PRESERVATION
 
-Upgrade qualification SHALL prove preservation or explicit migration of durable user state that remains compatible, including applicable:
+Upgrade qualification SHALL prove preservation or explicit migration of compatible durable user state including applicable projects/workspaces/environments, memories/history policy state, mission/task/worker history, settings, module/integration metadata, compatible approvals/standing permissions, and backup/recovery availability.
 
-- projects/workspaces/environments;
-- memories and conversation/history policy state;
-- mission/task/worker history;
-- settings;
-- module/integration registry metadata;
-- compatible approvals/standing permissions;
-- backup/recovery availability.
+Invalid/obsolete persisted states SHALL be migrated, invalidated, or surfaced explicitly; they SHALL NOT silently disappear because a new version no longer understands them.
 
-Invalid/obsolete persisted states SHALL be migrated, invalidated, or surfaced explicitly. They SHALL NOT silently disappear merely because a new version no longer understands them.
-
-Normal uninstall SHALL NOT silently delete durable user data/backups without explicit product policy and user-visible confirmation/choice appropriate to the removal operation.
+Normal uninstall SHALL NOT silently delete durable user data/backups without explicit product policy and user-visible confirmation/choice appropriate to removal.
 
 ---
 
-# 24. ARCHITECTURE DECISION ESCALATION
+# 28. ARCHITECTURE DECISION ESCALATION
 
 Non-critical engineering choices SHALL be resolved from the current normative suite, production evidence, and established principles without requiring user approval for routine implementation detail.
 
-The architecture/implementation process SHALL escalate when a decision materially requires user preference or consent, including material changes to:
+Escalation is required when a decision materially requires user preference/consent regarding security/trust boundary, privacy/data exposure, destructive/irreversible behavior, significant recurring cost, core UX, major product scope, permanent external account/policy commitment, or materially conflicting requirements with no clearly superior engineering resolution.
 
-- security/trust boundary;
-- privacy/data exposure;
-- destructive or materially irreversible behavior;
-- recurring/significant financial cost;
-- core user experience/interaction model;
-- major product scope/capabilities;
-- permanent external account/policy commitment;
-- materially conflicting requirements where no clearly superior engineering resolution exists.
+Internal package factoring, retry mechanics, routing implementation, schemas, state-machine implementation, observability mechanics, and equivalent choices SHOULD normally be resolved without interruption when accepted behavior/safety is preserved.
 
-Implementation details such as internal package factoring, retry mechanics, schema organization, worker/provider routing implementation, observability mechanics, and equivalent choices SHOULD normally be resolved without user interruption when they preserve the accepted product behavior and safety model.
+Significant non-critical architecture decisions made autonomously SHALL be documented in the appropriate current contract/ADR record as required by governance, and the user SHOULD receive a concise summary rather than being asked to approve every implementation detail or being left unaware of a material decision.
 
 > **Escalate product judgment. Resolve engineering judgment.**
 
 ---
 
-# 25. USER-INTENT AUTONOMY BOUNDARY
+# 29. USER-INTENT AUTONOMY BOUNDARY
 
 JARVIS SHOULD make useful progress without constant babysitting inside established user intent and authority.
 
-Reasonable recoverable subordinate actions MAY proceed when permitted by the Authority Envelope and deterministic policy.
+Reasonable recoverable subordinate actions MAY proceed when permitted by Authority Envelope and deterministic policy.
 
-Consequential ambiguity or a material expansion of goal, project, environment, target, financial exposure, security posture, workflow architecture, or external side effects SHALL be clarified/authorized according to policy rather than silently guessed.
+Consequential ambiguity or material expansion of goal, project, environment, target, financial exposure, security posture, workflow architecture, or external effects SHALL be clarified/authorized rather than silently guessed.
 
 > **Be autonomous inside the user's intent. Ask before materially expanding it.**
 
 ---
 
-# 26. REQUIRED QUALIFICATION
+# 30. REQUIRED QUALIFICATION
 
-Production qualification SHALL include tests proving at minimum:
+Production qualification SHALL prove at minimum:
 
-1. accepted delayed work is shown queued and never shown running before start;
-2. dependency/resource/budget/provider/approval/recovery queue reasons are visible;
-3. graph-revision-created queued work is visible;
-4. dashboard answers worker/current/history questions from authoritative records;
-5. delayed pause/cancel at an integrity-safe point is visibly represented and audited;
-6. explicit user reprioritization is not silently overridden by AI scheduling preference;
-7. recovery reports interrupted/resumed/blocked/uncertain/user-action-required work accurately;
-8. event disposition policy cannot bypass normal authority and queued event work remains visible;
-9. notification grouping prevents repetitive noise and focus modes alter delivery without deleting events;
-10. locked/sensitive notification policy does not disclose protected content;
-11. invalid configuration candidate leaves the previous valid configuration active;
-12. conflicting import does not overwrite durable state without merge/conflict policy;
-13. ranked memory retrieval respects scope/confidence/provenance/live-state authority;
-14. module install does not implicitly enable/authorize/prefer;
-15. module update is staged and rollback does not require overwritten files;
-16. module dashboard exposes qualified lifecycle/update state;
-17. integration connection does not imply all service capabilities are authorized;
-18. budget/usage UI preserves unknown provenance and queue reason;
-19. TTS fallback does not silently change JARVIS voice identity;
-20. acknowledgement never falsely implies completion;
-21. UI/reflex stop/mute/cancel remains responsive during slow AI/provider work;
-22. diagnostic export defaults to excluding conversation/private content and displays included categories;
-23. audit retention preserves required recent consequential evidence;
-24. High reachable vulnerability waiver requires all mandatory risk-acceptance fields and expiry;
-25. Critical reachable vulnerability blocks release;
-26. upgrade preserves/migrates durable compatible user state and does not silently drop unknown legacy state;
-27. uninstall does not silently delete durable user data contrary to explicit policy;
-28. operational explanations can identify request/work/provider/authorization/state/verification/recovery without chain-of-thought or secrets.
+1. delayed accepted work is queued visibly and never shown running before start;
+2. dependency/workspace/resource/budget/provider/approval/recovery queue reasons are visible;
+3. replanned queued work is visible;
+4. dashboard worker/current/history answers come from authoritative records;
+5. delayed safe-point pause/cancel is visible and audited;
+6. explicit user reprioritization is not silently overridden by AI priority;
+7. recovery accurately reports interrupted/resumed/blocked/uncertain/user-action-required work;
+8. standing permissions are scoped/revocable/non-transitive and revocation blocks new dependent work;
+9. event disposition cannot bypass normal authority and queued event work remains visible;
+10. notification grouping/focus modes behave without deleting authoritative events;
+11. locked/sensitive notification policy prevents protected disclosure;
+12. invalid configuration leaves prior valid configuration active;
+13. conflicting import does not overwrite durable state without merge/conflict policy;
+14. ranked memory retrieval respects scope/confidence/provenance/live-state authority;
+15. trivial deterministic actions are not forced into unnecessary worker missions;
+16. provider abstraction supports qualified warm/persistent/streaming lifecycle without mandating one-shot cold start;
+17. resource scheduling can unload/defer heavy providers while preserving interactive controls;
+18. module install does not implicitly enable/authorize/prefer;
+19. module update is staged and rollback does not depend on overwritten files;
+20. module dashboard exposes qualified lifecycle/update state;
+21. integration connection does not imply all capabilities and revocation blocks dependent actions;
+22. budget/usage UI preserves unknown provenance and queue reason;
+23. TTS fallback does not silently change JARVIS voice identity;
+24. acknowledgement never falsely implies completion;
+25. UI/reflex stop/mute/cancel remains responsive during slow AI/provider work;
+26. destructive approval UI shows target/consequence and UI confirmation remains available;
+27. diagnostic export defaults to excluding conversation/private content and displays included categories;
+28. audit retention preserves required recent consequential evidence;
+29. High reachable vulnerability waiver requires mandatory fields/expiry;
+30. Critical reachable vulnerability blocks release;
+31. upgrade preserves/migrates durable compatible user state without silent disappearance;
+32. uninstall does not silently delete durable user data contrary to explicit policy;
+33. operational explanations identify request/work/provider/authorization/state/verification/recovery without chain-of-thought/secrets;
+34. significant autonomously resolved architecture decisions are documented and summarized to the user where appropriate.
 
-Failure of any mandatory production behavior above blocks `Production Complete` for the active Release Profile.
+Failure of any applicable mandatory production behavior above blocks `Production Complete` for the active Release Profile.
 
 ---
 
-# 27. GOVERNING PRINCIPLES
+# 31. GOVERNING PRINCIPLES
 
 > **Truthful state is a product feature.**
 
 > **The user can see what JARVIS is doing, waiting for, and why.**
+
+> **AI determines logical parallelism. Software determines actual concurrency.**
 
 > **Configuration changes become active only after they are valid.**
 
