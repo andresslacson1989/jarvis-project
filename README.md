@@ -1,6 +1,6 @@
 # JARVIS Project
 
-JARVIS is a Windows-first, voice-capable AI operating companion built around deterministic authorization, bounded AI workers, durable mission orchestration, replaceable providers, secure integrations, verified execution, and tested recovery.
+JARVIS is a Windows-first, voice-capable AI operating companion built around deterministic authorization, bounded AI workers, durable mission orchestration, replaceable providers, secure integrations, verified execution, tested recovery, and one unified adaptive product identity.
 
 ## Branch authority
 
@@ -24,8 +24,11 @@ Read the active suite in this order:
 6. [`docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`](docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md) — threat model, session trust, permission precedence, IPC/WebView/worker/tool/module/integration security, and recovery-key rules.
 7. [`docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`](docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md) — normative coding, package-boundary, validation, Rust/TypeScript, database, security, testing, and CI rules.
 8. [`docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`](docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md) — queue/dashboard truth, worker/recovery visibility, event/notification/focus behavior, configuration/import safety, memory retrieval, module/integration UX, voice identity/responsiveness, diagnostics/audit behavior, vulnerability policy, and architecture decision escalation.
-9. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — Definition of Done, conformance, adversarial, recovery, performance, voice, packaging, and release gates.
-10. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria.
+9. [`docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`](docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md) — canonical JARVIS brand identity, dark-theme visual system, Mission Control shell, adaptive layout, dedicated-window behavior, component language, accessibility, and UI qualification.
+10. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — Definition of Done, conformance, adversarial, recovery, performance, voice, packaging, and release gates.
+11. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria.
+
+Canonical vector brand assets live under [`assets/brand/`](assets/brand/). UI code SHALL consume the canonical mark and design tokens rather than recreate unrelated variants per screen.
 
 Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. [`docs/JARVIS-CONTRACT-LINEAGE.md`](docs/JARVIS-CONTRACT-LINEAGE.md) explains how prior branches/ADRs were reconciled.
 
@@ -33,7 +36,7 @@ Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. [`docs/JARVIS-CONT
 
 Accepted ADRs under `docs/decisions/` and `docs/adr/` preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.2 suite.
 
-The active implementation suite now includes explicit current normative operational/user-facing requirements that historically lived in ADRs, including queue transparency, work-dashboard truth, notification/focus policy, safe configuration activation/import behavior, scoped ranked memory retrieval, module lifecycle UX, persistent voice identity/fallback, diagnostic-export privacy, audit retention/integrity claims, dependency-vulnerability release policy, and architecture escalation.
+The active implementation suite now includes explicit current normative operational/user-facing requirements that historically lived in ADRs, including queue transparency, work-dashboard truth, notification/focus policy, safe configuration activation/import behavior, scoped ranked memory retrieval, module lifecycle UX, persistent voice identity/fallback, diagnostic-export privacy, audit retention/integrity claims, dependency-vulnerability release policy, architecture escalation, and the approved JARVIS visual/interaction identity adopted by ADR-070.
 
 A future architectural ADR is incomplete until the same change also updates every affected active normative document. Implementation SHALL NOT rely on a new ADR while contradictory or incomplete canonical wording remains.
 
@@ -55,12 +58,14 @@ The divergent branch `codex/contract-implementation-lock` is historical/non-auth
 
 > **Escalate product judgment. Resolve engineering judgment.**
 
+> **One system. One identity. Any screen.**
+
 > **Build the control plane first, prove recoverability early, then give intelligence access to it.**
 
 > **History explains the contract. The current contract defines the product.**
 
 ## Status semantics
 
-`Implementation-locked` means the active contract defines foundational security, state, recovery, packaging, protocol, provider, integration, operational/user-visible behavior, and release behavior tightly enough that implementation does not invent architecture or require ADR overlay interpretation.
+`Implementation-locked` means the active contract defines foundational security, state, recovery, packaging, protocol, provider, integration, operational/user-visible behavior, UI identity, adaptive layout, and release behavior tightly enough that implementation does not invent architecture or require ADR overlay interpretation.
 
 `Production Complete` is different. It may be declared only for an implemented, signed release that passes every mandatory gate in `JARVIS-VERIFICATION-RELEASE-CONTRACT.md` and every mandatory qualification requirement in the active normative suite for the active Release Profile. Documentation alone can never satisfy that product status.
