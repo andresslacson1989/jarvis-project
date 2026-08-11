@@ -1,14 +1,14 @@
 # JARVIS Runtime Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md`  
-**Version:** 1.0.2  
-**Date:** August 11, 2026
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
+**Version:** 1.0.3  
+**Date:** August 12, 2026
 
 ---
 
 # 1. PURPOSE
 
-This document defines executable runtime ownership: production packaging, Tauri/WebView operation, startup/shutdown, IPC, provider/worker/module process supervision, delegated engineering execution, scheduling, cancellation, recovery, and degraded operation.
+This document defines executable runtime ownership: production packaging, Tauri/WebView operation, startup/shutdown, IPC, provider setup/repair, provider/worker/module process supervision, delegated engineering execution, scheduling, cancellation, recovery, and degraded operation.
 
 ---
 
@@ -22,6 +22,7 @@ jarvis-desktop.exe (Tauri/Rust host)
 ├── application-owned Node.js JARVIS Core
 └── Rust Native Process Broker managed jobs
     ├── Codex / AI worker processes
+    ├── narrowly invoked provider setup/repair helper when required
     ├── voice/STT/TTS/AEC helpers when separate
     ├── integration helpers
     ├── EXTERNAL_MANAGED modules
@@ -30,7 +31,7 @@ jarvis-desktop.exe (Tauri/Rust host)
 
 Rust is the native root supervisor. Node Core owns authoritative application state/policy. Managed children do not become independent authorities.
 
-The normal app runs non-elevated. A narrowly defined capability requiring elevation needs its own contract/PermissionEngine path; ordinary provider/worker execution does not inherit elevation.
+The normal app runs non-elevated. A narrowly defined capability requiring elevation needs its own explicit typed path, user-visible reason, bounded lifetime, qualification, and audit. Ordinary provider/worker execution does not inherit elevation from setup/install operations.
 
 ---
 
@@ -114,6 +115,8 @@ React communicates only through typed Tauri commands/events. It never opens the 
 
 UI caches/read models are non-authoritative. Optimistic UI never represents consequential work as complete before Core confirmation.
 
+The Rust host owns primary-window native presentation state. Renderer/AI may request show/hide/focus/fullscreen/focused-context transitions through typed commands, but deterministic native policy enforces focus/privacy/NotificationPolicy rules.
+
 ---
 
 # 6. BOOTSTRAP SEQUENCE
@@ -123,7 +126,7 @@ Startup SHALL occur in this order:
 1. acquire single-instance ownership;
 2. initialize crash-safe native diagnostics;
 3. set application session state `LOCKED`;
-4. load/validate non-secret bootstrap configuration and active Release Profile;
+4. load/validate non-secret bootstrap configuration, current contract manifest, and active Release Profile;
 5. open native Windows secure-store broker;
 6. verify signed release/runtime manifest and packaged Core/runtime integrity;
 7. create unpredictable local Core IPC endpoint with restrictive security descriptor;
@@ -132,11 +135,11 @@ Startup SHALL occur in this order:
 10. launch Core using the exact application-owned runtime path and controlled environment;
 11. transfer bootstrap material through an inherited/anonymous secure channel rather than command-line/log output;
 12. complete authenticated protocol handshake;
-13. Core opens persistence and validates SQLite/SQLCipher build, WAL/safety settings, schema, and recovery state;
+13. Core opens persistence and validates SQLite/SQLCipher build, WAL/safety settings, schema, KDF-profile metadata, and recovery state;
 14. Core scans transient task/tool/provider states for recovery;
-15. discover/qualify configured providers/integrations/modules;
-16. publish diagnostics/degraded states;
-17. render operational but locked UI;
+15. discover providers/integrations/modules and evaluate provider setup/compatibility state;
+16. publish diagnostics/degraded/setup-required states;
+17. render operational but locked Mission Control UI;
 18. after native session authentication succeeds, permit authenticated user commands.
 
 Failure of a mandatory step produces explicit recovery/diagnostic state rather than a false ready state.
@@ -173,21 +176,24 @@ OS object security is defense layer one; bootstrap authentication and schema/pro
 
 ---
 
-# 8. NATIVE PROCESS/CREDENTIAL BROKER
+# 8. NATIVE PROCESS/CREDENTIAL/ELEVATION BROKER
 
 The Rust host exposes narrow typed native capabilities such as:
 
 - secure secret put/get/rotate/delete by opaque handle and scoped requesting context;
 - managed process spawn/terminate/status;
 - Windows session lock events;
-- app activation/single-instance routing;
+- app activation/single-instance/window-presentation routing;
 - signed update staging/activation;
 - native audio/device helpers where appropriate;
+- narrowly qualified provider setup/repair invocation where upstream requires elevation;
 - future privileged Windows operations only through explicit typed capabilities.
 
 There is no generic `execute_any_command` broker operation for the orchestrator.
 
 Secure-store requests use resolved requesting component/capability context. Raw secret enumeration is not a normal Core/provider API.
+
+Elevation mediation SHALL accept only an installed/qualified operation identity plus bounded arguments; it SHALL NOT become an elevated general shell. Elevated helper completion does not authorize ordinary work and does not leak an elevated process/handle/token into worker execution.
 
 ---
 
@@ -195,7 +201,7 @@ Secure-store requests use resolved requesting component/capability context. Raw 
 
 Every JARVIS-managed executable process tree on supported Windows 11 SHALL be assigned to an explicitly owned Job Object hierarchy unless a narrow separately documented/verified incompatibility meets the approved exception criteria.
 
-Covered processes include Core, AI/provider workers, engineering workers, voice helpers, integration helpers, EXTERNAL_MANAGED modules, and tool helpers.
+Covered processes include Core, AI/provider workers, engineering workers, voice helpers, integration helpers, EXTERNAL_MANAGED modules, and tool helpers. A provider-owned elevation helper may require a separately qualified lifecycle because Windows/UAC launch mechanics differ, but it remains bounded, awaited, audited, and is never treated as a normal uncontained worker exception.
 
 Requirements:
 
@@ -229,6 +235,7 @@ ApprovalService
 AuthorityEnvelopeService
 ToolRegistry / ToolExecutor
 ProviderRegistry / ProviderRouter / ProviderSupervisor
+ProviderSetupCoordinator
 WorkerManager
 EventBus / durable event publisher
 CredentialBrokerClient
@@ -279,6 +286,7 @@ Low-latency reflexes may handle established commands such as:
 - cancel current voice generation;
 - push-to-talk state;
 - lock;
+- show/hide/focus JARVIS window after deterministic target/presentation resolution;
 - unambiguous task pause/cancel after target resolution.
 
 The reflex path does not generate substantive factual answers, broaden authority, authorize tools, or invent completion.
@@ -296,7 +304,7 @@ Before launch Core SHALL resolve:
 - immutable authority envelope;
 - data policy;
 - provider/version/profile;
-- approved sandbox mode;
+- approved setup-ready sandbox mode;
 - resource/time/iteration limits;
 - network policy;
 - secret/capability inputs.
@@ -321,30 +329,63 @@ Provider-native sandbox behavior is tested as an actual technical boundary. Prom
 
 ---
 
-# 14. PROVIDER DISCOVERY, COMPATIBILITY, AND SUPERVISION
+# 14. PROVIDER DISCOVERY, SETUP, COMPATIBILITY, AND SUPERVISION
 
-Every provider adapter defines discovery, exact version identity, authentication state, compatibility policy, startup timeout, execution timeout, cancel semantics, health probe, capability/locality/resource metadata, output normalization, sanitized errors, and process containment behavior.
+Every provider adapter defines discovery, exact distribution/version identity, setup policy/state, authentication state, compatibility policy, startup timeout, execution timeout, cancel semantics, health probe, capability/locality/resource metadata, output normalization, sanitized errors, and process containment behavior.
 
-States distinguish compatibility from health:
+States distinguish setup, compatibility, and health:
 
 ```text
+NOT_REQUIRED / SETUP_REQUIRED / SETUP_IN_PROGRESS /
+SETUP_READY / REPAIR_REQUIRED / SETUP_FAILED
+
 NOT_DETECTED / VERSION_UNKNOWN / VERSION_UNSUPPORTED /
 CONFORMANCE_UNQUALIFIED / COMPATIBLE
 
 STARTING / READY / DEGRADED / UNAVAILABLE / FAILED
 ```
 
-A provider becomes production `SUPPORTED` only when the selected version/range has release-time conformance evidence and runtime identity/health/auth/capability checks pass.
+A provider becomes production `SUPPORTED` only when the selected version/range has release-time conformance evidence and runtime setup/identity/health/auth/capability checks pass.
 
-A newly released provider version outside the qualified policy is not optimistically trusted.
+A newly released provider version outside the qualified policy is not optimistically trusted. Provider self-update invalidates cached compatibility and any setup/conformance evidence whose applicability is version-sensitive until revalidated.
 
 For Codex, the V1 adapter SHALL prefer the qualified stable non-interactive/structured interface rather than scraping an interactive TUI. Its Windows sandbox conformance tests SHALL observe actual write/network restrictions and SHALL not claim workspace-only read isolation unless technically proven.
 
-Provider self-update invalidates cached compatibility until revalidated.
+---
+
+# 15. CODEX WINDOWS SANDBOX SETUP / REPAIR
+
+If the release-qualified Codex Windows sandbox requires first-class elevated setup, JARVIS SHALL provide an explicit setup/repair workflow.
+
+The workflow is equivalent to:
+
+```text
+discover exact Codex distribution/version
+→ determine setup policy/state
+→ SETUP_REQUIRED / REPAIR_REQUIRED if needed
+→ authenticated user starts explicit setup/repair
+→ Rust validates qualified helper/distribution identity
+→ Windows UAC consent for only that provider setup helper/path
+→ wait for provider setup completion
+→ verify provider setup probe/state
+→ run sandbox conformance probe
+→ SETUP_READY + COMPATIBLE only on success
+```
+
+Rules:
+
+- UAC/elevation is never automatic background escalation.
+- The setup helper receives only bounded provider-defined/qualified arguments.
+- Ordinary Codex workers remain non-elevated.
+- Provider-internal sandbox-account passwords/credentials remain provider-owned; JARVIS SHALL NOT read, copy, export, or make them general Credential Broker secrets.
+- Setup/repair logs entering JARVIS diagnostics are sanitized and bounded.
+- Failure/cancel leaves `SETUP_REQUIRED`, `REPAIR_REQUIRED`, or `SETUP_FAILED`; the engineering profile remains unsupported/unavailable.
+- JARVIS SHALL NOT silently fall back to a less restrictive or unqualified Codex sandbox.
+- A provider update that changes setup/helper/sandbox semantics invalidates readiness as required by the release compatibility policy.
 
 ---
 
-# 15. PROVIDER SESSION RESUME
+# 16. PROVIDER SESSION RESUME
 
 Provider session/conversation resume handles are optional optimizations.
 
@@ -361,13 +402,13 @@ live-state assumptions
 remaining work
 ```
 
-Recovery first loads/reconciles JARVIS-owned state. It may attempt provider resume only after compatibility/auth/privacy/authority checks. Resume failure falls back to a fresh provider session reconstructed from durable JARVIS state.
+Recovery first loads/reconciles JARVIS-owned state. It may attempt provider resume only after compatibility/auth/privacy/authority/setup checks. Resume failure falls back to a fresh provider session reconstructed from durable JARVIS state.
 
 No completion evidence may exist only inside an inaccessible provider session.
 
 ---
 
-# 16. WORKER LOOP AND CHECKPOINTS
+# 17. WORKER LOOP AND CHECKPOINTS
 
 Worker loops are bounded and emit observable progress equivalent to:
 
@@ -396,7 +437,7 @@ Three consecutive no-material-progress iterations SHOULD cause reconsideration t
 
 ---
 
-# 17. TOOL EXECUTION
+# 18. TOOL EXECUTION
 
 All JARVIS typed tools execute through ToolExecutor.
 
@@ -422,7 +463,7 @@ Unverifiable consequence is `UNCERTAIN`.
 
 ---
 
-# 18. MISSION GRAPH AND SCHEDULER
+# 19. MISSION GRAPH AND SCHEDULER
 
 A mission points to one active immutable graph version. Only owning mission services activate validated graph revisions.
 
@@ -430,7 +471,7 @@ Scheduler considers:
 
 - priority/dependency readiness;
 - execution-scope/workspace/resource leases;
-- provider compatibility/health/locality/concurrency;
+- provider setup/compatibility/health/locality/concurrency;
 - CPU/RAM/GPU pressure;
 - foreground interaction/voice responsiveness;
 - exact budget reservations;
@@ -442,7 +483,7 @@ Parallel writable engineering tasks never share one worktree.
 
 ---
 
-# 19. PAUSE, PREEMPTION, RESUME
+# 20. PAUSE, PREEMPTION, RESUME
 
 Preemption policy is exactly:
 
@@ -462,11 +503,11 @@ PAUSED → RESUMING
 RESUMING → RUNNING | QUEUED | BLOCKED | RECOVERING | FAILED | CANCELLED
 ```
 
-`RESUMING` verifies live/external state, execution scope, workspace/resource leases, provider capability/version/health/locality, budget, approvals, and relevant preconditions before new execution.
+`RESUMING` verifies live/external state, execution scope, workspace/resource leases, provider setup/capability/version/health/locality, budget, approvals, and relevant preconditions before new execution.
 
 ---
 
-# 20. BUDGET ADMISSION
+# 21. BUDGET ADMISSION
 
 Before new chargeable work subject to a hard monetary budget, BudgetService atomically evaluates:
 
@@ -485,7 +526,7 @@ If actual cost exceeds reservation, the actual provider-reported/settled cost is
 
 ---
 
-# 21. CRASH RECOVERY
+# 22. CRASH RECOVERY
 
 Startup identifies transient mission/task/attempt/tool/provider states and enters `RECOVERING` before retry/resume.
 
@@ -495,7 +536,7 @@ Recovery examines:
 - process death/Job Object cleanup;
 - workspace/resource leases;
 - execution scope and authority envelope;
-- current provider compatibility/auth/locality;
+- current provider setup/compatibility/auth/locality;
 - approval expiry/digest/current target;
 - budget reservations;
 - live external state when side effects may have occurred.
@@ -506,7 +547,7 @@ Ambiguous consequential/destructive side effects are never blindly replayed. The
 
 ---
 
-# 22. SHUTDOWN
+# 23. SHUTDOWN
 
 Normal shutdown SHALL:
 
@@ -523,17 +564,21 @@ Normal shutdown SHALL:
 
 Crash semantics assume termination can occur between any two steps.
 
+An active UAC-elevated provider setup helper is not force-killed through an unsafe unrelated handle assumption; its separately qualified setup lifecycle determines cancellation/reconciliation, and JARVIS does not mark setup ready until final verification succeeds.
+
 ---
 
-# 23. INTEGRATIONS AND PROXMOX RUNTIME
+# 24. INTEGRATIONS AND PROXMOX RUNTIME
 
 Integration requests use typed registered adapters and Credential Broker handles; they do not execute arbitrary endpoint strings from AI output.
+
+GitHub runtime exposes only Release Profile-supported typed capability operations. `GITHUB_REF_WRITE` uses canonical repo/ref identity and expected-ref/conditional behavior for create/update; protected/admin/secrets/ref-delete operations are not implied by generic GitHub connection.
 
 The V1 Proxmox adapter uses HTTPS REST API as the normal control path. It SHALL:
 
 - verify TLS/system trust or configured SHA-256 pin;
 - resolve connection/environment/resource identity before consequential work;
-- enforce connection capabilities and node/VMID/pool scopes;
+- enforce Release Profile capability matrix and connection node/VMID/pool scopes;
 - keep raw token out of AI/UI/journals/logs;
 - track asynchronous Proxmox task identifiers through terminal outcome;
 - re-resolve live target state before consequential execution;
@@ -544,7 +589,7 @@ The V1 Proxmox adapter uses HTTPS REST API as the normal control path. It SHALL:
 
 ---
 
-# 24. MODULE RUNTIME
+# 25. MODULE RUNTIME
 
 Every module is `DATA_ONLY`, `BUILT_IN_TRUSTED`, or `EXTERNAL_MANAGED`.
 
@@ -560,7 +605,7 @@ Module crash degrades the module, not Core.
 
 ---
 
-# 25. VOICE RUNTIME
+# 26. VOICE RUNTIME
 
 Canonical voice path:
 
@@ -585,7 +630,7 @@ Speech provider routing obeys the same DataLocality policy as AI providers.
 
 ---
 
-# 26. DEGRADED MODES
+# 27. DEGRADED MODES
 
 Runtime exposes explicit states equivalent to:
 
@@ -594,6 +639,7 @@ CORE_READY
 VOICE_DEGRADED
 AI_DEGRADED
 INTEGRATION_DEGRADED
+PROVIDER_SETUP_REQUIRED
 RECOVERY_MODE
 OFFLINE_CAPABLE_LIMITED
 ```
@@ -602,7 +648,7 @@ Failure of one optional/degraded subsystem does not fabricate failure/success in
 
 ---
 
-# 27. RUNTIME INVARIANTS
+# 28. RUNTIME INVARIANTS
 
 1. UI state cannot authorize execution.
 2. AI output cannot authorize execution.
@@ -611,11 +657,11 @@ Failure of one optional/degraded subsystem does not fabricate failure/success in
 5. A task is not completed without acceptance evidence.
 6. Activated mission graph versions are immutable.
 7. A worker cannot widen its authority/scope.
-8. Provider fallback cannot weaken locality/permission/budget/security policy.
+8. Provider fallback cannot weaken setup/locality/permission/budget/security policy.
 9. Destructive execution cannot bypass final confirmation.
 10. Uncertain external result is not success.
 11. Crash cannot silently erase accepted queued/running mission state.
-12. Managed executable trees are OS-contained/owned or blocked.
+12. Managed executable trees are OS-contained/owned or blocked, subject only to separately qualified elevation-helper lifecycle.
 13. Job Objects are not represented as filesystem/network sandboxing.
 14. Production Core does not depend on system Node.
 15. Privileged Core IPC is restrictive local-only + authenticated.
@@ -624,7 +670,9 @@ Failure of one optional/degraded subsystem does not fabricate failure/success in
 18. Delegated engineering shell cannot directly gain consequential integration authority.
 19. Provider resume metadata is not task durability.
 20. External conditional-write conflicts cause reconciliation rather than silent retargeting.
+21. Provider setup success is not inferred from helper launch; it is verified before support.
+22. Elevation required for provider setup never grants elevated ordinary worker execution.
 
 ---
 
-**END — JARVIS RUNTIME CONTRACT v1.0.2**
+**END — JARVIS RUNTIME CONTRACT v1.0.3**
