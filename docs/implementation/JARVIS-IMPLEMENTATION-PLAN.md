@@ -1,579 +1,553 @@
 # JARVIS Production Implementation Plan
 
-**Status:** Execution plan derived from the v1.0 contract suite  
-**Date:** August 11, 2026
+**Status:** Authoritative dependency/sequencing plan for v1.0.2  
+**Version:** 1.0.2  
+**Date:** August 11, 2026  
+**Release target:** `docs/JARVIS-V1-RELEASE-PROFILE.md`
 
-This plan defines the order in which JARVIS should be implemented so that each stage produces a stable foundation for the next one. It is not a simplified MVP roadmap. Intermediate milestones are development checkpoints; the final target is the production-complete system defined by the contract suite.
+This is not a simplified MVP plan. Intermediate phases are proof checkpoints; final completion means the active Release Profile and verification contract pass for exact signed artifacts.
 
 ---
 
-# 1. DELIVERY STRATEGY
-
-Implementation SHALL follow vertical, testable foundations rather than building every UI screen first or wiring unrestricted AI access early.
-
-The order is intentionally:
+# 1. DELIVERY ORDER
 
 ```text
-trust boundary
-→ protocol
-→ persistence
-→ state machines
-→ security/permissions
-→ provider runtime
-→ tools/projects
-→ workers/graphs
-→ recovery
-→ credentials/modules/integrations
+repository/coding standards
+→ Tauri/native trust boundary + application-owned Core
+→ named-pipe + WebView security
+→ SQLite/SQLCipher/WAL + portable-backup proof
+→ authoritative state machines/events
+→ session/security/PermissionEngine/approval
+→ projects/context/memory/execution scopes
+→ Codex/provider compatibility + real sandbox proof
+→ controlled local tools
+→ bounded workers/graphs
+→ resources/budgets/recovery
+→ credentials + mandatory GitHub/Proxmox integrations
 → voice
-→ automation/notifications
-→ update/backup
-→ hardening/qualification
+→ event/automation
+→ updater/operations
+→ complete production qualification
 ```
 
-Security and recovery are built into each stage rather than added at the end.
+A later privileged subsystem SHALL NOT be used as a shortcut around an earlier unproven boundary.
 
 ---
 
-# 2. PHASE 0 — REPOSITORY AND TOOLCHAIN FOUNDATION
+# 2. PHASE 0 — REPOSITORY / TOOLCHAIN
 
 ## Deliverables
 
-- monorepo/workspace structure;
-- desktop app package;
-- Core service package;
-- protocol/schemas packages;
-- shared deterministic policy package;
-- test directories;
-- pinned package manager/toolchain configuration;
-- TypeScript strict mode;
-- Rust formatting/lint/build configuration;
-- CI skeleton;
-- dependency/secret scanning;
-- logging bootstrap.
+- monorepo package boundaries from Coding Standards;
+- pinned Node/Rust/TypeScript/Tauri/package manager toolchains;
+- strict TypeScript;
+- Rust fmt/clippy;
+- schema generation/validation strategy;
+- test layer directories;
+- architecture import checks;
+- CI format/type/build/unit/property/schema baseline;
+- secret/dependency scan;
+- root `AGENTS.md`.
 
-## Required repository shape
+## Exit
+
+Clean checkout builds reproducibly; UI/Core compile separately; schemas/tests run; architecture imports are enforceable; no business logic is vendor-bound.
+
+---
+
+# 3. PHASE 1 — TAURI HOST, WEBVIEW, APPLICATION-OWNED CORE
+
+## Deliverables
+
+- Tauri 2 + bundled React UI;
+- production local-only authoritative WebView content;
+- explicit Tauri capabilities;
+- restrictive CSP/navigation/external-link/devtools policy;
+- Rust native host;
+- single instance;
+- packaged release-owned Node runtime + prebuilt Core;
+- controlled Core environment/path;
+- initial Job Object hierarchy;
+- locked startup UI.
+
+## Exit
+
+- application runs on clean Windows target with no system Node;
+- privileged remote-origin Tauri capability tests fail closed;
+- CSP/navigation/untrusted-render tests pass;
+- selected Tauri/runtime includes required security fixes;
+- missing/corrupt bundled Core/runtime enters repair/recovery rather than PATH fallback.
+
+---
+
+# 4. PHASE 2 — SECURE LOCAL IPC / PROCESS BROKER
+
+## Deliverables
+
+- unpredictable named-pipe endpoint;
+- explicit restrictive DACL/logon-session identity;
+- local-only/remote rejection;
+- bootstrap secret over non-command-line channel;
+- protocol-major 1 framing + explicit response union;
+- bounded frame/schema validation;
+- Rust Process Broker;
+- Job Object kill-on-close + creation-time/suspended assignment;
+- handle allowlist;
+- clean/forced shutdown handling.
+
+## Exit
+
+Intended Core can connect; unauthorized user/session/remote/wrong secret cannot; renderer cannot open Core channel; managed child/grandchild containment and orphan cleanup pass.
+
+---
+
+# 5. PHASE 3 — PERSISTENCE / ENCRYPTION / PORTABLE-RESTORE PROOF
+
+This proof occurs before broad stateful feature development.
+
+## Deliverables
+
+- selected production Node SQLite/SQLCipher binding;
+- exact embedded SQLite build/fix evidence;
+- WAL activation, FULL synchronous, foreign keys, busy handling;
+- WAL/checkpoint diagnostics;
+- random local `DB_DEK` through Rust secure storage;
+- SQLite-safe backup snapshot;
+- fresh `SnapshotDBKey` re-key/export path;
+- fresh per-backup `BackupDEK`;
+- authenticated package container;
+- local DPAPI key slot;
+- portable Argon2id key slot;
+- clean-profile restore + fresh local DB_DEK re-key;
+- corruption/integrity handling;
+- production-style packaged execution.
+
+## Required proof
 
 ```text
-apps/desktop
-services/core
-packages/protocol
-packages/schemas
-packages/policy
-packages/shared
-providers/ai
-providers/speech
-providers/integrations
-tools
-modules
-tests
-docs
+packaged Core
++ encrypted DB create/open
++ WAL/foreign keys/transactions
++ WAL-reset fixed embedded core
++ online backup with WAL data
++ fresh snapshot key
++ fresh outer backup key
++ local restore
++ wrong portable factor failure
++ clean-profile portable restore without old DPAPI/DB_DEK
++ re-key under fresh new local DB_DEK
++ corruption detection
 ```
 
-## Exit criteria
-
-- clean checkout installs/builds reproducibly;
-- UI and Core compile independently;
-- schema package tests run;
-- CI blocks lint/type/build/test failures;
-- no application logic depends on a provider vendor yet.
+If chosen binding/package fails a mandatory property, replace it; do not weaken encryption/recovery/WAL rules.
 
 ---
 
-# 3. PHASE 1 — NATIVE HOST, PROCESS SUPERVISION, AND SECURE IPC
+# 6. PHASE 4 — AUTHORITATIVE STATE / EVENTS
 
 ## Deliverables
 
-- Tauri 2 shell;
-- React renderer;
-- Rust native host services;
-- single-instance behavior;
-- Node Core sidecar launch;
-- unpredictable Windows named-pipe endpoint;
-- bootstrap-secret handshake;
-- length-framed protocol v1;
-- Core heartbeat/process detection;
-- Windows Job Object process containment for spawned child trees where practical;
-- clean shutdown;
-- forced Core-crash detection;
-- locked startup screen.
+- schema/migrations;
+- mission/task/attempt states including durable `RESUMING`;
+- discriminated ExecutionScope;
+- immutable graph/acceptance structures;
+- approvals/canonical descriptor storage;
+- transactional events;
+- optimistic versioning;
+- DataSensitivity/DataLocality;
+- artifacts/checkpoints/leases;
+- provider qualification state;
+- exact money/usage/reservation primitives;
+- backup/update/recovery metadata.
 
-## Exit criteria
+## Exit
 
-- renderer cannot directly open privileged Core control channel;
-- wrong handshake secret rejected;
-- second instance activates existing app;
-- Core crash produces degraded/recovery UI rather than desktop crash;
-- app shutdown leaves no supervised child process behind;
-- IPC contract tests pass.
+Illegal state changes fail; state+causative event atomicity works; stale version cannot overwrite; non-project scopes need no fake workspace; protocol/persistence representations agree.
 
 ---
 
-# 4. PHASE 2 — PERSISTENCE, EVENTING, AND STATE MACHINES
+# 7. PHASE 5 — SESSION SECURITY / PERMISSIONENGINE / APPROVAL
 
 ## Deliverables
 
-- SQLite persistence service;
-- encrypted-at-rest production path design implemented early enough to avoid data migration debt;
-- schema migrations;
-- mission/task/attempt states;
-- approval states;
-- durable domain event store;
-- optimistic row/version concurrency;
-- artifact metadata store;
-- resource/workspace lease tables;
-- backup metadata;
-- recovery scan framework.
+- Argon2id session password;
+- cooldown/rate limits;
+- Windows lock/sign-out;
+- explicit recovery-factor/password-reset path;
+- Credential Broker;
+- authority envelopes;
+- exact PermissionEngine precedence;
+- LOW/MODERATE/HIGH/CRITICAL behavior;
+- standing permission + precedent restrictions;
+- `CanonicalActionDescriptorV1` builder;
+- RFC8785/SHA256/base64url Rust+TS vectors;
+- expiry/single-use transactional approval consumption;
+- locked data suppression.
 
-## Exit criteria
+## Exit
 
-- every state transition is validated;
-- illegal transitions fail deterministically;
-- state + causative event persist transactionally;
-- forced process termination after commit does not lose authoritative state;
-- schema-newer-than-binary fails closed;
-- migration tests run against previous-version fixture.
+Hard invariant/deny precedence, HIGH authority rules, precedent limits, CRITICAL final confirmation, digest invalidation, same-user threat wording, recovery password semantics, and locality tests all pass.
 
 ---
 
-# 5. PHASE 3 — SESSION AUTHENTICATION AND SECURITY CORE
+# 8. PHASE 6 — PROJECTS / SCOPES / CONTEXT / MEMORY
 
 ## Deliverables
 
-- JARVIS password setup;
-- Argon2id verifier storage;
-- unlock cooldown/rate limiting;
-- Windows lock/sign-out integration;
-- secure-store broker using Windows-protected storage;
-- database encryption key management;
-- privacy classifications;
-- authority-envelope service;
-- Permission Engine;
-- approval digest/expiry/consumption;
-- standing permission model;
-- precedent records/matcher;
-- locked-state content suppression.
-
-## Exit criteria
-
-- app always starts locked;
-- Windows lock locks JARVIS immediately;
-- password never enters logs/database as plaintext;
-- locked state cannot retrieve private conversation through normal UI commands;
-- destructive approval cannot be replayed or applied to changed target;
-- development precedent cannot authorize production;
-- security unit/property tests pass.
-
----
-
-# 6. PHASE 4 — PROJECT REGISTRY, CONTEXT, AND MEMORY
-
-## Deliverables
-
-- project CRUD/aliases;
-- environment model;
-- workspace model;
-- active conversational project hint;
-- scoped memory service;
-- memory confidence/revision model;
+- project aliases/environments/workspaces/worktrees;
+- integration/system/global scopes;
+- canonical Windows paths;
 - Context Manager;
-- live-state-over-memory authority behavior;
-- conversation/message storage;
-- retention controls.
+- memory confidence/revisions/data policy;
+- conversation/history separation;
+- live-state-over-memory behavior.
 
-## Exit criteria
+## Exit
 
-- natural project aliases resolve correctly;
-- consequential execution binds explicit project/workspace/environment IDs;
-- active-project hint alone cannot authorize another target;
-- memory retrieval respects scope/confidence;
-- corrected/stale memory does not overwrite verified live state.
+Project aliases resolve; project writes require exact `PROJECT_WORKSPACE`; integration-only work has no fake filesystem authority; memory respects scope/policy; local-only derived context remains local-only.
 
 ---
 
-# 7. PHASE 5 — CODEX PROVIDER AND AI RUNTIME MANAGER
+# 9. PHASE 7 — CODEX PROVIDER + SANDBOX QUALIFICATION
 
 ## Deliverables
 
-- `AIProvider` adapter contract;
-- Provider Registry/Supervisor/Router;
-- Codex CLI discovery/version/auth checks;
+- Provider Registry/Router/Supervisor;
+- compatibility vs health states;
+- exact Codex executable/version policy;
+- stable structured/non-interactive adapter;
 - orchestrator profile;
-- engineering worker profile;
-- provider health states;
-- streamed normalized events;
-- structured-output validation;
-- cancellation;
-- timeout/retry/circuit breaker;
-- provider usage accounting;
-- role/capability routing.
+- `WORKSPACE_ENGINEERING` profile;
+- controlled env/working directory;
+- provider sandbox mode configuration;
+- cancellation/timeouts/circuit breaker;
+- provider quota/usage provenance;
+- optional resume reference handling.
 
-## Exit criteria
+## Mandatory Windows sandbox proof
 
-- Core can converse through restricted orchestrator profile;
-- orchestrator cannot directly get general shell;
-- invalid structured output is rejected;
-- Codex crash does not crash Core;
-- auth-expired/model-unavailable maps to typed states;
-- provider conformance suite passes;
-- router can return `no compliant provider` cleanly.
+Measure/verify actual selected Codex behavior:
+
+- writes confined as required;
+- network denied by default profile;
+- read-access boundary documented truthfully, with no workspace-only claim unless enforced;
+- no unrelated credentials in env/context;
+- Job Object descendant containment;
+- shell/client availability cannot bypass JARVIS typed external-action authorization.
+
+## Exit
+
+Qualified Codex version runs orchestrator/engineering flows; unsupported version excluded; invalid output fails; provider crash contained; privacy/locality respected; fresh-session recovery works if provider resume unavailable.
 
 ---
 
-# 8. PHASE 6 — TOOL REGISTRY AND SAFE LOCAL CAPABILITIES
+# 10. PHASE 8 — TOOL REGISTRY / SAFE LOCAL CAPABILITIES
 
-## Initial tools
-
-- project status;
-- Git status/diff/log/current branch;
-- open application;
-- open project/folder/file;
-- system status;
-- run approved project tests through engineering context;
-- narrow filesystem read/write operations where required.
+Required first tools include project/system status, Git status/branch/diff/log, open app/project/file, approved project test/build execution, and narrow filesystem read/write.
 
 ## Deliverables
 
-- Tool Registry;
-- manifests;
-- Tool Executor;
-- schema validation;
+- manifests/input/output schemas;
+- ToolExecutor;
 - canonical target resolution;
-- Permission Engine integration;
+- PermissionEngine integration;
 - pre/postconditions;
-- idempotency semantics;
-- audit events.
+- idempotency/uncertainty;
+- conditional mutation expected-state mechanisms where supported;
+- audit.
 
-## Exit criteria
+## Exit
 
-- every tool has schema/risk/permission/preemption metadata;
-- path traversal tests pass;
-- ambiguous destructive target cannot execute;
-- `tool.uncertain` state works;
-- tool contract suite passes.
+Path/reparse tests pass; scope mismatch blocks; changed target/version fails precondition; stale approval cannot retarget; `UNCERTAIN` works; semantic success requires postcondition evidence.
 
 ---
 
-# 9. PHASE 7 — TASKS, WORKERS, AND BOUNDED LOOPS
+# 11. PHASE 9 — BOUNDED WORKERS
 
 ## Deliverables
 
-- Task Manager;
-- worker role registry;
-- task attempts;
-- worker journals;
-- checkpoints;
-- artifact references;
-- loop iteration limits;
+- worker roles/attempts;
+- journals/checkpoints/artifacts;
+- iteration/time/resource/budget ceilings;
 - no-progress detection;
-- worker structured results;
-- engineering worktree isolation;
-- safe pause/cancel primitives.
+- structured results/replan/block;
+- isolated engineering worktrees;
+- pause/cancel primitives.
 
-## Exit criteria
+## Exit
 
-- engineering task can inspect/edit/test a project in a bounded worker;
-- worker history is visible without chain-of-thought;
-- worker crash preserves prior checkpoint/artifacts;
-- no-progress limit terminates/replans;
-- worker cannot broaden its own authority;
-- parallel writable workers never share one worktree.
+Engineering worker can inspect/edit/build/test bounded workspace; cannot widen scope/authority; parallel writers are isolated; provider-private history not required for recovery; no-progress loops terminate/replan.
 
 ---
 
-# 10. PHASE 8 — MISSION GRAPH ENGINE
+# 12. PHASE 10 — MISSION GRAPH
 
 ## Deliverables
 
-- Mission Manager;
-- Graph Planner;
+- Mission Manager / Graph Planner;
 - immutable graph versions;
-- dependency types;
-- fake-edge removal logic/guidance;
-- fan-out/reduce/verify/synthesize pattern;
-- Scheduler;
-- queue transparency;
-- dynamic replan requests;
-- graph-revision validator;
-- task result reuse/invalidation;
-- mission-level verification.
+- real dependency types;
+- mission acceptance policy;
+- fan-out/reduce/verify/synthesize;
+- scheduler/queue transparency;
+- dynamic replan validator;
+- artifact reuse/invalidation.
 
-## Exit criteria
+## Exit
 
-- independent nodes run concurrently when resources permit;
-- graph cycles rejected;
-- graph revision creates versioned history;
-- invalidated output cannot feed current downstream node;
-- queued tasks are visibly queued;
-- mission cannot complete while required node is blocked/unknown;
-- end-to-end LocalCI-style engineering mission passes.
+Independent work can run concurrently within deterministic scheduling; cycles rejected; revisions are historical/versioned; invalid outputs cannot feed current graph; mission cannot complete with required unknown/blocked work.
 
 ---
 
-# 11. PHASE 9 — PRIORITY, RESOURCES, BUDGETS, AND RECOVERY
+# 13. PHASE 11 — RESOURCES / BUDGETS / RECOVERY
 
 ## Deliverables
 
-- CRITICAL/HIGH/NORMAL/LOW/BACKGROUND scheduler;
-- resource metadata/reservations;
-- provider concurrency limits;
-- preemption policies;
-- PAUSING/PAUSED/RESUMING behavior;
-- resource/workspace leases;
-- budget thresholds/hard limits;
-- usage reservations;
-- recovery policies;
-- startup reconciliation;
-- uncertain external-action recovery.
+- priorities/preemption;
+- durable `RESUMING`;
+- leases;
+- CPU/RAM/GPU/provider concurrency;
+- provider quota snapshots;
+- exact MoneyAmount budgets;
+- atomic reservations/settlement;
+- recovery policy/reconciliation;
+- startup transient-state scan.
 
-## Exit criteria
+## Exit
 
-- high-priority mission can preempt safely when needed;
-- unnecessary preemption avoided when resources suffice;
-- pause persists checkpoint and releases resources;
-- resume verifies live state;
-- hard budget prevents new metered work;
-- crash/restart preserves queue;
-- ambiguous destructive side effect never blindly retries.
+Priority can preempt safely; unnecessary preemption avoided; resume validates state/provider/locality/leases; concurrent hard-budget race is safe; ambiguous external effect never blindly retries; outstanding reservations survive recovery.
 
 ---
 
-# 12. PHASE 10 — CREDENTIAL BROKER, MODULES, AND CORE INTEGRATIONS
+# 14. PHASE 12 — CREDENTIALS / MODULE FOUNDATION
 
 ## Deliverables
 
-- Windows secure-store credential handles;
 - integration account registry;
-- module manifest/install/enable/authorize/prefer/health state;
-- module staging/update/rollback;
-- supported catalog UI;
-- provider/integration conformance harness.
+- secure-store credential handles;
+- authenticated module catalog/provenance;
+- DATA_ONLY/BUILT_IN_TRUSTED/EXTERNAL_MANAGED execution classes;
+- typed module IPC/health/lifecycle;
+- module staging/rollback;
+- dashboard state distinctions.
 
-## Initial production-supported integration targets
+## Exit
 
-The framework SHALL support the accepted catalog families, while each adapter becomes `SUPPORTED` only when its conformance suite passes.
-
-Practical implementation order SHOULD be:
-
-1. local filesystem/Git;
-2. GitHub;
-3. Google Workspace service modules;
-4. Cloudflare;
-5. Microsoft 365 service modules;
-6. SSH;
-7. Proxmox;
-8. additional supported services.
-
-Google/Microsoft SHALL expose service capabilities independently rather than one all-powerful account switch.
-
-## Exit criteria
-
-- raw refresh/API tokens absent from normal DB/logs/prompts;
-- integration scope revocation blocks dependent operations;
-- module update rollback works;
-- unsupported/unqualified module does not appear as standard supported;
-- at least the release-target integration set passes full conformance.
+No raw credentials in normal DB/log/prompts/backups; external executable cannot run in Core; unsupported module not labeled supported; crash/update rollback works; Job Object containment works for external module.
 
 ---
 
-# 13. PHASE 11 — VOICE FOUNDATION
+# 15. PHASE 13 — LOCAL GIT / GITHUB PRODUCTION INTEGRATION
+
+## Deliverables
+
+- production Local filesystem/Git integration;
+- scoped GitHub credential/account/capability model;
+- repository/ref identity;
+- required GitHub read/write operations for engineering workflow;
+- expected-ref/conditional-write protections;
+- rate limit/auth expiry/retry/uncertainty behavior;
+- conformance suite.
+
+## Exit
+
+Both mandatory families are `SUPPORTED`, credential-safe, scope-safe, race-safe, recoverable, auditable, and pass Release Profile conformance.
+
+---
+
+# 16. PHASE 14 — PROXMOX VE V1
+
+## Deliverables
+
+- connection wizard/registry;
+- scoped API-token credential flow;
+- TLS trust/pin;
+- cluster/node/QEMU/LXC discovery;
+- read-only onboarding;
+- typed power/snapshot/backup/config/create/migrate/destroy operations for the V1 supported capability matrix;
+- node/VMID/pool scope;
+- asynchronous task tracking;
+- postcondition/live verification;
+- destructive final confirmation;
+- no raw API/shell fallback;
+- guest-shell separation.
+
+## Exit
+
+ADR-059 semantics are fully represented by current contract implementation; Proxmox conformance suite passes; V1 cannot be Production Complete without it.
+
+---
+
+# 17. PHASE 15 — VOICE FOUNDATION
 
 ## Deliverables
 
 - audio device manager;
-- microphone selection;
 - push-to-talk;
-- whisper.cpp STT adapter;
-- Silero VAD/ONNX-compatible adapter or selected equivalent;
-- TTS provider abstraction;
-- persistent JARVIS voice identity;
-- pre-generated exact-voice acknowledgements;
-- voice state events;
-- typed transcript flow.
+- local STT;
+- VAD;
+- selected TTS provider/persistent voice;
+- typed transcript/voice state;
+- local latency instrumentation.
 
-## Exit criteria
+## Exit
 
-- voice input produces final transcript reliably;
-- typed input remains usable if STT fails;
-- TTS failure degrades to text;
-- lock prevents private voice output;
-- device reconnect handled;
-- local voice latency targets substantially met.
+Voice input reliable; text fallback always usable; device reconnect works; locked privacy/DataLocality enforced; TTS identity/provider/licensing frozen for RC.
 
 ---
 
-# 14. PHASE 12 — FULL-DUPLEX CONVERSATION
+# 18. PHASE 16 — FULL-DUPLEX VOICE
 
 ## Deliverables
 
-- AEC provider with exact TTS render reference;
-- Realtime Conversation Engine;
-- semantic/physical Turn Detector;
-- barge-in;
-- speech interruption;
-- deterministic reflex controls;
+- AEC provider + exact TTS render reference;
+- realtime conversation engine;
+- physical/semantic turn detection;
+- barge-in/double-talk;
+- interruptible speech;
+- deterministic stop/mute/cancel;
 - half-duplex fallback;
-- optional wake-word module interface;
-- conversation session lifecycle.
+- optional wake-word interface.
 
-## Exit criteria
+## Exit
 
-- user can interrupt JARVIS while it speaks;
-- stop/mute/cancel meets latency target;
-- AEC double-talk qualification passes;
-- stale/cancelled transcript cannot be submitted later;
-- AEC failure degrades safely rather than breaking all voice.
+Barge-in and stop latency pass target on real devices; AEC double-talk qualifies; stale transcript cannot submit; AEC failure safely degrades.
 
 ---
 
-# 15. PHASE 13 — EVENT GATEWAY, AUTOMATION, NOTIFICATIONS
+# 19. PHASE 17 — EVENT / AUTOMATION / NOTIFICATION
 
 ## Deliverables
 
-- normalized external event gateway;
-- signature/auth validation adapters;
-- dedup/replay protection;
-- event-triggered task/mission creation;
-- automation authority envelope;
-- notification policy engine;
-- focus modes;
-- grouping/defer/silent behavior.
+- normalized Event Gateway;
+- source auth/signature validation;
+- durable dedup/replay protection;
+- scheduled/poll/local triggers;
+- automation authority envelopes/scopes;
+- notification grouping/focus/defer;
+- no required direct public privileged-Core ingress.
 
-## Exit criteria
+## Exit
 
-- duplicate event cannot duplicate consequential action;
-- automation respects normal permissions/budget;
-- locked session does not speak sensitive notification;
-- routine worker events remain dashboard-only unless policy says otherwise.
+Duplicate event cannot duplicate consequence; automation obeys normal permission/locality/budget; locked private content not spoken; trigger storms bounded.
 
 ---
 
-# 16. PHASE 14 — BACKUP, RESTORE, DIAGNOSTICS, UPDATE
+# 20. PHASE 18 — BACKUP UX / DIAGNOSTICS / UPDATE
+
+The cryptographic backup proof exists from Phase 3; this phase productizes operations.
 
 ## Deliverables
 
-- safe online database backup;
-- retention policy;
-- pre-migration/pre-update backup;
+- scheduled/local backup retention;
+- portable backup creation/verification UX;
+- recovery-factor setup/rotation UX;
 - restore maintenance mode;
-- corruption recovery flow;
-- diagnostics dashboard;
+- corruption recovery;
+- WAL/provider/security diagnostics dashboard;
 - diagnostic export/redaction;
-- signed updater;
-- staged activation;
-- binary/schema rollback pairing;
-- module update health/rollback.
+- signed updater/staged activation;
+- binary/schema/runtime/backup rollback pairing;
+- release manifest generation.
 
-## Exit criteria
+## Exit
 
-- full backup/restore drill passes;
-- corrupted DB enters recovery mode;
-- update tamper rejected;
-- simulated bad migration/startup can restore last known-good pair;
-- diagnostics identify common provider/auth/database/voice failures.
+Full local + portable restore drills pass; bad migration/startup recovers known-good pair; tampered update rejected; diagnostics identify common subsystem failures.
 
 ---
 
-# 17. PHASE 15 — HARDENING AND PRODUCTION QUALIFICATION
+# 21. PHASE 19 — PRODUCTION QUALIFICATION
 
-This phase is not optional polish.
+Run the full v1.0.2 Verification Contract on exact signed Release Candidate artifacts:
 
-Run the full `JARVIS-VERIFICATION-RELEASE-CONTRACT.md` suite:
-
-- unit/property coverage;
-- provider/tool/integration conformance;
-- prompt injection;
-- security/adversarial tests;
-- crash/recovery matrix;
-- migration/backup/restore;
-- update rollback;
-- provider outage;
-- graph/replan;
-- pause/preemption;
-- budget;
+- static/strict/architecture;
+- protocol/canonicalization;
+- Tauri/WebView;
+- named-pipe/Job Objects;
+- PermissionEngine/destructive boundaries;
+- Codex compatibility/sandbox;
+- tools/races;
+- SQLite/SQLCipher/WAL;
+- backup/portable restore;
+- crash/recovery;
+- exact budget;
+- Local Git/GitHub/Proxmox;
+- modules/update;
+- voice;
 - event automation;
-- voice qualification;
-- resource pressure;
-- 24-hour idle and 8-hour mixed-workload soak;
-- clean install;
-- upgrade from previous production;
-- release artifact signing/SBOM/provenance.
+- resource/performance;
+- clean install/upgrade/rollback;
+- soak;
+- signed packaging/SBOM/provenance.
 
-## Exit criteria
+## Exit
 
-- zero open P0/P1 defects;
-- no unmitigated release-blocking security failure;
-- all production journeys pass;
-- rollback path verified;
-- Production Complete declaration generated with evidence.
+Zero P0/P1; no release-blocking security failure; all V1 journeys pass; rollback/recovery verified; Production Complete evidence references exact artifacts/source/profile.
 
 ---
 
-# 18. FIRST IMPLEMENTATION SLICE
+# 22. FIRST IMPLEMENTATION SLICE
 
-The first code slice SHOULD intentionally stop before AI autonomy.
-
-Build and verify:
+The first code slice intentionally stops before AI autonomy:
 
 ```text
-Tauri/React UI
-  ↓
-Rust Host
-  ↓
-authenticated named-pipe IPC
-  ↓
-Node Core
-  ↓
-SQLite event/state engine
+Tauri/React bundled local UI
+→ Rust Host
+→ Tauri capability/CSP boundary
+→ ACL-restricted authenticated named pipe
+→ application-owned Node Core
+→ transactional state/event skeleton
+→ locked session + harmless get_system_status
 ```
 
-Then add locked/unlocked session state and one harmless deterministic command such as `get_system_status`.
+Then immediately execute the Phase-3 SQLite/SQLCipher/WAL/portable-restore proof.
 
-This proves the trust boundary, protocol, persistence, events, UI projection, and shutdown/recovery model before introducing Codex.
+Only after trust, persistence, and recovery foundations pass should Codex autonomy be introduced.
 
-Do not start by giving Codex a shell and building architecture around whatever happens to work.
-
----
-
-# 19. ENGINEERING WORKFLOW
-
-Significant features SHOULD use isolated branches/worktrees.
-
-Before merge, changes SHALL include tests for modified contract behavior.
-
-Schema/protocol changes SHALL include version/migration implications.
-
-Security-sensitive changes SHALL include an explicit threat/failure test.
-
-Implementation changes that contradict a contract MUST either be corrected or accompanied by an approved contract/ADR amendment. The codebase SHALL NOT silently become the new architecture merely because it was easier to implement.
+Do not start by giving Codex a shell and letting working behavior become the architecture.
 
 ---
 
-# 20. RELEASE CHECKPOINTS
+# 23. ENGINEERING WORKFLOW
 
-Useful internal checkpoints are:
+Significant work uses isolated branches/worktrees.
+
+Re-fetch live branch before writes when concurrent work is possible and preserve valid changes.
+
+Contract/schema change includes compatibility/migration impact. Security/recovery change includes negative/failure tests.
+
+A material implementation-vs-contract conflict is corrected or goes through the synchronous ADR + canonical contract amendment process. Code never silently becomes the new architecture because it was easier.
+
+---
+
+# 24. RELEASE CHECKPOINTS
 
 ```text
-Foundation Ready
+Repository Standards Ready
+Desktop Trust Boundary Ready
+Persistence/Portable Recovery Proven
 Core State Ready
-Security Boundary Ready
-AI Runtime Ready
+Security/Permission Boundary Ready
+Codex Provider/Sandbox Ready
+Tool Runtime Ready
 Worker Runtime Ready
 Mission Runtime Ready
-Integration Runtime Ready
+GitHub Integration Ready
+Proxmox Integration Ready
 Voice Runtime Ready
-Recovery/Update Ready
+Operations/Update Ready
 Release Candidate
 Production Complete
 ```
 
-Only the final checkpoint represents the product standard requested by the contract.
+Only final checkpoint is Production Complete.
 
 ---
 
-# 21. GOVERNING PRINCIPLE
+# 25. GOVERNING PRINCIPLE
 
-> **Build the control plane first, then give intelligence access to it. Harden each boundary before depending on it.**
+> **Build the control plane first, prove recoverability early, then give intelligence access to it. Harden and test each boundary before depending on it.**
 
 ---
 
-**END — JARVIS PRODUCTION IMPLEMENTATION PLAN**
+**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.2**
