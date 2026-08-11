@@ -1,7 +1,7 @@
 # JARVIS Contract v1.0.2 Preservation & Reconciliation Audit
 
 **Review date:** August 12, 2026  
-**Reviewed branch:** `codex/contract-v1.0.2-consolidation`  
+**Reviewed branch:** `master`  
 **Historical semantic baseline:** `docs/history/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.md` plus its former normative appendices and accepted ADR lineage  
 **Current canonical contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md` and its listed appendices  
 **Document role:** audit/traceability evidence only; this report is not an implementation overlay.
@@ -18,6 +18,8 @@ The required outcome is that an implementer can build from the current v1.0.2 no
 
 ADRs/history remain rationale/provenance only.
 
+ADR-070 introduced a new approved UI identity/design-system requirement after the historical preservation audit. That decision is now incorporated into the current normative suite and does not alter the preservation conclusions for older requirements.
+
 ---
 
 # 2. CURRENT NORMATIVE SUITE
@@ -32,8 +34,9 @@ The current implementation source of truth is:
 6. `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`
 7. `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`
 8. `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`
-9. `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`
-10. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
+9. `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`
+10. `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`
+11. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
 
 `README.md` and `AGENTS.md` point contributors to the same suite.
 
@@ -60,12 +63,12 @@ Anything that cannot fit one of those categories is a preservation defect and mu
 |---|---|---|
 | Windows desktop, Tauri/Rust host, Node Core separation | PRESERVED/STRENGTHENED | Top-level, Runtime, Coding |
 | React unprivileged / no credentials / no authority | STRENGTHENED | Top-level, Security, Coding |
-| text conversation | PRESERVED | Top-level, Release Profile |
-| production local-first voice | PRESERVED/STRENGTHENED | Top-level, Release Profile, Runtime, Operations, Verification |
-| persistent voice identity | RESTORED/EXPLICIT | Operations §§19–20 + Release Profile |
-| no silent generic voice fallback | RESTORED | Operations §19 |
-| deterministic reflex/stop/mute/cancel | PRESERVED/EXPANDED | Runtime + Operations §§20–22 |
-| immediate truthful acknowledgement / slow-work responsiveness | RESTORED | Operations §§20–21 |
+| text conversation | PRESERVED | Top-level, Release Profile, UI Identity |
+| production local-first voice | PRESERVED/STRENGTHENED | Top-level, Release Profile, Runtime, Operations, UI Identity, Verification |
+| persistent voice identity | RESTORED/EXPLICIT | Operations §§19–20 + Release Profile + UI Identity |
+| no silent generic voice fallback | RESTORED | Operations §19 + UI Identity |
+| deterministic reflex/stop/mute/cancel | PRESERVED/EXPANDED | Runtime + Operations §§20–22 + UI Identity |
+| immediate truthful acknowledgement / slow-work responsiveness | RESTORED | Operations §§20–21 + UI Identity |
 | bounded conversation continuation window | RESTORED | Operations §20 |
 | voice latency telemetry | RESTORED | Operations §22 + Verification |
 | provider abstraction/supervision/failure isolation | PRESERVED/STRENGTHENED | Runtime, Protocol, Verification, Operations §14 |
@@ -84,35 +87,35 @@ Anything that cannot fit one of those categories is a preservation defect and mu
 | standing permissions scoped/revocable/non-transitive | RESTORED/EXPLICIT | Operations §8 |
 | precedent is evidence, not blank check | STRENGTHENED | Security |
 | destructive final confirmation | STRENGTHENED | Top-level, Security, Protocol |
-| human-readable destructive target/consequence UX | RESTORED/EXPLICIT | Operations §23 |
-| UI confirmation remains available | RESTORED | Operations §23 |
+| human-readable destructive target/consequence UX | RESTORED/EXPLICIT | Operations §23 + UI Identity |
+| UI confirmation remains available | RESTORED | Operations §23 + UI Identity |
 | typed/validated tool boundary | STRENGTHENED | Top-level, Protocol, Security, Coding |
-| postcondition verification / `UNCERTAIN` | STRENGTHENED | Runtime, Protocol, Verification |
-| queue transparency | RESTORED/EXPLICIT | Operations §3 |
+| postcondition verification / `UNCERTAIN` | STRENGTHENED | Runtime, Protocol, Verification, UI Identity |
+| queue transparency | RESTORED/EXPLICIT | Operations §3 + UI Identity |
 | priority/preemption/pause/resume | PRESERVED/STRENGTHENED | Runtime + Operations §6 |
-| delayed safe-point interruption visible | RESTORED | Operations §6 |
+| delayed safe-point interruption visible | RESTORED | Operations §6 + UI Identity |
 | user priority control over AI priority | RESTORED | Operations §6 |
 | scheduling transitions auditable | RESTORED | Operations §6 |
 | crash/recovery durability | STRENGTHENED | Runtime, Data, Verification |
-| recovery user visibility | RESTORED | Operations §7 |
+| recovery user visibility | RESTORED | Operations §7 + UI Identity |
 | scoped memory / live state beats memory | PRESERVED | Data, Top-level |
 | scoped ranked memory retrieval | RESTORED | Operations §13 |
-| work dashboard | RESTORED/EXPLICIT | Operations §3 |
+| work dashboard | RESTORED/EXPLICIT | Operations §3 + UI Identity/Mission Control |
 | worker journals / no chain-of-thought | PRESERVED/EXPANDED | Operations §4 + Data/Security |
 | budget/quota/hard limits | STRENGTHENED | Protocol, Runtime, Data |
-| budget queue/user visibility | RESTORED | Operations §18 |
+| budget queue/user visibility | RESTORED | Operations §18 + UI Identity |
 | Credential Broker / no raw secrets | STRENGTHENED | Security, Protocol, Coding |
 | integration catalog / independent capabilities | RESTORED/EXPLICIT | Operations §17 + Release Profile |
 | auth revocation blocks dependent operations only | RESTORED | Operations §§8,17 |
-| module registry/dashboard | RESTORED/EXPLICIT | Operations §15 |
+| module registry/dashboard | RESTORED/EXPLICIT | Operations §15 + UI Identity |
 | module install != enable/authorize/prefer | RESTORED | Operations §15 |
 | staged versioned module update/rollback | PRESERVED + EXPLICIT | Protocol, Coding, Operations §16 |
 | immutable module install units / activation pointer rollback | RESTORED | Operations §16 |
 | event gateway / event does not bypass authority | PRESERVED/STRENGTHENED | Top-level, Security, Operations §9 |
 | per-event disposition controls | RESTORED | Operations §9 |
-| NotificationPolicy / grouping / focus modes | RESTORED | Operations §10 |
+| NotificationPolicy / grouping / focus modes | RESTORED | Operations §10 + UI Identity window/focus rules |
 | project/workspace isolation | PRESERVED where applicable | ExecutionScope + Runtime/Operations |
-| diagnostics/degraded states | PRESERVED/EXPANDED | Runtime, Operations §24 |
+| diagnostics/degraded states | PRESERVED/EXPANDED | Runtime, Operations §24, UI Identity |
 | diagnostic export privacy/default exclusion | RESTORED | Operations §24 |
 | audit retention sufficient to explain consequential actions | RESTORED | Operations §25 |
 | audit tamper-evidence claim | STRENGTHENED/normalized | Operations §25; no false same-user guarantee |
@@ -126,7 +129,7 @@ Anything that cannot fit one of those categories is a preservation defect and mu
 | Critical reachable vulnerability release block | PRESERVED/STRENGTHENED | Verification + Operations §26 |
 | architecture decision escalation | RESTORED | Operations §28 |
 | concise report of significant autonomously resolved architecture decisions | RESTORED | Operations §28 |
-| production completion evidence, not documentation | PRESERVED/STRENGTHENED | Verification, Release Profile |
+| production completion evidence, not documentation | PRESERVED/STRENGTHENED | Verification, Release Profile, UI Identity |
 
 ---
 
@@ -150,6 +153,8 @@ Preserved or strengthened:
 Strengthened replacements include restrictive named-pipe DACL/locality, application-owned Node runtime, mandatory Job Objects, explicit delegated-engineering shell limits, exact provider compatibility, and durable `RESUMING`.
 
 Operational behaviors compressed during the original v1.0.2 rewrite—queue/dashboard visibility, safe-point pause visibility, persistent voice fallback, immediate acknowledgement, warm/streaming provider capability—are current in Operations.
+
+The post-audit UI decision further formalizes the native dedicated-window lifecycle and keeps its authority with the Rust/Tauri host rather than AI/renderer code.
 
 ## Data/State v1.0
 
@@ -188,6 +193,8 @@ Strengthened corrections include separate sensitivity/locality, accurate same-us
 
 Restored operational security details include diagnostic-export privacy, scoped/revocable standing permissions, destructive approval UX, reachable-High vulnerability risk acceptance, and audit-evidence retention.
 
+UI identity does not weaken this boundary: the renderer remains unprivileged and polished visual presentation does not create new authority.
+
 ## Protocol/Schema v1.0
 
 Preserved or strengthened:
@@ -206,6 +213,8 @@ The old atomic last-valid configuration rule is current in Operations rather tha
 Every still-valid release family remains required, with additional v1.0.2 gates for Tauri/WebView, named-pipe principal security, exact provider sandbox/version behavior, Job Objects, WAL fixed build, portable restore, exact budgets, GitHub/Proxmox, signed package identity, and soak/provenance.
 
 Old user-visible qualification that had been compressed—queue reasons, notification grouping/focus behavior, safe-point pause visibility, diagnostic-export defaults, upgrade-state preservation, High vulnerability waiver, uninstall data preservation—is explicitly required by Operations §30 and blocks Production Complete when applicable.
+
+ADR-070 adds a separate current UI qualification matrix for adaptive layouts, dark-theme identity, canonical brand assets, dedicated-window behavior, DPI/text scaling, keyboard/focus/accessibility, state language, and voice/visual continuity.
 
 ---
 
@@ -264,6 +273,7 @@ The accepted ADR corpus remains history/rationale only. Its effective rules are 
 | 067 | V1 integration release boundary / immediate post-V1 requirements | Release Profile/Top-level/Operations §17 |
 | 068 | SQLite WAL safety / operational diagnostics | Data/Coding/Verification/Release Profile |
 | 069 | v1.0.2 canonical consolidation / no overlay | Top-level/README/AGENTS/Lineage |
+| 070 | JARVIS UI identity / Mission Control / adaptive dashboard | Top-level/UI Identity/README/AGENTS/Lineage |
 
 No accepted ADR in this lineage is required as an implementation patch layer after this preservation pass.
 
@@ -317,13 +327,15 @@ After the fresh preservation loops, the current normative suite contains explici
 
 Those requirements no longer require ADR/history overlay interpretation.
 
+ADR-070 then added new current product requirements for a unified dark-theme JARVIS identity, Mission Control shell, dedicated controllable primary window, adaptive information hierarchy, canonical brand mark/assets, and UI accessibility/qualification. Those rules also live directly in the current normative suite rather than as an ADR-only overlay.
+
 ---
 
 # 9. GOVERNANCE CHECK
 
 A future accepted ADR is not implementation-ready by itself when it changes current behavior.
 
-The same reviewed change must update every affected active normative document, applicable Release Profile support scope, schema/migration/compatibility rules, and verification gates.
+The same reviewed change must update every affected active normative document, applicable Release Profile support scope, schema/migration/compatibility rules, verification gates, and canonical assets/tokens where applicable.
 
 If an ADR exposes a valid requirement absent from current normative text, the current contract is incomplete and must be corrected before implementation relies on that requirement.
 
@@ -335,7 +347,7 @@ This preservation audit concerns architecture/contract completeness only.
 
 It does not prove the software is Production Complete.
 
-Production Complete still requires implemented code and exact signed release artifacts to pass the complete current normative qualification suite, including the mandatory tests in `JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md` and `JARVIS-VERIFICATION-RELEASE-CONTRACT.md` for the active Release Profile.
+Production Complete still requires implemented code and exact signed release artifacts to pass the complete current normative qualification suite, including the mandatory tests in `JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`, `JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`, and `JARVIS-VERIFICATION-RELEASE-CONTRACT.md` for the active Release Profile.
 
 ---
 
