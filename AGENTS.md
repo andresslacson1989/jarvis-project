@@ -14,11 +14,12 @@ Before implementation or architecture work, read:
 6. `docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`
 7. `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`
 8. `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`
-9. `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`
-10. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
-11. relevant ADRs only when rationale/history is needed.
+9. `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`
+10. `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`
+11. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
+12. relevant ADRs only when rationale/history is needed.
 
-The v1.0.2 suite is the current normative implementation source. ADRs do not form a second overlay that implementers must mentally merge.
+The v1.0.2 suite is the current normative implementation source. ADRs do not form a second overlay that implementers must mentally merge. Operational/user-visible behavior such as queue transparency, work-dashboard truth, notification/focus policy, configuration activation, import conflicts, memory retrieval, module lifecycle UX, voice identity, diagnostics export, audit retention, and release vulnerability handling is normative in `JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md` rather than requiring historical ADR interpretation.
 
 ## Synchronous architecture-amendment rule
 
@@ -36,11 +37,14 @@ The old divergent `codex/contract-implementation-lock` branch is non-authoritati
 
 - **AI decides. Software authorizes. Software verifies.**
 - **Workers own the loop. JARVIS owns the graph. Verification decides done.**
+- **Be autonomous inside the user's intent. Ask before materially expanding it.**
+- **Escalate product judgment. Resolve engineering judgment.**
 - Never bypass final destructive confirmation.
 - Never treat AI confidence, provider capability, shell availability, or credential possession as authorization.
 - Never silently weaken `LOCAL_ONLY`, sensitivity, PermissionEngine, budget, execution-scope, provider, recovery, IPC, WebView, or module-integrity policy.
 - Never place raw long-lived credentials in AI prompts, normal SQLite rows, config, logs, journals, ordinary artifacts, or ordinary backups.
 - Never report consequential work complete without required postcondition/verification evidence.
+- Never represent queued/paused/uncertain work as running/completed.
 - Never represent Windows Job Objects as a filesystem/network security sandbox.
 - Never represent provider-native sandboxing as stronger than its qualified behavior.
 - Never treat documentation/architecture completion as `Production Complete`.
