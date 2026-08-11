@@ -5,7 +5,8 @@
 **Status:** Canonical Implementation-Locked Baseline  
 **Date:** August 12, 2026  
 **Primary Platform:** Microsoft Windows 11  
-**Adopted by:** ADR-069
+**Canonical consolidation:** ADR-069  
+**UI identity:** ADR-070
 
 ---
 
@@ -13,7 +14,7 @@
 
 This contract defines how JARVIS SHALL be implemented as a production-grade Windows AI operating companion rather than a prototype, chat wrapper, or loosely connected collection of scripts.
 
-A compliant implementation SHALL remain controlled, truthful, recoverable, and observable under provider failure, user interruption, crash/restart, network loss, invalid AI output, stale external state, resource pressure, update/migration failure, and adversarial input.
+A compliant implementation SHALL remain controlled, truthful, recoverable, observable, and visually coherent under provider failure, user interruption, crash/restart, network loss, invalid AI output, stale external state, resource pressure, update/migration failure, and adversarial input.
 
 The governing chain is:
 
@@ -52,12 +53,13 @@ The current production contract consists of this file plus:
 - `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`;
 - `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`;
 - `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`;
+- `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`;
 - `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`;
 - `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` as authoritative dependency sequencing and exit criteria.
 
 These documents SHALL use the same v1.0.2 semantics and vocabulary.
 
-ADRs preserve rationale/history. They are not a normal override layer. A future architecture change is incomplete until all affected current normative files are updated synchronously.
+ADRs preserve rationale/history. They are not a normal override layer. A future architecture or product-identity change is incomplete until all affected current normative files are updated synchronously.
 
 Earlier contracts under `docs/history/` are non-normative.
 
@@ -83,6 +85,9 @@ V1 SHALL provide:
 
 - natural text interaction;
 - production voice interaction through replaceable local-first providers;
+- a unified dark-theme **JARVIS Mission Control** interface with one approved brand/design system across conversation, missions, approvals, systems, integrations, memory, artifacts, diagnostics, and voice state;
+- a dedicated primary desktop dashboard/window that can be hidden, shown, windowed, maximized, full-screen, or focused-context presented under deterministic native/application policy;
+- adaptive layout across qualified window sizes, screen classes, multi-monitor/DPI conditions, and user text scaling without inventing separate visual products;
 - AI orchestration for flexible language understanding;
 - deterministic authorization and typed tool/integration execution;
 - durable project, memory, mission, task, approval, budget, event, and recovery state;
@@ -97,7 +102,7 @@ V1 SHALL provide:
 - encrypted backup/restore and staged reversible updates;
 - production diagnostics and qualification evidence.
 
-JARVIS SHALL NOT be implemented as a single LLM session with broad shell access or as a custom foundation-model project.
+JARVIS SHALL NOT be implemented as a single LLM session with broad shell access, as a custom foundation-model project, or as unrelated screens that merely share a name.
 
 ---
 
@@ -168,11 +173,14 @@ Node Core owns:
 Rust host owns:
 
 - single-instance/native lifecycle;
+- primary JARVIS window show/hide/focus/windowed/maximized/full-screen native lifecycle and safe monitor placement;
 - Windows lock observation;
 - Windows secure storage;
 - named-pipe security/bootstrap;
 - native process/job containment;
 - signed updater activation.
+
+AI may request a UI presentation transition, but it does not own the native window primitive or bypass focus/privacy/NotificationPolicy rules.
 
 Authority ordering is:
 
@@ -459,6 +467,8 @@ The architecture provides push-to-talk, local STT, VAD, AEC-capable full duplex,
 
 Typed input remains available when voice providers fail. `LOCAL_ONLY` applies to speech providers exactly as to AI providers.
 
+Voice presence, listening/speaking/degraded states, and voice-to-visual continuity SHALL use the same JARVIS UI identity and Mission Control context rather than a separate voice-only visual product.
+
 ---
 
 # 25. VERIFICATION AND PRODUCTION COMPLETE
@@ -469,7 +479,7 @@ Verification preference is deterministic checks, verified live state, independen
 
 The active Release Profile determines the exact platform/provider/integration/voice support matrix.
 
-`Production Complete` requires the exact signed release artifacts for one source commit to pass every mandatory qualification gate including clean install, provider/module/integration conformance, IPC/WebView security, destructive-action binding, encrypted portable restore, crash/recovery, SQLite/WAL safety, process containment, update rollback, resource pressure, voice, soak, SBOM, and provenance.
+`Production Complete` requires the exact signed release artifacts for one source commit to pass every mandatory qualification gate including clean install, provider/module/integration conformance, IPC/WebView security, destructive-action binding, encrypted portable restore, crash/recovery, SQLite/WAL safety, process containment, update rollback, resource pressure, voice, soak, SBOM, provenance, and the UI Identity & Design System Contract's adaptive-layout, dedicated-window, accessibility, branding, state-language, and interaction qualification matrix.
 
 Documentation/implementation-lock status alone is never Production Complete.
 
@@ -497,7 +507,8 @@ V1 does not require:
 - custom foundation-model training/inference infrastructure;
 - privileged Windows service architecture solely to claim same-user-malware isolation;
 - an open arbitrary executable plugin marketplace;
-- direct public Internet ingress to privileged Core.
+- direct public Internet ingress to privileged Core;
+- light theme, multiple visual themes, a 3D avatar, or a separate visual identity per integration.
 
 ---
 
@@ -510,6 +521,8 @@ V1 does not require:
 > **Be autonomous inside the user's intent. Ask before materially expanding it.**
 
 > **Escalate product judgment. Resolve engineering judgment.**
+
+> **One system. One identity. Any screen.**
 
 > **Build the control plane first, prove recoverability early, then give intelligence access to it.**
 
