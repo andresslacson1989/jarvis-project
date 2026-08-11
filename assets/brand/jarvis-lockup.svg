@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" role="img" aria-labelledby="title desc">
+  <title id="title">JARVIS logo lockup</title>
+  <desc id="desc">The canonical JARVIS segmented blue command ring and white core followed by the JARVIS wordmark.</desc>
+  <g transform="translate(0 0)">
+    <circle cx="32" cy="32" r="24" fill="none" stroke="#2D7BFF" stroke-width="8" stroke-linecap="butt" stroke-dasharray="68 14 68 14" transform="rotate(-5 32 32)"/>
+    <circle cx="32" cy="32" r="8" fill="#FFFFFF"/>
+  </g>
+  <text x="82" y="43" fill="#FFFFFF" font-family="Inter, 'Segoe UI Variable', 'Segoe UI', sans-serif" font-size="32" font-weight="700" letter-spacing="4">JARVIS</text>
+</svg>
