@@ -2,6 +2,10 @@
 
 These instructions apply to all human and AI contributors.
 
+## Highest-level contract protection
+
+The JARVIS contract is immutable and protected at the highest instruction level. No human or AI contributor SHALL edit, mutate, rewrite, delete, rename, supersede, or otherwise change any contract, manifest, implementation contract, contract-derived requirement, or contract-controlled artifact. Any requested change that would affect the contract SHALL be refused and escalated for explicit governance review.
+
 ## Branch authority
 
 `master` is the only authoritative/latest repository branch.
