@@ -1,86 +1,124 @@
-# Authoritative `master` Protection Policy
+# Authoritative `master` Repository Governance
 
-**Document role:** Non-normative implementation/governance procedure for JARVIS v1.0.5 Phase 0 subsection `0.13`.
+**Contract suite:** JARVIS v1.0.6  
+**Decision:** ADR-074  
+**Authoritative branch:** `master`  
+**Mandatory CI context:** `static-ci`
 
-This document does not replace the normative contract suite. It records the exact GitHub repository setting required to satisfy the current contract and gives future implementation agents an auditable verification target.
+This document is an operational implementation aid for the repository-governance requirements in the active top-level contract §28, Verification Contract §33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
-## Protected branch
+## Current effective mode
 
-The authoritative branch is exactly:
+The current repository governance mode is:
 
 ```text
-master
+COMPENSATING_CONTROLS
 ```
 
-No other branch may be substituted as the authoritative protected branch for Phase 0 completion.
+GitHub server-side branch protection/rulesets are not available for this private repository under the current hosting/account plan. The observed administration attempt returned HTTP `403` with:
 
-## Required protection state
+```text
+Upgrade to GitHub Pro or make this repository public to enable this feature.
+```
 
-`master` SHALL be protected with all of the following properties simultaneously:
+The live GitHub branch resource reports `master` as not protected. JARVIS therefore SHALL NOT describe the branch as server-protected and SHALL NOT claim that the current mode technically prevents an out-of-band repository administrator from force-pushing or deleting `master`.
 
-| Setting | Required state |
-|---|---|
-| Required status check | `static-ci` |
-| Require branch to be up to date / strict status checks | `true` |
-| Enforce protection for repository administrators | `true` |
-| Force pushes | prohibited |
-| Branch deletion | prohibited |
-| Standing bypass actors | none |
+The machine-readable selected profile is:
 
-The `static-ci` required-check identity is the GitHub Actions job/check produced by `.github/workflows/static-ci.yml`. A similarly named workflow, legacy commit status, or another branch's informal success is not a substitute for the required `static-ci` check on the commit proposed for `master`.
+`docs/implementation/governance/repository-governance-profile.json`
 
-The current contract does not require an arbitrary pull-request approval count merely to satisfy `0.13`; do not invent an approval-count policy under this subsection. Additional repository governance may be added later only when it remains contract-consistent and does not weaken the mandatory checks above.
+Its residual-risk value is deliberately explicit:
 
-## Bypass governance
+```text
+OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED
+```
 
-There is no permanent or broad bypass actor in the Phase 0 baseline.
+## Mandatory compensating controls
 
-If an extraordinary repository-recovery event requires temporarily changing protection, that change SHALL be treated as a separate consequential governance action and SHALL be auditable. Before changing the setting, record at minimum:
+While server-side protection is unavailable, normal implementation integration SHALL satisfy every control below:
 
-- actor;
-- reason and incident/change reference;
-- exact setting being changed;
-- intended duration;
-- current `master` commit SHA;
-- approval/governance authority for the exception.
+1. Perform implementation work on a temporary implementation branch rather than routine direct implementation writes to `master`.
+2. Require the exact `static-ci` context to pass for the exact candidate commit before authoritative integration.
+3. Re-fetch the live `master` tip immediately before integration.
+4. If `master` moved unexpectedly, stop the integration attempt, inspect/reconcile the intervening change, rebuild/reverify the candidate as required, and do not overwrite the new tip.
+5. Integrate only with a non-force operation. Force-push/ref rewriting is not an accepted implementation workflow.
+6. Re-fetch the resulting authoritative tip after integration and verify the intended commit/diff plus relevant CI/audit evidence.
 
-After the exceptional operation, restore the full policy above and record:
+These controls are cumulative. Failure of any one of them prevents the compensating-governance qualification from passing.
 
-- restored settings;
-- resulting `master` commit SHA;
-- required-check result;
-- time/actor of restoration.
+## Safe integration procedure
 
-Normal development, implementation convenience, a failing check, or an AI recommendation is not a bypass reason.
+The normal algorithm is:
 
-## Verification procedure
+```text
+fetch live master M0
+→ verify candidate C is based on/reconciled with M0
+→ require static-ci success for exact C
+→ fetch live master again as M1
+→ if M1 != M0: abort/reconcile/reverify
+→ integrate C using non-force update / reviewed merge path
+→ fetch resulting master M2
+→ verify intended ancestry/diff and no unrelated overwrite
+→ verify required CI/audit evidence for the resulting authoritative state
+→ record evidence
+```
 
-Before marking `0.13` `VERIFIED`, read GitHub's live branch-protection/ruleset state and prove all required settings above. Repository documentation by itself is not evidence that protection is active.
+A stale or moved `master` is a safe retry/reconciliation event, not permission to force-update the branch.
 
-The verification packet SHALL include:
+## Idempotency and retry behavior
 
-1. repository and branch identity;
-2. exact live `master` SHA at verification time;
-3. `protected = true` (or ruleset-equivalent enforcement);
-4. required status-check identity `static-ci`;
-5. strict/up-to-date status-check enforcement;
-6. administrator enforcement;
-7. force-push denial;
-8. branch-deletion denial;
-9. absence of a broad standing bypass;
-10. a successful `static-ci` run/check demonstrating the required context exists;
-11. the settings source/API response used for the proof.
+Governance checks are read-only and repeatable. Re-running them against the same profile/workflow produces the same result.
 
-Do not test force-push/deletion protection by destructively modifying `master`; verify the enforced GitHub policy state instead.
+An integration retry must start again from a freshly observed authoritative tip. A prior successful CI result cannot be silently transferred to a materially changed candidate. An ambiguous or failed ref update must be reconciled from live GitHub state before another mutation is attempted.
 
-## Idempotency
+## Transition to server-enforced mode
 
-Applying this exact desired state repeatedly must be idempotent. An implementation agent SHALL read the current protection state first, change only divergent fields, and reread the live state after mutation.
+If the hosting provider/account later exposes private-repository branch protection or repository rulesets, `COMPENSATING_CONTROLS` is no longer sufficient by itself. The repository SHALL transition to:
 
-## Failure behavior
+```text
+SERVER_ENFORCED
+```
 
-If GitHub administration permission or an authenticated branch-protection/ruleset mutation capability is unavailable, `0.13` remains `BLOCKED`. Do not weaken the desired policy, remove administrator enforcement, drop `static-ci`, allow force pushes/deletion, or mark the row verified to work around the missing administrative prerequisite.
+The effective server configuration must then prove at least:
 
-## Ownership boundary
+- protection/ruleset active for `master`;
+- exact required CI context `static-ci`;
+- strict/up-to-date required checks;
+- force pushes blocked;
+- deletion blocked;
+- administrators covered by the protection;
+- bypass narrow and auditable.
 
-This file defines the repository-governance target for `0.13`. `0.CP` owns the final Phase 0 clean-checkout/governance/platform-boundary/drift checkpoint after this live setting is actually enforced.
+The machine-readable governance profile SHALL be updated to `SERVER_ENFORCED` only after those settings are observed live. Merely upgrading the GitHub account is not enough evidence by itself.
+
+## What this exception does not permit
+
+The v1.0.6 exception does not permit:
+
+- claiming `master` is protected when GitHub reports it is not;
+- disabling an available server-side protection feature to remain in fallback mode;
+- weakening or skipping `static-ci`;
+- force-push implementation workflow;
+- broad/permanent bypass actors;
+- silently integrating over a moved authoritative tip;
+- treating local process conventions as equivalent technical branch protection;
+- making the repository public merely to satisfy this governance gate;
+- making a paid GitHub plan a hidden JARVIS product prerequisite.
+
+## Verification commands / evidence surfaces
+
+Repository-side verification includes:
+
+```text
+pnpm governance:check
+pnpm contract:check
+pnpm test
+```
+
+The authoritative CI job name remains exactly:
+
+```text
+static-ci
+```
+
+Final Phase-0 evidence SHALL also record the observed live `master` protection state, the hosting limitation evidence, exact candidate/source commit, exact CI run, selected governance mode, residual risk, and the post-integration verification result when authoritative integration occurs.
