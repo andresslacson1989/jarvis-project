@@ -313,7 +313,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **9.9** Project-policy snapshot enforcement and prevention of worker self-enrollment/trust widening | **NOT STARTED** | 9.2, 6.10 | PLAN §11; PPT §§7,9 | — | — | — |
 | ↳ **9.10** Mission Control worker/work/queue/activity surfaces driven only by authoritative state | **NOT STARTED** | 9.5–9.7, 1.13 | PLAN §11; OPS §§3–4; UI §13 | — | — | — |
 | ↳ **9.11** Worker crash, containment, no-progress, isolation, authority, checkpoint/recovery negative suite | **NOT STARTED** | 9.1–9.10 | PLAN §11 Exit; VR §§19,27 | — | — | — |
-| ↳ **9.CP** SECTION CHECKPOINT — bounded recoverable worker runtime | **NOT STARTED** | 9.1–9.11 | PLAN §11 Exit; PLAN §26 checkpoint | — | — | — |
+| ↳ **9.CP** SECTION CHECKPOINT — bounded recoverable worker runtime | **NOT STARTED** | 9.1–9.11 | PLAN §11 Exit; PLAN §26 checkpoint; VR §§19,27 | — | — | — |
 
 ### SECTION 10 — Mission Graph
 
@@ -372,7 +372,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **12.13** Crash-safe durable trusted-metadata state that survives ordinary cache cleanup | **NOT STARTED** | 12.9, 4.11 | SCT §14 | — | — | — |
 | ↳ **12.14** Module/support/trust lifecycle Mission Control states and trust incident diagnostics | **NOT STARTED** | 12.2–12.13, 1.13 | OPS §§15–17; SCT §15; UI §15 | — | — | — |
 | ↳ **12.15** TUF/module negative conformance: threshold, expiry, rotation, revocation, delegation, rollback/freeze/mix-match, cache/crash | **NOT STARTED** | 12.6–12.14 | PLAN §14 Exit; SCT §17; VR §26 | — | — | — |
-| ↳ **12.CP** SECTION CHECKPOINT — credential/module/TUF catalog trust foundation | **NOT STARTED** | 12.1–12.15 | PLAN §14 Exit; PLAN §26 checkpoint; VR §26 | — | — | — |
+| ↳ **12.CP** SECTION CHECKPOINT — credential/module/TUF catalog trust foundation | **NOT STARTED** | 12.1–12.15 | PLAN §14 Exit; PLAN §26 checkpoint | — | — | — |
 
 ### SECTION 13 — Local Git / GitHub Production Integration
 
