@@ -20,8 +20,8 @@ The two files together are one non-normative implementation matrix. They are not
 | Field | Current value |
 |---|---|
 | Active section | `SECTION 0 — Repository / Platform Contracts / Toolchain / Governance` |
-| Active subsection | None — `0.4` verified; `0.5` not started |
-| Next eligible subsection | `0.5` |
+| Active subsection | None — `0.5` verified; `0.6` not started |
+| Next eligible subsection | `0.6` |
 | Contract suite | JARVIS v1.0.5 |
 | Authoritative implementation sequence | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` |
 | Reference plan | `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` |
@@ -33,12 +33,12 @@ The two files together are one non-normative implementation matrix. They are not
 
 | Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
 |---|---|---|---|---:|---|---|
-| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **IN PROGRESS** | — | `Phase 0`; checkpoint: Repository Governance + Platform Boundary + Contract-Drift Protection Ready | — | `0.5` is next | `0.1–0.4` verified; section checkpoint remains pending |
+| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **IN PROGRESS** | — | `Phase 0`; checkpoint: Repository Governance + Platform Boundary + Contract-Drift Protection Ready | — | `0.6` is next | `0.1–0.5` verified; section checkpoint remains pending |
 | ↳ **0.1** Implementation admission, authoritative-suite pinning, and repository baseline | **VERIFIED** | — | PLAN §2; IC §§2–3,28–29; RP §17; AGENTS Source of truth/Branch authority | 10 CA / 9 scoped | None within `0.1` scope | `ded8f9e5c0e056ff69fa27668dfb0bd4fca7a0f7`; `docs/implementation/evidence/0.1-implementation-admission.md`; live `master` `bb32c530...`; diff verification changed only the evidence file |
 | ↳ **0.2** Monorepo responsibility boundaries and dependency-direction skeleton | **VERIFIED** | 0.1 | PLAN §2; CS §§2–4,32; IC §§5,8 | 10 CA / 9 scoped | None within `0.2` scope | `67fa540caab982dccb2330070df62c6d71603099`; `docs/implementation/architecture/REPOSITORY-BOUNDARIES.md`; `docs/implementation/evidence/0.2-monorepo-boundaries.md`; diff added only 22 Markdown boundary/evidence files; no package/toolchain/runtime/native implementation; Linux negative-support wording verified |
 | ↳ **0.3** Platform/runtime identity and compatibility protocol foundation | **VERIFIED** | 0.2 | PLAN §2; PP §§2–7,11; PS §§2–3,27; RP §§2–3 | 10 CA / 9 scoped | None within `0.3` scope | `229954d1e34c52bb11c50570308e9f66c2a21034`; `669fec6bad6cdec53a1a44fc94be3573e120997f`; `docs/implementation/evidence/0.3-platform-runtime-identity.md`; exact 6-file implementation; 5/5 schema self-validation; 20/20 positive/negative/adversarial cases; strict TypeScript auxiliary check PASS; no later-phase implementation leakage |
 | ↳ **0.4** Semantic platform-capability contracts, availability, and stable platform errors | **VERIFIED** | 0.3 | PLAN §2; PP §§6,26–28; CS §4; RP §3 | 10 CA / 9 scoped | None within `0.4` scope | `b5bcd1b05128e65123b2bac95aa7b59d308d458a`; `a4dcf8593137779fc7a1ce4be63ff6d70acf3aef`; `docs/implementation/evidence/0.4-platform-capability-contracts.md`; exact 3-file implementation; strict TypeScript PASS; 8/8 behavioral/negative tests; 2/2 negative compile-time checks; no native-backend/toolchain/CI leakage |
-| ↳ **0.5** Composition root, Windows backend registration, and future-Linux namespace reservation | **NOT STARTED** | 0.4 | PLAN §2; PP §§7–10; CS §§2–4,32 | — | — | — |
+| ↳ **0.5** Composition root, Windows backend registration, and future-Linux namespace reservation | **VERIFIED** | 0.4 | PLAN §2; PP §§7–10; CS §§2–4,32 | 10 CA / 9 scoped | None within `0.5` scope | `384be644b63f82da7397769066a595a9afa5a358`; `186dd001ff481c836a3e5074f59181e8b3152c8d`; `docs/implementation/evidence/0.5-platform-composition-root.md`; exact 4-file implementation; strict TypeScript PASS; 9/9 behavioral/negative checks; forbidden native/OS-branch scan PASS; Linux namespace contains no V1 executable runtime registration |
 | ↳ **0.6** Protocol/schema infrastructure and common boundary primitives | **NOT STARTED** | 0.3 | PLAN §2; PS §§1–9,25–27; CS §§5–7,11 | — | — | — |
 | ↳ **0.7** Typed bootstrap/configuration schemas and machine-readable canonical contract values | **NOT STARTED** | 0.6 | PLAN §2; MAN §§4–6; PS §24; CS §30; IC §28 | — | — | — |
 | ↳ **0.8** Pinned toolchains, package manager, strict TypeScript, Rust baseline, lockfiles | **NOT STARTED** | 0.2 | PLAN §2; CS §§5–6,28–29; RP §3 | — | — | — |
