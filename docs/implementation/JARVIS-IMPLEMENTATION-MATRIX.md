@@ -19,16 +19,18 @@ Implement the complete contract-defined **Windows 11 x64 `FULL_HOST` JARVIS V1 p
 
 1. Preserve the Implementation Plan's Phase 0 → 19 macro-order. This matrix refines that order; it does not replace it.
 2. Exactly one subsection is the primary active implementation target at a time.
-3. A subsection may start only when every mandatory dependency listed for it is `VERIFIED`, except explicitly documented bootstrap dependencies that are part of that same subsection.
-4. Dependency ranges such as `1.2–1.13` are inclusive. A section checkpoint requires every **mandatory** child subsection in that section to be `VERIFIED`. A contract-permitted row marked `DEFERRED` is excluded only while the concrete release does not enable that optional capability.
-5. No subsection may depend on a later full feature. Cross-cutting systems are staged as foundation/proof → full implementation → productization → final qualification.
-6. If implementation discovers a missing prerequisite, do not jump ahead and partially implement an arbitrary later subsection. Treat it as a matrix defect: identify the true prerequisite, confirm its contract basis, repair the matrix/dependency order, then resume. If the issue is a normative ambiguity/contradiction, use the contract amendment rule instead of guessing.
-7. Feature completion includes applicable failure/recovery, diagnostics, security, atomicity/idempotency, migration/update compatibility, platform behavior, negative tests, and user-facing accessibility at the point the feature becomes a production dependency.
-8. `IMPLEMENTED` is not `VERIFIED`. Scores never override a failed hard gate.
-9. Contract Accuracy must be exactly `10/10`; every other applicable baseline criterion must meet the `AGENTS.md` threshold.
-10. A parent section becomes `VERIFIED` only after all required child rows pass and its `*.CP` integration checkpoint passes.
-11. Do not advance support claims from `modeled`/`installed`/`launchable` to `SUPPORTED` without the exact required conformance evidence.
-12. `Production Complete` is available only at `19.27`/`19.CP`; no earlier row or checkpoint is production completion.
+3. Every child subsection inherits its parent section's dependency. The child's `Depends On` cell lists additional prerequisites beyond that section-entry gate.
+4. Within a section, execute mandatory rows in listed order by default. Do not skip an earlier mandatory `NOT STARTED` row merely because a later row's technical dependencies are already satisfied; row order is the intended smooth implementation path unless the matrix itself is formally repaired.
+5. A subsection may start only when every active mandatory dependency listed for it is `VERIFIED`, except explicitly documented bootstrap dependencies that are part of that same subsection.
+6. Dependency ranges such as `1.2–1.13` are inclusive. A contract-permitted row currently marked `DEFERRED` is an inactive optional branch and does not block a range, downstream subsection, or checkpoint unless the concrete release enables it. When enabled, that row immediately becomes a normal mandatory predecessor and must pass its full implementation/verification loop before downstream completion.
+7. No subsection may depend on a later full feature. Cross-cutting systems are staged as foundation/proof → full implementation → productization → final qualification.
+8. If implementation discovers a missing prerequisite, do not jump ahead and partially implement an arbitrary later subsection. Treat it as a matrix defect: identify the true prerequisite, confirm its contract basis, repair the matrix/dependency order, then resume. If the issue is a normative ambiguity/contradiction, use the contract amendment rule instead of guessing.
+9. Feature completion includes applicable failure/recovery, diagnostics, security, atomicity/idempotency, migration/update compatibility, platform behavior, negative tests, and user-facing accessibility at the point the feature becomes a production dependency.
+10. `IMPLEMENTED` is not `VERIFIED`. Scores never override a failed hard gate.
+11. Contract Accuracy must be exactly `10/10`; every other applicable baseline criterion must meet the `AGENTS.md` threshold.
+12. A parent section becomes `VERIFIED` only after all required child rows pass and its `*.CP` integration checkpoint passes.
+13. Do not advance support claims from `modeled`/`installed`/`launchable` to `SUPPORTED` without the exact required conformance evidence.
+14. `Production Complete` is available only at `19.27`/`19.CP`; no earlier row or checkpoint is production completion.
 
 ## Status model
 
@@ -127,7 +129,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **1.8** PlatformWindowController Windows backend, deterministic presentation states, multi-monitor recovery, and conservative no-focus-steal/privacy defaults before the later full NotificationPolicyEngine | **NOT STARTED** | 1.3, 0.4 | PLAN §3; UI §§9,24; PP §18 | — | — | — |
 | ↳ **1.9** Initial PlatformSessionObserver and PlatformSystemInfo Windows backends | **NOT STARTED** | 1.3, 0.4 | PLAN §3; PP §§17,26–27; RP §3 | — | — | — |
 | ↳ **1.10** Initial PlatformPathsAndIdentity Windows application/data path backend | **NOT STARTED** | 1.3, 0.4 | PLAN §3; PP §13; CS §16 | — | — | — |
-| ↳ **1.11** Canonical brand assets, offline Inter packaging, and asset/license provenance foundation | **NOT STARTED** | 1.1 | PLAN §3; IC §26; UI §§3–5; ASSET README; RP §3 | — | — | — |
+| ↳ **1.11** Canonical brand assets, offline Inter packaging, and asset/license provenance foundation | **NOT STARTED** | 1.1 | PLAN §3; IC §26; UI §§3–5; `assets/brand/README.md`; RP §3 | — | — | — |
 | ↳ **1.12** Central design tokens, reusable components, keyboard/focus, reduced-motion, and forced-colors foundation | **NOT STARTED** | 1.11 | PLAN §3; UI §§6–7,18,20,22–23; CS §25 | — | — | — |
 | ↳ **1.13** Mission Control shell, locked startup surface, and truthful foundational states | **NOT STARTED** | 1.6, 1.8, 1.12 | PLAN §3; IC §§4,6; UI §§8,11,17,25; OPS §§2–3 | — | — | — |
 | ↳ **1.14** Clean Windows 11 x64 standard-non-admin desktop foundation proof: packaged Core, window state, repair/degraded paths, no system Node | **NOT STARTED** | 1.2–1.13 | PLAN §3 Exit; VR §§11–13,32 | — | — | — |
@@ -145,7 +147,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **2.5** Managed-process cancellation escalation, forced shutdown, descendant/orphan cleanup, and truthful containment diagnostics | **NOT STARTED** | 2.4 | PLAN §4; RT §§9,23; PP §§16,27; VR §19 | — | — | — |
 | ↳ **2.6** PlatformPrivilegeMediator bounded operation registry and Windows UAC/elevation boundary | **NOT STARTED** | 1.CP, 0.4 | PLAN §4; RT §8; SEC §22; PP §9 | — | — | — |
 | ↳ **2.7** Native broker capability surface: typed secure/process/window/session/update/audio operations; no generic command broker | **NOT STARTED** | 2.4, 2.6 | RT §8; IC §8; SEC §§6,22 | — | — | — |
-| ↳ **2.8** Startup sequence through native launch and authenticated IPC handshake, with typed extension points for later persistence/recovery/provider steps and fail-closed diagnostics | **NOT STARTED** | 2.2, 2.5, 2.7 | RT §6 steps 1–12; OPS §§2,7,24; VR §13 | — | — | — |
+| ↳ **2.8** Pre-persistence bootstrap ordering and fail-closed diagnostics through authenticated Core IPC: implement the Phase-2-available portions of the Runtime bootstrap sequence, register the typed PlatformSecureStorage boundary without claiming the Phase-3 Windows secure-store backend, and leave persistence/recovery/provider startup stages explicitly unqualified until their owning sections | **NOT STARTED** | 2.2, 2.5, 2.7 | PLAN §§4,22; RT §6 sequencing; OPS §§2,7,24; VR §13 | — | — | — |
 | ↳ **2.9** Pre-autonomy control-plane slice: deterministic LOCKED Core state, minimal state/event ownership interfaces, and harmless get_system_status round-trip (not the later general ToolExecutor) | **NOT STARTED** | 2.8, 1.13 | PLAN §22 First Implementation Slice; RT §§10–12; PS §§8–9 | — | — | — |
 | ↳ **2.CP** SECTION CHECKPOINT — intended Core connects; unauthorized peers fail; process/elevation boundaries cannot be bypassed | **NOT STARTED** | 2.1–2.9 | PLAN §4 Exit; VR §§13,19 | — | — | — |
 
@@ -167,12 +169,12 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **3.11** GENERATED_RECOVERY_V1 256-bit factor representation, HKDF slot KEK, wrap-AEAD, and export/privacy constraints | **NOT STARTED** | 3.10 | BKC §§7–8; IC §21; RP §4 | — | — | — |
 | ↳ **3.12** Windows LOCAL_RECOVERY DPAPI/PlatformSecureStorage BackupDEK slot | **NOT STARTED** | 3.9, 3.4 | BKC §10; DS §32; RP §4 | — | — | — |
 | ↳ **3.13** Optional PASSPHRASE_ARGON2ID_V1 backup slot — implement only if enabled by product/release configuration | **DEFERRED** | 3.11 | BKC §9; RP §4; PLAN §5 | — | Contract-permitted optional capability; not required for base V1 Production Complete unless enabled | Must be fully qualified before any release exposes it |
-| ↳ **3.14** Whole-package verification: bounded parse, slot authentication, manifest/hash, SnapshotDBKey open, SQLite integrity | **NOT STARTED** | 3.10–3.12 | BKC §§11–14; DS §30; VR §21 | — | — | — |
+| ↳ **3.14** Whole-package verification: bounded parse, slot authentication, manifest/hash, SnapshotDBKey open, SQLite integrity | **NOT STARTED** | 3.10–3.12; +3.13 if enabled | BKC §§11–14; DS §30; VR §21 | — | — | — |
 | ↳ **3.15** Clean-profile portable restore: full authentication before activation, fresh DB_DEK re-key, REAUTH_REQUIRED reconciliation | **NOT STARTED** | 3.14, 3.3 | BKC §12; DS §§31,33; IC §21; VR §21 | — | — | — |
 | ↳ **3.16** Local restore, wrong-factor/tamper failure atomicity, damaged-state preservation, Recovery Mode entry | **NOT STARTED** | 3.12, 3.14, 3.15 | DS §§32,35; SEC §32; BKC §14 | — | — | — |
-| ↳ **3.17** Cross-language backup golden vectors and malicious bounds/KDF/nonce/tag/chunk negative suite | **NOT STARTED** | 3.8–3.16 | BKC §14; PLAN §5 Required proof; VR §21 | — | — | — |
-| ↳ **3.18** Packaged Windows persistence/backup proof with secret-free logs/diagnostics and exact binding evidence | **NOT STARTED** | 3.1–3.17 | PLAN §5 Exit; CS §§12–13,27; VR §§20–21,32 | — | — | — |
-| ↳ **3.CP** SECTION CHECKPOINT — persistence/KDF/JARVIS_BACKUP_V1 portable recovery proof | **NOT STARTED** | 3.1–3.18 | PLAN §5 Exit; PLAN §26 checkpoint; RP §4; VR §§14,20–22 | — | — | — |
+| ↳ **3.17** Cross-language backup golden vectors and malicious bounds/KDF/nonce/tag/chunk negative suite | **NOT STARTED** | 3.8–3.12, 3.14–3.16; +3.13 if enabled | BKC §14; PLAN §5 Required proof; VR §21 | — | — | — |
+| ↳ **3.18** Packaged Windows persistence/backup proof with secret-free logs/diagnostics and exact binding evidence | **NOT STARTED** | 3.1–3.12, 3.14–3.17; +3.13 if enabled | PLAN §5 Exit; CS §§12–13,27; VR §§20–21,32 | — | — | — |
+| ↳ **3.CP** SECTION CHECKPOINT — persistence/KDF/JARVIS_BACKUP_V1 portable recovery proof | **NOT STARTED** | 3.1–3.12, 3.14–3.18; +3.13 if enabled | PLAN §5 Exit; PLAN §26 checkpoint; RP §4; VR §§14,20–22 | — | — | — |
 
 ### SECTION 3A — Early Voice Feasibility Spike
 
@@ -359,14 +361,14 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **12.2** Module Registry support-state separation, execution classes, manifests, platform/runtime compatibility | **NOT STARTED** | 12.1, 4.9 | PLAN §14; IC §22; RP §10; PS §20 | — | — | — |
 | ↳ **12.3** DATA_ONLY non-execution and BUILT_IN_TRUSTED release-owned execution boundaries | **NOT STARTED** | 12.2 | CS §24; SEC §26 | — | — | — |
 | ↳ **12.4** EXTERNAL_MANAGED typed IPC/capability envelope/process containment/health/crash isolation | **NOT STARTED** | 12.2, 2.4–2.5 | PLAN §14; IC §22; RT §25; SEC §26 | — | — | — |
-| ↳ **12.5** Immutable module versions, verified staging (never execute unverified download path), activation, pinning, retained rollback and failure-safe lifecycle | **NOT STARTED** | 12.2–12.4 | PLAN §14; OPS §§15–16 | — | — | — |
+| ↳ **12.5** Immutable module versions, verified staging (never execute unverified download path), activation, pinning, retained rollback and failure-safe lifecycle; active tasks are never silently switched underneath outside a qualified safe boundary | **NOT STARTED** | 12.2–12.4 | PLAN §14; OPS §§15–16 | — | — | — |
 | ↳ **12.6** Audited TUF 1.0.35 implementation/library integration and authenticated bootstrap root | **NOT STARTED** | 12.2, 4.11 | PLAN §14; SCT §§2–4 | — | — | — |
 | ↳ **12.7** Distinct Ed25519 root/targets/snapshot/timestamp/module-role key profiles and custody tooling/records | **NOT STARTED** | 12.6 | SCT §§3–6,16 | — | — | — |
-| ↳ **12.8** Threshold enforcement: root 2-of-3, targets 2-of-3, modules 2-of-3; offline key separation from runtime/general CI | **NOT STARTED** | 12.7 | PLAN §14; SCT §§4–6,17 | — | — | — |
+| ↳ **12.8** Threshold enforcement: root 2-of-3, targets 2-of-3, modules 2-of-3; offline install-authorizing key separation from ordinary runtime, developer workstations, update servers, and general CI | **NOT STARTED** | 12.7 | PLAN §14; SCT §§4–6,17 | — | — | — |
 | ↳ **12.9** Consistent snapshots, role metadata versions/expiry, freeze/rollback/mix-and-match and clock-rollback diagnostics, plus narrowly scoped timestamp automation using only the online timestamp key | **NOT STARTED** | 12.6, 12.8 | SCT §§2,8–9,17 | — | — | — |
 | ↳ **12.10** Sequential root rotation/revocation including expired-root-only sequential-update semantics, and honest full-root-threshold-compromise recovery boundary | **NOT STARTED** | 12.8–12.9 | SCT §7; SEC §32 | — | — | — |
 | ↳ **12.11** Dedicated modules delegation path scoping and catalog authorization separate from application targets | **NOT STARTED** | 12.8–12.10 | SCT §6 | — | — | — |
-| ↳ **12.12** Target length/hash/platform/profile/catalog-sequence/revocation/module anti-rollback admission | **NOT STARTED** | 12.9, 12.11 | SCT §§9,11,13 | — | — | — |
+| ↳ **12.12** Target length/hash/platform/profile/catalog-sequence/revocation/module anti-rollback admission; publisher/self-signature alone never confers `SUPPORTED` | **NOT STARTED** | 12.9, 12.11 | SCT §§6,9,11,13 | — | — | — |
 | ↳ **12.13** Crash-safe durable trusted-metadata state that survives ordinary cache cleanup | **NOT STARTED** | 12.9, 4.11 | SCT §14 | — | — | — |
 | ↳ **12.14** Module/support/trust lifecycle Mission Control states and trust incident diagnostics | **NOT STARTED** | 12.2–12.13, 1.13 | OPS §§15–17; SCT §15; UI §15 | — | — | — |
 | ↳ **12.15** TUF/module negative conformance: threshold, expiry, rotation, revocation, delegation, rollback/freeze/mix-match, cache/crash | **NOT STARTED** | 12.6–12.14 | PLAN §14 Exit; SCT §17; VR §26 | — | — | — |
@@ -379,7 +381,7 @@ This table is a guard against backward dependencies and premature implementation
 | **SECTION 13 — Local Git / GitHub Production Integration** | **NOT STARTED** | 12.CP | `Phase 13`; checkpoint: GitHub Capability Matrix Ready | — | — | — |
 | ↳ **13.1** Production Windows local filesystem/Git adapter through canonical platform path/process boundaries | **NOT STARTED** | 12.CP, 8.CP | PLAN §15; RP §9; VR §24 | — | — | — |
 | ↳ **13.2** Repository/ref/worktree identity and local Git consequential-write expected-ref protections | **NOT STARTED** | 13.1, 6.2 | PLAN §15; CS §22; VR §24 | — | — | — |
-| ↳ **13.3** GitHub account authentication (PKCE/state + temporary narrow loopback when used), least-privilege credential scopes, and exact release capability support matrix | **NOT STARTED** | 12.1, 5.4 | PLAN §15; RP §9.1; SEC §24 | — | — | — |
+| ↳ **13.3** GitHub account authentication-flow selection/implementation, least-privilege credential scopes, and exact release capability support matrix; the chosen auth method must be explicitly qualified and must not create privileged Core ingress | **NOT STARTED** | 12.1, 5.4 | PLAN §15; RP §9.1; SEC §24; OPS §17 | — | — | — |
 | ↳ **13.4** Typed GitHub transport: canonical repo/account identity, schema/errors, auth expiry, rate limit, retry/UNCERTAIN | **NOT STARTED** | 13.3, 8.4–8.5 | PLAN §15; CS §22 | — | — | — |
 | ↳ **13.5** GITHUB_REPOSITORY_READ | **NOT STARTED** | 13.4 | RP §9.1; VR §24 | — | — | — |
 | ↳ **13.6** GITHUB_REF_READ | **NOT STARTED** | 13.5 | RP §9.1; VR §24 | — | — | — |
@@ -392,9 +394,9 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **13.13** GITHUB_ACTIONS_READ | **NOT STARTED** | 13.5 | RP §9.1; VR §24 | — | — | — |
 | ↳ **13.14** Optional GITHUB_ACTIONS_DISPATCH — only if enabled and independently qualified | **DEFERRED** | 13.13 | RP §9.1; VR §24 | — | Contract-permitted optional base-V1 capability | Must not affect base-V1 completion unless release enables it |
 | ↳ **13.15** Explicit rejection of repository/admin/secrets/protection/member/delete/ref-delete authority | **NOT STARTED** | 13.3–13.13 | RP §9.1; CS §22; SEC §24; VR §24 | — | — | — |
-| ↳ **13.16** GitHub support/capability/account/health/approval Mission Control UX | **NOT STARTED** | 13.3–13.15, 1.13 | PLAN §15; OPS §17; UI §15 | — | — | — |
-| ↳ **13.17** Full Git/GitHub success/failure/auth/rate/race/idempotency/recovery/secret/audit conformance | **NOT STARTED** | 13.1–13.16 | PLAN §15 Exit; VR §24 | — | — | — |
-| ↳ **13.CP** SECTION CHECKPOINT — every mandatory GitHub capability SUPPORTED on Windows V1 with exact boundaries | **NOT STARTED** | 13.1–13.17 | PLAN §15 Exit; PLAN §26 checkpoint; RP §9.1 | — | — | — |
+| ↳ **13.16** GitHub support/capability/account/health/approval Mission Control UX | **NOT STARTED** | 13.3–13.13, 13.15; +13.14 if enabled | PLAN §15; OPS §17; UI §15 | — | — | — |
+| ↳ **13.17** Full Git/GitHub success/failure/auth/rate/race/idempotency/recovery/secret/audit conformance | **NOT STARTED** | 13.1–13.13, 13.15–13.16; +13.14 if enabled | PLAN §15 Exit; VR §24 | — | — | — |
+| ↳ **13.CP** SECTION CHECKPOINT — every mandatory GitHub capability SUPPORTED on Windows V1 with exact boundaries | **NOT STARTED** | 13.1–13.13, 13.15–13.17; +13.14 if enabled | PLAN §15 Exit; PLAN §26 checkpoint; RP §9.1 | — | — | — |
 
 ### SECTION 14 — Proxmox VE V1
 
@@ -416,9 +418,9 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **14.13** Optional PROXMOX_STORAGE_WRITE — absent/disabled unless separately fully qualified | **DEFERRED** | 14.5 | RP §9.2; VR §25 | — | Optional/non-blocking for base V1 | If enabled, requires full positive/negative/risk qualification and signed support listing |
 | ↳ **14.14** Optional PROXMOX_NETWORK_WRITE — absent/disabled unless separately fully qualified | **DEFERRED** | 14.5 | RP §9.2; VR §25 | — | Optional/non-blocking for base V1 | If enabled, requires full positive/negative/risk qualification and signed support listing |
 | ↳ **14.15** No SSH/qm/pct/pvesh/root/direct-/etc/pve fallback; guest-shell and PBS authority separation | **NOT STARTED** | 14.4–14.12 | IC §23; SEC §25; CS §23 | — | — | — |
-| ↳ **14.16** Proxmox capability/health/scope/approval Mission Control UX | **NOT STARTED** | 14.1–14.15, 1.13 | PLAN §16; UI §15 | — | — | — |
-| ↳ **14.17** Full Proxmox scope/denial/postcondition/UNCERTAIN/destructive/recovery/revocation conformance | **NOT STARTED** | 14.1–14.16 | PLAN §16 Exit; VR §25 | — | — | — |
-| ↳ **14.CP** SECTION CHECKPOINT — all mandatory Proxmox capabilities qualified; optional writes absent or separately qualified | **NOT STARTED** | 14.1–14.17 | PLAN §16 Exit; PLAN §26 checkpoint; RP §9.2 | — | — | — |
+| ↳ **14.16** Proxmox capability/health/scope/approval Mission Control UX | **NOT STARTED** | 14.1–14.12, 14.15; +14.13/14.14 if enabled | PLAN §16; UI §15 | — | — | — |
+| ↳ **14.17** Full Proxmox scope/denial/postcondition/UNCERTAIN/destructive/recovery/revocation conformance | **NOT STARTED** | 14.1–14.12, 14.15–14.16; +14.13/14.14 if enabled | PLAN §16 Exit; VR §25 | — | — | — |
+| ↳ **14.CP** SECTION CHECKPOINT — all mandatory Proxmox capabilities qualified; optional writes absent or separately qualified | **NOT STARTED** | 14.1–14.12, 14.15–14.17; +14.13/14.14 if enabled | PLAN §16 Exit; PLAN §26 checkpoint; RP §9.2 | — | — | — |
 
 ### SECTION 15 — Voice Foundation
 
@@ -497,39 +499,39 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **18.19** Release-manifest generation with complete platform/runtime/toolchain/DB/KDF/backup/policy/provider/integration/module/voice/TUF/signing/SBOM fields | **NOT STARTED** | 18.5, 18.16–18.18 | PLAN §20; RP §16; SCT §16; VR §36 | — | — | — |
 | ↳ **18.20** Upgrade/uninstall durable user-state preservation and explicit migration/invalidation/data-retention behavior | **NOT STARTED** | 18.17 | OPS §27; VR §§22,32 | — | — | — |
 | ↳ **18.21** Reachable dependency/vulnerability policy, SBOM/license/provenance readiness and RC known-limitations record | **NOT STARTED** | 18.19, 0.11 | OPS §26; SEC §27; VR §36 | — | — | — |
-| ↳ **18.CP** SECTION CHECKPOINT — Operations/UI/TUF Update Ready; produce a release-candidate build for exact final qualification | **NOT STARTED** | 18.1–18.21 | PLAN §20 Exit; PLAN §26 checkpoint; UI §28 | — | — | — |
+| ↳ **18.CP** SECTION CHECKPOINT — Operations/UI/TUF Update Ready; produce a qualification-ready build candidate and proceed to Section 19 where the exact signed Windows RC artifacts are created/frozen before any final qualification result is accepted | **NOT STARTED** | 18.1–18.21 | PLAN §20 Exit; PLAN §26 checkpoint; UI §28 | — | — | — |
 
 ### SECTION 19 — Windows V1 Production Qualification
 
 | Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
 |---|---|---|---|---:|---|---|
-| **SECTION 19 — Windows V1 Production Qualification** | **NOT STARTED** | 18.CP | `Phase 19`; checkpoint: Production Complete | — | — | — |
-| ↳ **19.1** Freeze exact RC identity: source commit, contract manifest/profile, Windows FULL_HOST backend, protocol/schema, toolchains | **NOT STARTED** | 18.CP | PLAN §21; VR §§1–2,36; RP §16 | — | — | — |
-| ↳ **19.2** Repository governance, reproducible build, static/strict architecture, platform boundary, and contract-drift qualification | **NOT STARTED** | 19.1 | PLAN §21; VR §§6,9,33 | — | — | — |
-| ↳ **19.3** Cross-language protocol/schema/canonicalization complete qualification | **NOT STARTED** | 19.1 | VR §10; PS §27 | — | — | — |
-| ↳ **19.4** Mission Control identity/adaptive/accessibility/window-state qualification on exact RC | **NOT STARTED** | 19.1, 18.4 | VR §11; RP §12; UI §§26,28 | — | — | — |
-| ↳ **19.5** Tauri/WebView security qualification on exact RC | **NOT STARTED** | 19.1, 1.2 | VR §12 | — | — | — |
-| ↳ **19.6** Windows named-pipe and Job Object/process-tree containment qualification on exact RC | **NOT STARTED** | 19.1, 2.CP | VR §§13,19 | — | — | — |
-| ↳ **19.7** KDF/session/recovery-profile qualification and clean-profile new-password recovery semantics | **NOT STARTED** | 19.1, 5.CP | VR §14 | — | — | — |
-| ↳ **19.8** Permission/content-authority/project-policy trust/adversarial/destructive-boundary qualification | **NOT STARTED** | 19.1, 5.CP, 6.CP | VR §§15–16; PPT §15 | — | — | — |
-| ↳ **19.9** Codex Windows setup/version/health/sandbox/provider qualification | **NOT STARTED** | 19.1, 7.CP | VR §17 | — | — | — |
-| ↳ **19.10** Tool contract/TOCTOU/idempotency/UNCERTAIN qualification | **NOT STARTED** | 19.1, 8.CP | VR §18 | — | — | — |
-| ↳ **19.11** Exact SQLite/SQLCipher/WAL/migration/snapshot-rekey persistence qualification | **NOT STARTED** | 19.1, 3.CP, 4.CP | VR §§20,22 | — | — | — |
+| **SECTION 19 — Windows V1 Production Qualification** | **NOT STARTED** | 18.CP | `Phase 19`; checkpoints: Windows Release Candidate → Production Complete | — | — | — |
+| ↳ **19.1** WINDOWS RELEASE CANDIDATE CHECKPOINT — build/package/sign and freeze the exact RC identity and qualification bytes/trust metadata: source commit, contract manifest/profile, Windows FULL_HOST backend, protocol/schema, toolchains, signed installer/update artifacts, TUF/update metadata set, and artifact hashes; any later material rebuild/resign/trust-metadata change invalidates affected qualification | **NOT STARTED** | 18.CP | PLAN §§21,26; VR §§1–2,33,36; RP §§16,18 | — | — | — |
+| ↳ **19.2** Run the complete normal CI/reproducibility/architecture gate against the frozen RC source/artifact context: format/lint, strict TypeScript, Rust fmt/clippy, unit/property/schema suites, architecture/import/platform-boundary checks, contract drift, dependency/security/license scans, protected-master evidence, and reproducible build verification | **NOT STARTED** | 19.1 | PLAN §21; CS §28; VR §§6,9,33 | — | — | — |
+| ↳ **19.3** Cross-language protocol/schema/canonicalization complete qualification | **NOT STARTED** | 19.2 | VR §10; PS §27 | — | — | — |
+| ↳ **19.4** Mission Control identity/adaptive/accessibility/window-state qualification on exact RC | **NOT STARTED** | 19.3, 18.4 | VR §11; RP §12; UI §§26,28 | — | — | — |
+| ↳ **19.5** Tauri/WebView security qualification on exact RC | **NOT STARTED** | 19.4, 1.2 | VR §12 | — | — | — |
+| ↳ **19.6** Windows named-pipe and Job Object/process-tree containment qualification on exact RC | **NOT STARTED** | 19.5, 2.CP | VR §§13,19 | — | — | — |
+| ↳ **19.7** KDF/session/recovery-profile qualification and clean-profile new-password recovery semantics | **NOT STARTED** | 19.6, 5.CP | VR §14 | — | — | — |
+| ↳ **19.8** Permission/content-authority/project-policy trust/adversarial/destructive-boundary qualification | **NOT STARTED** | 19.7, 5.CP, 6.CP | VR §§15–16; PPT §15 | — | — | — |
+| ↳ **19.9** Codex Windows setup/version/health/sandbox/provider qualification | **NOT STARTED** | 19.8, 7.CP | VR §17 | — | — | — |
+| ↳ **19.10** Tool contract/TOCTOU/idempotency/UNCERTAIN qualification | **NOT STARTED** | 19.9, 8.CP | VR §18 | — | — | — |
+| ↳ **19.11** Exact SQLite/SQLCipher/WAL/migration/snapshot-rekey persistence qualification | **NOT STARTED** | 19.10, 3.CP, 4.CP | VR §§20,22 | — | — | — |
 | ↳ **19.12** JARVIS_BACKUP_V1 crypto/tamper/order/truncation and exact signed-RC disaster-restore drill | **NOT STARTED** | 19.11, 3.CP | BKC §14; VR §21 | — | — | — |
-| ↳ **19.13** Crash/recovery/UNCERTAIN/pause/preemption fault-injection matrix | **NOT STARTED** | 19.1, 11.CP | VR §§27–28 | — | — | — |
-| ↳ **19.14** Exact budget/quota/resource/performance and hardware-pressure qualification | **NOT STARTED** | 19.1, 11.CP | VR §§23,31; RP §13 | — | — | — |
-| ↳ **19.15** Module/catalog/TUF root/role/delegation/revocation/update/signing trust qualification | **NOT STARTED** | 19.1, 12.CP, 18.18 | SCT §17; VR §26 | — | — | — |
-| ↳ **19.16** Local filesystem/Git and exact GitHub mandatory capability-matrix qualification | **NOT STARTED** | 19.1, 13.CP | VR §24 | — | — | — |
-| ↳ **19.17** Exact Proxmox mandatory capability-matrix qualification | **NOT STARTED** | 19.1, 14.CP | VR §25 | — | — | — |
-| ↳ **19.18** Final voice qualification on real Windows devices against Phase-3A evidence | **NOT STARTED** | 19.1, 16.CP | VR §30; RP §11 | — | — | — |
-| ↳ **19.19** Event/automation/notification security/dedup/privacy qualification | **NOT STARTED** | 19.1, 17.CP | VR §29 | — | — | — |
-| ↳ **19.20** Clean install/first launch/first text+worker mission/integration+voice/diagnostics/uninstall on Windows 11 25H2 x64 standard non-admin profile with no usable system Node | **NOT STARTED** | 19.2–19.19 | VR §32 | — | — | — |
+| ↳ **19.13** Crash/recovery/UNCERTAIN/pause/preemption fault-injection matrix | **NOT STARTED** | 19.12, 11.CP | VR §§27–28 | — | — | — |
+| ↳ **19.14** Exact budget/quota/resource/performance and hardware-pressure qualification | **NOT STARTED** | 19.13, 11.CP | VR §§23,31; RP §13 | — | — | — |
+| ↳ **19.15** Module/catalog/TUF root/role/delegation/revocation/update/signing trust qualification | **NOT STARTED** | 19.14, 12.CP, 18.18 | SCT §17; VR §26 | — | — | — |
+| ↳ **19.16** Local filesystem/Git and exact GitHub mandatory capability-matrix qualification | **NOT STARTED** | 19.15, 13.CP | VR §24 | — | — | — |
+| ↳ **19.17** Exact Proxmox mandatory capability-matrix qualification | **NOT STARTED** | 19.16, 14.CP | VR §25 | — | — | — |
+| ↳ **19.18** Final voice qualification on real Windows devices against Phase-3A evidence | **NOT STARTED** | 19.17, 16.CP | VR §30; RP §11 | — | — | — |
+| ↳ **19.19** Event/automation/notification security/dedup/privacy qualification | **NOT STARTED** | 19.18, 17.CP | VR §29 | — | — | — |
+| ↳ **19.20** Clean install/first launch/first text+worker mission/integration+voice/diagnostics/uninstall on Windows 11 25H2 x64 standard non-admin profile with no usable system Node | **NOT STARTED** | 19.19 | VR §32 | — | — | — |
 | ↳ **19.21** Previous-production upgrade, migration, authorized rollback, recovery, and durable-state preservation qualification | **NOT STARTED** | 19.20, 18.20 | VR §22; OPS §27 | — | — | — |
-| ↳ **19.22** Complete mandatory V1 production user-journey suite (all 18 journeys) | **NOT STARTED** | 19.20–19.21 | VR §35 | — | — | — |
+| ↳ **19.22** Complete mandatory V1 production user-journey suite (all 18 journeys) | **NOT STARTED** | 19.21 | VR §35 | — | — | — |
 | ↳ **19.23** 24-hour idle/background soak and 8-hour mixed workload soak with leak/backlog/WAL/orphan monitoring | **NOT STARTED** | 19.22 | VR §34 | — | — | — |
 | ↳ **19.24** Zero-P0/P1 gate and reachable Critical/High vulnerability policy | **NOT STARTED** | 19.23, 18.21 | VR §38; OPS §26 | — | — | — |
-| ↳ **19.25** Signed installer/update, SBOM, licensing/provenance, release manifest, qualification report and tested artifact hashes | **NOT STARTED** | 19.24 | VR §36; RP §§16,18 | — | — | — |
-| ↳ **19.26** WINDOWS RELEASE CANDIDATE CHECKPOINT — all evidence bound to the same exact signed artifacts/source/profile/platform/trust identity | **NOT STARTED** | 19.1–19.25 | PLAN §26 Windows Release Candidate; VR §2 | — | — | — |
+| ↳ **19.25** Finalize SBOM/license/provenance/release-manifest/qualification-report evidence for the already frozen 19.1 artifacts; verify exact tested hashes and that no executable/update/trust-metadata byte or trust identity changed after qualification began. Any material change returns affected gates to non-verified state for requalification | **NOT STARTED** | 19.24 | VR §36; RP §§16,18; VR §2 | — | — | — |
+| ↳ **19.26** QUALIFICATION CLOSURE — every mandatory central and specialized active-contract gate is evidenced against the same frozen signed RC source/profile/platform/artifact/trust identity, with no unqualified change since 19.1 | **NOT STARTED** | 19.1–19.25 | PLAN §21; VR §§2,36 | — | — | — |
 | ↳ **19.27** PRODUCTION COMPLETE declaration with exact supported provider/module/integration capability versions and known limitations | **NOT STARTED** | 19.26 | IC §27; RP §18; VR §39; PLAN §21 Exit | — | — | — |
 | ↳ **19.CP** FINAL SECTION CHECKPOINT — Production Complete | **NOT STARTED** | 19.27 | PLAN §26 final checkpoint; only final checkpoint is Production Complete | — | — | — |
 
@@ -557,13 +559,13 @@ This is a secondary traceability safety net. The subsection's own governing refe
 | `RP` §10 | Section 12, 19.15 |
 | `RP` §§11–13 | 3A, Sections 15–16, 18.1–18.4, 19.4, 19.14, 19.18 |
 | `RP` §§14–15 | Explicitly outside base V1 implementation; tracked under Non-goals / Post-V1 |
-| `RP` §§16–18 | 0.13, 18.19–18.21, Section 19 |
+| `RP` §§16–18 | 0.13, 18.19–18.21, 19.1, 19.25–19.27 |
 | `RP` §19 | Global governing distinction |
 | `PP` §§1–12 | Sections 0–2, 7, 12, 19.2 |
 | `PP` §§13–19 | Sections 1–6, 3 backup proof, 18, 19 |
 | `PP` §§20–27 | Sections 12, 15–18; future companion constraints under Non-goals |
 | `PP` §§28–32 | 0.10, 19.2 plus global platform invariants/non-goals |
-| `RT` §§1–12 | Sections 1–5 |
+| `RT` §§1–12 | Sections 1–5; Phase-2 bootstrap is intentionally partial until Sections 3/7/11 complete the ordered runtime prerequisites |
 | `RT` §§13–18 | Sections 7–9 |
 | `RT` §§19–23 | Sections 9–11 |
 | `RT` §§24–28 | Sections 12–17 plus 18 operations and final qualification |
@@ -610,13 +612,13 @@ Every one of the Verification Contract's 36 central production gates has an expl
 
 | # | Central release gate | Matrix final owner |
 |---:|---|---|
-| 1 | Contract Manifest + Release Profile conformance | 19.1 |
+| 1 | Contract Manifest + Release Profile conformance | 19.1, 19.26 |
 | 2 | Reproducible build/toolchain | 19.2 |
 | 3 | Protected-authoritative-branch / CI governance | 19.2 |
 | 4 | Static / architecture analysis | 19.2 |
 | 5 | Platform portability / composition / import boundary | 19.2 |
-| 6 | Unit tests | Every subsection DoD; final evidence 19.26 |
-| 7 | Property / state-machine tests | 4.16, 5.13, 10.10, 19.3/19.8/19.13 |
+| 6 | Unit tests | 19.2 complete normal CI plus owning feature qualification rows |
+| 7 | Property / state-machine tests | 19.2 plus 4.16, 5.13, 10.10, 19.13 |
 | 8 | Protocol/schema cross-language | 19.3 |
 | 9 | Mission Control UI identity/adaptive/accessibility | 19.4 |
 | 10 | Tauri/WebView security | 19.5 |
@@ -642,7 +644,7 @@ Every one of the Verification Contract's 36 central production gates has an expl
 | 30 | Resource-pressure | 19.14 |
 | 31 | Clean install with no usable system Node | 19.20 |
 | 32 | Previous-production upgrade/rollback | 19.21 |
-| 33 | Signed installer/update verification | 19.25 |
+| 33 | Signed installer/update verification | 19.1 creation/freeze + 19.25 final identity verification |
 | 34 | SBOM/license/provenance/release manifest | 19.25 |
 | 35 | Soak/stability | 19.23 |
 | 36 | V1 production user journeys | 19.22 |
@@ -692,21 +694,52 @@ Binding post-V1 integration targets remain SSH, Google Workspace, Microsoft 365,
 - Optional `DEFERRED` rows become mandatory for the concrete release the moment that release exposes/enables the capability; they must then move into the normal implementation/verification loop.
 - Never use this file to waive a contract requirement or to claim a future platform/capability as supported.
 
+## Fresh matrix design review
+
+**Review date:** August 12, 2026  
+**Contract baseline:** live `master` `5766978576a48165a7ec8013ed6a106b0b0ddd17`, JARVIS contract suite v1.0.5.  
+**Draft reviewed:** initial matrix commit `d937c606785c5b21ddff72ab1ed011dd7c931b11` plus the current hardening amendments in this branch.
+
+The review was performed as a fresh contract/dependency audit rather than a self-approval of the original outline. It re-read `AGENTS.md`, the current manifest, top-level Implementation Contract, Release Profile, every active normative component, the Implementation Plan, and the actual repository copy of this matrix.
+
+Material findings corrected before acceptance:
+
+1. **Phase-2 secure-storage forward dependency:** the first draft described Runtime startup steps 1–12 as complete before the Phase-3 Windows secure-store backend existed. Section 2 now implements only the pre-persistence bootstrap ordering/capability shell and explicitly defers production secure-storage qualification to 3.4.
+2. **Optional-row dependency ambiguity:** dependency-range semantics now explicitly skip contract-permitted `DEFERRED` branches until enabled, and backup/GitHub/Proxmox downstream rows show their optional conditional dependencies explicitly.
+3. **Over-prescriptive GitHub authentication:** the draft named PKCE/loopback behavior not fixed by the active contract. Section 13 now requires a secure qualified auth method without inventing a new normative choice in the matrix.
+4. **Signed-RC qualification order:** the draft placed signed installer/update finalization after most qualification. Section 19 now creates/signs/freezes the exact RC artifacts and trust metadata at 19.1 before any final qualification is accepted. Later artifact/trust changes invalidate affected evidence.
+5. **Final normal-CI coverage:** 19.2 now explicitly reruns the complete normal CI/unit/property/schema/architecture/drift/reproducibility gate on the frozen RC context instead of relying only on historical per-feature runs.
+6. **Release-candidate checkpoint semantics:** Phase 18 now ends with an Operations/UI/TUF-update-ready qualification candidate. The named Windows Release Candidate checkpoint occurs only once exact signed RC bytes/trust identity are frozen at 19.1.
+7. **Supply-chain lifecycle precision:** module activation now explicitly prevents silent active-task replacement, offline install-authorizing key custody excludes ordinary developer workstations/update servers/general CI, and publisher signature alone cannot confer support.
+
+Structural review result:
+
+- macro-order remains exactly Phase `0 → 1 → 2 → 3 → 3A → 4 ... → 19`;
+- 21 macro sections are represented, including the mandatory Phase 3A feasibility gate;
+- 315 subsection/checkpoint rows retain unique IDs;
+- mandatory GitHub capability coverage remains exactly 9 base-V1 capabilities;
+- mandatory Proxmox capability coverage remains exactly 8 base-V1 capabilities;
+- four contract-permitted optional branches remain explicitly `DEFERRED` and non-blocking until enabled;
+- every one of the Verification Contract's 36 central release gates has a final owner;
+- specialized backup-crypto, project-policy, TUF/supply-chain, exact SQLite/WAL, early-voice and repository/drift gates remain cumulative;
+- all child dependencies are backward-looking within the authoritative macro-order; parent-section entry gates are inherited by children;
+- no known circular dependency, later-feature prerequisite, orphan mandatory domain, or support-claim shortcut remains after the corrections above.
+
 ## Matrix design assurance checklist
 
 Before this matrix is accepted for implementation, a fresh review must establish all of the following:
 
-- [ ] Current `master`, `AGENTS.md`, manifest, Release Profile, every active normative component, and Implementation Plan were re-read.
-- [ ] Every mandatory active-contract domain has at least one implementation owner and one verification owner.
-- [ ] Every subsection dependency resolves to an earlier subsection/checkpoint; no forward dependency or cycle remains.
-- [ ] Cross-cutting systems use deliberate foundation/full-implementation/productization/qualification staging.
-- [ ] No earlier section requires a later full feature merely to satisfy a prerequisite.
-- [ ] Optional/non-V1/post-V1 capabilities cannot accidentally block base V1 or appear `SUPPORTED`.
-- [ ] Phase exits and named release checkpoints remain faithful to the authoritative Implementation Plan.
-- [ ] Final qualification covers all 36 central release gates plus cumulative specialized-contract gates.
-- [ ] No parent section can become `VERIFIED` from child statuses alone; its section checkpoint remains mandatory.
-- [ ] The first executable target is self-contained enough to start without an unimplemented later prerequisite.
-- [ ] The final `Production Complete` declaration binds to one exact source commit and exact signed Windows FULL_HOST artifacts.
-- [ ] Fresh review found no known unresolved matrix ordering/coverage/prerequisite defect.
+- [x] Current `master`, `AGENTS.md`, manifest, Release Profile, every active normative component, and Implementation Plan were re-read.
+- [x] Every mandatory active-contract domain has at least one implementation owner and one verification owner.
+- [x] Every subsection dependency resolves to an earlier subsection/checkpoint; no known forward dependency or cycle remains.
+- [x] Cross-cutting systems use deliberate foundation/full-implementation/productization/qualification staging.
+- [x] No earlier section requires a later full feature merely to satisfy a prerequisite.
+- [x] Optional/non-V1/post-V1 capabilities cannot accidentally block base V1 or appear `SUPPORTED`.
+- [x] Phase exits and named release checkpoints remain faithful to the authoritative Implementation Plan.
+- [x] Final qualification covers all 36 central release gates plus cumulative specialized-contract gates.
+- [x] No parent section can become `VERIFIED` from child statuses alone; its section checkpoint remains mandatory.
+- [x] The first executable target is self-contained enough to start without an unimplemented later prerequisite.
+- [x] The final `Production Complete` declaration binds to one exact source commit and exact signed Windows FULL_HOST artifacts.
+- [x] Fresh review found no known unresolved matrix ordering/coverage/prerequisite defect.
 
-> **Safety statement:** this matrix can be accepted for implementation only when the checklist above is fully evidenced. It cannot guarantee that future implementation code will contain no bugs; it is designed to eliminate known planning, authority, ordering, and prerequisite defects before coding begins.
+> **Safety statement:** after the fresh review and corrections above, this matrix has no known unresolved planning, authority, ordering, coverage, or prerequisite defect. No planning artifact can guarantee that future implementation code will be bug-free; implementation must still follow the subsection verification loop and exact contract gates. The matrix is accepted only as a safe execution plan against the reviewed v1.0.5 baseline, and it must be revalidated whenever the contract or live repository prerequisites change.
