@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","title":"DataPolicy","type":"object","properties":{"sensitivity":{"enum":["PUBLIC","PRIVATE","SENSITIVE","SECRET"]},"locality":{"enum":["LOCAL_ONLY","ANY_APPROVED_PROVIDER"]}},"required":["sensitivity","locality"],"additionalProperties":false}
