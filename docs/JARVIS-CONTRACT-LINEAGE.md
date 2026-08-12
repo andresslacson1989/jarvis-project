@@ -1,8 +1,8 @@
 # JARVIS Contract Lineage and Authority
 
-**Current contract suite:** v1.0.5  
+**Current contract suite:** v1.0.6  
 **Current authoritative branch:** `master`  
-**Current manifest:** `docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md`  
+**Current manifest:** `docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`  
 **Date:** 2026-08-12
 
 ## Purpose
@@ -13,7 +13,7 @@ This file removes ambiguity about which JARVIS documents and decisions are curre
 
 `master` is the only authoritative/latest repository branch.
 
-The canonical decision history includes accepted ADR-054 through ADR-068, v1.0.2 consolidation in ADR-069, UI identity/adaptive Mission Control in ADR-070, v1.0.3 production hardening in ADR-071, the Windows/Linux platform/runtime-role boundary in ADR-072, and the pre-implementation security/sequence closure in ADR-073.
+The canonical decision history includes accepted ADR-054 through ADR-068, v1.0.2 consolidation in ADR-069, UI identity/adaptive Mission Control in ADR-070, v1.0.3 production hardening in ADR-071, the Windows/Linux platform/runtime-role boundary in ADR-072, the pre-implementation security/sequence closure in ADR-073, and hosting-capability-aware repository governance in ADR-074.
 
 ADR identifiers in this lineage are unique. Duplicate ADR identifiers from deleted historical review branches are non-canonical.
 
@@ -33,15 +33,19 @@ v1.0.3 — production-hardening closure (ADR-071)
 v1.0.4 — platform runtime roles / Windows-Linux portability boundary (ADR-072)
         ↓
 v1.0.5 — backup/policy/supply-chain security closure + delivery sequencing (ADR-073)
+        ↓
+v1.0.6 — hosting-capability-aware repository governance (ADR-074)
 ```
 
 v1.0.4 did not make Linux a V1 release target. It made Linux an explicit future `FULL_HOST` target and required implementation to preserve the platform capability boundaries needed to reach it without weakening Windows V1.
 
 v1.0.5 does not redesign the core architecture or reduce V1 scope. It freezes the remaining security-sensitive implementation choices that should not be invented during coding and moves one feasibility proof earlier.
 
-## v1.0.5 closure
+v1.0.6 does not change V1 platform, runtime, provider, integration, UI, backup, voice, or product capability scope. It changes only repository-governance qualification so a hosting feature unavailable because of the repository plan does not become a hidden paid prerequisite, while stronger server-side enforcement remains mandatory whenever the hosting capability exists.
 
-ADR-073 and the v1.0.5 suite establish:
+## v1.0.5 closure retained by v1.0.6
+
+ADR-073 and the inherited v1.0.5 security closure establish:
 
 - exact `JARVIS_BACKUP_V1` outer cryptographic framing and key-slot semantics;
 - mandatory generated 256-bit recovery secret for production portable-state verification, with optional additional strong passphrase slot;
@@ -55,15 +59,26 @@ ADR-073 and the v1.0.5 suite establish:
 - Phase-0 machine-readable repeated contract values/CI drift checks where practical;
 - exact-build/fix evidence rather than raw numeric SQLite version comparison as production qualification.
 
-These rules live in current normative documents. ADR-073 explains why and is not required as an implementation overlay.
+These rules remain current normative behavior in v1.0.6. ADR-073 explains why and is not required as an implementation overlay.
+
+## v1.0.6 repository-governance closure
+
+ADR-074 establishes:
+
+- `master` remains the sole authoritative/latest branch;
+- server-side branch protection/rulesets are mandatory whenever the authoritative repository's hosting provider/account exposes them;
+- a verified hosting plan/platform limitation may use the explicit `COMPENSATING_CONTROLS` mode instead of making a paid hosting feature a hidden JARVIS prerequisite;
+- compensating mode requires temporary implementation branches, exact candidate mandatory CI, immediate live-`master` tip revalidation, reconciliation on stale movement, non-force integration, and post-integration tip/diff/CI/audit verification;
+- compensating mode must state truthfully that `master` is not server-protected and does not hard-block an out-of-band administrator force push/deletion;
+- server-enforced mode becomes mandatory again when the hosting capability becomes available.
 
 ## Current normative model
 
-`docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md` is the authoritative index and records the exact component-revision set.
+`docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md` is the authoritative index and records the exact component-revision set.
 
 Some unchanged earlier component revisions remain current because their normative behavior did not change. The manifest explicitly identifies them; earlier suite top-level contracts are not current merely because an inherited component's historical header names an earlier parent.
 
-The v1.0.5 specialized security contracts narrow compatible broad inherited rules. They do not require ADR overlay interpretation.
+The v1.0.5 specialized security contracts remain current cumulative specializations of compatible broad inherited rules. The v1.0.6 top-level, Verification, and Implementation Plan revisions add the repository-governance qualification. These rules are one current suite, not an ADR overlay.
 
 ADRs preserve context, alternatives, rationale, and historical decision identity. Implementers do not reconstruct current behavior by layering ADRs over stale contracts.
 
@@ -73,7 +88,7 @@ Former `codex/contract-*` branches are deleted/non-authoritative. Useful semanti
 
 ## Future amendment rule
 
-When a future material architectural/product/security/platform/release decision changes current behavior:
+When a future material architectural/product/security/platform/release/governance decision changes current behavior:
 
 1. assign a new unique ADR;
 2. document rationale and migration/compatibility consequences;
