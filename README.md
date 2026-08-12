@@ -10,17 +10,17 @@ Windows is the V1 production full-host platform. The architecture deliberately p
 
 Temporary feature/review branches MAY exist while work is in progress, but they SHALL start from the current live `master` and SHALL NOT become parallel implementation sources of truth. After accepted work is incorporated into `master`, the temporary branch is historical/disposable and must not be used as the base for new work.
 
-Before Phase 0 implementation is considered complete, `master` must have production-grade repository protection that blocks force pushes/deletion and requires designated CI checks, with narrowly controlled/auditable bypass.
+Before Phase 0 implementation is considered complete, repository governance must be qualified against the actual hosting capability. If server-side branch protection/rulesets are available, `master` must use them to block force pushes/deletion and require designated CI with narrowly controlled/auditable bypass. If the hosting plan/platform does not expose that capability, v1.0.6 permits the explicit `COMPENSATING_CONTROLS` mode: temporary implementation branches, exact candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. The fallback does not claim hard prevention of an out-of-band administrator force push/deletion and expires when server protection becomes available.
 
 ## Current implementation source of truth
 
-**There is one current contract suite: JARVIS v1.0.5.**
+**There is one current contract suite: JARVIS v1.0.6.**
 
-Start with [`docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md`](docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md). It is the authoritative index of the current suite and records each component revision.
+Start with [`docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`](docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md). It is the authoritative index of the current suite and records each component revision.
 
 Read the active suite in this order:
 
-1. [`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md`](docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md) — canonical product, architecture, security, operations, platform-role, and production contract.
+1. [`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`](docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md) — canonical product, architecture, security, operations, platform-role, repository-governance, and production contract.
 2. [`docs/JARVIS-V1-RELEASE-PROFILE.md`](docs/JARVIS-V1-RELEASE-PROFILE.md) — exact Windows V1 production support/capability/release target.
 3. [`docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md`](docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md) — Windows/Linux full-host boundaries and future companion role.
 4. [`docs/implementation/JARVIS-RUNTIME-CONTRACT.md`](docs/implementation/JARVIS-RUNTIME-CONTRACT.md) — current Windows V1 runtime specialization, secure IPC, provider setup, worker/provider supervision, scheduling, cancellation, and recovery.
@@ -33,8 +33,8 @@ Read the active suite in this order:
 11. [`docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`](docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md) — normative coding/package/platform-boundary/validation/testing/CI rules.
 12. [`docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`](docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md) — queue/dashboard truth, recovery visibility, notification/focus behavior, module/integration UX, voice responsiveness, diagnostics, and governance.
 13. [`docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`](docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md) — canonical brand, dark-theme Mission Control, adaptive/reflow behavior, accessibility, and UI qualification.
-14. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — central Definition of Done and Windows V1 release qualification; all specialized mandatory verification rules in the active v1.0.5 contracts are cumulative.
-15. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria, including the early voice feasibility spike. It does not authorize implementation to begin by itself.
+14. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — central Definition of Done and Windows V1 release qualification; all specialized mandatory verification rules in the active v1.0.6 contracts are cumulative.
+15. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria, including hosting-capability-aware repository governance and the early voice feasibility spike. It does not authorize implementation to begin by itself.
 
 Canonical vector brand assets live under [`assets/brand/`](assets/brand/).
 
@@ -66,9 +66,19 @@ v1.0.5 does not redesign the architecture or reduce V1 scope. It closes the rema
 - Phase 0 adds machine-readable repeated contract values and CI drift checks where practical;
 - SQLite qualification is tied to the exact embedded build and fix evidence, not numerical version comparison alone.
 
+## v1.0.6 repository-governance closure
+
+v1.0.6 does not change the V1 platform, runtime, provider, integration, voice, backup, UI, or product capability scope. It makes repository governance truthful to the hosting capability:
+
+- server-side branch protection/rulesets remain mandatory whenever the authoritative repository's hosting plan exposes them;
+- a verified plan/platform limitation may use `COMPENSATING_CONTROLS` rather than making a paid hosting feature a hidden JARVIS prerequisite;
+- compensating governance still requires exact candidate CI, stale-tip-safe non-force integration, and post-integration verification/audit;
+- the residual inability to hard-block an out-of-band administrator force push/deletion is recorded explicitly rather than represented as equivalent protection;
+- server-enforced protection becomes mandatory again if the hosting capability later becomes available.
+
 ## No overlay interpretation
 
-Accepted ADRs preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.5 suite.
+Accepted ADRs preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.6 suite.
 
 If an ADR/history file and the active suite appear to conflict, the current manifest and normative documents govern; a suspected missing still-valid requirement is treated as a contract defect and corrected in the current suite rather than silently inferred from history.
 
