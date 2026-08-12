@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "sourceRoots": [
+    "apps",
+    "services",
+    "packages",
+    "platform",
+    "providers",
+    "tools",
+    "modules"
+  ],
+  "excludedRoots": [
+    "tools/architecture",
+    "tools/test",
+    "tools/toolchain"
+  ],
+  "sharedRoots": [
+    "services/core",
+    "packages/protocol",
+    "packages/schemas",
+    "packages/policy",
+    "packages/platform-contracts",
+    "packages/shared"
+  ],
+  "osBranchAllowedRoots": [
+    "platform",
+    "providers",
+    "tools/platform",
+    "tools/git",
+    "tools/filesystem",
+    "tools/projects",
+    "apps/desktop/src-tauri"
+  ],
+  "unsafeRustAllowedRoots": [
+    "platform/windows"
+  ],
+  "uiRoots": [
+    "apps/desktop/src"
+  ],
+  "uiForbiddenTargetRoots": [
+    "services/core",
+    "platform",
+    "providers",
+    "tools",
+    "packages/policy"
+  ],
+  "sharedForbiddenTargetRoots": [
+    "platform/windows",
+    "platform/linux"
+  ],
+  "sharedUtilityRoot": "packages/shared",
+  "sharedUtilityForbiddenTargetRoots": [
+    "apps",
+    "services",
+    "platform",
+    "providers",
+    "tools",
+    "modules",
+    "packages/policy"
+  ]
+}

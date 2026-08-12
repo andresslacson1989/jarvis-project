@@ -12,7 +12,8 @@
     "toolchain:verify:metadata": "node tools/toolchain/verify-toolchain.mjs --metadata-only",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node tools/test/run-tests.mjs --profile normal",
-    "test:qualification": "node tools/test/run-tests.mjs --profile qualification"
+    "test:qualification": "node tools/test/run-tests.mjs --profile qualification",
+    "architecture:check": "node tools/architecture/check-architecture.mjs"
   },
   "devDependencies": {
     "typescript": "6.0.3"
