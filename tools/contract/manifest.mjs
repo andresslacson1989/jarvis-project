@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { CANONICAL_VALUES_PATH, MANIFEST_PATH, readCanonical, stablePretty, violation } from "./lib.mjs";
 
 const COMPONENT_KEY_BY_FILE = Object.freeze({
-  "JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md": "implementationContract",
+  "JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md": "implementationContract",
   "JARVIS-V1-RELEASE-PROFILE.md": "releaseProfile",
   "JARVIS-PLATFORM-PORTABILITY-CONTRACT.md": "platformPortability",
   "JARVIS-RUNTIME-CONTRACT.md": "runtime",
