@@ -1,7 +1,7 @@
 # JARVIS Verification, Qualification & Release Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.4.md`  
-**Version:** 1.0.4  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`  
+**Version:** 1.0.5  
 **Date:** August 12, 2026
 
 ---
@@ -14,7 +14,7 @@ Code existence, model self-report, documentation completion, one happy-path demo
 
 Production is verified behavior under normal success, ambiguity, interruption, crash, stale state, provider setup/repair, provider outage, adversarial input, target race, recovery, update, resource pressure, accessibility modes, adaptive layouts, platform-capability failure, and real release packaging.
 
-V1 production qualification is for a **Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the v1.0.4 contract.
+V1 production qualification is for a **Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the active v1.0.6 contract suite.
 
 ---
 
@@ -28,7 +28,7 @@ RELEASE CANDIDATE
 PRODUCTION
 ```
 
-Only a release satisfying every mandatory v1.0.4 gate for the active Release Profile may be labeled `PRODUCTION`/`Production Complete`.
+Only a release satisfying every mandatory v1.0.6 gate for the active Release Profile may be labeled `PRODUCTION`/`Production Complete`.
 
 Qualification SHALL bind to one source commit, contract manifest, Release Profile, PlatformFamily/RuntimeRole/backend profile, exact protocol/schema versions, and exact signed installer/update artifacts.
 
@@ -72,7 +72,7 @@ A V1 production release SHALL pass at least:
 
 1. Contract Manifest + Release Profile conformance;
 2. reproducible build/toolchain;
-3. protected-authoritative-branch/CI governance gate;
+3. authoritative-branch/CI governance gate;
 4. static/architecture analysis;
 5. **platform portability/composition/import-boundary gate**;
 6. unit tests;
@@ -609,7 +609,23 @@ No Linux/Android artifact is required or implied by this gate.
 
 # 33. REPOSITORY / CI GOVERNANCE QUALIFICATION
 
-Before Phase 0 exit and before implementation relies on protected `master`, evidence SHALL show an active repository ruleset/branch-protection equivalent that prevents deletion/force push, requires designated CI checks, and has narrowly controlled/auditable bypass permission.
+Before Phase 0 exit, qualification SHALL determine and record the authoritative repository's actual hosting capability and effective governance mode.
+
+If server-side branch protection/rulesets are available for the authoritative repository, evidence SHALL show the server-enforced mode is active on `master`, prevents deletion and force push, requires the designated mandatory CI context, and keeps bypass narrowly controlled/auditable. An available server-side protection capability that is deliberately disabled fails this gate.
+
+If the hosting provider/account does not expose server-side branch protection/rulesets because of a verified plan/platform capability limitation, the gate MAY pass in `COMPENSATING_CONTROLS` mode only when evidence proves all of the following:
+
+- the hosting limitation is observed and recorded rather than inferred;
+- `master` remains the sole authoritative branch and is truthfully reported as not server-protected;
+- implementation work uses temporary branches rather than routine direct implementation writes to `master`;
+- the designated mandatory CI context passes on the exact candidate commit before authoritative integration;
+- the live `master` tip is re-fetched immediately before integration and stale/unexpected movement causes reconciliation rather than overwrite;
+- authoritative integration uses a non-force update only;
+- the resulting authoritative tip, intended diff, and CI/audit evidence are verified after integration;
+- the compensating mode is not represented as equivalent hard prevention of an out-of-band administrator force push or deletion;
+- server-enforced protection becomes mandatory again if the hosting capability later becomes available.
+
+The compensating mode SHALL NOT waive CI, authorize force-push implementation workflow, create broad bypass, or allow a paid hosting feature to become a hidden JARVIS product prerequisite.
 
 Implementation workflow SHOULD require pull-request review once coding work begins. Qualification SHALL also confirm there is no second long-lived authoritative contract/implementation branch.
 
@@ -716,4 +732,4 @@ The production question is:
 
 ---
 
-**END — JARVIS VERIFICATION, QUALIFICATION & RELEASE CONTRACT v1.0.4**
+**END — JARVIS VERIFICATION, QUALIFICATION & RELEASE CONTRACT v1.0.5**
