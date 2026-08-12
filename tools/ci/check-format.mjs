@@ -18,6 +18,7 @@ const TEXT_EXTENSIONS = new Set([
 ]);
 const CONTROLLED_ROOTS = Object.freeze([
   ".github",
+  "generated",
   "apps",
   "modules",
   "packages",

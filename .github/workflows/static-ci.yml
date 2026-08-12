@@ -53,6 +53,15 @@ jobs:
       - name: Schema integrity
         run: pnpm schema:check
 
+      - name: Generated contract artifacts
+        run: pnpm contract:check-generated
+
+      - name: Contract manifest
+        run: pnpm contract:check-manifest
+
+      - name: Contract and profile drift
+        run: pnpm contract:check-drift
+
       - name: Secret scan
         run: pnpm security:secrets
 

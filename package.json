@@ -20,7 +20,12 @@
     "dependency:check": "node tools/ci/check-dependencies.mjs",
     "provenance:check": "node tools/ci/check-provenance.mjs",
     "build": "tsc -p tsconfig.build.json",
-    "ci:evidence": "node tools/ci/generate-evidence.mjs"
+    "ci:evidence": "node tools/ci/generate-evidence.mjs",
+    "contract:generate": "node tools/contract/generate-contract-artifacts.mjs --write",
+    "contract:check-generated": "node tools/contract/generate-contract-artifacts.mjs --check",
+    "contract:check-manifest": "node tools/contract/check-manifest.mjs",
+    "contract:check-drift": "node tools/contract/check-drift.mjs",
+    "contract:check": "pnpm contract:check-generated && pnpm contract:check-manifest && pnpm contract:check-drift"
   },
   "devDependencies": {
     "typescript": "6.0.3"
