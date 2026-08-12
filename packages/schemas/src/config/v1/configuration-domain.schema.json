@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"jarvis://schemas/config/v1/configuration-domain","title":"ConfigurationDomain","enum":["STARTUP","SESSION_SECURITY","VOICE","PROVIDERS","PRIVACY","PERMISSIONS","BUDGETS","PROJECTS","MODULES","INTEGRATIONS","NOTIFICATIONS","RETENTION","UPDATES","PLATFORM_BACKEND","DEVELOPER_MODE"]}
