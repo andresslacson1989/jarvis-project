@@ -12,7 +12,7 @@ const required = [
   "tools/contract/generate-contract-artifacts.mjs",
   "tools/contract/check-manifest.mjs",
   "tools/contract/check-drift.mjs",
-  "generated/contract/jarvis-v1.0.5.contract-values.generated.json",
+  "generated/contract/jarvis-v1.0.6.contract-values.generated.json",
 ];
 
 test("0.12 contract reproducibility artifacts exist", () => {
@@ -40,7 +40,7 @@ import { checkContractDriftFromTexts } from "../../../tools/contract/check-drift
 import { checkGeneratedArtifacts, writeGeneratedArtifacts } from "../../../tools/contract/generate-contract-artifacts.mjs";
 import { validateContractManifest } from "../../../tools/contract/manifest.mjs";
 
-const canonical = JSON.parse(readFileSync(resolve(root, "packages/schemas/src/canonical/v1/jarvis-v1.0.5.contract-values.json"), "utf8"));
+const canonical = JSON.parse(readFileSync(resolve(root, "packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json"), "utf8"));
 
 function union(name, values) {
   return `type ${name} =\n${values.map((value) => `  | '${value}'`).join("\n")};\n`;
@@ -84,7 +84,7 @@ for (const [name, mutate, expectedCode] of [
 }
 
 const componentPaths = [
-  ["implementationContract", "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md", "Contract Suite Version"],
+  ["implementationContract", "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md", "Contract Suite Version"],
   ["releaseProfile", "docs/JARVIS-V1-RELEASE-PROFILE.md", "Profile Version"],
   ["platformPortability", "docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md", "Version"],
   ["runtime", "docs/implementation/JARVIS-RUNTIME-CONTRACT.md", "Version"],
@@ -104,7 +104,7 @@ const componentPaths = [
 async function manifestFixture() {
   const dir = await mkdtemp(resolve(tmpdir(), "jarvis-manifest-"));
   await mkdir(resolve(dir, "packages/schemas/src/canonical/v1"), { recursive: true });
-  await writeFile(resolve(dir, "packages/schemas/src/canonical/v1/jarvis-v1.0.5.contract-values.json"), `${JSON.stringify(canonical)}\n`);
+  await writeFile(resolve(dir, "packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json"), `${JSON.stringify(canonical)}\n`);
   const rows = [];
   let index = 1;
   for (const [key, path, label] of componentPaths) {
@@ -114,7 +114,7 @@ async function manifestFixture() {
     index += 1;
   }
   const manifest = `# Manifest\n**Suite Version:** ${canonical.contractSuiteVersion}\n\n| # | Document | Current component revision | Role |\n|---|---|---:|---|\n${rows.join("\n")}\n`;
-  await writeFile(resolve(dir, "docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md"), manifest);
+  await writeFile(resolve(dir, "docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md"), manifest);
   return dir;
 }
 
@@ -127,7 +127,7 @@ test("manifest validator proves all canonical components, files, rows, and inter
 
 test("manifest revision/header drift is rejected", async () => {
   const dir = await manifestFixture();
-  const manifestPath = resolve(dir, "docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md");
+  const manifestPath = resolve(dir, "docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md");
   const text = await readFile(manifestPath, "utf8");
   await writeFile(manifestPath, text.replace("| 3 | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | 1.0.4 |", "| 3 | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | 9.9.9 |"));
   const result = await validateContractManifest(dir);
@@ -137,13 +137,13 @@ test("manifest revision/header drift is rejected", async () => {
 test("generated artifacts are deterministic and stale bytes fail closed", async () => {
   const dir = await mkdtemp(resolve(tmpdir(), "jarvis-generated-"));
   await mkdir(resolve(dir, "packages/schemas/src/canonical/v1"), { recursive: true });
-  await writeFile(resolve(dir, "packages/schemas/src/canonical/v1/jarvis-v1.0.5.contract-values.json"), `${JSON.stringify(canonical)}\n`);
+  await writeFile(resolve(dir, "packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json"), `${JSON.stringify(canonical)}\n`);
   const first = await writeGeneratedArtifacts(dir);
   const second = await writeGeneratedArtifacts(dir);
   assert.equal(first.json, second.json);
   assert.equal(first.ts, second.ts);
   assert.deepEqual((await checkGeneratedArtifacts(dir)).stale, []);
-  const generated = resolve(dir, "generated/contract/jarvis-v1.0.5.contract-values.generated.json");
+  const generated = resolve(dir, "generated/contract/jarvis-v1.0.6.contract-values.generated.json");
   await writeFile(generated, `${await readFile(generated, "utf8")} `);
   assert.deepEqual((await checkGeneratedArtifacts(dir)).stale.map((item) => item.reason), ["STALE"]);
 });
