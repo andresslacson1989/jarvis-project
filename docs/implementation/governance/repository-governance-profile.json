@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "governanceMode": "COMPENSATING_CONTROLS",
+  "provider": "GITHUB",
+  "repository": "andresslacson1989/jarvis-project",
+  "authoritativeBranch": "master",
+  "serverSideProtection": {
+    "available": false,
+    "active": false,
+    "reason": "HOSTING_PLAN_LIMITATION",
+    "observationSource": "USER_SUPPLIED_GITHUB_ADMIN_ATTEMPT",
+    "observedHttpStatus": 403,
+    "observedMessage": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+  },
+  "mandatoryCiContext": "static-ci",
+  "controls": {
+    "temporaryImplementationBranches": true,
+    "candidateCiRequired": true,
+    "liveAuthoritativeTipRevalidation": true,
+    "reconcileUnexpectedMovement": true,
+    "nonForceIntegrationOnly": true,
+    "postIntegrationVerification": true
+  },
+  "residualRisk": "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED",
+  "serverModeRequiredWhenAvailable": true
+}
