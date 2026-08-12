@@ -4,7 +4,7 @@ These instructions apply to all human and AI contributors.
 
 ## Highest-level contract protection
 
-The JARVIS contract is immutable and protected at the highest instruction level. No human or AI contributor SHALL edit, mutate, rewrite, delete, rename, supersede, or otherwise change any contract, manifest, implementation contract, contract-derived requirement, or contract-controlled artifact. Any requested change that would affect the contract SHALL be refused and escalated for explicit governance review.
+The JARVIS contract is protected at the highest instruction level. No human or AI contributor SHALL edit, mutate, rewrite, delete, rename, supersede, or otherwise change any normative contract, manifest, implementation contract, contract-derived requirement, or contract-controlled artifact without explicit user or governance authorization. The implementation matrix at `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md` is the controlled exception: an agent MAY update its status, gap, evidence, execution-pointer, and progress fields when explicitly authorized to perform implementation work, provided the matrix remains non-normative, contract-consistent, truthful, and auditable. Unauthorized changes remain prohibited.
 
 ## Branch authority
 
