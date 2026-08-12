@@ -69,7 +69,7 @@ A client SHALL NOT fetch an arbitrary network key and treat it as a new root mer
 
 ---
 
-# 5. TOP-LEVEL ROLES
+# 5. ROLE KEY CUSTODY AND THRESHOLDS
 
 Root metadata SHALL authorize distinct keys for:
 
@@ -80,11 +80,25 @@ snapshot
 timestamp
 ```
 
-The targets key(s) authorize JARVIS release artifacts and delegated catalog roles. Snapshot/timestamp keys MAY be online because TUF limits their authority; they SHALL remain separate from root private keys.
+The production JARVIS profile SHALL use at least:
 
-Root role keys SHALL NOT be reused as ordinary timestamp/snapshot keys.
+```text
+root:      2-of-3, offline
+targets:   2-of-3, offline/release-signing only
+snapshot:  1-of-1 or stronger, offline/release-signing only
+timestamp: 1-of-1 or stronger, online automation permitted
+modules delegated targets role: 2-of-3, offline/release-signing only
+```
 
-Production key custody, key IDs, thresholds, and storage class are release/security-operational records.
+`offline/release-signing only` means the private key is not available to ordinary application runtime, update servers, developer workstations used for normal coding, or general-purpose CI jobs. A narrowly isolated release-signing environment or hardware-backed signing ceremony MAY use the key when producing authorized metadata and SHALL keep key custody separate from ordinary build/test automation.
+
+The timestamp role is intentionally the minimally trusted routinely-online role. Its key MAY be available to narrowly scoped automated infrastructure because timestamp metadata cannot by itself authorize a new target file.
+
+Targets and delegated module-target keys authorize installable content and therefore SHALL NOT be ordinary online service/runtime keys. Snapshot keys also SHALL remain offline in accordance with the TUF key-management model, even though snapshot metadata does not directly authorize target bytes.
+
+Root role keys SHALL NOT be reused for targets, snapshot, timestamp, or module-delegation signing. Targets/module keys SHALL NOT be reused as the online timestamp key.
+
+Production key custody, key IDs, thresholds, storage class, and rotation procedure are release/security-operational records.
 
 ---
 
@@ -97,6 +111,8 @@ modules
 ```
 
 The delegation SHALL be path/target-scoped so module-catalog authority cannot sign arbitrary JARVIS application release targets.
+
+The production `modules` delegated role SHALL use at least three independent Ed25519 keys with a **2-of-3** signature threshold and offline/release-signing custody as defined above.
 
 A publisher/self-signature MAY provide additional provenance, but it does not make a module `SUPPORTED` without current TUF catalog authorization, manifest compatibility, integrity, permission review, and conformance.
 
@@ -137,7 +153,11 @@ root:      <= 365 days
 
 A release may use shorter periods.
 
-Expired required metadata is not trusted for new update/module authorization. If update metadata is expired/unavailable, the installed application may continue operating according to its normal security policy, but JARVIS SHALL truthfully report update/catalog trust as stale/unavailable.
+Expired required metadata is not trusted to authorize a new target/module activation.
+
+The one narrow exception is the TUF root-update procedure: an already trusted root metadata version MAY be used, even if its expiration has passed, only to authenticate the strictly sequential `N+1` root chain. After attempting root update, the final trusted root's expiration SHALL be checked against the fixed update-start time before timestamp/snapshot/targets processing or target activation proceeds. If that final trusted root is expired, the update cycle aborts and reports a potential freeze/trust-expiry condition.
+
+If update metadata is expired/unavailable, the installed application may continue operating according to its normal security policy, but JARVIS SHALL truthfully report update/catalog trust as stale/unavailable and SHALL NOT activate newly obtained targets under expired authorization.
 
 The client persists last-trusted metadata versions and update observation state. A material system-clock rollback relative to already trusted update observations SHALL produce a diagnostic/trust-degraded state rather than silently treating obviously stale metadata as fresh.
 
@@ -275,9 +295,11 @@ Every production release SHALL record at least:
 ```text
 tuf_spec_version
 trusted_root_version
-root_key_ids + threshold
-targets/snapshot/timestamp key ids + thresholds
-module delegated-role identity/key ids
+root_key_ids + threshold + custody class
+targets_key_ids + threshold + custody class
+snapshot_key_ids + threshold + custody class
+timestamp_key_ids + threshold + custody class
+module delegated-role identity/key ids + threshold + custody class
 release_sequence
 security_epoch
 target metadata version/hash
@@ -296,7 +318,12 @@ Production tests SHALL prove at minimum:
 
 - bootstrap trusted root validation;
 - 2-of-3 root threshold success/failure;
+- top-level targets 2-of-3 threshold success/failure;
+- delegated module-targets 2-of-3 threshold success/failure;
+- root/targets/snapshot/module private keys are unavailable to ordinary runtime/update-server/general CI contexts;
+- timestamp automation works without exposing higher-authority offline keys;
 - root N→N+1 rotation with old+new thresholds;
+- expired current root can participate only in the sequential root-update process and cannot authorize targets unless the resulting final trusted root is unexpired;
 - attempted skipped/untrusted root rejection;
 - revoked role key rejection;
 - expired timestamp/snapshot/targets behavior;
@@ -321,7 +348,7 @@ Production tests SHALL prove at minimum:
 
 # 18. STANDARDS BASIS
 
-The trust lifecycle is based on The Update Framework specification 1.0.35. TUF's root, targets, snapshot, timestamp, threshold-signature, expiration, versioning, and delegation model is the normative update-metadata foundation for this JARVIS profile.
+The trust lifecycle is based on The Update Framework specification 1.0.35. TUF's root, targets, snapshot, timestamp, threshold-signature, expiration, versioning, delegation, offline-key custody, and sequential root-update model is the normative update-metadata foundation for this JARVIS profile.
 
 Tauri/Windows signing remains an additional artifact/platform integrity layer, not a replacement for TUF trust lifecycle semantics.
 
@@ -330,15 +357,17 @@ Tauri/Windows signing remains an additional artifact/platform integrity layer, n
 # 19. INVARIANTS
 
 1. Root trust is threshold-based and recoverable from fewer-than-threshold key compromise.
-2. Root private keys are not ordinary online/CI/runtime keys.
-3. Role/key rotation and revocation are versioned authenticated state.
-4. Expired/stale metadata does not silently authorize new targets.
-5. Old valid signatures do not bypass current revocation/anti-rollback policy.
-6. Application and module trust authorities are scoped/delegated separately.
-7. TUF, Tauri signature, and Windows code-signing gates are cumulative for Windows production updates.
-8. Trusted metadata survives ordinary cache cleanup and crashes.
-9. A full root-threshold compromise is not falsely claimed to be safely recoverable in-band.
-10. Update/module trust failures block activation and remain diagnostically explicit.
+2. Root, targets, snapshot, and install-authorizing module private keys are not ordinary online/CI/runtime keys; the timestamp key is the routinely-online minimally trusted role.
+3. Application targets and supported executable-module targets require thresholded offline signing authority.
+4. Role/key rotation and revocation are versioned authenticated state.
+5. An expired already-trusted root may authenticate only the sequential root-update chain; final root freshness is required before normal update authorization continues.
+6. Expired/stale metadata does not silently authorize new targets.
+7. Old valid signatures do not bypass current revocation/anti-rollback policy.
+8. Application and module trust authorities are scoped/delegated separately.
+9. TUF, Tauri signature, and Windows code-signing gates are cumulative for Windows production updates.
+10. Trusted metadata survives ordinary cache cleanup and crashes.
+11. A full root-threshold compromise is not falsely claimed to be safely recoverable in-band.
+12. Update/module trust failures block activation and remain diagnostically explicit.
 
 ---
 
