@@ -1,6 +1,6 @@
 # JARVIS Implementation Execution Matrix — Live Control Board
 
-**Document role:** Non-normative live execution/status control board for the JARVIS v1.0.5 implementation.
+**Document role:** Non-normative live execution/status control board for the JARVIS v1.0.6 implementation.
 
 ## Matrix split
 
@@ -20,9 +20,9 @@ The two files together are one non-normative implementation matrix. They are not
 | Field | Current value |
 |---|---|
 | Active section | `SECTION 0 — Repository / Platform Contracts / Toolchain / Governance` |
-| Active subsection | None — `0.12` verified; `0.13` not started |
-| Next eligible subsection | `0.13` |
-| Contract suite | JARVIS v1.0.5 |
+| Active subsection | None — `0.13` verified; `0.CP` not started |
+| Next eligible subsection | `0.CP` |
+| Contract suite | JARVIS v1.0.6 |
 | Authoritative implementation sequence | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` |
 | Reference plan | `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` |
 | Production Complete | **NO** |
@@ -33,7 +33,7 @@ The two files together are one non-normative implementation matrix. They are not
 
 | Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
 |---|---|---|---|---:|---|---|
-| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **IN PROGRESS** | — | `Phase 0`; checkpoint: Repository Governance + Platform Boundary + Contract-Drift Protection Ready | — | `0.13` is next | `0.1–0.12` verified; section checkpoint remains pending |
+| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **IN PROGRESS** | — | `Phase 0`; checkpoint: Repository Governance + Platform Boundary + Contract-Drift Protection Ready | — | `0.CP` checkpoint is next | `0.1–0.13` verified; section checkpoint remains pending |
 | ↳ **0.1** Implementation admission, authoritative-suite pinning, and repository baseline | **VERIFIED** | — | PLAN §2; IC §§2–3,28–29; RP §17; AGENTS Source of truth/Branch authority | 10 CA / 9 scoped | None within `0.1` scope | `ded8f9e5c0e056ff69fa27668dfb0bd4fca7a0f7`; `docs/implementation/evidence/0.1-implementation-admission.md`; live `master` `bb32c530...`; diff verification changed only the evidence file |
 | ↳ **0.2** Monorepo responsibility boundaries and dependency-direction skeleton | **VERIFIED** | 0.1 | PLAN §2; CS §§2–4,32; IC §§5,8 | 10 CA / 9 scoped | None within `0.2` scope | `67fa540caab982dccb2330070df62c6d71603099`; `docs/implementation/architecture/REPOSITORY-BOUNDARIES.md`; `docs/implementation/evidence/0.2-monorepo-boundaries.md`; diff added only 22 Markdown boundary/evidence files; no package/toolchain/runtime/native implementation; Linux negative-support wording verified |
 | ↳ **0.3** Platform/runtime identity and compatibility protocol foundation | **VERIFIED** | 0.2 | PLAN §2; PP §§2–7,11; PS §§2–3,27; RP §§2–3 | 10 CA / 9 scoped | None within `0.3` scope | `229954d1e34c52bb11c50570308e9f66c2a21034`; `669fec6bad6cdec53a1a44fc94be3573e120997f`; `docs/implementation/evidence/0.3-platform-runtime-identity.md`; exact 6-file implementation; 5/5 schema self-validation; 20/20 positive/negative/adversarial cases; strict TypeScript auxiliary check PASS; no later-phase implementation leakage |
@@ -46,7 +46,7 @@ The two files together are one non-normative implementation matrix. They are not
 | ↳ **0.10** Architecture/forbidden-import/package-cycle/unsafe-Rust-containment/platform-capability-failure enforcement | **VERIFIED** | 0.4, 0.5, 0.9 | PLAN §2; PP §28; CS §§3,28,32; VR §9 | 10 CA / 9 scoped | None within `0.10` scope | `57a26db4d1ff1f129e4ac042eb38eaf4386453c1`; `a979c8560197073e9cb5e4356494f333bd27a02e`; `docs/implementation/evidence/0.10-architecture-enforcement.md`; exact 4-path implementation scope; architecture checker PASS; normal suite 6 files/17 tests PASS; 8/8 architecture mutations/adversarial checks; explicit no-fallback/unsafe/cycle/import enforcement |
 | ↳ **0.11** Static CI baseline: format/type/build/schema/security/dependency/license/secret/provenance | **VERIFIED** | 0.8, 0.9 | PLAN §2; CS §§28–29; SEC §§27–28; VR §6 | 10 CA / 9 scoped | None within `0.11` scope | `4cb29e41bdd9ca522a44986f823976aab24f826e`; fixes `df80e90b9a0289ca9b92648c439f431939d05e92`, `ef105dda4f054a36661dde60898facb406910042`; `462336d1b12695b36b8b37cf72f428383cbb6129`; `docs/implementation/evidence/0.11-static-ci-baseline.md`; GitHub Actions run `31589263182` on `ef105dda...` completed `success`; exact toolchain, format, schema, secret, dependency/provenance, strict TS/build, architecture, normal tests, High+ audit, Rust fmt/clippy/host/Windows-target and commit-bound evidence all PASS |
 | ↳ **0.12** Generated-artifact reproducibility, manifest validation, and contract/profile drift checks | **VERIFIED** | 0.7, 0.11 | PLAN §2; MAN §6; IC §28; RP §17 | 10 CA / 9 scoped | None within `0.12` scope | `a6043279434824327a3b43e136a47cbd7df7567b`; `31bc81bb17d73391135e62c640680f875b395a16`; `docs/implementation/evidence/0.12-contract-reproducibility-and-drift.md`; exact 13-path change; 15/15 adversarial/structural tests PASS; generated JSON/TS reproducibility + 15-component manifest/revision + contract/profile semantic drift PASS; exact GitHub Actions run `31592319467` on `a6043279...` completed `success` with all inherited 0.11 gates also PASS |
-| ↳ **0.13** Authoritative master protection, required checks, and auditable bypass governance | **NOT STARTED** | 0.11, 0.12 | PLAN §2; IC §28; RP §17; VR §33 | — | — | — |
+| ↳ **0.13** Authoritative `master` repository governance: server-enforced when available, compensating controls when unavailable | **VERIFIED** | 0.11, 0.12 | PLAN §2; IC §28; RP §17; VR §33; ADR-074 | 10 CA / 8 scoped | None within `0.13` scope; hosting residual risk is explicit and contract-approved only while server protection is unavailable | `8996d6947fd60b415e32485ee3777914f80cd590`; `docs/implementation/evidence/0.13-master-protection-blocker.md`; governance mode `COMPENSATING_CONTROLS`; live `master` truthfully `protected=false`; pre-integration run `31637736770` PASS; non-force authoritative integration PASS; post-integration `master` run `31637928189` PASS; server-side mode becomes mandatory when available |
 | ↳ **0.CP** SECTION CHECKPOINT — Phase 0 clean-checkout, governance, platform-boundary, and drift proof | **NOT STARTED** | 0.1–0.13 | PLAN §2 Exit; PLAN §26 checkpoint; VR §§6,9,33 | — | — | — |
 
 ## Future-section status summary
