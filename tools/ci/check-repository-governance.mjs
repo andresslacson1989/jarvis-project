@@ -68,9 +68,13 @@ export function validateRepositoryGovernanceProfile(profile, workflowText) {
 export function validateGovernanceContractTexts(implementationContract, verificationContract) {
   const violations = [];
   for (const [name, text] of [["implementation contract", implementationContract], ["verification contract", verificationContract]]) {
-    if (!String(text).includes("COMPENSATING_CONTROLS")) violations.push(violation("GOVERNANCE_CONTRACT_MODE_MISSING", `${name} must define COMPENSATING_CONTROLS`));
-    if (!String(text).includes("server-side branch protection") && !String(text).includes("server-side protection")) violations.push(violation("GOVERNANCE_SERVER_REQUIREMENT_MISSING", `${name} must retain server-side protection when available`));
-    if (!String(text).includes("non-force")) violations.push(violation("GOVERNANCE_NON_FORCE_REQUIREMENT_MISSING", `${name} must require non-force integration in fallback mode`));
+    const contractText = String(text);
+    const hasCompensatingGovernance =
+      contractText.includes("COMPENSATING_CONTROLS") ||
+      /\bcompensating (?:governance|mode)\b/i.test(contractText);
+    if (!hasCompensatingGovernance) violations.push(violation("GOVERNANCE_CONTRACT_MODE_MISSING", `${name} must define compensating governance semantics`));
+    if (!contractText.includes("server-side branch protection") && !contractText.includes("server-side protection")) violations.push(violation("GOVERNANCE_SERVER_REQUIREMENT_MISSING", `${name} must retain server-side protection when available`));
+    if (!contractText.includes("non-force")) violations.push(violation("GOVERNANCE_NON_FORCE_REQUIREMENT_MISSING", `${name} must require non-force integration in fallback mode`));
   }
   return violations;
 }

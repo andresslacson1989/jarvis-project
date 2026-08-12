@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateRepositoryGovernanceProfile } from "../../../tools/ci/check-repository-governance.mjs";
+import {
+  validateGovernanceContractTexts,
+  validateRepositoryGovernanceProfile,
+} from "../../../tools/ci/check-repository-governance.mjs";
 
 const fallbackProfile = Object.freeze({
   schemaVersion: 1,
@@ -80,4 +83,30 @@ test("server-enforced mode requires all effective server controls", () => {
   assert.deepEqual(codes(profile), []);
   profile.serverSideProtection.forcePushBlocked = false;
   assert.ok(codes(profile).includes("GOVERNANCE_SERVER_CONTROL_MISSING"));
+});
+
+test("contract text validation accepts the v1.0.6 compensating-governance wording without an internal profile token", () => {
+  const implementationContract = `
+    When the hosting provider/account does not expose server-side branch protection/rulesets
+    because of a plan limitation, normal implementation integration SHALL instead use
+    compensating governance and uses non-force integration/ref updates only.
+  `;
+  const verificationContract = `
+    If server-side branch protection/rulesets are unavailable, the gate MAY pass in
+    COMPENSATING_CONTROLS mode and authoritative integration uses a non-force update only.
+  `;
+  assert.deepEqual(validateGovernanceContractTexts(implementationContract, verificationContract), []);
+});
+
+test("contract text validation still fails closed when compensating governance semantics are absent", () => {
+  const implementationContract = `
+    server-side branch protection is preferred.
+    authoritative integration uses non-force updates.
+  `;
+  const verificationContract = `
+    COMPENSATING_CONTROLS remains available when server-side branch protection is unavailable.
+    authoritative integration uses non-force updates.
+  `;
+  const result = validateGovernanceContractTexts(implementationContract, verificationContract);
+  assert.ok(result.some((item) => item.code === "GOVERNANCE_CONTRACT_MODE_MISSING"));
 });
