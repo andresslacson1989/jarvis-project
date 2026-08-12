@@ -38,7 +38,7 @@ jobs:
         shell: bash
         run: |
           rustup set profile minimal
-          rustup toolchain install 1.97.1 --component rustfmt clippy --target x86_64-pc-windows-msvc
+          rustup toolchain install 1.97.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc
           rustup default 1.97.1
 
       - name: Install dependencies without lifecycle scripts
