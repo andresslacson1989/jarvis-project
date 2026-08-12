@@ -1,7 +1,7 @@
 # JARVIS Production Implementation Plan
 
-**Status:** Authoritative dependency/sequencing plan for v1.0.5  
-**Version:** 1.0.5  
+**Status:** Authoritative dependency/sequencing plan for v1.0.6  
+**Version:** 1.0.6  
 **Date:** August 12, 2026  
 **Release target:** `docs/JARVIS-V1-RELEASE-PROFILE.md`
 
@@ -16,7 +16,7 @@ V1 implements a Windows `FULL_HOST`. The plan SHALL preserve the platform capabi
 # 1. DELIVERY ORDER
 
 ```text
-repository protection / platform contracts / coding standards / CI / contract-profile drift checks
+repository governance / platform contracts / coding standards / CI / contract-profile drift checks
 → shared Core/domain + Windows Tauri platform host + Mission Control foundation
 → PlatformLocalIpc + PlatformProcessSupervisor Windows backends
 → SQLite/SQLCipher/WAL + PlatformSecureStorage + JARVIS_BACKUP_V1/KDF/portable-restore proof
@@ -39,7 +39,7 @@ The platform boundary is cross-cutting: Phase 0 defines it, Phase 1 composes the
 
 The UI identity/accessibility system is also cross-cutting: Phase 1 establishes it, every later user-facing phase uses it, and final qualification proves the complete product.
 
-The v1.0.5 security closures are also cross-cutting: backup-format cryptography is frozen before persistence depends on it; project-policy trust is explicit before engineering workers consume repository policy; supply-chain trust is established before module/update activation; and voice feasibility is measured early before late product integration.
+The v1.0.5 security closures remain cross-cutting: backup-format cryptography is frozen before persistence depends on it; project-policy trust is explicit before engineering workers consume repository policy; supply-chain trust is established before module/update activation; and voice feasibility is measured early before late product integration. The v1.0.6 repository-governance closure additionally prevents an unavailable paid hosting feature from becoming a hidden implementation prerequisite while preserving stronger server enforcement whenever the hosting capability exists.
 
 ---
 
@@ -64,7 +64,7 @@ The v1.0.5 security closures are also cross-cutting: backup-format cryptography 
 - secret/dependency/license scan;
 - root `AGENTS.md`;
 - current contract manifest validation in CI;
-- GitHub ruleset/branch protection for authoritative `master`;
+- authoritative-`master` governance profile: server-side GitHub ruleset/branch protection when the hosting capability exists, otherwise the v1.0.6 verified compensating-control mode;
 - machine-readable canonical definitions or generated equivalents for repeated contract values including KDF profiles, backup format profile identifiers/limits, platform/runtime enums, GitHub/Proxmox capability matrices, provider setup states, and security/release constants where practical;
 - CI checks that compare generated/machine-readable definitions against the normative profile and fail on semantic drift.
 
@@ -88,20 +88,38 @@ Before exit:
 - generated artifacts are reproducible and stale generated output fails CI;
 - machine-readable representation never silently becomes authority for a value absent from the current normative suite.
 
-## Required repository protection
+## Required repository governance
 
-Before exit:
+Before exit, determine the authoritative repository's verified hosting capability and select exactly one effective governance mode.
+
+If server-side branch protection/rulesets are available for the authoritative repository:
 
 - `master` deletion is blocked;
 - force push is blocked;
 - mandatory CI checks are required once defined;
 - bypass permissions are narrowly controlled/auditable;
+- an available protection capability may not be deliberately disabled to select the fallback mode.
+
+If server-side protection/rulesets are unavailable because of a verified hosting plan/platform limitation:
+
+- record the exact unavailable capability and truthfully record that `master` is not server-protected;
+- implementation work occurs on temporary branches rather than routine direct implementation writes to `master`;
+- the designated mandatory CI context passes on the exact candidate commit before authoritative integration;
+- live `master` is re-fetched immediately before integration and stale/unexpected movement is reconciled rather than overwritten;
+- integration/ref movement is non-force only;
+- the resulting authoritative tip, intended diff, and CI/audit evidence are verified after integration;
+- the residual inability to hard-block an out-of-band administrator force push/deletion remains visible rather than being represented as equivalent protection;
+- server-side protection becomes mandatory again if the hosting capability later becomes available.
+
+In either mode:
+
 - pull-request review is strongly preferred for implementation changes;
-- no second long-lived authoritative branch exists.
+- no second long-lived authoritative branch exists;
+- mandatory CI is never waived as a substitute for hosting limitations.
 
 ## Exit
 
-Clean checkout builds reproducibly; UI/Core compile separately; schemas/tests run; platform/import architecture is enforceable; contract manifest is current; repeated contract values have drift protection where selected; repository history protection is active; no business logic is vendor- or Windows-backend-bound.
+Clean checkout builds reproducibly; UI/Core compile separately; schemas/tests run; platform/import architecture is enforceable; contract manifest is current; repeated contract values have drift protection where selected; repository governance is verified for the actual hosting capability; server-side protection is active when available or the explicit compensating mode is evidenced when unavailable; no business logic is vendor- or Windows-backend-bound.
 
 ---
 
@@ -695,10 +713,10 @@ Full Windows local + portable restore drills pass; generated recovery secret alo
 
 # 21. PHASE 19 — WINDOWS V1 PRODUCTION QUALIFICATION
 
-Run the full v1.0.5 active contract suite on exact signed Windows FULL_HOST Release Candidate artifacts:
+Run the full v1.0.6 active contract suite on exact signed Windows FULL_HOST Release Candidate artifacts:
 
 - contract manifest / Release Profile;
-- repository/CI protection evidence;
+- authoritative repository/CI governance evidence for the verified hosting capability;
 - static/strict/architecture + machine-readable contract-profile drift checks;
 - platform composition/import boundary;
 - protocol/canonicalization/platform schemas;
@@ -729,7 +747,7 @@ Linux runtime and Android companion tests are explicitly outside this V1 qualifi
 
 ## Exit
 
-Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys and all active v1.0.5 specialized security-contract gates pass; rollback/recovery verified; Production Complete evidence references exact Windows artifacts/source/profile/contract/platform/trust identity.
+Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys and all active v1.0.6 specialized security/governance-contract gates pass; rollback/recovery verified; Production Complete evidence references exact Windows artifacts/source/profile/contract/platform/trust identity.
 
 ---
 
@@ -763,17 +781,17 @@ Do not start by giving Codex a shell and letting working behavior become the arc
 
 # 23. ENGINEERING WORKFLOW
 
-Significant work uses temporary isolated branches/worktrees created from live protected `master`.
+Significant work uses temporary isolated branches/worktrees created from live authoritative `master`.
 
 Re-fetch live `master` before writes when concurrent work is possible and preserve valid changes.
 
-Contract/schema change includes compatibility/migration impact. Security/recovery change includes negative/failure tests. UI identity/accessibility change includes qualification impact. Platform-native change includes capability-contract and platform-support impact. Backup crypto, project-policy trust, and supply-chain trust changes require their specialized contract/versioning implications.
+Contract/schema change includes compatibility/migration impact. Security/recovery change includes negative/failure tests. UI identity/accessibility change includes qualification impact. Platform-native change includes capability-contract and platform-support impact. Backup crypto, project-policy trust, supply-chain trust, and repository-governance changes require their specialized contract/versioning implications.
 
 A material implementation-vs-contract conflict is corrected or goes through the synchronous ADR + canonical contract + manifest amendment process. Code never silently becomes the new architecture because it was easier.
 
 Windows-only dependencies belong in the Windows backend unless the shared layer genuinely requires them. Shared code SHALL not gain OS conditionals as a shortcut around platform composition.
 
-Accepted temporary branches are merged/rebased through protected workflow and deleted; `master` remains the sole authoritative line.
+Accepted temporary branches are integrated through the verified repository-governance mode and deleted; `master` remains the sole authoritative line. When server-side protection is unavailable, integration still requires exact candidate CI, live-tip revalidation, non-force update, and post-integration verification.
 
 ---
 
@@ -842,4 +860,4 @@ Only final checkpoint is Production Complete.
 
 ---
 
-**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.5**
+**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.6**
