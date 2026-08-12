@@ -87,8 +87,8 @@ This table is a guard against backward dependencies and premature implementation
 | Field | Current value |
 |---|---|
 | Active section | `SECTION 0 — Repository / Platform Contracts / Toolchain / Governance` |
-| Active subsection | None — `0.2` verified; `0.3` not started |
-| Next eligible subsection | `0.3` |
+| Active subsection | None — `0.3` verified; `0.4` not started |
+| Next eligible subsection | `0.4` |
 | Last matrix review baseline | JARVIS v1.0.5 contract suite at `5766978576a48165a7ec8013ed6a106b0b0ddd17` |
 | Production Complete | **NO** |
 
@@ -98,10 +98,10 @@ This table is a guard against backward dependencies and premature implementation
 
 | Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
 |---|---|---|---|---:|---|---|
-| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **IN PROGRESS** | — | `Phase 0`; checkpoint: Repository Governance + Platform Boundary + Contract-Drift Protection Ready | — | `0.3` is next | `0.1–0.2` verified; section checkpoint remains pending |
+| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **IN PROGRESS** | — | `Phase 0`; checkpoint: Repository Governance + Platform Boundary + Contract-Drift Protection Ready | — | `0.4` is next | `0.1–0.3` verified; section checkpoint remains pending |
 | ↳ **0.1** Implementation admission, authoritative-suite pinning, and repository baseline | **VERIFIED** | — | PLAN §2; IC §§2–3,28–29; RP §17; AGENTS Source of truth/Branch authority | 10 CA / 9 scoped | None within `0.1` scope | `ded8f9e5c0e056ff69fa27668dfb0bd4fca7a0f7`; `docs/implementation/evidence/0.1-implementation-admission.md`; live `master` `bb32c530...`; diff verification changed only the evidence file |
 | ↳ **0.2** Monorepo responsibility boundaries and dependency-direction skeleton | **VERIFIED** | 0.1 | PLAN §2; CS §§2–4,32; IC §§5,8 | 10 CA / 9 scoped | None within `0.2` scope | `67fa540caab982dccb2330070df62c6d71603099`; `docs/implementation/architecture/REPOSITORY-BOUNDARIES.md`; `docs/implementation/evidence/0.2-monorepo-boundaries.md`; diff added only 22 Markdown boundary/evidence files; no package/toolchain/runtime/native implementation; Linux negative-support wording verified |
-| ↳ **0.3** Platform/runtime identity and compatibility protocol foundation | **NOT STARTED** | 0.2 | PLAN §2; PP §§2–7,11; PS §§2–3,27; RP §§2–3 | — | — | — |
+| ↳ **0.3** Platform/runtime identity and compatibility protocol foundation | **VERIFIED** | 0.2 | PLAN §2; PP §§2–7,11; PS §§2–3,27; RP §§2–3 | 10 CA / 9 scoped | None within `0.3` scope | `229954d1e34c52bb11c50570308e9f66c2a21034`; `669fec6bad6cdec53a1a44fc94be3573e120997f`; `docs/implementation/evidence/0.3-platform-runtime-identity.md`; exact 6-file implementation; 5/5 schema self-validation; 20/20 positive/negative/adversarial cases; strict TypeScript auxiliary check PASS; no later-phase implementation leakage |
 | ↳ **0.4** Semantic platform-capability contracts, availability, and stable platform errors | **NOT STARTED** | 0.3 | PLAN §2; PP §§6,26–28; CS §4; RP §3 | — | — | — |
 | ↳ **0.5** Composition root, Windows backend registration, and future-Linux namespace reservation | **NOT STARTED** | 0.4 | PLAN §2; PP §§7–10; CS §§2–4,32 | — | — | — |
 | ↳ **0.6** Protocol/schema infrastructure and common boundary primitives | **NOT STARTED** | 0.3 | PLAN §2; PS §§1–9,25–27; CS §§5–7,11 | — | — | — |
@@ -372,7 +372,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **12.13** Crash-safe durable trusted-metadata state that survives ordinary cache cleanup | **NOT STARTED** | 12.9, 4.11 | SCT §14 | — | — | — |
 | ↳ **12.14** Module/support/trust lifecycle Mission Control states and trust incident diagnostics | **NOT STARTED** | 12.2–12.13, 1.13 | OPS §§15–17; SCT §15; UI §15 | — | — | — |
 | ↳ **12.15** TUF/module negative conformance: threshold, expiry, rotation, revocation, delegation, rollback/freeze/mix-match, cache/crash | **NOT STARTED** | 12.6–12.14 | PLAN §14 Exit; SCT §17; VR §26 | — | — | — |
-| ↳ **12.CP** SECTION CHECKPOINT — credential/module/TUF catalog trust foundation | **NOT STARTED** | 12.1–12.15 | PLAN §14 Exit; PLAN §26 checkpoint | — | — | — |
+| ↳ **12.CP** SECTION CHECKPOINT — credential/module/TUF catalog trust foundation | **NOT STARTED** | 12.1–12.15 | PLAN §14 Exit; PLAN §26 checkpoint; VR §26 | — | — | — |
 
 ### SECTION 13 — Local Git / GitHub Production Integration
 
