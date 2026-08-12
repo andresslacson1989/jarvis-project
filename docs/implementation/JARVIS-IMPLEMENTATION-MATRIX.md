@@ -86,9 +86,9 @@ This table is a guard against backward dependencies and premature implementation
 
 | Field | Current value |
 |---|---|
-| Active section | None — preparation only |
-| Active subsection | None — application implementation has not started |
-| Next eligible subsection | `0.1` after explicit implementation authorization |
+| Active section | `SECTION 0 — Repository / Platform Contracts / Toolchain / Governance` |
+| Active subsection | None — `0.1` verified; `0.2` not started |
+| Next eligible subsection | `0.2` |
 | Last matrix review baseline | JARVIS v1.0.5 contract suite at `5766978576a48165a7ec8013ed6a106b0b0ddd17` |
 | Production Complete | **NO** |
 
@@ -98,8 +98,8 @@ This table is a guard against backward dependencies and premature implementation
 
 | Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
 |---|---|---|---|---:|---|---|
-| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **NOT STARTED** | — | `Phase 0`; checkpoint: Repository Governance + Platform Boundary + Contract-Drift Protection Ready | — | — | — |
-| ↳ **0.1** Implementation admission, authoritative-suite pinning, and repository baseline | **NOT STARTED** | — | PLAN §2; IC §§2–3,28–29; RP §17; AGENTS Source of truth/Branch authority | — | — | — |
+| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **IN PROGRESS** | — | `Phase 0`; checkpoint: Repository Governance + Platform Boundary + Contract-Drift Protection Ready | — | `0.2` is next | `0.1` verified; section checkpoint remains pending |
+| ↳ **0.1** Implementation admission, authoritative-suite pinning, and repository baseline | **VERIFIED** | — | PLAN §2; IC §§2–3,28–29; RP §17; AGENTS Source of truth/Branch authority | 10 CA / 9 scoped | None within `0.1` scope | `ded8f9e5c0e056ff69fa27668dfb0bd4fca7a0f7`; `docs/implementation/evidence/0.1-implementation-admission.md`; live `master` `bb32c530...`; diff verification changed only the evidence file |
 | ↳ **0.2** Monorepo responsibility boundaries and dependency-direction skeleton | **NOT STARTED** | 0.1 | PLAN §2; CS §§2–4,32; IC §§5,8 | — | — | — |
 | ↳ **0.3** Platform/runtime identity and compatibility protocol foundation | **NOT STARTED** | 0.2 | PLAN §2; PP §§2–7,11; PS §§2–3,27; RP §§2–3 | — | — | — |
 | ↳ **0.4** Semantic platform-capability contracts, availability, and stable platform errors | **NOT STARTED** | 0.3 | PLAN §2; PP §§6,26–28; CS §4; RP §3 | — | — | — |
