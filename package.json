@@ -10,7 +10,9 @@
   "scripts": {
     "toolchain:verify": "node tools/toolchain/verify-toolchain.mjs",
     "toolchain:verify:metadata": "node tools/toolchain/verify-toolchain.mjs --metadata-only",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node tools/test/run-tests.mjs --profile normal",
+    "test:qualification": "node tools/test/run-tests.mjs --profile qualification"
   },
   "devDependencies": {
     "typescript": "6.0.3"

@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "layers": [
+    {
+      "id": "unit",
+      "directory": "tests/layers/unit",
+      "normalChangeEligible": true,
+      "phase0HarnessRequired": true
+    },
+    {
+      "id": "property-state-machine",
+      "directory": "tests/layers/property-state-machine",
+      "normalChangeEligible": true,
+      "phase0HarnessRequired": true
+    },
+    {
+      "id": "schema-cross-language-contract",
+      "directory": "tests/layers/schema-cross-language-contract",
+      "normalChangeEligible": true,
+      "phase0HarnessRequired": true
+    },
+    {
+      "id": "platform-architecture-contracts",
+      "directory": "tests/layers/platform-architecture-contracts",
+      "normalChangeEligible": true,
+      "phase0HarnessRequired": true
+    },
+    {
+      "id": "provider-setup-contract-sandbox",
+      "directory": "tests/layers/provider-setup-contract-sandbox",
+      "normalChangeEligible": true,
+      "phase0HarnessRequired": false
+    },
+    {
+      "id": "tool-contract",
+      "directory": "tests/layers/tool-contract",
+      "normalChangeEligible": true,
+      "phase0HarnessRequired": false
+    },
+    {
+      "id": "integration-module-conformance",
+      "directory": "tests/layers/integration-module-conformance",
+      "normalChangeEligible": false,
+      "phase0HarnessRequired": false
+    },
+    {
+      "id": "integration-e2e",
+      "directory": "tests/layers/integration-e2e",
+      "normalChangeEligible": false,
+      "phase0HarnessRequired": false
+    },
+    {
+      "id": "ui-accessibility-adaptive",
+      "directory": "tests/layers/ui-accessibility-adaptive",
+      "normalChangeEligible": false,
+      "phase0HarnessRequired": false
+    },
+    {
+      "id": "safety-adversarial",
+      "directory": "tests/layers/safety-adversarial",
+      "normalChangeEligible": true,
+      "phase0HarnessRequired": true
+    },
+    {
+      "id": "recovery-chaos",
+      "directory": "tests/layers/recovery-chaos",
+      "normalChangeEligible": false,
+      "phase0HarnessRequired": false
+    },
+    {
+      "id": "persistence-backup-migration",
+      "directory": "tests/layers/persistence-backup-migration",
+      "normalChangeEligible": false,
+      "phase0HarnessRequired": false
+    },
+    {
+      "id": "performance-resource",
+      "directory": "tests/layers/performance-resource",
+      "normalChangeEligible": false,
+      "phase0HarnessRequired": false
+    },
+    {
+      "id": "voice-audio",
+      "directory": "tests/layers/voice-audio",
+      "normalChangeEligible": false,
+      "phase0HarnessRequired": false
+    },
+    {
+      "id": "packaging-update-release",
+      "directory": "tests/layers/packaging-update-release",
+      "normalChangeEligible": false,
+      "phase0HarnessRequired": false
+    }
+  ]
+}

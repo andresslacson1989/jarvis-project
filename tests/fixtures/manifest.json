@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "fixtures": [
+    {
+      "id": "foundation-json",
+      "path": "data/foundation.json",
+      "mediaType": "application/json",
+      "provenance": "SYNTHETIC",
+      "containsRealCredentials": false,
+      "sha256": "a3a43851b866eb475c768ac68d6fbf7b8ce1c1e6e2df7641118f872f0af34000"
+    }
+  ]
+}
