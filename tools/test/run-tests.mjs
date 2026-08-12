@@ -1,4 +1,5 @@
 import { readdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -35,6 +36,7 @@ function parseArgs(argv) {
 
 async function discoverTests(directory) {
   const found = [];
+  if (!existsSync(directory)) return found;
   async function walk(current) {
     const entries = await readdir(current, { withFileTypes: true });
     entries.sort((a, b) => a.name.localeCompare(b.name, "en"));
