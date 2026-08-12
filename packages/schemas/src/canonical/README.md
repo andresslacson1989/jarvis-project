@@ -1,7 +1,7 @@
 # Canonical contract values
 
-`v1/jarvis-v1.0.5.contract-values.json` is the machine-readable Phase-0 binding
-of repeated values fixed by the active JARVIS v1.0.5 contract suite.
+`v1/jarvis-v1.0.6.contract-values.json` is the machine-readable Phase-0 binding
+of repeated values fixed by the active JARVIS v1.0.6 contract suite.
 
 It is **not** a replacement for the normative contracts. It exists so runtime,
 tests, generated artifacts, and later drift checks can consume one structured
