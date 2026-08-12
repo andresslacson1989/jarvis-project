@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JarvisToolchainBaselineV1",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "profile": {"const": "JARVIS_V1_WINDOWS_FULL_HOST"},
+    "node": {
+      "type": "object",
+      "properties": {
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32},
+        "releaseLine": {"type": "integer", "minimum": 1, "maximum": 999},
+        "lifecycle": {"const": "LTS"}
+      },
+      "required": ["version", "releaseLine", "lifecycle"],
+      "additionalProperties": false
+    },
+    "pnpm": {
+      "type": "object",
+      "properties": {
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32},
+        "lockfileVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$", "maxLength": 16}
+      },
+      "required": ["version", "lockfileVersion"],
+      "additionalProperties": false
+    },
+    "typescript": {
+      "type": "object",
+      "properties": {
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32},
+        "integrity": {"type": "string", "pattern": "^sha512-[A-Za-z0-9+/]+={0,2}$", "maxLength": 256}
+      },
+      "required": ["version", "integrity"],
+      "additionalProperties": false
+    },
+    "rust": {
+      "type": "object",
+      "properties": {
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32},
+        "channel": {"const": "stable"},
+        "edition": {"const": "2024"},
+        "target": {"const": "x86_64-pc-windows-msvc"},
+        "components": {
+          "type": "array",
+          "items": {"enum": ["rustfmt", "clippy"]},
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true
+        }
+      },
+      "required": ["version", "channel", "edition", "target", "components"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["schemaVersion", "profile", "node", "pnpm", "typescript", "rust"],
+  "additionalProperties": false
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "profile": "JARVIS_V1_WINDOWS_FULL_HOST",
+  "node": {
+    "version": "24.18.0",
+    "releaseLine": 24,
+    "lifecycle": "LTS"
+  },
+  "pnpm": {
+    "version": "11.21.0",
+    "lockfileVersion": "9.0"
+  },
+  "typescript": {
+    "version": "6.0.3",
+    "integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="
+  },
+  "rust": {
+    "version": "1.97.1",
+    "channel": "stable",
+    "edition": "2024",
+    "target": "x86_64-pc-windows-msvc",
+    "components": ["rustfmt", "clippy"]
+  }
+}
