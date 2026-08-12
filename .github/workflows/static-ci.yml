@@ -62,6 +62,9 @@ jobs:
       - name: Contract and profile drift
         run: pnpm contract:check-drift
 
+      - name: Repository governance
+        run: pnpm governance:check
+
       - name: Secret scan
         run: pnpm security:secrets
 
