@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlatformPathRef",
+  "description": "Platform-tagged path reference. The platform tag preserves path semantics and does not grant filesystem authority.",
+  "type": "object",
+  "properties": {
+    "platform": {
+      "$ref": "platform-family.schema.json"
+    },
+    "value": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32768
+    }
+  },
+  "required": ["platform", "value"],
+  "additionalProperties": false
+}

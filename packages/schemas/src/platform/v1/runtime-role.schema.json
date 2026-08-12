@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RuntimeRole",
+  "description": "Canonical runtime role identity. Runtime role is explicit and must not be inferred from platform family.",
+  "type": "string",
+  "enum": ["FULL_HOST", "COMPANION"]
+}

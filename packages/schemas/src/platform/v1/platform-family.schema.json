@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlatformFamily",
+  "description": "Canonical platform family identity. Modeling a platform value does not confer production support.",
+  "type": "string",
+  "enum": ["WINDOWS", "LINUX", "ANDROID"]
+}

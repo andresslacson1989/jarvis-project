@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlatformCompatibility",
+  "description": "Canonical compatibility declaration shape. Compatibility data is not a support or qualification claim.",
+  "type": "object",
+  "properties": {
+    "platform": {
+      "$ref": "platform-family.schema.json"
+    },
+    "runtimeRoles": {
+      "type": "array",
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "runtime-role.schema.json"
+      }
+    },
+    "osVersionRange": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "architecture": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    }
+  },
+  "required": ["platform", "runtimeRoles"],
+  "additionalProperties": false
+}

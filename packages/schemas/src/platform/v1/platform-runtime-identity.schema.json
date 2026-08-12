@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlatformRuntimeIdentity",
+  "description": "Canonical platform/runtime identity. A valid identity is not, by itself, evidence that the tuple is qualified or supported.",
+  "type": "object",
+  "properties": {
+    "platform": {
+      "$ref": "platform-family.schema.json"
+    },
+    "runtimeRole": {
+      "$ref": "runtime-role.schema.json"
+    },
+    "architecture": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "backendProfileId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  },
+  "required": ["platform", "runtimeRole", "architecture", "backendProfileId"],
+  "additionalProperties": false
+}
