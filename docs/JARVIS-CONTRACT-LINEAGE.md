@@ -1,8 +1,8 @@
 # JARVIS Contract Lineage and Authority
 
-**Current contract suite:** v1.0.4  
+**Current contract suite:** v1.0.5  
 **Current authoritative branch:** `master`  
-**Current manifest:** `docs/JARVIS-CONTRACT-MANIFEST-v1.0.4.md`  
+**Current manifest:** `docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md`  
 **Date:** 2026-08-12
 
 ## Purpose
@@ -13,7 +13,7 @@ This file removes ambiguity about which JARVIS documents and decisions are curre
 
 `master` is the only authoritative/latest repository branch.
 
-The canonical decision history includes accepted ADR-054 through ADR-068, v1.0.2 consolidation in ADR-069, UI identity/adaptive Mission Control in ADR-070, v1.0.3 production hardening in ADR-071, and the Windows/Linux platform/runtime-role boundary in ADR-072.
+The canonical decision history includes accepted ADR-054 through ADR-068, v1.0.2 consolidation in ADR-069, UI identity/adaptive Mission Control in ADR-070, v1.0.3 production hardening in ADR-071, the Windows/Linux platform/runtime-role boundary in ADR-072, and the pre-implementation security/sequence closure in ADR-073.
 
 ADR identifiers in this lineage are unique. Duplicate ADR identifiers from deleted historical review branches are non-canonical.
 
@@ -31,33 +31,39 @@ ADR-070 — approved JARVIS UI identity + adaptive Mission Control
 v1.0.3 — production-hardening closure (ADR-071)
         ↓
 v1.0.4 — platform runtime roles / Windows-Linux portability boundary (ADR-072)
+        ↓
+v1.0.5 — backup/policy/supply-chain security closure + delivery sequencing (ADR-073)
 ```
 
-v1.0.4 does not make Linux a V1 release target. It makes Linux an explicit future `FULL_HOST` target and requires implementation to preserve the platform capability boundaries needed to reach it without weakening Windows V1.
+v1.0.4 did not make Linux a V1 release target. It made Linux an explicit future `FULL_HOST` target and required implementation to preserve the platform capability boundaries needed to reach it without weakening Windows V1.
 
-Android is recorded as a future `COMPANION` direction only, not as a full-host or current V1 obligation.
+v1.0.5 does not redesign the core architecture or reduce V1 scope. It freezes the remaining security-sensitive implementation choices that should not be invented during coding and moves one feasibility proof earlier.
 
-## v1.0.4 platform closure
+## v1.0.5 closure
 
-ADR-072 and the v1.0.4 suite establish:
+ADR-073 and the v1.0.5 suite establish:
 
-- `FULL_HOST` and `COMPANION` as separate runtime roles;
-- Windows `FULL_HOST` as the sole V1 production target;
-- Linux `FULL_HOST` as an explicit future production target;
-- Android as a future non-authoritative companion direction;
-- typed platform capability/composition boundaries for native services;
-- prohibition on scattering Windows-native implementation dependencies through shared Core/domain/policy code;
-- no-lowest-common-denominator security rule;
-- platform-specific provider/tool/module qualification where native behavior differs;
-- future companion Remote Access Gateway requirement while preserving V1's no-privileged-LAN/Internet-Core boundary.
+- exact `JARVIS_BACKUP_V1` outer cryptographic framing and key-slot semantics;
+- mandatory generated 256-bit recovery secret for production portable-state verification, with optional additional strong passphrase slot;
+- exact SQLCipher snapshot/re-key behavior must be proven on the selected production binding rather than assumed;
+- explicit authenticated project-policy candidate/enrollment/hash-change/nesting/revocation boundary for `AGENTS.md`;
+- TUF 1.0.35 update/module trust metadata with Ed25519 role keys, offline 2-of-3 root threshold, delegation, expiration, rotation/revocation and anti-rollback/freeze/mix-and-match behavior;
+- cumulative TUF + Tauri updater + Windows code-signing + JARVIS compatibility gates;
+- monotonic application `releaseSequence` and `securityEpoch` policy;
+- early real-hardware voice feasibility spike after the persistence/recovery proof;
+- independent post-V1 delivery of SSH, Google Workspace, Microsoft 365 and Cloudflare while retaining all four as binding roadmap targets;
+- Phase-0 machine-readable repeated contract values/CI drift checks where practical;
+- exact-build/fix evidence rather than raw numeric SQLite version comparison as production qualification.
 
-These rules live in current normative documents. ADR-072 explains why and is not required as an implementation overlay.
+These rules live in current normative documents. ADR-073 explains why and is not required as an implementation overlay.
 
 ## Current normative model
 
-`docs/JARVIS-CONTRACT-MANIFEST-v1.0.4.md` is the authoritative index and records the exact component-revision set.
+`docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md` is the authoritative index and records the exact component-revision set.
 
-Some unchanged v1.0.3 component revisions remain current because their normative behavior did not change. The manifest explicitly identifies them; earlier suite top-level contracts are not current merely because an inherited component's historical header names an earlier parent.
+Some unchanged earlier component revisions remain current because their normative behavior did not change. The manifest explicitly identifies them; earlier suite top-level contracts are not current merely because an inherited component's historical header names an earlier parent.
+
+The v1.0.5 specialized security contracts narrow compatible broad inherited rules. They do not require ADR overlay interpretation.
 
 ADRs preserve context, alternatives, rationale, and historical decision identity. Implementers do not reconstruct current behavior by layering ADRs over stale contracts.
 
@@ -80,4 +86,4 @@ When a future material architectural/product/security/platform/release decision 
 
 ## Governing rule
 
-> **There is one current contract suite on `master`, pinned by one manifest. Share product semantics; specialize native mechanisms.**
+> **There is one current contract suite on `master`, pinned by one manifest. Share product semantics; specialize native mechanisms; freeze security formats that must remain recoverable and trustworthy over time.**

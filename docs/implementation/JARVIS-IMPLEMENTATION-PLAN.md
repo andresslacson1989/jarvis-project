@@ -1,11 +1,11 @@
 # JARVIS Production Implementation Plan
 
-**Status:** Authoritative dependency/sequencing plan for v1.0.4  
-**Version:** 1.0.4  
+**Status:** Authoritative dependency/sequencing plan for v1.0.5  
+**Version:** 1.0.5  
 **Date:** August 12, 2026  
 **Release target:** `docs/JARVIS-V1-RELEASE-PROFILE.md`
 
-This is not a simplified MVP plan. Intermediate phases are proof checkpoints; final completion means the active Release Profile and Verification Contract pass for exact signed artifacts.
+This is not a simplified MVP plan. Intermediate phases are proof checkpoints; final completion means the active Release Profile and every active normative verification requirement pass for exact signed artifacts.
 
 No application implementation begins merely because this plan exists. This document defines the sequence to use when implementation is explicitly started.
 
@@ -16,27 +16,30 @@ V1 implements a Windows `FULL_HOST`. The plan SHALL preserve the platform capabi
 # 1. DELIVERY ORDER
 
 ```text
-repository protection / platform contracts / coding standards / CI
+repository protection / platform contracts / coding standards / CI / contract-profile drift checks
 → shared Core/domain + Windows Tauri platform host + Mission Control foundation
 → PlatformLocalIpc + PlatformProcessSupervisor Windows backends
-→ SQLite/SQLCipher/WAL + PlatformSecureStorage Windows backend + portable-backup/KDF proof
+→ SQLite/SQLCipher/WAL + PlatformSecureStorage + JARVIS_BACKUP_V1/KDF/portable-restore proof
+→ EARLY VOICE FEASIBILITY SPIKE on representative qualification hardware
 → authoritative state machines/events
 → session security / PermissionEngine / approval
-→ projects/context/memory/platform-aware execution scopes
+→ projects/context/memory/platform-aware execution scopes + project-policy trust enrollment
 → Codex Windows provider setup/repair + compatibility + real sandbox proof
 → controlled local tools through platform boundaries
 → bounded workers/graphs
 → resources/budgets/recovery
-→ credentials + mandatory GitHub/Proxmox integrations
-→ voice through platform audio/device boundary
+→ credentials + TUF-backed module foundation + mandatory GitHub/Proxmox integrations
+→ full voice product through platform audio/device boundary
 → event/automation
-→ full UI/operations productization + updater
+→ full UI/operations productization + TUF-authorized signed updater
 → complete Windows production qualification
 ```
 
 The platform boundary is cross-cutting: Phase 0 defines it, Phase 1 composes the Windows backend through it, every later native feature respects it, and final qualification proves no Windows implementation details leaked into shared Core/domain/policy where a semantic capability belongs.
 
 The UI identity/accessibility system is also cross-cutting: Phase 1 establishes it, every later user-facing phase uses it, and final qualification proves the complete product.
+
+The v1.0.5 security closures are also cross-cutting: backup-format cryptography is frozen before persistence depends on it; project-policy trust is explicit before engineering workers consume repository policy; supply-chain trust is established before module/update activation; and voice feasibility is measured early before late product integration.
 
 ---
 
@@ -52,16 +55,18 @@ The UI identity/accessibility system is also cross-cutting: Phase 1 establishes 
 - semantic capability responsibilities for secure storage, local IPC, process supervision, session observation, window control, notifications, paths/identity, audio, updater, privilege mediation, and system info;
 - narrow OS composition/factory boundary;
 - forbidden-import/architecture rules preventing Windows backend imports in shared Core/domain/policy/protocol code;
-- pinned Node/Rust/TypeScript/Tauri/package manager toolchains;
+- pinned Node/Rust/TypeScript/Tauri/package-manager toolchains;
 - strict TypeScript;
 - Rust fmt/clippy;
 - schema generation/validation strategy;
-- test layer directories including platform/UI/accessibility/provider-setup layers;
+- test layer directories including platform/UI/accessibility/provider-setup/backup-crypto/project-policy/supply-chain layers;
 - CI format/type/build/unit/property/schema/platform-architecture baseline;
 - secret/dependency/license scan;
 - root `AGENTS.md`;
 - current contract manifest validation in CI;
-- GitHub ruleset/branch protection for authoritative `master`.
+- GitHub ruleset/branch protection for authoritative `master`;
+- machine-readable canonical definitions or generated equivalents for repeated contract values including KDF profiles, backup format profile identifiers/limits, platform/runtime enums, GitHub/Proxmox capability matrices, provider setup states, and security/release constants where practical;
+- CI checks that compare generated/machine-readable definitions against the normative profile and fail on semantic drift.
 
 ## Required platform architecture proof
 
@@ -73,6 +78,15 @@ Before exit:
 - Windows-only dependencies are permitted inside the Windows backend when justified;
 - no weak generic mechanism replaces a stronger Windows requirement merely for portability;
 - Linux remains unimplemented/unqualified and cannot appear supported.
+
+## Required contract-profile drift proof
+
+Before exit:
+
+- one canonical machine-readable source exists for every repeated value selected for generation/checking;
+- human-contract checks fail when a generated/canonical value differs from the active Release Profile/manifest expectations;
+- generated artifacts are reproducible and stale generated output fails CI;
+- machine-readable representation never silently becomes authority for a value absent from the current normative suite.
 
 ## Required repository protection
 
@@ -87,7 +101,7 @@ Before exit:
 
 ## Exit
 
-Clean checkout builds reproducibly; UI/Core compile separately; schemas/tests run; platform/import architecture is enforceable; contract manifest is current; repository history protection is active; no business logic is vendor- or Windows-backend-bound.
+Clean checkout builds reproducibly; UI/Core compile separately; schemas/tests run; platform/import architecture is enforceable; contract manifest is current; repeated contract values have drift protection where selected; repository history protection is active; no business logic is vendor- or Windows-backend-bound.
 
 ---
 
@@ -161,27 +175,28 @@ Intended Core can connect; unauthorized user/session/remote/wrong secret cannot;
 
 ---
 
-# 5. PHASE 3 — PERSISTENCE / PLATFORM SECURE STORAGE / KDF / PORTABLE-RESTORE PROOF
+# 5. PHASE 3 — PERSISTENCE / PLATFORM SECURE STORAGE / KDF / JARVIS_BACKUP_V1 PROOF
 
 This proof occurs before broad stateful feature development.
 
 ## Deliverables
 
 - selected production Node SQLite/SQLCipher binding;
-- exact embedded SQLite build/fix evidence;
+- exact embedded SQLite/SQLCipher build/fix evidence; numeric version comparison alone is not accepted as WAL-fix proof;
 - WAL activation, FULL synchronous, foreign keys, busy handling;
 - WAL/checkpoint diagnostics;
 - PlatformSecureStorage semantic boundary;
 - random local `DB_DEK` protected by Windows secure-storage backend;
 - versioned Argon2id profile schema/persistence;
-- production KDF floor enforcement: v0x13, >=64 MiB, >=3 passes, 4 lanes, >=16-byte random salt, >=32-byte output;
-- distinct session-password and portable-recovery profiles;
-- SQLite-safe backup snapshot;
-- fresh `SnapshotDBKey` re-key/export path;
-- fresh per-backup `BackupDEK`;
-- authenticated package container;
+- production session/general KDF floor enforcement: v0x13, >=64 MiB, >=3 passes, 4 lanes, >=16-byte random salt, >=32-byte output;
+- exact `JARVIS_BACKUP_V1` implementation from the Backup Cryptography Contract;
+- exact release-qualified SQLCipher-safe snapshot/re-key/export mechanism proven on the selected binding;
+- fresh 256-bit `SnapshotDBKey` per backup;
+- fresh 256-bit `BackupDEK` per backup;
+- AES-256-GCM 4 MiB chunk framing, nonce construction, JCS descriptor/AAD, 128-bit tags, strict count/order/truncation/append validation, and package bounds;
 - Windows local DPAPI/secure-store key slot;
-- portable Argon2id key slot recording exact KDF profile and independent of historical DPAPI;
+- mandatory `GENERATED_RECOVERY_V1` slot using a 256-bit OS-CSPRNG recovery secret for production portable-state verification;
+- optional `PASSPHRASE_ARGON2ID_V1` slot using >=256 MiB, >=3 passes, 4 lanes, >=16-byte salt, >=32-byte output and the Backup Cryptography Contract's passphrase admission rules;
 - clean-profile Windows restore + fresh local DB_DEK re-key;
 - corruption/integrity handling;
 - production-style packaged execution.
@@ -192,22 +207,66 @@ This proof occurs before broad stateful feature development.
 packaged Windows Core
 + encrypted DB create/open
 + WAL/foreign keys/transactions
-+ WAL-reset fixed embedded core
++ exact WAL-reset fix evidence
 + production KDF floor reject/accept fixtures
-+ verifier/key-slot parameter round-trip
-+ online backup with WAL data
-+ fresh snapshot key
-+ fresh outer backup key
++ exact SQLCipher snapshot/re-key/export mechanism
++ JARVIS_BACKUP_V1 golden crypto vectors
++ chunk reorder/delete/duplicate/truncate/append rejection
++ malicious length/count/KDF-bound rejection
++ fresh SnapshotDBKey + BackupDEK
 + Windows local restore
-+ wrong portable factor failure
++ wrong generated recovery factor failure
++ wrong optional passphrase failure
 + clean-profile portable restore without old DPAPI/DB_DEK
++ separately preserved generated recovery factor
 + re-key under fresh new local DB_DEK
 + corruption detection
++ no plaintext key/recovery material in package metadata/logs/diagnostics
 ```
 
 Cross-platform restore is not required. The portable cryptographic envelope must nevertheless avoid dependence on historical Windows-local key material.
 
 If chosen binding/crypto library/package fails a mandatory property, replace it; do not weaken encryption/recovery/WAL/KDF/platform rules.
+
+---
+
+# 5A. PHASE 3A — EARLY VOICE FEASIBILITY SPIKE
+
+This is a feasibility gate, not the final voice product implementation.
+
+## Goal
+
+Prove before broad feature work that at least one production-credible local-first Windows voice stack can meet the intended V1 privacy, packaging, device, AEC/barge-in, identity, and latency direction on representative qualification hardware.
+
+## Candidate scope
+
+Exercise at least one realistic candidate combination covering:
+
+- local STT;
+- VAD;
+- local TTS with a stable JARVIS voice identity candidate;
+- AEC using the exact TTS render reference;
+- double-talk/barge-in;
+- deterministic stop/mute/cancel path;
+- microphone/speaker selection and reconnect;
+- representative built-in speakers/microphone and wired/USB headset paths;
+- Bluetooth audio where supported/representative, with limitations recorded truthfully;
+- CPU/GPU acceleration and fallback behavior;
+- RAM/VRAM/CPU contention on the 16 GB/i7 13th-gen/RTX 4060-class baseline;
+- model/runtime packaging size and offline behavior;
+- redistribution/licensing/provenance feasibility.
+
+## Measurements
+
+Measure at least listening-state feedback, VAD start/close, STT partial/final, TTS first audio, stop/cancel, AEC behavior under playback, and end-to-end local pipeline latency separately from remote AI reasoning.
+
+## Deliverable
+
+Produce a versioned feasibility report recording candidate versions, hardware/devices, measured results, quality limitations, packaging/licensing status, and whether at least one candidate stack is viable for later Phase 15/16 qualification.
+
+## Exit
+
+At least one candidate stack is technically/licensing/package feasible without changing mandatory privacy/security assumptions, or the project raises the concrete product/provider/hardware constraint immediately through the normal contract decision process. A pass does not qualify final voice support and does not freeze every implementation detail prematurely.
 
 ---
 
@@ -227,13 +286,16 @@ If chosen binding/crypto library/package fails a mandatory property, replace it;
 - DataSensitivity/DataLocality;
 - artifacts/checkpoints/leases;
 - KDF profile/verifier metadata;
+- backup format/recovery-slot metadata without raw recovery factors;
 - provider setup/qualification/platform state;
 - exact money/usage/reservation primitives;
+- update/TUF trusted-metadata state hooks;
+- project-policy trust/snapshot state hooks;
 - backup/update/recovery metadata.
 
 ## Exit
 
-Illegal state changes fail; state+causative event atomicity works; stale version cannot overwrite; non-project scopes need no fake workspace; provider setup is distinct from compatibility/health/platform support; protocol/persistence representations agree; shared durable state does not persist native Windows handles as domain identity.
+Illegal state changes fail; state+causative event atomicity works; stale version cannot overwrite; non-project scopes need no fake workspace; provider setup is distinct from compatibility/health/platform support; protocol/persistence representations agree; shared durable state does not persist native Windows handles as domain identity; recovery-factor secrets are absent from normal DB state.
 
 ---
 
@@ -250,6 +312,7 @@ Illegal state changes fail; state+causative event atomicity works; stale version
 - authority envelopes;
 - exact PermissionEngine precedence;
 - platform-capability gate before ALLOW;
+- trusted-project-policy state gate where applicable;
 - LOW/MODERATE/HIGH/CRITICAL behavior;
 - standing permission + precedent restrictions;
 - `CanonicalActionDescriptorV1` builder;
@@ -263,7 +326,7 @@ Hard invariant/deny precedence, HIGH authority rules, precedent limits, CRITICAL
 
 ---
 
-# 8. PHASE 6 — PROJECTS / SCOPES / CONTEXT / MEMORY
+# 8. PHASE 6 — PROJECTS / SCOPES / CONTEXT / MEMORY / PROJECT-POLICY TRUST
 
 ## Deliverables
 
@@ -275,11 +338,20 @@ Hard invariant/deny precedence, HIGH authority rules, precedent limits, CRITICAL
 - memory confidence/revisions/data policy;
 - scoped ranked retrieval;
 - conversation/history separation;
-- live-state-over-memory behavior.
+- live-state-over-memory behavior;
+- `AGENTS.md` project-policy candidate discovery without automatic trust;
+- canonical project/path/scope/content-hash policy identity;
+- explicit authenticated review/trust/disable/revoke workflow;
+- durable project-policy trust records and revision state;
+- immutable applicable policy snapshot per attempt;
+- branch/worktree/content/path change detection → `CHANGED_REVIEW_REQUIRED`;
+- separately enrolled nested-policy scope and precedence;
+- context labeling that distinguishes trusted project policy from untrusted repository content;
+- contextually HIGH path for mutating an enrolled trusted policy; new content is not auto-trusted.
 
 ## Exit
 
-Project aliases resolve; project writes require exact `PROJECT_WORKSPACE`; integration-only work has no fake filesystem authority; Windows reparse/UNC/drive/path checks pass; platform-tagged path cannot be accidentally interpreted under wrong platform semantics; memory respects scope/policy; local-only derived context remains local-only.
+Project aliases resolve; project writes require exact `PROJECT_WORKSPACE`; integration-only work has no fake filesystem authority; Windows reparse/UNC/drive/path checks pass; platform-tagged path cannot be accidentally interpreted under wrong platform semantics; memory respects scope/policy; local-only derived context remains local-only; unfamiliar repository `AGENTS.md` remains untrusted until explicit enrollment; policy changes/revocation affect new/resuming work deterministically; trusted project policy cannot widen JARVIS authority.
 
 ---
 
@@ -301,7 +373,8 @@ Project aliases resolve; project writes require exact `PROJECT_WORKSPACE`; integ
 - PlatformProcessSupervisor integration;
 - cancellation/timeouts/circuit breaker;
 - provider quota/usage provenance;
-- optional resume reference handling.
+- optional resume reference handling;
+- immutable trusted project-policy snapshot injection as scoped context, never direct raw candidate trust.
 
 ## Mandatory Windows setup/sandbox proof
 
@@ -321,6 +394,7 @@ Measure/verify actual selected Codex behavior:
 - no unrelated credentials in env/context;
 - Job Object descendant containment;
 - shell/client availability cannot bypass JARVIS typed external-action authorization;
+- untrusted repository policy-looking files do not become trusted worker instructions;
 - qualification record binds to `WINDOWS + FULL_HOST`.
 
 ## Exit
@@ -365,11 +439,12 @@ Path/reparse tests pass; platform capability mismatch blocks; scope mismatch blo
 - structured results/replan/block;
 - isolated engineering worktrees;
 - pause/cancel primitives;
+- immutable applicable project-policy snapshot on worker attempts;
 - Mission Control work/queue/activity components using canonical design system.
 
 ## Exit
 
-Engineering worker can inspect/edit/build/test bounded Windows workspace; cannot widen scope/authority; parallel writers are isolated; provider-private history not required for recovery; no-progress loops terminate/replan; dashboard truth derives from authoritative state.
+Engineering worker can inspect/edit/build/test bounded Windows workspace; cannot widen scope/authority; parallel writers are isolated; provider-private history not required for recovery; no-progress loops terminate/replan; dashboard truth derives from authoritative state; worker cannot silently replace/enroll the trusted policy that constrains it.
 
 ---
 
@@ -406,30 +481,37 @@ Independent work can run concurrently within deterministic scheduling; cycles re
 - atomic reservations/settlement;
 - recovery policy/reconciliation;
 - startup transient-state scan;
-- transparent queue/block/recovery/platform-unavailable UI states.
+- policy-snapshot revalidation on resume;
+- transparent queue/block/recovery/platform/policy-unavailable UI states.
 
 ## Exit
 
-Priority can preempt safely; unnecessary preemption avoided; resume validates state/provider setup/locality/platform capabilities/leases; concurrent hard-budget race is safe; ambiguous external effect never blindly retries; outstanding reservations survive recovery.
+Priority can preempt safely; unnecessary preemption avoided; resume validates state/provider setup/locality/platform capabilities/leases/policy trust; concurrent hard-budget race is safe; ambiguous external effect never blindly retries; outstanding reservations survive recovery.
 
 ---
 
-# 14. PHASE 12 — CREDENTIALS / MODULE FOUNDATION
+# 14. PHASE 12 — CREDENTIALS / MODULE / SUPPLY-CHAIN TRUST FOUNDATION
 
 ## Deliverables
 
 - integration account registry;
 - PlatformSecureStorage credential handles;
-- authenticated module catalog/provenance;
 - DATA_ONLY/BUILT_IN_TRUSTED/EXTERNAL_MANAGED execution classes;
 - platform/runtime-role compatibility in module manifests;
 - typed module IPC/health/lifecycle;
 - module staging/rollback;
-- dashboard state distinctions.
+- dashboard state distinctions;
+- audited TUF 1.0.35 implementation/library integration;
+- embedded/authenticated initial TUF root metadata;
+- Ed25519 role keys and 2-of-3 offline root-threshold policy represented by deployment/release tooling without placing root private keys in ordinary CI/runtime;
+- targets/snapshot/timestamp role separation, expiration/version checks, and consistent snapshots;
+- dedicated `modules` delegated targets role scoped away from application release targets;
+- durable trusted-metadata state that survives cache cleanup;
+- module target length/hash/catalog authorization/revocation/anti-rollback checks.
 
 ## Exit
 
-No raw credentials in normal DB/log/prompts/backups; external executable cannot run in Core; wrong-platform/unsupported module not labeled supported; crash/update rollback works; Windows process containment works for external module.
+No raw credentials in normal DB/log/prompts/backups; external executable cannot run in Core; wrong-platform/unsupported/revoked module not labeled supported; crash/update rollback works; Windows process containment works for external module; TUF role/delegation/expiry/rollback/freeze/mix-and-match negative tests pass; module publisher signature alone cannot confer support.
 
 ---
 
@@ -458,7 +540,7 @@ GITHUB_ACTIONS_READ
 - exact capability enum/support matrix;
 - repository/ref identity;
 - typed mandatory GitHub read/write operations;
-- expected-ref/conditional-write protections for `GITHUB_REF_WRITE`;
+- exact expected-old-ref/conditional-write protections for `GITHUB_REF_WRITE`;
 - rate limit/auth expiry/retry/uncertainty behavior;
 - explicit rejection of admin/secrets/protection/delete overreach;
 - Mission Control integration/support/capability state UI;
@@ -512,21 +594,24 @@ All mandatory Proxmox capabilities pass Windows V1 conformance; optional storage
 
 # 17. PHASE 15 — VOICE FOUNDATION
 
+Phase 3A feasibility evidence is input, not a substitute for this production implementation.
+
 ## Deliverables
 
 - PlatformAudioBackend contract integration;
 - Windows audio device manager;
 - push-to-talk;
-- local STT;
-- VAD;
+- selected production local STT;
+- selected production VAD;
 - selected TTS provider/persistent voice;
 - typed transcript/voice state;
 - local latency instrumentation;
-- Mission Control voice-state components using canonical identity.
+- Mission Control voice-state components using canonical identity;
+- packaged/offline/licensing/provenance closure for selected components.
 
 ## Exit
 
-Voice input reliable on Windows; text fallback always usable; device reconnect works; locked privacy/DataLocality enforced; TTS identity/provider/licensing frozen for RC.
+Voice input reliable on Windows; text fallback always usable; device reconnect works; locked privacy/DataLocality enforced; TTS identity/provider/licensing frozen for RC; Phase 3A assumptions have been revalidated against the production implementation.
 
 ---
 
@@ -534,7 +619,7 @@ Voice input reliable on Windows; text fallback always usable; device reconnect w
 
 ## Deliverables
 
-- AEC provider + exact TTS render reference;
+- selected AEC provider + exact TTS render reference;
 - realtime conversation engine;
 - physical/semantic turn detection;
 - barge-in/double-talk;
@@ -545,7 +630,7 @@ Voice input reliable on Windows; text fallback always usable; device reconnect w
 
 ## Exit
 
-Barge-in and stop latency pass target on real Windows devices; AEC double-talk qualifies; stale transcript cannot submit; AEC failure safely degrades.
+Barge-in and stop latency pass target on real Windows devices; AEC double-talk qualifies; stale transcript cannot submit; AEC failure safely degrades; production behavior does not rely only on the earlier feasibility spike.
 
 ---
 
@@ -571,7 +656,7 @@ Duplicate event cannot duplicate consequence; automation obeys normal permission
 
 # 20. PHASE 18 — UI / OPERATIONS / BACKUP / DIAGNOSTICS / UPDATE PRODUCTIZATION
 
-The cryptographic backup proof exists from Phase 3 and the UI/platform identity foundation from Phase 1; this phase completes all operational surfaces and qualification fixtures before RC.
+The cryptographic backup proof exists from Phase 3, voice feasibility evidence exists from Phase 3A, and the UI/platform identity foundation exists from Phase 1. This phase completes all operational surfaces and qualification fixtures before RC.
 
 ## Deliverables
 
@@ -586,29 +671,35 @@ The cryptographic backup proof exists from Phase 3 and the UI/platform identity 
 - canonical brand asset generation pipeline for Windows PNG/ICO/installer artifacts while retaining platform-neutral source assets;
 - font/icon/visual asset license/provenance notices;
 - scheduled/local backup retention;
-- portable backup creation/verification UX;
-- recovery-factor setup/rotation UX;
+- `JARVIS_BACKUP_V1` portable backup creation/verification UX;
+- generated recovery-factor export/verification/rotation UX;
+- optional passphrase-slot UX;
 - restore maintenance mode;
 - corruption recovery;
-- WAL/provider/setup/security/platform diagnostics dashboard;
+- WAL/provider/setup/security/platform/project-policy/TUF trust diagnostics dashboard;
 - diagnostic export/redaction;
-- PlatformUpdateBackend with signed Windows updater/staged activation;
+- PlatformUpdateBackend with TUF-authorized staged Windows updater;
+- TUF trusted root/targets/snapshot/timestamp state, rotation/revocation/expiry behavior;
+- signed monotonic `releaseSequence` and `securityEpoch` admission;
+- Tauri updater signature verification;
+- Windows production code-signing/Authenticode validation policy;
 - binary/schema/runtime/backup rollback pairing;
-- release manifest generation including platform/runtime/backend support identity.
+- rollback permitted only when current trusted metadata explicitly authorizes the exact non-revoked compatible target;
+- release manifest generation including platform/runtime/backend/support identity and TUF/signing/security-epoch metadata.
 
 ## Exit
 
-Full Windows local + portable restore drills pass; bad migration/startup recovers known-good pair; tampered update rejected; diagnostics identify common subsystem/platform failures; all UI Identity Contract completion criteria pass; shared UI components remain free of unnecessary Windows-only semantic coupling.
+Full Windows local + portable restore drills pass; generated recovery secret alone can restore a clean profile; bad migration/startup recovers a known-good authorized pair; revoked/old unauthorized validly signed updates are rejected; TUF/Tauri/Windows signing gates are cumulative; diagnostics identify common subsystem/platform/policy/trust failures; all UI Identity Contract completion criteria pass; shared UI components remain free of unnecessary Windows-only semantic coupling.
 
 ---
 
 # 21. PHASE 19 — WINDOWS V1 PRODUCTION QUALIFICATION
 
-Run the full v1.0.4 Verification Contract on exact signed Windows FULL_HOST Release Candidate artifacts:
+Run the full v1.0.5 active contract suite on exact signed Windows FULL_HOST Release Candidate artifacts:
 
 - contract manifest / Release Profile;
 - repository/CI protection evidence;
-- static/strict/architecture;
+- static/strict/architecture + machine-readable contract-profile drift checks;
 - platform composition/import boundary;
 - protocol/canonicalization/platform schemas;
 - Mission Control UI identity/adaptive/accessibility;
@@ -616,19 +707,21 @@ Run the full v1.0.4 Verification Contract on exact signed Windows FULL_HOST Rele
 - Windows named-pipe/Job Objects;
 - KDF/session/recovery profiles;
 - PermissionEngine/destructive boundaries;
+- project-policy enrollment/hash-change/nesting/revocation/worker-mutation;
 - Codex Windows setup/compatibility/sandbox;
 - tools/races;
-- SQLite/SQLCipher/WAL;
-- backup/portable restore;
+- exact SQLite/SQLCipher/WAL/snapshot-rekey path;
+- `JARVIS_BACKUP_V1` crypto/tamper/order/truncation/portable disaster restore;
 - crash/recovery;
 - exact budget;
 - Local Git + exact GitHub capability matrix;
 - exact Proxmox capability matrix;
-- modules/update;
-- voice;
+- modules/TUF catalog delegation/revocation;
+- TUF app update root threshold/rotation/expiry/rollback/freeze/mix-and-match + Tauri/Windows signing;
+- voice, including comparison against early feasibility evidence;
 - event automation;
 - resource/performance;
-- clean install/upgrade/rollback;
+- clean install/upgrade/authorized rollback;
 - soak;
 - signed packaging/SBOM/license/provenance.
 
@@ -636,7 +729,7 @@ Linux runtime and Android companion tests are explicitly outside this V1 qualifi
 
 ## Exit
 
-Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys pass; rollback/recovery verified; Production Complete evidence references exact Windows artifacts/source/profile/contract/platform identity.
+Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys and all active v1.0.5 specialized security-contract gates pass; rollback/recovery verified; Production Complete evidence references exact Windows artifacts/source/profile/contract/platform/trust identity.
 
 ---
 
@@ -658,9 +751,11 @@ platform capability contracts + composition root
 → locked session + harmless get_system_status
 ```
 
-Then immediately execute the Phase-3 SQLite/SQLCipher/PlatformSecureStorage/KDF/portable-restore proof.
+Then immediately execute the Phase-3 SQLite/SQLCipher/PlatformSecureStorage/KDF/`JARVIS_BACKUP_V1`/portable-restore proof.
 
-Only after trust, persistence, recovery, session, and platform boundaries pass should Codex setup/autonomy be introduced.
+Immediately after Phase 3, execute the Phase-3A voice feasibility spike before broad feature development.
+
+Only after trust, persistence, recovery, session, platform boundaries, and the early voice feasibility risk are understood should Codex autonomy and broad product capabilities expand.
 
 Do not start by giving Codex a shell and letting working behavior become the architecture. Do not implement Linux merely to prove the abstraction; prove the abstraction through boundaries/tests and build the Windows backend completely.
 
@@ -672,7 +767,7 @@ Significant work uses temporary isolated branches/worktrees created from live pr
 
 Re-fetch live `master` before writes when concurrent work is possible and preserve valid changes.
 
-Contract/schema change includes compatibility/migration impact. Security/recovery change includes negative/failure tests. UI identity/accessibility change includes qualification impact. Platform-native change includes capability-contract and platform-support impact.
+Contract/schema change includes compatibility/migration impact. Security/recovery change includes negative/failure tests. UI identity/accessibility change includes qualification impact. Platform-native change includes capability-contract and platform-support impact. Backup crypto, project-policy trust, and supply-chain trust changes require their specialized contract/versioning implications.
 
 A material implementation-vs-contract conflict is corrected or goes through the synchronous ADR + canonical contract + manifest amendment process. Code never silently becomes the new architecture because it was easier.
 
@@ -692,22 +787,35 @@ Neither is part of the Windows V1 implementation plan.
 
 ---
 
-# 25. RELEASE CHECKPOINTS
+# 25. POST-V1 INTEGRATION DELIVERY
+
+SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding product roadmap targets after V1.
+
+They are independent production integration deliverables and MAY ship in separate feature releases as each reaches `SUPPORTED` and full qualification. No one integration blocks release of another already-complete integration solely to preserve an artificial four-integration bundle.
+
+Any decision to remove one from the binding roadmap requires a deliberate future product-contract amendment.
+
+---
+
+# 26. RELEASE CHECKPOINTS
 
 ```text
-Repository Governance + Platform Boundary Ready
+Repository Governance + Platform Boundary + Contract-Drift Protection Ready
 Windows Desktop Trust + Mission Control Foundation Ready
-Persistence/KDF/Portable Recovery Proven
+Persistence/KDF/JARVIS_BACKUP_V1 Portable Recovery Proven
+Early Voice Feasibility Proven
 Core State Ready
 Security/Permission Boundary Ready
+Project Policy Trust Boundary Ready
 Codex Windows Setup/Provider/Sandbox Ready
 Tool Runtime Ready
 Worker Runtime Ready
 Mission Runtime Ready
+Supply-Chain/Module Trust Foundation Ready
 GitHub Capability Matrix Ready
 Proxmox Capability Matrix Ready
 Voice Runtime Ready
-Operations/UI/Update Ready
+Operations/UI/TUF Update Ready
 Windows Release Candidate
 Production Complete
 ```
@@ -716,9 +824,11 @@ Only final checkpoint is Production Complete.
 
 ---
 
-# 26. GOVERNING PRINCIPLES
+# 27. GOVERNING PRINCIPLES
 
 > **Build the control plane first, prove recoverability early, then give intelligence access to it. Harden and test each boundary before depending on it.**
+
+> **Prove mandatory hardware/provider feasibility before the rest of the product becomes dependent on it.**
 
 > **Build the product identity into the shell before feature screens multiply.**
 
@@ -726,6 +836,10 @@ Only final checkpoint is Production Complete.
 
 > **Windows production quality now. Linux portability through explicit platform boundaries.**
 
+> **A repository file is data until an authenticated user enrolls its exact policy identity.**
+
+> **A valid historical signature is not perpetual authorization to activate.**
+
 ---
 
-**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.4**
+**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.5**

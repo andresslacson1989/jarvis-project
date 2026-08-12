@@ -1,7 +1,7 @@
 # JARVIS
 ## Implementation, Security, Operations & Production Contract
 
-**Contract Suite Version:** 1.0.4  
+**Contract Suite Version:** 1.0.5  
 **Status:** Canonical Implementation-Locked Baseline  
 **Date:** August 12, 2026  
 **V1 Production Platform:** Microsoft Windows 11  
@@ -9,7 +9,8 @@
 **Canonical consolidation:** ADR-069  
 **UI identity:** ADR-070  
 **Production-hardening closure:** ADR-071  
-**Platform/runtime-role architecture:** ADR-072
+**Platform/runtime-role architecture:** ADR-072  
+**Pre-implementation security closure:** ADR-073
 
 ---
 
@@ -49,7 +50,7 @@ USER
 
 # 2. ONE CURRENT NORMATIVE SUITE
 
-The current production contract consists of this file plus the exact documents and component revisions listed in `docs/JARVIS-CONTRACT-MANIFEST-v1.0.4.md`.
+The current production contract consists of this file plus the exact documents and component revisions listed in `docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md`.
 
 The active suite includes:
 
@@ -59,6 +60,9 @@ The active suite includes:
 - `docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md`;
 - `docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`;
 - `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`;
+- `docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md`;
+- `docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md`;
+- `docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`;
 - `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`;
 - `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`;
 - `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`;
@@ -67,7 +71,7 @@ The active suite includes:
 
 The suite version identifies the current combined product contract. Individual appendix revisions MAY remain unchanged when their normative content did not change; the manifest records the exact current revision set.
 
-ADRs preserve rationale/history. They are not an override layer. A future architecture, security, release, product-identity, or platform-role change is incomplete until every affected current normative file and the contract manifest are updated synchronously.
+ADRs preserve rationale/history. They are not an override layer. A future architecture, security, release, product-identity, cryptographic-format, trust-root, policy-admission, or platform-role change is incomplete until every affected current normative file and the contract manifest are updated synchronously.
 
 Earlier contracts and obsolete audits are non-current provenance.
 
@@ -218,7 +222,9 @@ Node Core owns:
 - queues, priorities, budgets, usage/reservations;
 - provider routing/setup/qualification logical state;
 - module/integration logical state;
-- event/automation/notification policy.
+- event/automation/notification policy;
+- project-policy trust/enrollment records and immutable attempt policy snapshots;
+- update/catalog trusted metadata logical state, while native activation remains a platform-host responsibility.
 
 The Rust platform host owns native capabilities such as:
 
@@ -271,6 +277,8 @@ V1 SHALL NOT claim hard isolation from arbitrary malicious code already executin
 
 Session-password recovery SHALL NOT use a weak OS-login-only bypass. A verified JARVIS portable recovery factor may establish an explicit password-reset/recovery workflow. Without an applicable recovery factor, the verifier is not reversible. Clean-machine portable restore establishes a new session password after successful state recovery.
 
+The general KDF floor above does not weaken the stronger optional portable-backup passphrase profile defined by `JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md`.
+
 ---
 
 # 10. EXECUTION SCOPES
@@ -300,7 +308,7 @@ A provider's native OS capability never broadens the JARVIS scope.
 
 A worker is a scoped executor, not a second JARVIS authority.
 
-Workers receive task/mission identity, execution scope, authority envelope, bounded context/artifacts, acceptance criteria, role, provider assignment, tools, data policy, resource/budget ceilings, and checkpoint policy.
+Workers receive task/mission identity, execution scope, authority envelope, bounded context/artifacts, acceptance criteria, role, provider assignment, tools, data policy, resource/budget ceilings, checkpoint policy, and the exact trusted project-policy snapshot applicable to the attempt when one exists.
 
 Shell-capable software engineering workers operate under the V1 `WORKSPACE_ENGINEERING` delegated profile:
 
@@ -313,6 +321,8 @@ Shell-capable software engineering workers operate under the V1 `WORKSPACE_ENGIN
 - those operations return through registered JARVIS tools/integrations and PermissionEngine.
 
 Windows V1 uses Job Objects for lifecycle/resource containment. Job Objects are not filesystem/network security isolation and are not the universal shared abstraction; the shared concept is managed process-tree supervision.
+
+A repository file such as `AGENTS.md` is untrusted content until explicitly enrolled under the Project Policy Trust Contract. Worker access to the repository does not promote policy-looking text to trusted instruction. Changing an enrolled trusted project-policy file is contextually HIGH and the resulting content does not auto-trust itself.
 
 ---
 
@@ -360,7 +370,7 @@ PermissionEngine SHALL apply this decision precedence:
 3. session/automation eligibility;
 4. authority-envelope scope/action containment;
 5. required capability/target/account/environment checks;
-6. data locality, budget, resource, precondition, platform-capability, setup, and integrity checks;
+6. data locality, budget, resource, precondition, platform-capability, setup, integrity, trusted project-policy state, and applicable supply-chain trust checks;
 7. authority established by the current explicit instruction;
 8. matching standing permission;
 9. risk/approval rule: a recoverable HIGH action requires a new approval unless the exact resolved action/target/scope is directly and unambiguously authorized by the current authenticated instruction or an explicit matching standing permission under policy; CRITICAL/destructive/materially unrecoverable always requires fresh final confirmation;
@@ -412,7 +422,7 @@ No model or future companion client may waive this boundary.
 
 Complex work is represented as immutable-versioned DAGs. Workers may request replanning but cannot mutate the active graph directly.
 
-Task state includes durable `RESUMING`. A paused task must enter `RESUMING`, revalidate live state, scope, provider/locality, platform capabilities, budget, leases, and preconditions, then transition to RUNNING/QUEUED/BLOCKED/RECOVERING/FAILED/CANCELLED as appropriate.
+Task state includes durable `RESUMING`. A paused task must enter `RESUMING`, revalidate live state, scope, provider/locality, platform capabilities, budget, leases, project-policy trust snapshots where applicable, and preconditions, then transition to RUNNING/QUEUED/BLOCKED/RECOVERING/FAILED/CANCELLED as appropriate.
 
 Accepted work, queue state, checkpoints, graph versions, approvals, and recovery state are durable.
 
@@ -473,7 +483,7 @@ Provider-reported quota/cost facts and JARVIS local budget policy remain distinc
 
 SQLite/SQLCipher is the V1 authoritative durable state store.
 
-Production SHALL use WAL on a qualified local filesystem unless an explicit qualified alternative is adopted. The embedded SQLite core SHALL include the upstream WAL-reset corruption fix. WAL activation, foreign keys, connection initialization, bounded busy handling, checkpoint health, and authoritative `synchronous=FULL` policy are verified rather than assumed.
+Production SHALL use WAL on a qualified local filesystem unless an explicit qualified alternative is adopted. The exact embedded SQLite/SQLCipher build SHALL be identified and proven to contain the required upstream WAL-reset corruption fix; SQLite `3.51.3` is the first known fixed upstream point for that defect, but numeric version comparison alone does not establish production qualification. WAL activation, foreign keys, connection initialization, bounded busy handling, checkpoint health, and authoritative `synchronous=FULL` policy are verified rather than assumed.
 
 Authoritative state transitions and their causative durable events are transactional. External side effects use attempt/uncertain/recovery semantics rather than pretending SQLite and remote services share one transaction.
 
@@ -485,29 +495,28 @@ Logical persistence schemas SHOULD remain platform-neutral. Platform-specific na
 
 The live database uses a random local `DB_DEK` protected by the active full host's qualified local secure-storage backend. Windows V1 uses the Windows secure-storage design in the Security/Data contracts.
 
-Every backup package uses an independent random 256-bit backup DEK and authenticated encryption. Backup classes are at least:
+The production portable-backup format is `JARVIS_BACKUP_V1` and is governed exactly by `JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md`.
+
+Every backup package uses an independent random 256-bit `BackupDEK`, a fresh backup-specific `SnapshotDBKey`, and the versioned authenticated encryption/chunk/key-slot format defined by that contract. The snapshot key record exists only inside the authenticated encrypted backup payload.
+
+Backup classes are at least:
 
 ```text
 LOCAL_RECOVERY
 PORTABLE_STATE
 ```
 
-A database backup snapshot SHALL be encrypted under a backup-specific snapshot database key rather than requiring the historical live `DB_DEK` on a clean machine. The snapshot key record exists only inside the authenticated encrypted backup payload.
+For Windows V1, `BackupDEK` may be protected by a local current-user DPAPI/PlatformSecureStorage slot.
 
-For Windows V1, the backup DEK may be protected by:
-
-- local current-user DPAPI/local secure-store slot for local recovery;
-- versioned Argon2id portable-recovery KDF slot for `PORTABLE_STATE` (and optionally both slots).
-
-The portable slot records its KDF profile/parameters and SHALL meet the current production Argon2id floor. It is intentionally independent of the historical platform-local secure-store key.
+Every production backup labeled `PORTABLE_STATE VERIFIED` SHALL additionally contain a JARVIS-generated 256-bit `GENERATED_RECOVERY_V1` recovery slot. A user-selected Argon2id passphrase slot MAY be offered as an additional convenience recovery method but SHALL NOT be the sole production portability anchor.
 
 Clean-profile Windows V1 restore is:
 
 ```text
-portable recovery factor
-→ derive/unlock backup DEK using recorded qualified KDF profile
-→ authenticate/decrypt package
-→ obtain snapshot database key transiently
+generated portable recovery factor (or an additional qualified slot)
+→ authenticate/unlock BackupDEK
+→ authenticate/decrypt complete bounded JARVIS_BACKUP_V1 package
+→ obtain SnapshotDBKey transiently
 → open/integrity-check SQLCipher snapshot
 → restore
 → generate fresh local DB_DEK
@@ -517,13 +526,13 @@ portable recovery factor
 
 Ordinary backups exclude raw long-lived integration credentials. Restored integrations without credentials become `REAUTH_REQUIRED`.
 
-Portable recovery is not considered configured/verified until its portable key slot and clean-profile restore path have been qualified.
+Portable recovery is not considered configured/verified until its generated portable key slot and a clean-profile restore path have been qualified with the exact production backup format.
 
 Cross-platform Windows↔Linux restore is not a current V1 guarantee and requires future migration/compatibility qualification, but the portable backup cryptographic envelope SHALL NOT require the historical Windows DPAPI secret.
 
 ---
 
-# 22. MODULES
+# 22. MODULES AND SUPPLY-CHAIN TRUST
 
 Every module is exactly one execution class:
 
@@ -540,6 +549,8 @@ Separately installable executable modules SHALL NOT execute inside authoritative
 Signed package provenance does not itself make external code safe enough for Core.
 
 V1 does not require an open arbitrary executable-module marketplace. Only modules listed/qualified by the active Release Profile/catalog for the current platform may be presented as supported.
+
+Application-update and supported module-catalog trust SHALL follow `JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`. Windows production application updates require current TUF authorization plus the required Tauri updater signature, Windows code-signing, compatibility, and rollback gates. An old historically valid signature does not override current revocation, release-sequence, or security-epoch policy.
 
 ---
 
@@ -614,6 +625,8 @@ Voice presence, listening/speaking/degraded states, and voice-to-visual continui
 
 Voice semantics are shared; audio/device/provider implementations may be platform-specific and require independent qualification.
 
+The Implementation Plan includes an early real-hardware voice feasibility spike after the Phase-3 persistence/recovery proof. This does not reduce the later full voice implementation/qualification requirement; it prevents the rest of the product from depending on untested latency/AEC/provider/licensing assumptions.
+
 ---
 
 # 26. BRAND / ASSET PROVENANCE
@@ -634,7 +647,7 @@ Verification preference is deterministic checks, verified live state, independen
 
 The active Release Profile determines the exact platform/provider/integration/voice support matrix.
 
-`Production Complete` for V1 requires the exact signed Windows artifacts for one source commit to pass every mandatory qualification gate including:
+`Production Complete` for V1 requires the exact signed Windows artifacts for one source commit to pass every mandatory qualification gate in every active normative contract, including:
 
 - clean install and supported Windows qualification;
 - platform-boundary architecture/import checks proving shared Core/domain does not depend directly on Windows-native implementation modules;
@@ -644,13 +657,15 @@ The active Release Profile determines the exact platform/provider/integration/vo
 - IPC/WebView security;
 - Argon2id KDF-profile and migration/upgrade tests;
 - destructive-action binding;
-- encrypted portable restore;
+- `JARVIS_BACKUP_V1` cryptographic vectors, tamper/order/truncation tests, generated-recovery factor, and clean-profile disaster restore;
+- project-policy candidate/enrollment/hash-change/nesting/revocation/worker-mutation trust tests;
+- TUF bootstrap/root-threshold/rotation/revocation/expiration/rollback/freeze/delegation tests plus cumulative Tauri/Windows signing gates;
 - crash/recovery;
-- SQLite/WAL safety;
+- SQLite/WAL safety on the exact qualified embedded build;
 - process containment;
 - update rollback;
 - resource pressure;
-- voice;
+- voice, including evidence from the early feasibility spike and final production qualification;
 - soak;
 - SBOM, licensing, provenance, and signed artifacts.
 
@@ -673,13 +688,15 @@ Before Phase 0 is complete, `master` SHALL be protected by a GitHub ruleset/bran
 
 A pull-request requirement is strongly preferred for implementation changes. Repository governance SHALL NOT require maintaining a second long-lived authoritative branch.
 
+Phase 0 SHALL also establish machine-readable canonical definitions/checks for repeated security/profile constants and capability matrices where practical, with CI detecting divergence from current normative values rather than relying indefinitely on manual duplication discipline.
+
 ---
 
 # 29. FUTURE ARCHITECTURE AMENDMENTS
 
 A future material decision uses a new unique ADR and updates every affected active normative file plus the current contract manifest synchronously before implementation depends on it.
 
-Material changes to product scope, runtime roles/platform intent, trust boundaries, release gates, authentication/recovery, required capabilities, or UI identity SHALL advance the contract-suite semantic version rather than silently changing the meaning of an existing suite version.
+Material changes to product scope, runtime roles/platform intent, trust boundaries, release gates, authentication/recovery, backup cryptographic format, project-policy admission, supply-chain trust root, required capabilities, or UI identity SHALL advance the contract-suite semantic version rather than silently changing the meaning of an existing suite version.
 
 No ordinary “later ADR silently supersedes this contract until someone eventually reconciles it” workflow is allowed.
 
@@ -731,6 +748,10 @@ The absence of Linux/companion delivery from V1 SHALL NOT be used to justify vio
 
 > **One authoritative host. Multiple interaction surfaces may come later.**
 
+> **A repository file is data until an authenticated user enrolls its exact policy identity.**
+
+> **A valid historical signature is not perpetual authorization to activate.**
+
 > **Build the control plane first, prove recoverability early, then give intelligence access to it.**
 
 > **Version the current truth; do not make implementers infer it from history.**
@@ -739,4 +760,4 @@ The absence of Linux/companion delivery from V1 SHALL NOT be used to justify vio
 
 ---
 
-**END — JARVIS IMPLEMENTATION, SECURITY, OPERATIONS & PRODUCTION CONTRACT SUITE v1.0.4**
+**END — JARVIS IMPLEMENTATION, SECURITY, OPERATIONS & PRODUCTION CONTRACT SUITE v1.0.5**

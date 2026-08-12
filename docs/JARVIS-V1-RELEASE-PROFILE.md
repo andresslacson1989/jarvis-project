@@ -1,9 +1,9 @@
 # JARVIS V1 Production Release Profile
 
-**Profile Version:** 1.0.4  
+**Profile Version:** 1.0.5  
 **Status:** Canonical production-support target  
 **Date:** August 12, 2026  
-**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.4.md`
+**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md`
 
 ---
 
@@ -13,7 +13,7 @@ The architecture describes what JARVIS may support over time. This Release Profi
 
 A capability that exists only in an ADR, experimental code, historical contract, or unqualified module/platform is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after full qualification.
 
-V1 is intentionally **Windows-only as a production FULL_HOST release**. The v1.0.4 architecture preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden.
+V1 is intentionally **Windows-only as a production FULL_HOST release**. The v1.0.5 architecture preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden.
 
 ---
 
@@ -75,7 +75,7 @@ Required runtime properties:
 - no privileged localhost/LAN HTTP control plane;
 - Windows Job Object containment is mandatory for managed executable child trees except narrowly qualified exceptions;
 - signed installer/update artifacts;
-- protocol major `1` using v1.0.4 protocol/domain schemas.
+- protocol major `1` using the current manifest's protocol/domain schemas.
 
 The implementation SHALL expose native responsibilities through explicit semantic platform-capability/composition boundaries equivalent to:
 
@@ -120,21 +120,22 @@ V1 SHALL use:
 
 - SQLite/SQLCipher-compatible authoritative database;
 - local-filesystem WAL mode unless an explicitly qualified alternative is adopted;
-- embedded SQLite core proven to include the upstream WAL-reset corruption fix (SQLite 3.51.3+ or a verified fixed backport/equivalent embedded source);
+- an exact embedded SQLite/SQLCipher build proven to contain the upstream WAL-reset corruption fix; SQLite `3.51.3` is the first known fixed upstream point for that defect, but numeric `>= 3.51.3` comparison alone SHALL NOT establish qualification;
 - `synchronous=FULL` for authoritative state by default;
 - foreign keys on every connection;
 - bounded busy handling and WAL/checkpoint diagnostics;
 - random local `DB_DEK` protected by the Windows PlatformSecureStorage backend;
-- SQLite-safe online backup/snapshot;
-- independent per-backup DEK;
-- backup-specific SQLCipher snapshot key inside authenticated encrypted backup payload;
+- a release-qualified SQLCipher-safe online snapshot/export/re-key path proven on the exact packaged binding;
+- independent per-backup 256-bit `SnapshotDBKey` and 256-bit `BackupDEK`;
+- production backup format `JARVIS_BACKUP_V1` exactly as defined by `JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md`;
 - `LOCAL_RECOVERY` and `PORTABLE_STATE` backup classes;
 - DPAPI/current-user Windows local key slot for Windows-local recovery;
-- Argon2id portable recovery slot independent of historical DPAPI/local secure-store material;
+- mandatory `GENERATED_RECOVERY_V1` 256-bit recovery slot for every production `PORTABLE_STATE VERIFIED` backup;
+- optional additional `PASSPHRASE_ARGON2ID_V1` slot using the stronger portable-backup KDF profile;
 - clean-profile Windows restore followed by fresh local `DB_DEK` generation/re-key;
 - forward migrations and paired binary/database rollback.
 
-JARVIS-managed session-password and portable-recovery KDF profiles SHALL use Argon2id version `0x13` and SHALL NOT fall below:
+JARVIS-managed session-password and general portable-recovery KDF profiles SHALL use Argon2id version `0x13` and SHALL NOT fall below:
 
 ```text
 memory:      65536 KiB
@@ -144,11 +145,21 @@ salt:        16 random bytes
 output:      32 bytes
 ```
 
-Release calibration MAY strengthen these parameters. The exact versioned profile used for each verifier/key slot SHALL be persisted and included in migration/upgrade qualification. Portable recovery SHOULD use a materially higher memory cost when practical on the qualified hardware baseline.
+The optional V1 portable-backup passphrase slot SHALL use at least:
+
+```text
+memory:      262144 KiB
+passes:      3
+parallelism: 4
+salt:        16 random bytes
+output:      32 bytes
+```
+
+Release calibration MAY strengthen these parameters. The exact versioned profile used for each verifier/key slot SHALL be persisted and included in migration/upgrade qualification.
 
 The `PORTABLE_STATE` cryptographic envelope SHALL NOT require the historical Windows DPAPI key. Cross-platform Windows↔Linux state restoration is **not** a V1 guarantee and must later qualify platform-specific path/provider/setup/artifact migration semantics.
 
-A specific Node SQLite/SQLCipher binding becomes `SUPPORTED` only after the persistence/packaging proof passes on the exact packaged Windows application.
+A specific Node SQLite/SQLCipher binding becomes `SUPPORTED` only after the persistence/packaging/snapshot/re-key proof passes on the exact packaged Windows application.
 
 ---
 
@@ -204,6 +215,7 @@ No local LLM is required for V1.
 V1 SHALL include production-qualified:
 
 - project registration, aliases, environments, workspaces/worktrees;
+- explicit project-policy candidate detection, user enrollment/disable/revocation, immutable attempt policy snapshots, content-hash change detection, and nested-policy scope under `JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md`;
 - project/system status;
 - Git status/current branch/diff/log;
 - controlled project/folder/file open;
@@ -219,6 +231,8 @@ The orchestrator never gets a generic unrestricted shell.
 
 Filesystem/path handling SHALL go through platform-aware canonical path/resource abstractions. Windows-specific traversal/reparse/UNC/drive behavior remains mandatory for V1 without becoming the universal shared path model.
 
+Project registration/opening SHALL NOT silently trust repository `AGENTS.md` or other policy-looking files. Trusted policy requires the explicit enrolled canonical project/path/scope/content identity defined by the Project Policy Trust Contract.
+
 ---
 
 # 7. REQUIRED MISSION/WORKER RUNTIME
@@ -231,7 +245,7 @@ V1 SHALL ship and qualify:
 - bounded worker loops and no-progress detection;
 - worker journals/checkpoints without private chain-of-thought;
 - queue transparency;
-- durable `RESUMING` state and live-state revalidation;
+- durable `RESUMING` state and live-state/policy revalidation;
 - resource/provider/budget/platform-capability-aware scheduler;
 - exact budget reservations/settlement;
 - provider fallback that preserves policy/platform support;
@@ -248,6 +262,7 @@ V1 SHALL ship and qualify:
 - versioned Argon2id session-password verifier meeting the production KDF floor;
 - Windows lock/sign-out integration through the platform session observer;
 - explicit portable recovery-factor workflow for session/data recovery;
+- mandatory generated 256-bit portable backup recovery factor for production portable-state verification;
 - Windows PlatformSecureStorage/Credential Broker backend;
 - explicit Windows named-pipe DACL/local-only/bootstrap authentication backend;
 - authoritative local-only WebView/Tauri capability/CSP/navigation boundary;
@@ -255,12 +270,14 @@ V1 SHALL ship and qualify:
 - authority envelopes;
 - deterministic PermissionEngine precedence with mandatory safety/deny dominance;
 - standing permission and limited precedent semantics;
+- explicit project-policy trust enrollment; untrusted repository text cannot self-promote to policy;
 - `CanonicalActionDescriptorV1` JCS/SHA-256/base64url approval binding;
 - mandatory final destructive confirmation;
 - independent `DataSensitivity` + `DataLocality`;
 - prompt-injection/content-authority boundary;
 - canonical platform-aware path/resource resolution;
 - conditional external mutation when supported;
+- TUF 1.0.35-based update/module trust lifecycle with current revocation/anti-rollback policy;
 - secret-minimizing logs/journals/diagnostics;
 - explicit same-user-malware limitation;
 - platform-capability failure that blocks/degrades dependent behavior rather than unsafe fallback.
@@ -306,7 +323,7 @@ The mandatory matrix does **not** include:
 - organization/member/team administration;
 - ref deletion.
 
-`GITHUB_REF_WRITE` means typed creation/update of permitted non-protected refs with expected-ref/conditional semantics. Later ref deletion requires a separately defined risk/action contract.
+`GITHUB_REF_WRITE` means typed creation/update of permitted non-protected refs with exact expected-old-ref/conditional semantics. Later ref deletion requires a separately defined risk/action contract.
 
 ## 9.2 Proxmox VE V1 capability matrix
 
@@ -364,7 +381,9 @@ Separately installed executable code cannot run inside Core.
 
 Module support SHALL be platform/runtime-role qualified when native execution or dependencies differ. A module supported on Windows is not automatically supported on Linux.
 
-An open arbitrary third-party executable-module marketplace is **not** a V1 Production Complete requirement. An `EXTERNAL_MANAGED` module is supported only when explicitly present in the signed release/catalog support matrix and fully qualified.
+An open arbitrary third-party executable-module marketplace is **not** a V1 Production Complete requirement. An `EXTERNAL_MANAGED` module is supported only when explicitly present in the current TUF-authorized signed release/catalog support matrix and fully qualified.
+
+Production module catalog authorization SHALL use the dedicated TUF delegated role/profile from `JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`; publisher signature alone does not confer `SUPPORTED` status.
 
 ---
 
@@ -397,6 +416,8 @@ TTS: one local production-qualified provider meeting identity/latency/interrupti
 These are Windows V1 qualification requirements. Future Linux voice support must independently qualify actual Linux device lifecycle, AEC, acceleration/runtime, privacy, latency, and packaging behavior while preserving the same voice/product semantics.
 
 Wake word may remain disabled/unqualified and is not required for V1.
+
+Before broad feature implementation proceeds beyond the early platform/persistence foundation, the v1.0.5 Implementation Plan SHALL run an early real-hardware feasibility spike for candidate STT/VAD/TTS/AEC/barge-in/device/resource/licensing behavior. Passing that spike is evidence of stack feasibility, not final Voice Production Complete.
 
 ---
 
@@ -453,16 +474,18 @@ The release SHALL remain usable without a permanently loaded large local LLM and
 
 # 14. POST-V1 REQUIRED INTEGRATIONS
 
-The following remain binding product requirements but do not block V1 Production Complete:
+The following remain binding product roadmap requirements but do not block V1 Production Complete:
 
 - SSH;
 - Google Workspace;
 - Microsoft 365;
 - Cloudflare.
 
-The first feature-bearing release after V1 SHALL NOT be feature-complete until all four are `SUPPORTED` and qualified. Security/maintenance patch releases may ship before that gate without being used to evade it.
+They MAY ship independently in production-qualified post-V1 feature releases as each integration becomes complete. No release is required to delay an otherwise complete one of these integrations merely because another is not ready. Removing any of the four from the binding roadmap still requires a deliberate product-contract amendment.
 
-Direct public inbound Internet listeners remain outside the required V1/post-V1 integration gate unless separately hardened/approved.
+Security/maintenance patch releases remain independent of this roadmap.
+
+Direct public inbound Internet listeners remain outside the required V1/post-V1 integration roadmap unless separately hardened/approved.
 
 ---
 
@@ -518,24 +541,31 @@ installer/signing identity metadata
 Tauri/Rust/Node/TypeScript/package-manager versions
 Core packaging/runtime identity
 protocol/schema version
-database/SQLCipher/SQLite identity and WAL-fix evidence
+database/SQLCipher/SQLite identity + exact WAL-fix evidence + qualified snapshot mechanism
 migration set
 session_password_kdf_profile
 portable_recovery_kdf_profiles
+backup_format_id/version/cipher/chunk profile
+generated_recovery_slot_profile
+project_policy_trust_profile_version
 supported provider versions/ranges/setup-state requirements + platform binding
 supported integration capability matrix
 supported module versions/ranges + platform binding
 voice provider versions/ranges + platform binding
 brand asset/source identities
 font/icon/visual-asset license/provenance references
-module catalog trust key ids
+TUF spec version/trusted root version/root key IDs+threshold/role key IDs+thresholds/module delegation
+release_sequence
+security_epoch
+Tauri updater signing key identity
+Windows code-signing identity/timestamp metadata
 SBOM reference/hash
 qualification report reference/hash
 known limitations
 rollback pairing information
 ```
 
-No raw credentials/private user data appear in the manifest.
+No raw credentials/private user data/private signing keys/recovery factors appear in the manifest.
 
 ---
 
@@ -550,29 +580,34 @@ Before Phase 0 may be declared complete, authoritative `master` SHALL have an ac
 
 A pull-request requirement is strongly preferred once implementation changes begin. No second long-lived branch becomes an alternate source of truth.
 
+Phase 0 SHALL also create machine-readable canonical profile/capability definitions and CI drift checks for repeated normative constants/matrices where practical.
+
 ---
 
 # 18. PRODUCTION-COMPLETE GATE
 
 For this profile, Production Complete requires the same source commit and signed **Windows FULL_HOST** release artifacts to pass:
 
-- all required functionality and current mandatory contract rules;
+- all required functionality and every current mandatory active-contract rule;
 - platform/clean-install qualification;
 - platform-capability/composition/import-boundary architecture checks;
 - Mission Control UI identity/adaptive/accessibility/window-state qualification;
 - Tauri/WebView and named-pipe security gates;
 - self-contained Core/runtime package gate;
-- SQLite/SQLCipher/WAL fix and persistence gates;
+- exact SQLite/SQLCipher/WAL fix, snapshot/re-key, and persistence gates;
 - KDF-profile floor/migration tests;
-- portable clean-profile encrypted restore;
+- `JARVIS_BACKUP_V1` cryptographic/tamper/order/truncation vectors and generated-recovery clean-profile disaster restore;
+- project-policy trust enrollment/change/nested-policy/worker-mutation conformance;
 - Codex setup/repair + provider/version/sandbox conformance;
 - Local Git + exact GitHub capability-matrix conformance;
 - exact Proxmox capability-matrix conformance;
 - destructive-action/PermissionEngine safety gates;
 - Windows Job Object process containment/orphan cleanup;
+- TUF bootstrap/threshold/root rotation/revocation/expiration/delegation/rollback/freeze/mix-and-match plus Tauri updater and Windows signing gates;
 - module/catalog/update integrity;
 - crash/recovery/uncertain-side-effect tests;
 - budget/resource/performance/voice tests;
+- early voice-feasibility evidence plus final voice production qualification;
 - event/automation tests;
 - upgrade/rollback;
 - soak/stability;
@@ -594,4 +629,4 @@ Documentation completion alone never satisfies this gate.
 
 ---
 
-**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.4**
+**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.5**

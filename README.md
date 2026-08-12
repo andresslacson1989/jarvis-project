@@ -14,24 +14,27 @@ Before Phase 0 implementation is considered complete, `master` must have product
 
 ## Current implementation source of truth
 
-**There is one current contract suite: JARVIS v1.0.4.**
+**There is one current contract suite: JARVIS v1.0.5.**
 
-Start with [`docs/JARVIS-CONTRACT-MANIFEST-v1.0.4.md`](docs/JARVIS-CONTRACT-MANIFEST-v1.0.4.md). It is the authoritative index of the current suite and records each component revision.
+Start with [`docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md`](docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md). It is the authoritative index of the current suite and records each component revision.
 
 Read the active suite in this order:
 
-1. [`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.4.md`](docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.4.md) — canonical product, architecture, security, operations, platform-role, and production contract.
+1. [`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md`](docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md) — canonical product, architecture, security, operations, platform-role, and production contract.
 2. [`docs/JARVIS-V1-RELEASE-PROFILE.md`](docs/JARVIS-V1-RELEASE-PROFILE.md) — exact Windows V1 production support/capability/release target.
 3. [`docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md`](docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md) — Windows/Linux full-host boundaries and future companion role.
 4. [`docs/implementation/JARVIS-RUNTIME-CONTRACT.md`](docs/implementation/JARVIS-RUNTIME-CONTRACT.md) — current Windows V1 runtime specialization, secure IPC, provider setup, worker/provider supervision, scheduling, cancellation, and recovery.
-5. [`docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md`](docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md) — canonical V1 protocol/domain/KDF/provider/integration schemas.
-6. [`docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`](docs/implementation/JARVIS-DATA-STATE-CONTRACT.md) — SQLite/SQLCipher state, KDF metadata, state machines, budgets, backups, restore, and migrations.
-7. [`docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`](docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md) — threat model, permission precedence, Windows V1 security mechanisms, worker/provider/tool/module/integration security, and recovery-key rules.
-8. [`docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`](docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md) — normative coding/package/platform-boundary/validation/testing/CI rules.
-9. [`docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`](docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md) — queue/dashboard truth, recovery visibility, notification/focus behavior, module/integration UX, voice responsiveness, diagnostics, and governance.
-10. [`docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`](docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md) — canonical brand, dark-theme Mission Control, adaptive/reflow behavior, accessibility, and UI qualification.
-11. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — Definition of Done, portability-boundary evidence, Windows V1 security/provider/integration/UI/recovery gates, and release qualification.
-12. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria. It does not authorize implementation to begin by itself.
+5. [`docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md`](docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md) — canonical V1 protocol/domain/KDF/provider/integration/platform schemas.
+6. [`docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`](docs/implementation/JARVIS-DATA-STATE-CONTRACT.md) — SQLite/SQLCipher state, KDF metadata, state machines, budgets, broad backup/restore semantics, and migrations.
+7. [`docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`](docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md) — threat model, permission precedence, Windows V1 security mechanisms, worker/provider/tool/module/integration security, and broad recovery-key rules.
+8. [`docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md`](docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md) — exact `JARVIS_BACKUP_V1` cryptographic format, chunk/AAD/nonce/key-slot rules, generated recovery factor, and restore qualification.
+9. [`docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md`](docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md) — deterministic `AGENTS.md` candidate/enrollment/hash-change/nesting/revocation trust boundary.
+10. [`docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`](docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md) — TUF-based update/module trust roots, rotation/revocation, expiration, delegations, anti-rollback and cumulative signing gates.
+11. [`docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`](docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md) — normative coding/package/platform-boundary/validation/testing/CI rules.
+12. [`docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`](docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md) — queue/dashboard truth, recovery visibility, notification/focus behavior, module/integration UX, voice responsiveness, diagnostics, and governance.
+13. [`docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`](docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md) — canonical brand, dark-theme Mission Control, adaptive/reflow behavior, accessibility, and UI qualification.
+14. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — central Definition of Done and Windows V1 release qualification; all specialized mandatory verification rules in the active v1.0.5 contracts are cumulative.
+15. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria, including the early voice feasibility spike. It does not authorize implementation to begin by itself.
 
 Canonical vector brand assets live under [`assets/brand/`](assets/brand/).
 
@@ -51,25 +54,23 @@ A future Linux release must independently qualify its native secure storage, IPC
 
 A future companion remains non-authoritative and may only reach a host through a separately designed/qualified remote-access boundary. V1 still exposes no privileged LAN/Internet Core API.
 
+## v1.0.5 security closure
+
+v1.0.5 does not redesign the architecture or reduce V1 scope. It closes the remaining pre-implementation security ambiguities:
+
+- `JARVIS_BACKUP_V1` is a fixed production backup cryptographic format with AES-256-GCM chunk/AAD/nonce rules, strict ordering/truncation protection, fresh per-backup keys, and a mandatory JARVIS-generated 256-bit portable recovery factor; a user passphrase is optional additional recovery, not the sole production portability anchor;
+- repository `AGENTS.md` is untrusted until the authenticated user enrolls an exact canonical project/path/scope/content hash; changed policy requires review and worker edits do not auto-trust new policy;
+- application updates and supported module catalog use TUF trust metadata with threshold offline root trust, rotation/revocation/expiration/delegation/anti-rollback, plus cumulative Tauri and Windows signing gates;
+- the implementation plan measures voice/AEC/barge-in feasibility immediately after the early persistence/recovery proof rather than discovering voice-stack infeasibility late;
+- SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding post-V1 targets but may ship independently when individually production-qualified;
+- Phase 0 adds machine-readable repeated contract values and CI drift checks where practical;
+- SQLite qualification is tied to the exact embedded build and fix evidence, not numerical version comparison alone.
+
 ## No overlay interpretation
 
-Accepted ADRs under `docs/decisions/` and `docs/adr/` preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.4 suite.
+Accepted ADRs preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.5 suite.
 
 If an ADR/history file and the active suite appear to conflict, the current manifest and normative documents govern; a suspected missing still-valid requirement is treated as a contract defect and corrected in the current suite rather than silently inferred from history.
-
-## Key production closures
-
-v1.0.3 closed UI release integration, Codex setup/repair, KDF floors, exact GitHub/Proxmox matrices, brand provenance, contract versioning, and repository governance.
-
-v1.0.4 adds one deliberate architectural preservation constraint without expanding V1 delivery scope:
-
-- Windows and Linux are full-host platform targets, with Windows alone required for V1;
-- native OS functions sit behind explicit platform capability/composition boundaries;
-- shared Core/domain/policy code must not accumulate direct Windows implementation dependencies;
-- stronger Windows mechanisms are never weakened for portability;
-- provider/module/tool support remains platform-qualified;
-- Android is reserved as a future companion, not a full-host parity requirement;
-- future companion communication requires a separately qualified remote-access gateway and never direct unrestricted Core exposure.
 
 ## Governing principles
 
@@ -84,5 +85,9 @@ v1.0.4 adds one deliberate architectural preservation constraint without expandi
 > **Windows production quality now. Linux portability through explicit platform boundaries.**
 
 > **One authoritative host. Multiple interaction surfaces may come later.**
+
+> **A repository file is data until an authenticated user enrolls its exact policy identity.**
+
+> **A valid historical signature is not perpetual authorization to activate.**
 
 `Implementation-locked` means the active contract defines architecture tightly enough that implementation does not invent product/security/platform boundaries. `Production Complete` still requires an implemented, signed Windows V1 release that passes every mandatory active release gate.
