@@ -13,7 +13,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node tools/test/run-tests.mjs --profile normal",
     "test:qualification": "node tools/test/run-tests.mjs --profile qualification",
-    "architecture:check": "node tools/architecture/check-architecture.mjs"
+    "architecture:check": "node tools/architecture/check-architecture.mjs",
+    "format:check": "node tools/ci/check-format.mjs",
+    "schema:check": "node tools/ci/check-schemas.mjs",
+    "security:secrets": "node tools/ci/scan-secrets.mjs",
+    "dependency:check": "node tools/ci/check-dependencies.mjs",
+    "provenance:check": "node tools/ci/check-provenance.mjs",
+    "build": "tsc -p tsconfig.build.json",
+    "ci:evidence": "node tools/ci/generate-evidence.mjs"
   },
   "devDependencies": {
     "typescript": "6.0.3"

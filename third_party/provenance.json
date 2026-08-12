@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "dependencies": [
+    {
+      "ecosystem": "npm",
+      "name": "typescript",
+      "version": "6.0.3",
+      "license": "Apache-2.0",
+      "source": "https://github.com/microsoft/TypeScript",
+      "role": "BUILD_TEST",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    }
+  ],
+  "ciActions": [
+    {
+      "repository": "actions/checkout",
+      "release": "v7.0.1",
+      "commit": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "license": "MIT",
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "repository": "pnpm/setup",
+      "release": "v2.0.2",
+      "commit": "84cb39b217b10273981911c288cd62326dc7c6d2",
+      "license": "MIT",
+      "reviewStatus": "APPROVED"
+    }
+  ],
+  "toolchains": [
+    {
+      "name": "Node.js",
+      "version": "24.18.0",
+      "license": "MIT",
+      "source": "https://github.com/nodejs/node",
+      "role": "BUILD_RUNTIME",
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "name": "pnpm",
+      "version": "11.21.0",
+      "license": "MIT",
+      "source": "https://github.com/pnpm/pnpm",
+      "role": "BUILD_TOOL",
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "name": "Rust",
+      "version": "1.97.1",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/rust-lang/rust",
+      "role": "BUILD_TOOL",
+      "reviewStatus": "APPROVED"
+    }
+  ]
+}

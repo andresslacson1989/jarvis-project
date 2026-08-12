@@ -4,3 +4,5 @@ target/
 dist/
 coverage/
 *.tsbuildinfo
+
+.artifacts/
