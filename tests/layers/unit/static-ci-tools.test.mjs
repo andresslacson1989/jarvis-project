@@ -115,9 +115,27 @@ test("provenance checker rejects floating/unknown actions, license mismatch, and
   assert.ok(resultCodes.includes("PROVENANCE_TOOLCHAIN_MISMATCH"));
 });
 
-test("CI evidence is commit-bound and cannot claim PASS unless the workflow gate flag is present", () => {
+test("CI evidence is Phase-0 scoped, commit-bound, and requires the aggregate checkpoint flag", () => {
   assert.throws(() => buildCiEvidence({ env: {}, versions: {} }), /GITHUB_SHA/);
-  assert.throws(() => buildCiEvidence({ env: { GITHUB_SHA: "a".repeat(40) }, versions: {} }), /JARVIS_STATIC_CI_GATES_PASSED/);
+  assert.throws(
+    () =>
+      buildCiEvidence({
+        env: { GITHUB_SHA: "a".repeat(40) },
+        versions: {},
+      }),
+    /JARVIS_STATIC_CI_GATES_PASSED/,
+  );
+  assert.throws(
+    () =>
+      buildCiEvidence({
+        env: {
+          GITHUB_SHA: "a".repeat(40),
+          JARVIS_STATIC_CI_GATES_PASSED: "1",
+        },
+        versions: {},
+      }),
+    /JARVIS_PHASE0_CHECKPOINT_PASSED/,
+  );
 
   const evidence = buildCiEvidence({
     env: {
@@ -128,13 +146,34 @@ test("CI evidence is commit-bound and cannot claim PASS unless the workflow gate
       RUNNER_OS: "Linux",
       RUNNER_ARCH: "X64",
       JARVIS_STATIC_CI_GATES_PASSED: "1",
+      JARVIS_PHASE0_CHECKPOINT_PASSED: "1",
     },
-    versions: { node: "24.18.0", pnpm: "11.21.0", typescript: "6.0.3", rust: "1.97.1", cargo: "1.97.1" },
+    versions: {
+      node: "24.18.0",
+      pnpm: "11.21.0",
+      typescript: "6.0.3",
+      rust: "1.97.1",
+      cargo: "1.97.1",
+    },
+    contractSuiteVersion: "1.0.6",
+    governanceMode: "COMPENSATING_CONTROLS",
   });
-  assert.equal(evidence.schemaVersion, 1);
-  assert.equal(evidence.subsection, "0.11");
+
+  assert.equal(evidence.schemaVersion, 2);
+  assert.equal(evidence.scope, "PHASE_0_STATIC_CI");
+  assert.equal(evidence.checkpoint, "0.CP");
   assert.equal(evidence.status, "PASS");
+  assert.equal(evidence.contractSuiteVersion, "1.0.6");
+  assert.equal(evidence.governanceMode, "COMPENSATING_CONTROLS");
   assert.equal(evidence.commitSha, "a".repeat(40));
   assert.equal(evidence.runId, "123");
-  assert.deepEqual(evidence.toolchain, { node: "24.18.0", pnpm: "11.21.0", typescript: "6.0.3", rust: "1.97.1", cargo: "1.97.1" });
+  assert.ok(evidence.gates.includes("repository-governance"));
+  assert.ok(evidence.gates.includes("phase0-section-checkpoint"));
+  assert.deepEqual(evidence.toolchain, {
+    node: "24.18.0",
+    pnpm: "11.21.0",
+    typescript: "6.0.3",
+    rust: "1.97.1",
+    cargo: "1.97.1",
+  });
 });

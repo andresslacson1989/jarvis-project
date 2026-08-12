@@ -101,7 +101,11 @@ jobs:
       - name: Rust Windows-target build
         run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
 
+      - name: Phase 0 section checkpoint
+        run: pnpm phase0:check
+
       - name: Static CI evidence
         env:
           JARVIS_STATIC_CI_GATES_PASSED: '1'
+          JARVIS_PHASE0_CHECKPOINT_PASSED: '1'
         run: pnpm ci:evidence
