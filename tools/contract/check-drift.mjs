@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { extractFenceAfter, extractTypeUnion, isMain, printViolations, readCanonical, readUtf8, sameSet, violation, escapeRegex } from "./lib.mjs";
 
 const DOCS = Object.freeze({
-  manifest: "docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md",
+  manifest: "docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md",
   releaseProfile: "docs/JARVIS-V1-RELEASE-PROFILE.md",
   portability: "docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md",
   protocol: "docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md",
