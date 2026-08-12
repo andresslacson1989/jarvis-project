@@ -1,0 +1,1 @@
+The v1.0.5 top-level implementation contract and contract manifest are historical after the authorized v1.0.6 governance amendment. Their exact prior blobs are preserved in Git history. The current suite is v1.0.6.
