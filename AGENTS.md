@@ -197,6 +197,10 @@ These rules apply once the user explicitly authorizes application implementation
 
 Maintain one current implementation matrix derived from the active Implementation Plan plus all cumulative active-contract requirements.
 
+The canonical execution/status board is `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md`. Before starting or resuming application implementation, read that file after revalidating live `master`, the current manifest, and the Implementation Plan. Use its current execution pointer and next eligible subsection, update its status/gap/evidence fields as work progresses, and do not create a competing implementation matrix.
+
+The matrix is non-normative. Its ordering/status/evidence aids execution, while the current active contract suite remains the only implementation authority. If the matrix and current contract ever disagree, stop dependent implementation, reconcile the matrix to the contract, and do not use the matrix to waive or reinterpret a normative requirement.
+
 The matrix SHALL use one hierarchical first column named equivalent to `Section / Subsection`: each section appears once as a section row and its subsections are listed beneath it in the same column. Do not flatten the matrix by repeating the section name in a separate section column for every subsection.
 
 Recommended tracking fields are:
