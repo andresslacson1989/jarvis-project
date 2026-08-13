@@ -1,5 +1,7 @@
 import { execFile, spawn } from "node:child_process";
+import { createHmac, randomBytes } from "node:crypto";
 import { lstat, readFile, realpath } from "node:fs/promises";
+import { createServer } from "node:net";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -9,6 +11,10 @@ const DEFAULT_STARTUP_TIMEOUT_MS = 2_000;
 const DEFAULT_STOP_TIMEOUT_MS = 2_000;
 const MAX_TIMEOUT_MS = 10_000;
 const MAX_DIAGNOSTIC_BYTES = 16_384;
+const IPC_PROTOCOL_MAJOR = 1;
+const IPC_FRAME_CEILING = 1024 * 1024;
+const BOOTSTRAP_FRAME_CEILING = 64 * 1024;
+const HANDSHAKE_DOMAIN = Buffer.from("JARVIS-CORE-IPC-BOOTSTRAP-V1\0", "utf8");
 
 const execFileAsync = promisify(execFile);
 
@@ -68,6 +74,78 @@ function isCanonicalChild(root, candidate) {
 function appendDiagnostic(buffer, chunk) {
   if (buffer.length >= MAX_DIAGNOSTIC_BYTES) return buffer;
   return `${buffer}${chunk.toString("utf8")}`.slice(0, MAX_DIAGNOSTIC_BYTES);
+}
+
+function encodeFrame(value, ceiling = IPC_FRAME_CEILING) {
+  const payload = Buffer.from(JSON.stringify(value), "utf8");
+  if (payload.length > ceiling) throw new Error("qualification IPC frame exceeds its ceiling");
+  const frame = Buffer.allocUnsafe(4 + payload.length);
+  frame.writeUInt32LE(payload.length, 0);
+  payload.copy(frame, 4);
+  return frame;
+}
+
+function bootstrapFrame(endpoint, secret) {
+  return encodeFrame(
+    { endpoint, protocolMajor: IPC_PROTOCOL_MAJOR, secret: secret.toString("hex") },
+    BOOTSTRAP_FRAME_CEILING,
+  );
+}
+
+function handshakeProof(secret, nonce) {
+  const version = Buffer.alloc(4);
+  version.writeUInt32LE(IPC_PROTOCOL_MAJOR, 0);
+  return createHmac("sha256", secret)
+    .update(Buffer.concat([HANDSHAKE_DOMAIN, version, nonce]))
+    .digest("hex");
+}
+
+function createQualificationCoreServer(endpoint, secret) {
+  let authenticatedResolve;
+  let authenticatedReject;
+  const authenticated = new Promise((resolve, reject) => {
+    authenticatedResolve = resolve;
+    authenticatedReject = reject;
+  });
+  const server = createServer((socket) => {
+    const nonce = randomBytes(32);
+    socket.write(
+      encodeFrame({
+        kind: "challenge",
+        protocolMajor: IPC_PROTOCOL_MAJOR,
+        supportedProtocolMajors: [IPC_PROTOCOL_MAJOR],
+        nonce: nonce.toString("hex"),
+      }),
+    );
+    let buffered = Buffer.alloc(0);
+    socket.on("data", (chunk) => {
+      buffered = Buffer.concat([buffered, chunk]);
+      if (buffered.length < 4) return;
+      const length = buffered.readUInt32LE(0);
+      if (length > IPC_FRAME_CEILING || buffered.length < length + 4) return;
+      let hello;
+      try {
+        hello = JSON.parse(buffered.subarray(4, length + 4).toString("utf8"));
+      } catch (error) {
+        authenticatedReject(new Error("Core qualification handshake emitted malformed JSON", { cause: error }));
+        socket.destroy();
+        return;
+      }
+      if (
+        hello.kind !== "hello" ||
+        hello.protocolMajor !== IPC_PROTOCOL_MAJOR ||
+        hello.proof !== handshakeProof(secret, nonce)
+      ) {
+        authenticatedReject(new Error("Core qualification handshake proof or protocol was invalid"));
+        socket.destroy();
+        return;
+      }
+      socket.write(encodeFrame({ kind: "welcome", protocolMajor: IPC_PROTOCOL_MAJOR }));
+      authenticatedResolve({ socket, protocolMajor: IPC_PROTOCOL_MAJOR });
+    });
+    socket.on("error", (error) => authenticatedReject(error));
+  });
+  return { server, authenticated };
 }
 
 async function requireRegularFile(path, label) {
@@ -176,12 +254,20 @@ export async function qualifyPackagedCore({
     JARVIS_TUF_METADATA_DIR: metadataDirectory,
   };
   const validated = await coreModule.validateCoreEnvironment(environment);
+  const endpoint = `\\\\.\\pipe\\jarvis-core-${randomBytes(16).toString("hex")}`;
+  const secret = randomBytes(32);
+  const qualificationServer = createQualificationCoreServer(endpoint, secret);
+  await new Promise((resolveListen, rejectListen) => {
+    qualificationServer.server.once("error", rejectListen);
+    qualificationServer.server.listen(endpoint, resolveListen);
+  });
   const child = spawn(nodePath, [entrypoint], {
     cwd: releaseRoot,
     env: environment,
     windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
   });
+  child.stdin?.end(bootstrapFrame(endpoint, secret));
   let stderr = "";
   let stdout = "";
   child.stdout?.on("data", (chunk) => {
@@ -192,12 +278,18 @@ export async function qualifyPackagedCore({
   });
 
   try {
-    const exitedBeforeStartup = await waitForExit(child, startupTimeoutMs);
-    if (exitedBeforeStartup) {
-      throw new Error(
-        `packaged Core exited before startup qualification (code=${child.exitCode ?? "none"}, stderr=${stderr.trim() || "<empty>"})`,
-      );
-    }
+    const authenticated = await Promise.race([
+      qualificationServer.authenticated.then(() => true),
+      waitForExit(child, startupTimeoutMs).then((exited) => {
+        if (exited) {
+          throw new Error(
+            `packaged Core exited before authenticated startup (code=${child.exitCode ?? "none"}, stderr=${stderr.trim() || "<empty>"})`,
+          );
+        }
+        return false;
+      }),
+    ]);
+    if (!authenticated) throw new Error("packaged Core did not complete authenticated IPC startup within the bounded timeout");
     const controlledStop = await stopChild(child, stopTimeoutMs);
     if (!controlledStop) throw new Error("packaged Core did not stop within the bounded timeout");
     if (stderr.trim()) throw new Error(`packaged Core wrote unexpected stderr: ${stderr.trim()}`);
@@ -208,6 +300,8 @@ export async function qualifyPackagedCore({
       releaseSequence: validated.releaseTrust.releaseSequence,
       sourceCommitSha: validated.releaseTrust.sourceCommitSha,
       coreStayedAliveBeforeControlledStop: true,
+      authenticatedCoreTransport: true,
+      protocolMajor: IPC_PROTOCOL_MAJOR,
       controlledStop: true,
       stdout: stdout.trim(),
       stderr: stderr.trim(),
@@ -216,6 +310,7 @@ export async function qualifyPackagedCore({
     if (child.exitCode === null && child.signalCode === null) {
       await stopChild(child, stopTimeoutMs);
     }
+    qualificationServer.server.close();
   }
 }
 

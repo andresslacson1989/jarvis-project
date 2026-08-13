@@ -55,6 +55,7 @@ mod windows {
     use std::os::windows::ffi::OsStrExt;
     use std::path::{Path, PathBuf};
     use std::ptr::null;
+    use std::sync::Arc;
     use std::time::Duration;
     use windows_sys::Win32::Foundation::{
         CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, WAIT_FAILED, WAIT_OBJECT_0,
@@ -68,8 +69,11 @@ mod windows {
         SetInformationJobObject, TerminateJobObject,
     };
     use windows_sys::Win32::System::Threading::{
-        CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW, GetExitCodeProcess,
-        PROCESS_INFORMATION, ResumeThread, STARTUPINFOW, TerminateProcess, WaitForSingleObject,
+        CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
+        DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess,
+        InitializeProcThreadAttributeList, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROCESS_INFORMATION,
+        ResumeThread, STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW, TerminateProcess,
+        UpdateProcThreadAttribute, WaitForSingleObject,
     };
 
     const NO_INHERITED_HANDLES: i32 = 0;
@@ -79,6 +83,13 @@ mod windows {
 
     #[derive(Debug)]
     struct OwnedHandle(HANDLE);
+
+    // SAFETY: Windows kernel HANDLE values are process-owned opaque values;
+    // transferring the ownership wrapper between Rust threads does not move
+    // or alias the underlying object. All lifecycle operations remain scoped
+    // to the owning Job Object/process-supervisor methods.
+    unsafe impl Send for OwnedHandle {}
+    unsafe impl Sync for OwnedHandle {}
 
     impl OwnedHandle {
         fn new(handle: HANDLE) -> Option<Self> {
@@ -202,6 +213,7 @@ mod windows {
         arguments: Vec<OsString>,
         current_dir: PathBuf,
         environment: BTreeMap<OsString, OsString>,
+        bootstrap_reader: Option<HANDLE>,
     }
 
     impl From<CoreLaunchSpec> for ProcessLaunchSpec {
@@ -211,6 +223,7 @@ mod windows {
                 arguments: spec.arguments,
                 current_dir: spec.current_dir,
                 environment: spec.environment,
+                bootstrap_reader: None,
             }
         }
     }
@@ -222,13 +235,13 @@ mod windows {
     }
 
     #[derive(Debug)]
-    pub struct SupervisedCoreProcess<'supervisor> {
+    pub struct SupervisedCoreProcess {
         process: OwnedHandle,
         process_id: u32,
-        supervisor: &'supervisor PlatformProcessSupervisor,
+        job: Arc<JobObject>,
     }
 
-    impl SupervisedCoreProcess<'_> {
+    impl SupervisedCoreProcess {
         pub fn process_id(&self) -> u32 {
             self.process_id
         }
@@ -269,40 +282,57 @@ mod windows {
         /// already assigned to it. Cooperative cancellation and grace periods
         /// are owned by the later lifecycle layer; this is the hard-stop path.
         pub fn terminate(&self, exit_code: u32) -> Result<(), ProcessSupervisorError> {
-            self.supervisor.job.terminate(exit_code)
+            self.job.terminate(exit_code)
         }
     }
 
     #[derive(Debug)]
     pub struct PlatformProcessSupervisor {
-        job: JobObject,
+        job: Arc<JobObject>,
     }
 
     impl PlatformProcessSupervisor {
         pub fn new() -> Result<Self, ProcessSupervisorError> {
             Ok(Self {
-                job: JobObject::new()?,
+                job: Arc::new(JobObject::new()?),
             })
         }
 
         /// Launch the application-owned Core only after its integrity and
         /// release identity have been validated. The process is suspended
         /// until it is assigned to the owned Job Object.
-        pub fn launch_core<'supervisor>(
-            &'supervisor self,
+        pub fn launch_core(
+            &self,
             layout: &CoreRuntimeLayout,
             manifest_path: &Path,
-        ) -> Result<SupervisedCoreProcess<'supervisor>, ProcessSupervisorError> {
+        ) -> Result<SupervisedCoreProcess, ProcessSupervisorError> {
             let spec = layout
                 .launch_spec(manifest_path)
                 .map_err(core_runtime_error)?;
             self.spawn_spec(spec.into())
         }
 
-        fn spawn_spec<'supervisor>(
-            &'supervisor self,
+        /// Launch Core with a single inherited anonymous bootstrap reader.
+        /// The handle-list attribute is the complete inheritance allowlist;
+        /// the bootstrap secret itself never enters the command line or env.
+        pub fn launch_core_with_bootstrap(
+            &self,
+            layout: &CoreRuntimeLayout,
+            manifest_path: &Path,
+            bootstrap_reader: HANDLE,
+        ) -> Result<SupervisedCoreProcess, ProcessSupervisorError> {
+            let spec = layout
+                .launch_spec(manifest_path)
+                .map_err(core_runtime_error)?;
+            let mut spec: ProcessLaunchSpec = spec.into();
+            spec.bootstrap_reader = Some(bootstrap_reader);
+            self.spawn_spec(spec)
+        }
+
+        fn spawn_spec(
+            &self,
             spec: ProcessLaunchSpec,
-        ) -> Result<SupervisedCoreProcess<'supervisor>, ProcessSupervisorError> {
+        ) -> Result<SupervisedCoreProcess, ProcessSupervisorError> {
             validate_spec(&spec)?;
             let application_name = wide_null(spec.program.as_os_str(), "program")?;
             let mut command_line = build_command_line(&spec)?;
@@ -312,6 +342,79 @@ mod windows {
                 cb: size_of::<STARTUPINFOW>() as u32,
                 ..Default::default()
             };
+            let mut startup_info_ex = STARTUPINFOEXW {
+                StartupInfo: startup_info,
+                ..Default::default()
+            };
+            let mut attribute_storage: Vec<usize> = Vec::new();
+            let mut attributes_initialized = false;
+            let mut creation_flags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
+            let inherit_handles = if let Some(reader) = spec.bootstrap_reader {
+                startup_info_ex.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
+                startup_info_ex.StartupInfo.dwFlags |= STARTF_USESTDHANDLES;
+                startup_info_ex.StartupInfo.hStdInput = reader;
+                let mut required_bytes = 0usize;
+                // SAFETY: the first call intentionally supplies a null list
+                // to obtain the bounded attribute-list size for one handle.
+                unsafe {
+                    InitializeProcThreadAttributeList(
+                        std::ptr::null_mut(),
+                        1,
+                        0,
+                        &mut required_bytes,
+                    );
+                }
+                if required_bytes == 0 {
+                    return Err(win32_error(
+                        ProcessSupervisorState::ProcessCreationFailed,
+                        "InitializeProcThreadAttributeList did not report a size",
+                    ));
+                }
+                attribute_storage.resize(required_bytes.div_ceil(size_of::<usize>()), 0);
+                startup_info_ex.lpAttributeList = attribute_storage.as_mut_ptr().cast();
+                // SAFETY: the storage is aligned and sized from the Windows
+                // query; the list is initialized for one inherited handle.
+                if unsafe {
+                    InitializeProcThreadAttributeList(
+                        startup_info_ex.lpAttributeList,
+                        1,
+                        0,
+                        &mut required_bytes,
+                    )
+                } == 0
+                {
+                    return Err(win32_error(
+                        ProcessSupervisorState::ProcessCreationFailed,
+                        "InitializeProcThreadAttributeList failed",
+                    ));
+                }
+                attributes_initialized = true;
+                // SAFETY: the attribute list is initialized and `reader` is
+                // the one valid inherited HANDLE selected by the host.
+                if unsafe {
+                    UpdateProcThreadAttribute(
+                        startup_info_ex.lpAttributeList,
+                        0,
+                        PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
+                        (&reader as *const HANDLE).cast(),
+                        size_of::<HANDLE>(),
+                        std::ptr::null_mut(),
+                        std::ptr::null(),
+                    )
+                } == 0
+                {
+                    // SAFETY: the list was initialized immediately above.
+                    unsafe { DeleteProcThreadAttributeList(startup_info_ex.lpAttributeList) };
+                    return Err(win32_error(
+                        ProcessSupervisorState::ProcessCreationFailed,
+                        "UpdateProcThreadAttribute failed for the Core bootstrap handle",
+                    ));
+                }
+                creation_flags |= EXTENDED_STARTUPINFO_PRESENT;
+                1
+            } else {
+                NO_INHERITED_HANDLES
+            };
             let mut process_information = PROCESS_INFORMATION::default();
             // SAFETY: all wide strings are NUL-terminated and remain alive
             // through the synchronous CreateProcessW call; startup and
@@ -320,20 +423,26 @@ mod windows {
             // explicit empty handle allowlist.
             // SAFETY: the pointers above remain valid for this synchronous
             // Windows API call and no handles are inherited.
+            let startup_ptr = &startup_info_ex.StartupInfo as *const STARTUPINFOW;
             let created = unsafe {
                 CreateProcessW(
                     application_name.as_ptr(),
                     command_line.as_mut_ptr(),
                     null(),
                     null(),
-                    NO_INHERITED_HANDLES,
-                    CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT,
+                    inherit_handles,
+                    creation_flags,
                     environment.as_mut_ptr().cast(),
                     current_directory.as_ptr(),
-                    &startup_info,
+                    startup_ptr,
                     &mut process_information,
                 )
             };
+            if attributes_initialized {
+                // SAFETY: the attribute list was initialized and remains
+                // valid until after CreateProcessW returns.
+                unsafe { DeleteProcThreadAttributeList(startup_info_ex.lpAttributeList) };
+            }
             if created == 0 {
                 return Err(win32_error(
                     ProcessSupervisorState::ProcessCreationFailed,
@@ -413,15 +522,15 @@ mod windows {
             Ok(SupervisedCoreProcess {
                 process,
                 process_id: process_information.dwProcessId,
-                supervisor: self,
+                job: Arc::clone(&self.job),
             })
         }
 
         #[cfg(test)]
-        fn launch_test_process<'supervisor>(
-            &'supervisor self,
+        fn launch_test_process(
+            &self,
             spec: ProcessLaunchSpec,
-        ) -> Result<SupervisedCoreProcess<'supervisor>, ProcessSupervisorError> {
+        ) -> Result<SupervisedCoreProcess, ProcessSupervisorError> {
             self.spawn_spec(spec)
         }
 
@@ -611,6 +720,7 @@ mod windows {
                     OsString::from("SystemRoot"),
                     root.into_os_string(),
                 )]),
+                bootstrap_reader: None,
             }
         }
 
@@ -764,6 +874,7 @@ mod windows {
                 arguments: Vec::new(),
                 current_dir: std::env::current_dir().expect("test directory must resolve"),
                 environment: BTreeMap::new(),
+                bootstrap_reader: None,
             };
             let error = supervisor
                 .launch_test_process(relative)
@@ -777,6 +888,7 @@ mod windows {
                 arguments: vec![nul],
                 current_dir: PathBuf::from("C:\\Windows"),
                 environment: BTreeMap::new(),
+                bootstrap_reader: None,
             };
             let error = supervisor
                 .launch_test_process(embedded_nul)

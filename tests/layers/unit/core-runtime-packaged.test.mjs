@@ -23,6 +23,7 @@ test("packaged Core resolves its release-owned TUF verifier and dependencies", a
     const node = join(root, "node.exe");
     const core = resolve("services/core/dist/main.js");
     const support = resolve("services/core/dist/release-trust.js");
+    const ipcSupport = resolve("services/core/dist/ipc-bootstrap.js");
     const preview = join(root, "preview");
     const sourceCommitSha = "b".repeat(40);
     await writeFile(node, syntheticX64Pe());
@@ -31,6 +32,7 @@ test("packaged Core resolves its release-owned TUF verifier and dependencies", a
     await copyFile(node, join(preview, "runtime", "node.exe"));
     await copyFile(core, join(preview, "core", "dist", "main.js"));
     await copyFile(support, join(preview, "core", "dist", "release-trust.js"));
+    await copyFile(ipcSupport, join(preview, "core", "dist", "ipc-bootstrap.js"));
     const previewManifest = await generateRuntimeManifest({
       root: preview,
       nodeVersion: "24.18.0",

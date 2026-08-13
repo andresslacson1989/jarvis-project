@@ -8,6 +8,13 @@ import type {
   CoreStatusResponse,
 } from "../../../packages/protocol/src/core.js";
 import { admitReleaseRuntime, type ReleaseTrustAdmission } from "./release-trust.js";
+import {
+  authenticateCoreTransport,
+  connectCoreTransport,
+  CoreIpcBootstrapError,
+  readBootstrapMaterial,
+  type AuthenticatedTransport,
+} from "./ipc-bootstrap.js";
 
 export const CORE_PROTOCOL_MAJOR = 1 as const;
 export const CORE_PLATFORM = "WINDOWS" as const;
@@ -289,12 +296,23 @@ export class CoreBootstrap {
   }
 }
 
+export interface CoreTransportRuntime {
+  readonly transport: AuthenticatedTransport;
+}
+
 async function runEntrypoint(): Promise<void> {
   const bootstrap = new CoreBootstrap();
+  let transport: AuthenticatedTransport | undefined;
   try {
+    const bootstrapMaterial = await readBootstrapMaterial(process.stdin);
     await bootstrap.start();
+    const socket = await connectCoreTransport(bootstrapMaterial.endpoint);
+    transport = await authenticateCoreTransport(bootstrapMaterial, socket);
   } catch (error) {
-    const code = error instanceof CoreBootstrapError ? error.code : "CORE_START_FAILED";
+    const code =
+      error instanceof CoreBootstrapError || error instanceof CoreIpcBootstrapError
+        ? error.code
+        : "CORE_START_FAILED";
     process.stderr.write(`[${code}]\n`);
     process.exitCode = 1;
     return;
@@ -307,6 +325,7 @@ async function runEntrypoint(): Promise<void> {
   await new Promise<void>((resolveShutdown) => {
     const shutdown = () => {
       clearInterval(lifecycleHandle);
+      transport?.socket.destroy();
       bootstrap.stop();
       resolveShutdown();
     };

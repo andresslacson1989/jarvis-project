@@ -6,7 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { generateRuntimeManifest } from "./generate-core-runtime-manifest.mjs";
 
 const V1_NODE_VERSION = "24.18.0";
-const CORE_SUPPORT_FILE = "release-trust.js";
+const CORE_SUPPORT_FILES = ["release-trust.js", "ipc-bootstrap.js"];
 
 function usage() {
   return "Usage: node tools/release/package-core-runtime.mjs --node <absolute-node.exe> --core <absolute-core-entrypoint> --output <absolute-release-root> --jarvis-release-version <version> --core-version <version> --source-commit-sha <40-hex-sha> --release-sequence <uint64> --security-epoch <uint64> --tuf-metadata-dir <absolute-dir> [--node-version 24.18.0]";
@@ -164,14 +164,16 @@ function requireAbsolutePath(path, label) {
   return resolve(path);
 }
 
-async function copyReleaseUnit({ node, core, coreSupport, coreNodeModules, output }) {
+async function copyReleaseUnit({ node, core, coreSupports, coreNodeModules, output }) {
   const runtimeDirectory = join(output, "runtime");
   const coreDirectory = join(output, "core", "dist");
   await mkdir(runtimeDirectory, { recursive: true });
   await mkdir(coreDirectory, { recursive: true });
   await copyFile(node, join(runtimeDirectory, "node.exe"), constants.COPYFILE_EXCL);
   await copyFile(core, join(coreDirectory, "main.js"), constants.COPYFILE_EXCL);
-  await copyFile(coreSupport, join(coreDirectory, CORE_SUPPORT_FILE), constants.COPYFILE_EXCL);
+  for (const support of coreSupports) {
+    await copyFile(support.source, join(coreDirectory, support.name), constants.COPYFILE_EXCL);
+  }
   await copyCoreDependencies(coreNodeModules, join(output, "core", "node_modules"));
 }
 
@@ -287,7 +289,10 @@ export async function packageCoreRuntime({
 
   const sourceNode = requireAbsolutePath(node, "--node");
   const sourceCore = requireAbsolutePath(core, "--core");
-  const sourceCoreSupport = join(dirname(sourceCore), CORE_SUPPORT_FILE);
+  const sourceCoreSupports = CORE_SUPPORT_FILES.map((name) => ({
+    name,
+    source: join(dirname(sourceCore), name),
+  }));
   const releaseRoot = requireAbsolutePath(output, "--output");
 
   await requireRegularFile(sourceNode, "source node.exe");
@@ -299,7 +304,9 @@ export async function packageCoreRuntime({
   if (await pathExists(releaseRoot)) {
     throw new Error("release output root already exists; refusing to overwrite it");
   }
-  await requireRegularFile(sourceCoreSupport, "source Core trust module");
+  for (const support of sourceCoreSupports) {
+    await requireRegularFile(support.source, `source Core support module ${support.name}`);
+  }
 
   await mkdir(dirname(releaseRoot), { recursive: true });
   const temporaryRoot = await mkdtemp(join(dirname(releaseRoot), ".jarvis-core-runtime-"));
@@ -307,7 +314,7 @@ export async function packageCoreRuntime({
     await copyReleaseUnit({
       node: sourceNode,
       core: sourceCore,
-      coreSupport: sourceCoreSupport,
+      coreSupports: sourceCoreSupports,
       coreNodeModules,
       output: temporaryRoot,
     });

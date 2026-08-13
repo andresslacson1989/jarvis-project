@@ -16,6 +16,17 @@ mod ui_boundary;
 #[cfg(not(debug_assertions))]
 use tauri::Manager;
 use tauri::{Url, WebviewUrl};
+#[cfg(not(debug_assertions))]
+use std::sync::Mutex;
+
+#[cfg(not(debug_assertions))]
+#[allow(dead_code)]
+struct HostRuntime {
+    local_ipc: Mutex<local_ipc::NamedPipeServer>,
+    process_supervisor: process_supervisor::PlatformProcessSupervisor,
+    core_process: process_supervisor::SupervisedCoreProcess,
+    authenticated: local_ipc::AuthenticatedCoreSession,
+}
 
 fn allows_authoritative_navigation(url: &Url) -> bool {
     if cfg!(debug_assertions) {
@@ -60,8 +71,48 @@ fn main() {
 
             let _platform_composition = platform::compose_windows_full_host()
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+            #[cfg(debug_assertions)]
             let _local_ipc = local_ipc::NamedPipeServer::bind()
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+
+            #[cfg(not(debug_assertions))]
+            let host_runtime = {
+                let resource_dir = app.path().resource_dir()?;
+                let layout = _core_runtime_policy.load_verified_layout(resource_dir.clone())?;
+                let manifest_path = resource_dir
+                    .join(core_runtime::RELEASE_RUNTIME_DIRECTORY)
+                    .join("runtime-manifest.json");
+                let local_ipc = local_ipc::NamedPipeServer::bind()
+                    .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+                let mut bootstrap_channel = local_ipc
+                    .create_bootstrap_channel()
+                    .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+                bootstrap_channel
+                    .write_material(local_ipc.bootstrap_material())
+                    .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+                let process_supervisor = process_supervisor::PlatformProcessSupervisor::new()
+                    .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+                let core_process = process_supervisor
+                    .launch_core_with_bootstrap(
+                        &layout,
+                        &manifest_path,
+                        bootstrap_channel.reader_handle(),
+                    )
+                    .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+                bootstrap_channel.close_reader();
+                let authenticated = local_ipc
+                    .authenticate_client()
+                    .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+                HostRuntime {
+                    local_ipc: Mutex::new(local_ipc),
+                    process_supervisor,
+                    core_process,
+                    authenticated,
+                }
+            };
+
+            #[cfg(not(debug_assertions))]
+            app.manage(host_runtime);
             let window_controller = window_controller::PlatformWindowController::new(
                 application_paths.data.join("window-state.json"),
             )

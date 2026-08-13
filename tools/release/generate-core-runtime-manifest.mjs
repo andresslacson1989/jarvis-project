@@ -6,7 +6,10 @@ import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 const NODE_RELATIVE_PATH = "runtime/node.exe";
 const CORE_RELATIVE_PATH = "core/dist/main.js";
-const CORE_SUPPORT_RELATIVE_PATH = "core/dist/release-trust.js";
+const CORE_SUPPORT_RELATIVE_PATHS = [
+  "core/dist/release-trust.js",
+  "core/dist/ipc-bootstrap.js",
+];
 const DEFAULT_OUTPUT = "runtime-manifest.json";
 
 function usage() {
@@ -176,13 +179,18 @@ export async function generateRuntimeManifest({
   const releaseRoot = resolve(root);
   const nodePath = resolve(releaseRoot, NODE_RELATIVE_PATH);
   const corePath = resolve(releaseRoot, CORE_RELATIVE_PATH);
-  const coreSupportPath = resolve(releaseRoot, CORE_SUPPORT_RELATIVE_PATH);
   const manifestPath = resolve(releaseRoot, output);
   ensureReleaseChild(releaseRoot, manifestPath, "manifest output");
 
   await requireRegularFile(nodePath, "release-owned node.exe");
   await requireRegularFile(corePath, "release-owned Core entrypoint");
-  await requireRegularFile(coreSupportPath, "release-owned Core trust module");
+  const coreSupportPaths = await Promise.all(
+    CORE_SUPPORT_RELATIVE_PATHS.map(async (relativePath) => {
+      const path = resolve(releaseRoot, relativePath);
+      await requireRegularFile(path, `release-owned Core support module ${relativePath}`);
+      return { relativePath, path };
+    }),
+  );
 
   const manifest = {
     manifestVersion: 1,
@@ -206,12 +214,12 @@ export async function generateRuntimeManifest({
     coreEntrypoint: CORE_RELATIVE_PATH.replaceAll("\\", "/"),
     nodeSha256: await sha256File(nodePath),
     coreSha256: await sha256File(corePath),
-    coreSupportFiles: [
-      {
-        path: CORE_SUPPORT_RELATIVE_PATH.replaceAll("\\", "/"),
-        sha256: await sha256File(coreSupportPath),
-      },
-    ],
+    coreSupportFiles: await Promise.all(
+      coreSupportPaths.map(async ({ relativePath, path }) => ({
+        path: relativePath.replaceAll("\\", "/"),
+        sha256: await sha256File(path),
+      })),
+    ),
   };
 
   await mkdir(dirname(manifestPath), { recursive: true });

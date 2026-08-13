@@ -22,10 +22,12 @@ test("Core runtime packaging creates one deterministic release-owned unit", asyn
     const node = join(root, "node.exe");
     const core = join(root, "main.js");
     const coreSupport = join(root, "release-trust.js");
+    const coreIpcSupport = join(root, "ipc-bootstrap.js");
     const output = join(root, "release");
     await writeFile(node, syntheticX64Pe());
     await writeFile(core, "export const coreProtocolMajor = 1;\n");
     await writeFile(coreSupport, "export const trustProfile = '1.0.35';\n");
+    await writeFile(coreIpcSupport, "export const ipcProtocolMajor = 1;\n");
     const sourceCommitSha = "a".repeat(40);
     const preview = join(root, "preview");
     await mkdir(join(preview, "runtime"), { recursive: true });
@@ -33,6 +35,7 @@ test("Core runtime packaging creates one deterministic release-owned unit", asyn
     await copyFile(node, join(preview, "runtime", "node.exe"));
     await copyFile(core, join(preview, "core", "dist", "main.js"));
     await copyFile(coreSupport, join(preview, "core", "dist", "release-trust.js"));
+    await copyFile(coreIpcSupport, join(preview, "core", "dist", "ipc-bootstrap.js"));
     const previewManifest = await generateRuntimeManifest({
       root: preview,
       nodeVersion: "24.18.0",

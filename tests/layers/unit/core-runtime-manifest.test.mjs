@@ -19,6 +19,7 @@ async function fixture() {
   await writeFile(join(root, "runtime", "node.exe"), "synthetic node");
   await writeFile(join(root, "core", "dist", "main.js"), "synthetic core");
   await writeFile(join(root, "core", "dist", "release-trust.js"), "synthetic trust module");
+  await writeFile(join(root, "core", "dist", "ipc-bootstrap.js"), "synthetic IPC module");
   return root;
 }
 
@@ -43,8 +44,9 @@ test("runtime manifest generation is deterministic and hashes explicit release f
     assert.equal(parsed.releaseSequence, releaseIdentity.releaseSequence);
     assert.equal(parsed.securityEpoch, releaseIdentity.securityEpoch);
     assert.equal(parsed.tufSpecVersion, "1.0.35");
-    assert.equal(parsed.coreSupportFiles.length, 1);
+    assert.equal(parsed.coreSupportFiles.length, 2);
     assert.equal(parsed.coreSupportFiles[0].path, "core/dist/release-trust.js");
+    assert.equal(parsed.coreSupportFiles[1].path, "core/dist/ipc-bootstrap.js");
     assert.equal(parsed.target, "WINDOWS_FULL_HOST_X64");
     assert.equal(parsed.protocolVersion, 1);
     assert.equal(parsed.minimumDataSchemaVersion, 1);

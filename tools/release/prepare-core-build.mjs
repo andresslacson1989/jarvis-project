@@ -11,6 +11,11 @@ const generatedTrustModule = resolve(
   ".artifacts/core-build/services/core/src/release-trust.js",
 );
 const outputTrustModule = resolve(outputDirectory, "release-trust.js");
+const generatedIpcModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/ipc-bootstrap.js",
+);
+const outputIpcModule = resolve(outputDirectory, "ipc-bootstrap.js");
 
 async function main() {
   const information = await stat(generatedEntrypoint).catch(() => null);
@@ -21,6 +26,7 @@ async function main() {
   await mkdir(outputDirectory, { recursive: true });
   await copyFile(generatedEntrypoint, outputEntrypoint);
   await copyFile(generatedTrustModule, outputTrustModule);
+  await copyFile(generatedIpcModule, outputIpcModule);
   console.log(`[core-build] wrote ${outputEntrypoint}`);
 }
 
