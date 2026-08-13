@@ -1,4 +1,5 @@
 mod platform;
+mod lifecycle;
 
 use tauri::webview::{NewWindowResponse, WebviewWindowBuilder};
 use tauri::{Url, WebviewUrl};
@@ -17,6 +18,11 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            let application_paths = lifecycle::ApplicationPaths::from_local_app_data()?;
+            application_paths.ensure_root()?;
+            let _instance_ownership = lifecycle::InstanceOwnership::acquire(&application_paths)?;
+            application_paths.ensure_layout()?;
+
             let _platform_composition = platform::compose_windows_full_host()
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
 
