@@ -115,6 +115,10 @@ test("production WebView source is a bundled local frontend and development bind
     active: true,
     resources: ["resources/core-runtime"],
     icon: ["icons/icon.ico"],
+    windows: {
+      certificateThumbprint: "23DA4DA3E340B66EC4240B4CC845E4387E5BBDD3",
+      digestAlgorithm: "sha256",
+    },
   });
   assert.doesNotMatch(JSON.stringify(config), /https?:\/\/(?!127\.0\.0\.1:1420|ipc\.localhost)/i);
 });

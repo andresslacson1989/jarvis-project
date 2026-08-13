@@ -28,6 +28,10 @@
     "resources": ["resources/core-runtime"],
     "icon": [
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "certificateThumbprint": "23DA4DA3E340B66EC4240B4CC845E4387E5BBDD3",
+      "digestAlgorithm": "sha256"
+    }
   }
 }
