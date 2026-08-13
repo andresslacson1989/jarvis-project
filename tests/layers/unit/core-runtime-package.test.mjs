@@ -23,11 +23,18 @@ test("Core runtime packaging creates one deterministic release-owned unit", asyn
     await writeFile(node, syntheticX64Pe());
     await writeFile(core, "export const coreProtocolMajor = 1;\n");
 
-    const result = await packageCoreRuntime({ node, core, output });
+    const result = await packageCoreRuntime({
+      node,
+      core,
+      output,
+      jarvisReleaseVersion: "0.0.0",
+      coreVersion: "0.0.0",
+    });
     assert.equal(result.manifest.platform, "WINDOWS");
     assert.equal(result.manifest.runtimeRole, "FULL_HOST");
     assert.equal(result.manifest.architecture, "x64");
     assert.equal(result.manifest.nodeVersion, "24.18.0");
+    assert.equal(result.manifest.target, "WINDOWS_FULL_HOST_X64");
     assert.equal(await readFile(join(output, "core", "dist", "main.js"), "utf8"), "export const coreProtocolMajor = 1;\n");
     assert.equal((await stat(join(output, "runtime", "node.exe"))).isFile(), true);
     assert.equal((await stat(join(output, "runtime-manifest.json"))).isFile(), true);
@@ -48,13 +55,25 @@ test("Core runtime packaging refuses overwrite and cleans failed staging", async
     await mkdir(existingOutput);
     await writeFile(join(root, "sentinel.txt"), "do not overwrite");
     await assert.rejects(
-      packageCoreRuntime({ node, core, output: existingOutput }),
+      packageCoreRuntime({
+        node,
+        core,
+        output: existingOutput,
+        jarvisReleaseVersion: "0.0.0",
+        coreVersion: "0.0.0",
+      }),
       /release output root already exists/,
     );
 
     await rm(core);
     await assert.rejects(
-      packageCoreRuntime({ node, core, output: failedOutput }),
+      packageCoreRuntime({
+        node,
+        core,
+        output: failedOutput,
+        jarvisReleaseVersion: "0.0.0",
+        coreVersion: "0.0.0",
+      }),
       /source Core entrypoint is missing/,
     );
     await assert.rejects(stat(failedOutput), { code: "ENOENT" });
@@ -72,7 +91,13 @@ test("Core runtime packaging rejects non-x64 or non-PE node executables", async 
     await writeFile(node, "not an executable");
     await writeFile(core, "export const coreProtocolMajor = 1;\n");
     await assert.rejects(
-      packageCoreRuntime({ node, core, output: join(root, "release") }),
+      packageCoreRuntime({
+        node,
+        core,
+        output: join(root, "release"),
+        jarvisReleaseVersion: "0.0.0",
+        coreVersion: "0.0.0",
+      }),
       /Windows PE executable|DOS header is truncated/,
     );
   } finally {

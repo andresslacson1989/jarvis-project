@@ -24,7 +24,8 @@
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
+    "resources": ["resources/core-runtime"],
     "icon": [
       "icons/icon.ico"
     ]

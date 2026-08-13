@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
-use std::fs::{canonicalize, read, symlink_metadata, File};
+use std::fs::{canonicalize, read, symlink_metadata, File, Metadata};
 use std::io::{self, BufReader, Read};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const RELEASE_RUNTIME_DIRECTORY: &str = "core-runtime";
+pub const V1_NODE_VERSION: &str = "24.18.0";
+pub const V1_RELEASE_TARGET: &str = "WINDOWS_FULL_HOST_X64";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CoreRuntimeState {
@@ -23,6 +25,8 @@ pub enum CoreRuntimeState {
     CoreRuntimeIntegrityFailed,
     CoreRuntimeIncompatible,
     CoreEntrypointMissing,
+    CoreStartFailed,
+    CoreProtocolIncompatible,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,6 +79,13 @@ pub struct CoreRuntimeLayout {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeIntegrityManifest {
+    pub manifest_version: u32,
+    pub jarvis_release_version: String,
+    pub core_version: String,
+    pub target: String,
+    pub protocol_version: u32,
+    pub minimum_data_schema_version: u32,
+    pub maximum_data_schema_version: u32,
     pub schema_version: u32,
     pub platform: String,
     pub runtime_role: String,
@@ -136,6 +147,13 @@ impl CoreRuntimeLayout {
                 "release-owned Core entrypoint is missing",
             ));
         }
+        let root_metadata = symlink_metadata(&self.release_root).map_err(|error| {
+            Self::io_error(
+                CoreRuntimeState::CoreRuntimeMissing,
+                "release root",
+                error,
+            )
+        })?;
         let node_metadata = symlink_metadata(&self.node_executable).map_err(|error| {
             Self::io_error(
                 CoreRuntimeState::CoreRuntimeIntegrityFailed,
@@ -150,10 +168,15 @@ impl CoreRuntimeLayout {
                 error,
             )
         })?;
-        if !node_metadata.file_type().is_file()
+        if !root_metadata.file_type().is_dir()
+            || root_metadata.file_type().is_symlink()
+            || is_reparse_point(&root_metadata)
+            || !node_metadata.file_type().is_file()
             || node_metadata.file_type().is_symlink()
+            || is_reparse_point(&node_metadata)
             || !core_metadata.file_type().is_file()
             || core_metadata.file_type().is_symlink()
+            || is_reparse_point(&core_metadata)
         {
             return Err(Self::error(
                 CoreRuntimeState::CoreRuntimeIntegrityFailed,
@@ -190,6 +213,22 @@ impl CoreRuntimeLayout {
                 "runtime integrity manifest must remain inside release_root",
             ));
         }
+        let manifest_metadata = symlink_metadata(&manifest_path).map_err(|error| {
+            Self::io_error(
+                CoreRuntimeState::CoreRuntimeIntegrityFailed,
+                "runtime integrity manifest",
+                error,
+            )
+        })?;
+        if !manifest_metadata.file_type().is_file()
+            || manifest_metadata.file_type().is_symlink()
+            || is_reparse_point(&manifest_metadata)
+        {
+            return Err(Self::error(
+                CoreRuntimeState::CoreRuntimeIntegrityFailed,
+                "runtime integrity manifest must be a regular non-reparse file",
+            ));
+        }
 
         let manifest_bytes = read(&manifest_path).map_err(|error| {
             Self::io_error(
@@ -206,11 +245,18 @@ impl CoreRuntimeLayout {
                 )
             })?;
 
-        if manifest.schema_version != 1
+        if manifest.manifest_version != 1
+            || manifest.jarvis_release_version.is_empty()
+            || manifest.core_version.is_empty()
+            || manifest.target != V1_RELEASE_TARGET
+            || manifest.protocol_version != 1
+            || manifest.minimum_data_schema_version == 0
+            || manifest.maximum_data_schema_version < manifest.minimum_data_schema_version
+            || manifest.schema_version != 1
             || manifest.platform != "WINDOWS"
             || manifest.runtime_role != "FULL_HOST"
             || manifest.architecture != "x64"
-            || manifest.node_version.is_empty()
+            || manifest.node_version != V1_NODE_VERSION
             || manifest.protocol_major != 1
         {
             return Err(Self::error(
@@ -350,6 +396,19 @@ fn is_canonical_child(root: &Path, candidate: &Path) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(windows)]
+fn is_reparse_point(metadata: &Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
+    metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+}
+
+#[cfg(not(windows))]
+fn is_reparse_point(_metadata: &Metadata) -> bool {
+    false
+}
+
 fn validate_sha256(value: &str, field: &str) -> Result<(), CoreRuntimeError> {
     if value.len() != 64
         || value != value.to_ascii_lowercase()
@@ -443,6 +502,13 @@ mod tests {
         )
         .expect("synthetic entrypoint must be writable");
         let manifest = RuntimeIntegrityManifest {
+            manifest_version: 1,
+            jarvis_release_version: "0.0.0".to_owned(),
+            core_version: "0.0.0".to_owned(),
+            target: V1_RELEASE_TARGET.to_owned(),
+            protocol_version: 1,
+            minimum_data_schema_version: 1,
+            maximum_data_schema_version: 1,
             schema_version: 1,
             platform: "WINDOWS".to_owned(),
             runtime_role: "FULL_HOST".to_owned(),
@@ -497,6 +563,13 @@ mod tests {
         )
         .expect("synthetic entrypoint must be writable");
         let manifest = RuntimeIntegrityManifest {
+            manifest_version: 1,
+            jarvis_release_version: "0.0.0".to_owned(),
+            core_version: "0.0.0".to_owned(),
+            target: V1_RELEASE_TARGET.to_owned(),
+            protocol_version: 1,
+            minimum_data_schema_version: 1,
+            maximum_data_schema_version: 1,
             schema_version: 1,
             platform: "WINDOWS".to_owned(),
             runtime_role: "FULL_HOST".to_owned(),
@@ -525,6 +598,30 @@ mod tests {
             root.join("core").join("dist").join("main.js")
         );
         remove_dir_all(resource_parent).expect("test resource directory must be removable");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn integrity_manifest_must_be_a_regular_file() {
+        let (root, layout) = test_layout();
+        create_dir_all(root.join("runtime")).expect("runtime directory must be creatable");
+        create_dir_all(root.join("core").join("dist"))
+            .expect("core directory must be creatable");
+        write(root.join("runtime").join("node.exe"), b"synthetic node")
+            .expect("synthetic runtime must be writable");
+        write(
+            root.join("core").join("dist").join("main.js"),
+            b"synthetic core",
+        )
+        .expect("synthetic entrypoint must be writable");
+        let manifest_path = root.join("runtime-manifest.json");
+        create_dir_all(&manifest_path).expect("manifest directory must be creatable");
+
+        let error = layout
+            .validate_integrity(&manifest_path)
+            .expect_err("a manifest directory must fail closed");
+        assert_eq!(error.state, CoreRuntimeState::CoreRuntimeIntegrityFailed);
+        remove_dir_all(root).expect("test runtime directory must be removable");
     }
 
     #[cfg(windows)]
@@ -563,6 +660,13 @@ mod tests {
         .expect("synthetic entrypoint must be writable");
 
         let manifest = RuntimeIntegrityManifest {
+            manifest_version: 1,
+            jarvis_release_version: "0.0.0".to_owned(),
+            core_version: "0.0.0".to_owned(),
+            target: V1_RELEASE_TARGET.to_owned(),
+            protocol_version: 1,
+            minimum_data_schema_version: 1,
+            maximum_data_schema_version: 1,
             schema_version: 1,
             platform: "WINDOWS".to_owned(),
             runtime_role: "FULL_HOST".to_owned(),
@@ -616,6 +720,13 @@ mod tests {
         .expect("synthetic entrypoint must be writable");
 
         let manifest = RuntimeIntegrityManifest {
+            manifest_version: 1,
+            jarvis_release_version: "0.0.0".to_owned(),
+            core_version: "0.0.0".to_owned(),
+            target: V1_RELEASE_TARGET.to_owned(),
+            protocol_version: 1,
+            minimum_data_schema_version: 1,
+            maximum_data_schema_version: 1,
             schema_version: 1,
             platform: "WINDOWS".to_owned(),
             runtime_role: "FULL_HOST".to_owned(),

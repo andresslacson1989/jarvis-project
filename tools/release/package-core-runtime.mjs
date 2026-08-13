@@ -7,12 +7,23 @@ import { generateRuntimeManifest } from "./generate-core-runtime-manifest.mjs";
 const V1_NODE_VERSION = "24.18.0";
 
 function usage() {
-  return "Usage: node tools/release/package-core-runtime.mjs --node <absolute-node.exe> --core <absolute-core-entrypoint> --output <absolute-release-root> [--node-version 24.18.0]";
+  return "Usage: node tools/release/package-core-runtime.mjs --node <absolute-node.exe> --core <absolute-core-entrypoint> --output <absolute-release-root> --jarvis-release-version <version> --core-version <version> [--node-version 24.18.0]";
 }
 
 function parseArguments(argv) {
   const values = new Map();
-  const allowedArguments = new Set(["--node", "--core", "--output", "--node-version"]);
+  const allowedArguments = new Set([
+    "--node",
+    "--core",
+    "--output",
+    "--node-version",
+    "--jarvis-release-version",
+    "--core-version",
+    "--target",
+    "--protocol-version",
+    "--minimum-data-schema-version",
+    "--maximum-data-schema-version",
+  ]);
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (!argument.startsWith("--")) throw new Error(`unexpected argument: ${argument}`);
@@ -28,8 +39,38 @@ function parseArguments(argv) {
   const core = values.get("--core");
   const output = values.get("--output");
   const nodeVersion = values.get("--node-version") ?? V1_NODE_VERSION;
-  if (!node || !core || !output) throw new Error(usage());
-  return { node, core, output, nodeVersion };
+  const jarvisReleaseVersion = values.get("--jarvis-release-version");
+  const coreVersion = values.get("--core-version");
+  const target = values.get("--target") ?? "WINDOWS_FULL_HOST_X64";
+  const protocolVersion = values.get("--protocol-version") ?? "1";
+  const minimumDataSchemaVersion = values.get("--minimum-data-schema-version") ?? "1";
+  const maximumDataSchemaVersion = values.get("--maximum-data-schema-version") ?? "1";
+  if (!node || !core || !output || !jarvisReleaseVersion || !coreVersion) {
+    throw new Error(usage());
+  }
+  return {
+    node,
+    core,
+    output,
+    nodeVersion,
+    jarvisReleaseVersion,
+    coreVersion,
+    target,
+    protocolVersion: parseVersionNumber(protocolVersion, "--protocol-version"),
+    minimumDataSchemaVersion: parseVersionNumber(
+      minimumDataSchemaVersion,
+      "--minimum-data-schema-version",
+    ),
+    maximumDataSchemaVersion: parseVersionNumber(
+      maximumDataSchemaVersion,
+      "--maximum-data-schema-version",
+    ),
+  };
+}
+
+function parseVersionNumber(value, label) {
+  if (!/^\d+$/.test(value)) throw new Error(`${label} must be a non-negative integer`);
+  return Number(value);
 }
 
 async function pathExists(path) {
@@ -95,7 +136,19 @@ async function copyReleaseUnit({ node, core, output }) {
   await copyFile(core, join(coreDirectory, "main.js"), constants.COPYFILE_EXCL);
 }
 
-export async function packageCoreRuntime({ node, core, output, nodeVersion = V1_NODE_VERSION, ...unknownOptions }) {
+export async function packageCoreRuntime({
+  node,
+  core,
+  output,
+  nodeVersion = V1_NODE_VERSION,
+  jarvisReleaseVersion,
+  coreVersion,
+  target = "WINDOWS_FULL_HOST_X64",
+  protocolVersion = 1,
+  minimumDataSchemaVersion = 1,
+  maximumDataSchemaVersion = 1,
+  ...unknownOptions
+}) {
   if (Object.keys(unknownOptions).length > 0) {
     throw new Error(`unknown option: ${Object.keys(unknownOptions)[0]}`);
   }
@@ -124,6 +177,12 @@ export async function packageCoreRuntime({ node, core, output, nodeVersion = V1_
     const manifestResult = await generateRuntimeManifest({
       root: temporaryRoot,
       nodeVersion,
+      jarvisReleaseVersion,
+      coreVersion,
+      target,
+      protocolVersion,
+      minimumDataSchemaVersion,
+      maximumDataSchemaVersion,
     });
     await rename(temporaryRoot, releaseRoot);
     return { manifest: manifestResult.manifest, releaseRoot };

@@ -99,7 +99,11 @@ test("production WebView source is a bundled local frontend and development bind
   assert.equal(config.build?.frontendDist, "../dist");
   assert.equal(config.build?.devUrl, "http://127.0.0.1:1420");
   assert.equal(config.app?.windows, undefined, "the security-sensitive window is created by the native builder");
-  assert.deepEqual(config.bundle, { active: false, icon: ["icons/icon.ico"] });
+  assert.deepEqual(config.bundle, {
+    active: true,
+    resources: ["resources/core-runtime"],
+    icon: ["icons/icon.ico"],
+  });
   assert.doesNotMatch(JSON.stringify(config), /https?:\/\/(?!127\.0\.0\.1:1420|ipc\.localhost)/i);
 });
 

@@ -9,12 +9,22 @@ const CORE_RELATIVE_PATH = "core/dist/main.js";
 const DEFAULT_OUTPUT = "runtime-manifest.json";
 
 function usage() {
-  return "Usage: node tools/release/generate-core-runtime-manifest.mjs --root <absolute-release-root> --node-version <x.y.z> [--output <relative-path>]";
+  return "Usage: node tools/release/generate-core-runtime-manifest.mjs --root <absolute-release-root> --node-version <x.y.z> --jarvis-release-version <version> --core-version <version> [--target WINDOWS_FULL_HOST_X64] [--protocol-version 1] [--minimum-data-schema-version 1] [--maximum-data-schema-version 1] [--output <relative-path>]";
 }
 
 function parseArguments(argv) {
   const values = new Map();
-  const allowedArguments = new Set(["--root", "--node-version", "--output"]);
+  const allowedArguments = new Set([
+    "--root",
+    "--node-version",
+    "--jarvis-release-version",
+    "--core-version",
+    "--target",
+    "--protocol-version",
+    "--minimum-data-schema-version",
+    "--maximum-data-schema-version",
+    "--output",
+  ]);
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (!argument.startsWith("--")) throw new Error(`unexpected argument: ${argument}`);
@@ -27,9 +37,36 @@ function parseArguments(argv) {
   }
   const root = values.get("--root");
   const nodeVersion = values.get("--node-version");
+  const jarvisReleaseVersion = values.get("--jarvis-release-version");
+  const coreVersion = values.get("--core-version");
+  const target = values.get("--target") ?? "WINDOWS_FULL_HOST_X64";
+  const protocolVersion = values.get("--protocol-version") ?? "1";
+  const minimumDataSchemaVersion = values.get("--minimum-data-schema-version") ?? "1";
+  const maximumDataSchemaVersion = values.get("--maximum-data-schema-version") ?? "1";
   const output = values.get("--output") ?? DEFAULT_OUTPUT;
-  if (!root || !nodeVersion || values.size > 3) throw new Error(usage());
-  return { root, nodeVersion, output };
+  if (!root || !nodeVersion || !jarvisReleaseVersion || !coreVersion) throw new Error(usage());
+  return {
+    root,
+    nodeVersion,
+    jarvisReleaseVersion,
+    coreVersion,
+    target,
+    protocolVersion: parseVersionNumber(protocolVersion, "--protocol-version"),
+    minimumDataSchemaVersion: parseVersionNumber(
+      minimumDataSchemaVersion,
+      "--minimum-data-schema-version",
+    ),
+    maximumDataSchemaVersion: parseVersionNumber(
+      maximumDataSchemaVersion,
+      "--maximum-data-schema-version",
+    ),
+    output,
+  };
+}
+
+function parseVersionNumber(value, label) {
+  if (!/^\d+$/.test(value)) throw new Error(`${label} must be a non-negative integer`);
+  return Number(value);
 }
 
 function ensureReleaseChild(root, candidate, label) {
@@ -62,6 +99,12 @@ async function requireRegularFile(path, label) {
 export async function generateRuntimeManifest({
   root,
   nodeVersion,
+  jarvisReleaseVersion,
+  coreVersion,
+  target = "WINDOWS_FULL_HOST_X64",
+  protocolVersion = 1,
+  minimumDataSchemaVersion = 1,
+  maximumDataSchemaVersion = 1,
   output = DEFAULT_OUTPUT,
   ...unknownOptions
 }) {
@@ -71,6 +114,24 @@ export async function generateRuntimeManifest({
   if (!isAbsolute(root)) throw new Error("--root must be an absolute release root");
   if (!/^\d+\.\d+\.\d+$/.test(nodeVersion)) {
     throw new Error("--node-version must use exact x.y.z form");
+  }
+  if (typeof jarvisReleaseVersion !== "string" || jarvisReleaseVersion.length === 0) {
+    throw new Error("--jarvis-release-version is required");
+  }
+  if (typeof coreVersion !== "string" || coreVersion.length === 0) {
+    throw new Error("--core-version is required");
+  }
+  if (target !== "WINDOWS_FULL_HOST_X64") {
+    throw new Error("--target must be WINDOWS_FULL_HOST_X64");
+  }
+  if (protocolVersion !== 1) throw new Error("--protocol-version must be 1");
+  if (
+    !Number.isInteger(minimumDataSchemaVersion) ||
+    !Number.isInteger(maximumDataSchemaVersion) ||
+    minimumDataSchemaVersion < 1 ||
+    maximumDataSchemaVersion < minimumDataSchemaVersion
+  ) {
+    throw new Error("data schema versions must be ordered positive integers");
   }
 
   const releaseRoot = resolve(root);
@@ -83,6 +144,13 @@ export async function generateRuntimeManifest({
   await requireRegularFile(corePath, "release-owned Core entrypoint");
 
   const manifest = {
+    manifestVersion: 1,
+    jarvisReleaseVersion,
+    coreVersion,
+    target,
+    protocolVersion,
+    minimumDataSchemaVersion,
+    maximumDataSchemaVersion,
     schemaVersion: 1,
     platform: "WINDOWS",
     runtimeRole: "FULL_HOST",

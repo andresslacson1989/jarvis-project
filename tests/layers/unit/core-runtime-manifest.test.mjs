@@ -18,11 +18,23 @@ async function fixture() {
 test("runtime manifest generation is deterministic and hashes explicit release files", async () => {
   const root = await fixture();
   try {
-    const result = await generateRuntimeManifest({ root, nodeVersion: "24.18.0" });
+    const result = await generateRuntimeManifest({
+      root,
+      nodeVersion: "24.18.0",
+      jarvisReleaseVersion: "0.0.0",
+      coreVersion: "0.0.0",
+    });
     const parsed = JSON.parse(await readFile(result.manifestPath, "utf8"));
     assert.equal(parsed.platform, "WINDOWS");
     assert.equal(parsed.runtimeRole, "FULL_HOST");
     assert.equal(parsed.architecture, "x64");
+    assert.equal(parsed.manifestVersion, 1);
+    assert.equal(parsed.jarvisReleaseVersion, "0.0.0");
+    assert.equal(parsed.coreVersion, "0.0.0");
+    assert.equal(parsed.target, "WINDOWS_FULL_HOST_X64");
+    assert.equal(parsed.protocolVersion, 1);
+    assert.equal(parsed.minimumDataSchemaVersion, 1);
+    assert.equal(parsed.maximumDataSchemaVersion, 1);
     assert.equal(parsed.nodePath, "runtime/node.exe");
     assert.equal(parsed.coreEntrypoint, "core/dist/main.js");
     assert.equal(
@@ -42,12 +54,23 @@ test("runtime manifest generation fails closed for missing files and outside out
   const root = await fixture();
   try {
     await assert.rejects(
-      generateRuntimeManifest({ root, nodeVersion: "24.18.0", output: "../manifest.json" }),
+      generateRuntimeManifest({
+        root,
+        nodeVersion: "24.18.0",
+        jarvisReleaseVersion: "0.0.0",
+        coreVersion: "0.0.0",
+        output: "../manifest.json",
+      }),
       /manifest output must remain inside the release root/,
     );
     await rm(join(root, "runtime", "node.exe"));
     await assert.rejects(
-      generateRuntimeManifest({ root, nodeVersion: "24.18.0" }),
+      generateRuntimeManifest({
+        root,
+        nodeVersion: "24.18.0",
+        jarvisReleaseVersion: "0.0.0",
+        coreVersion: "0.0.0",
+      }),
       /release-owned node\.exe is missing/,
     );
   } finally {
@@ -59,7 +82,13 @@ test("runtime manifest CLI argument parsing rejects unknown options", async () =
   const root = await fixture();
   try {
     await assert.rejects(
-      generateRuntimeManifest({ root, nodeVersion: "24.18.0", unknown: "rejected" }),
+      generateRuntimeManifest({
+        root,
+        nodeVersion: "24.18.0",
+        jarvisReleaseVersion: "0.0.0",
+        coreVersion: "0.0.0",
+        unknown: "rejected",
+      }),
       /unknown option/,
     );
   } finally {
