@@ -200,20 +200,7 @@ impl CoreRuntimeLayout {
                 error,
             )
         })?;
-        let manifest_path = canonicalize(manifest_path).map_err(|error| {
-            Self::io_error(
-                CoreRuntimeState::CoreRuntimeIntegrityFailed,
-                "runtime integrity manifest",
-                error,
-            )
-        })?;
-        if !is_canonical_child(&root, &manifest_path) {
-            return Err(Self::error(
-                CoreRuntimeState::CoreRuntimeIncompatible,
-                "runtime integrity manifest must remain inside release_root",
-            ));
-        }
-        let manifest_metadata = symlink_metadata(&manifest_path).map_err(|error| {
+        let manifest_metadata = symlink_metadata(manifest_path).map_err(|error| {
             Self::io_error(
                 CoreRuntimeState::CoreRuntimeIntegrityFailed,
                 "runtime integrity manifest",
@@ -229,7 +216,19 @@ impl CoreRuntimeLayout {
                 "runtime integrity manifest must be a regular non-reparse file",
             ));
         }
-
+        let manifest_path = canonicalize(manifest_path).map_err(|error| {
+            Self::io_error(
+                CoreRuntimeState::CoreRuntimeIntegrityFailed,
+                "runtime integrity manifest",
+                error,
+            )
+        })?;
+        if !is_canonical_child(&root, &manifest_path) {
+            return Err(Self::error(
+                CoreRuntimeState::CoreRuntimeIncompatible,
+                "runtime integrity manifest must remain inside release_root",
+            ));
+        }
         let manifest_bytes = read(&manifest_path).map_err(|error| {
             Self::io_error(
                 CoreRuntimeState::CoreRuntimeIntegrityFailed,
