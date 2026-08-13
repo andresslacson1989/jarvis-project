@@ -55,6 +55,69 @@ export function parseWorkflowSteps(text) {
   return steps;
 }
 
+function workflowJobBlock(text, jobId) {
+  const lines = String(text).split(/\r?\n/);
+  const start = lines.findIndex((line) => line === `  ${jobId}:`);
+  if (start < 0) return null;
+  let end = lines.length;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (/^  [A-Za-z0-9_-]+:\s*$/.test(lines[index])) {
+      end = index;
+      break;
+    }
+  }
+  return lines.slice(start, end).join("\n");
+}
+
+function validateNativeWindowsGate(profile, workflowText) {
+  const violations = [];
+  const gate = profile?.requiredNativeWindowsGate;
+  const path = ".github/workflows/static-ci.yml";
+  if (!gate || typeof gate !== "object" || Array.isArray(gate)) {
+    return [violation("PHASE0_WINDOWS_NATIVE_PROFILE", "tools/checkpoints/phase0-checkpoint-profile.json", "requiredNativeWindowsGate is required")];
+  }
+
+  const windowsJob = workflowJobBlock(workflowText, gate.jobId);
+  if (windowsJob === null) {
+    violations.push(violation("PHASE0_WINDOWS_NATIVE_JOB_MISSING", path, `missing ${gate.jobId} job`));
+  } else {
+    if (!windowsJob.includes(`\n    name: ${gate.jobName}`)) {
+      violations.push(violation("PHASE0_WINDOWS_NATIVE_JOB_NAME", path, `native Windows job name must be ${gate.jobName}`));
+    }
+    if (!windowsJob.includes(`\n    runs-on: ${gate.runner}`)) {
+      violations.push(violation("PHASE0_WINDOWS_NATIVE_RUNNER", path, `native Windows job must run on ${gate.runner}`));
+    }
+    if (/^    (?:if|continue-on-error):/m.test(windowsJob) || /^\s+continue-on-error:/m.test(windowsJob) || /^\s+if:/m.test(windowsJob)) {
+      violations.push(violation("PHASE0_WINDOWS_NATIVE_SKIPPABLE", path, "native Windows job and its steps may not use if/continue-on-error"));
+    }
+    if (!/uses:\s*actions\/checkout@[0-9a-f]{40}/.test(windowsJob) || !/persist-credentials:\s*false/.test(windowsJob) || !/fetch-depth:\s*1/.test(windowsJob)) {
+      violations.push(violation("PHASE0_WINDOWS_NATIVE_CHECKOUT", path, "native Windows job must use immutable shallow credential-free checkout"));
+    }
+    if (!/uses:\s*pnpm\/setup@[0-9a-f]{40}/.test(windowsJob) || !/version:\s*11\.21\.0/.test(windowsJob) || !/runtime:\s*node@24\.18\.0/.test(windowsJob)) {
+      violations.push(violation("PHASE0_WINDOWS_NATIVE_NODE_TOOLCHAIN", path, "native Windows job must use pinned pnpm 11.21.0 and Node 24.18.0"));
+    }
+    for (const [code, command] of [
+      ["PHASE0_WINDOWS_NATIVE_RUST_TOOLCHAIN", gate.rustToolchainCommand],
+      ["PHASE0_WINDOWS_NATIVE_DEPENDENCIES", gate.dependencyInstallCommand],
+      ["PHASE0_WINDOWS_NATIVE_FRONTEND_BUILD", gate.frontendBuildCommand],
+      ["PHASE0_WINDOWS_NATIVE_BUILD", gate.buildCommand],
+    ]) {
+      if (!windowsJob.includes(command)) violations.push(violation(code, path, `native Windows job must run ${command}`));
+    }
+  }
+
+  const staticJob = workflowJobBlock(workflowText, gate.prerequisiteFor);
+  if (staticJob === null || !staticJob.includes(`\n    needs: ${gate.jobId}`)) {
+    violations.push(violation("PHASE0_WINDOWS_NATIVE_NOT_REQUIRED", path, `${gate.prerequisiteFor} must depend on ${gate.jobId}`));
+  }
+
+  if (/\bllvm-rc\b|RC_x86_64_pc_windows_msvc|apt(?:-get)?\s+install[^\n]*llvm/i.test(workflowText)) {
+    violations.push(violation("PHASE0_WINDOWS_CROSS_COMPILE_FALLBACK", path, "MSVC Tauri qualification must use native Windows CI rather than an ambient Linux llvm-rc fallback"));
+  }
+
+  return violations;
+}
+
 function matrixRowStatus(matrix, id) {
   const escaped = id.replace(".", "\\.");
   const match = String(matrix).match(
@@ -149,6 +212,8 @@ export function validatePhase0Snapshot({
       ),
     );
   }
+
+  violations.push(...validateNativeWindowsGate(profile, workflowText));
 
   const steps = parseWorkflowSteps(workflowText);
   let lastIndex = -1;

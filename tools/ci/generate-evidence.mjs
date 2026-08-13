@@ -24,7 +24,7 @@ const GATES = Object.freeze([
   "rustfmt",
   "rust-clippy-warnings-as-errors",
   "rust-host-build",
-  "rust-windows-target-build",
+  "windows-native-msvc-build",
   "phase0-section-checkpoint",
 ]);
 

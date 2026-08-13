@@ -24,6 +24,7 @@ const childIds = [
 ];
 
 function workflowFromProfile() {
+  const native = profile.requiredNativeWindowsGate;
   const gates = profile.requiredWorkflowSteps
     .map(
       ({ name, run }) =>
@@ -37,8 +38,32 @@ on:
 permissions:
   contents: read
 jobs:
+  ${native.jobId}:
+    name: ${native.jobName}
+    runs-on: ${native.runner}
+    steps:
+      - name: Checkout Windows candidate
+        uses: actions/checkout@${"a".repeat(40)}
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Install pinned Windows pnpm and Node
+        uses: pnpm/setup@${"b".repeat(40)}
+        with:
+          version: 11.21.0
+          runtime: node@24.18.0
+      - name: Install pinned Windows Rust toolchain
+        run: ${native.rustToolchainCommand}
+      - name: Install Windows dependencies without lifecycle scripts
+        run: ${native.dependencyInstallCommand}
+      - name: Build bundled local desktop frontend on Windows
+        run: ${native.frontendBuildCommand}
+      - name: Native Windows MSVC Tauri compile
+        run: ${native.buildCommand}
+
   static-ci:
     name: static-ci
+    needs: ${native.jobId}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -96,6 +121,27 @@ function codes(overrides = {}) {
 
 test("0.CP aggregate Phase 0 checkpoint snapshot passes", () => {
   assert.deepEqual(codes(), []);
+});
+
+test("native Windows runner is required", () => {
+  const workflow = workflowFromProfile().replace(
+    `    runs-on: ${profile.requiredNativeWindowsGate.runner}`,
+    "    runs-on: ubuntu-24.04",
+  );
+  assert.ok(codes({ workflow }).includes("PHASE0_WINDOWS_NATIVE_RUNNER"));
+});
+
+test("mandatory static-ci context must depend on native Windows gate", () => {
+  const workflow = workflowFromProfile().replace(
+    `    needs: ${profile.requiredNativeWindowsGate.jobId}\n`,
+    "",
+  );
+  assert.ok(codes({ workflow }).includes("PHASE0_WINDOWS_NATIVE_NOT_REQUIRED"));
+});
+
+test("Linux llvm-rc workaround is rejected in favor of native Windows qualification", () => {
+  const workflow = `${workflowFromProfile()}\nenv:\n  RC_x86_64_pc_windows_msvc: llvm-rc\n`;
+  assert.ok(codes({ workflow }).includes("PHASE0_WINDOWS_CROSS_COMPILE_FALLBACK"));
 });
 
 test("missing mandatory Phase 0 gate fails closed", () => {
@@ -162,7 +208,6 @@ test("unverified child subsection fails checkpoint", () => {
     codes({ matrix: mutated }).includes("PHASE0_CHILD_NOT_VERIFIED"),
   );
 });
-
 
 test("verified Section 0 summary permits completed child rows to be compacted later", () => {
   const compactMatrix =

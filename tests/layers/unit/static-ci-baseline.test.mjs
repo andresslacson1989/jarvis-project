@@ -31,7 +31,7 @@ test("static CI workflow is least-privileged and uses immutable action SHAs", { 
   assert.match(workflow, /permissions:\s*\n\s*contents:\s*read/);
   assert.doesNotMatch(workflow, /permissions:\s*write-all/);
   const uses = [...workflow.matchAll(/^\s*-?\s*uses:\s*([^\s#]+).*$/gm)].map((match) => match[1]);
-  assert.ok(uses.length >= 2, "expected pinned checkout/runtime setup actions");
+  assert.ok(uses.length >= 4, "expected pinned checkout/runtime setup actions in both CI jobs");
   for (const specifier of uses) {
     if (specifier.startsWith("./")) continue;
     assert.match(specifier, /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[0-9a-f]{40}$/);
@@ -42,7 +42,7 @@ test("static CI workflow is least-privileged and uses immutable action SHAs", { 
   assert.match(workflow, /\n\s*run: cargo audit\n/);
   assert.match(workflow, /cargo clippy --locked -p jarvis-toolchain-smoke --all-targets --all-features -- -D warnings/);
   assert.match(workflow, /cargo check --locked -p jarvis-toolchain-smoke --all-targets --all-features/);
-  assert.match(workflow, /rustup toolchain install 1\.97\.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc/);
+  assert.match(workflow, /rustup toolchain install 1\.97\.1 --component rustfmt --component clippy/);
 });
 
 test("native Windows MSVC build is an unskippable prerequisite of the mandatory static-ci context", { skip: !existsSync(resolve(root, ".github/workflows/static-ci.yml")) }, () => {
@@ -55,10 +55,9 @@ test("native Windows MSVC build is an unskippable prerequisite of the mandatory 
     workflow,
     /^  static-ci:\s*\n    name: static-ci\s*\n    needs: windows-desktop\s*\n    runs-on: ubuntu-24\.04\s*$/m,
   );
-  assert.match(
-    workflow,
-    /cargo check --locked --workspace --target x86_64-pc-windows-msvc/,
-  );
+  assert.match(workflow, /rustup toolchain install 1\.97\.1 --target x86_64-pc-windows-msvc/);
+  assert.match(workflow, /pnpm --filter @jarvis\/desktop build:web/);
+  assert.match(workflow, /cargo check --locked --workspace --target x86_64-pc-windows-msvc/);
   assert.doesNotMatch(workflow, /RC_x86_64_pc_windows_msvc|\bRC:\s*llvm-rc|apt(?:-get)?\s+install[^\n]*llvm/i);
 });
 

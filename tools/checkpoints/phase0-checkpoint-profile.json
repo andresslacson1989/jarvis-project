@@ -3,6 +3,16 @@
   "checkpointId": "0.CP",
   "checkpointName": "Repository Governance + Platform Boundary + Contract-Drift Protection Ready",
   "contractSuiteVersion": "1.0.6",
+  "requiredNativeWindowsGate": {
+    "jobId": "windows-desktop",
+    "jobName": "windows-desktop",
+    "runner": "windows-2025",
+    "prerequisiteFor": "static-ci",
+    "rustToolchainCommand": "rustup toolchain install 1.97.1 --target x86_64-pc-windows-msvc",
+    "dependencyInstallCommand": "pnpm install --frozen-lockfile --ignore-scripts",
+    "frontendBuildCommand": "pnpm --filter @jarvis/desktop build:web",
+    "buildCommand": "cargo check --locked --workspace --target x86_64-pc-windows-msvc"
+  },
   "requiredWorkflowSteps": [
     {
       "name": "Install dependencies without lifecycle scripts",
@@ -87,10 +97,6 @@
     {
       "name": "Rust host build",
       "run": "cargo check --locked -p jarvis-toolchain-smoke --all-targets --all-features"
-    },
-    {
-      "name": "Rust Windows-target build",
-      "run": "cargo check --locked --workspace --target x86_64-pc-windows-msvc"
     }
   ],
   "requiredEvidencePaths": [
