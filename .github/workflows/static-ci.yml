@@ -53,6 +53,9 @@ jobs:
       - name: Build bundled local desktop frontend on Windows
         run: pnpm --filter @jarvis/desktop build:web
 
+      - name: Desktop workspace contract tests on Windows
+        run: node --test tests/layers/unit/desktop-workspace.test.mjs
+
       - name: Native Windows MSVC Tauri compile
         run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
 

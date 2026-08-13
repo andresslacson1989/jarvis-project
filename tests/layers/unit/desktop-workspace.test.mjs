@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..", "..", "..");
 const desktop = resolve(root, "apps", "desktop");
+const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 function read(path) {
   return readFileSync(resolve(root, path), "utf8");
@@ -67,7 +68,7 @@ test("production WebView source is a bundled local frontend and development bind
   assert.doesNotMatch(JSON.stringify(config), /https?:\/\/(?!127\.0\.0\.1:1420)/i);
 });
 
-test("bootstrap Windows icon is structurally valid and explicitly non-canonical until 1.11", { skip: !existsSync(resolve(desktop, "src-tauri", "icons", "icon.ico")) }, () => {
+test("bootstrap Windows icon uses modern PNG-compressed ICO layers and remains explicitly non-canonical until 1.11", { skip: !existsSync(resolve(desktop, "src-tauri", "icons", "icon.ico")) }, () => {
   const icon = readFileSync(resolve(desktop, "src-tauri", "icons", "icon.ico"));
   assert.ok(icon.length > 6, "ICO file must contain a directory and image entries");
   assert.equal(icon.readUInt16LE(0), 0, "ICO reserved field must be zero");
@@ -79,7 +80,15 @@ test("bootstrap Windows icon is structurally valid and explicitly non-canonical 
     const offset = 6 + index * 16;
     const width = icon[offset] === 0 ? 256 : icon[offset];
     const height = icon[offset + 1] === 0 ? 256 : icon[offset + 1];
+    const byteLength = icon.readUInt32LE(offset + 8);
+    const imageOffset = icon.readUInt32LE(offset + 12);
     assert.equal(width, height, `ICO layer ${index} must be square`);
+    assert.ok(byteLength > pngSignature.length, `ICO layer ${index} payload must be non-empty`);
+    assert.deepEqual(
+      icon.subarray(imageOffset, imageOffset + pngSignature.length),
+      pngSignature,
+      `ICO layer ${index} must use PNG compression accepted by modern Windows resource compilation`,
+    );
     sizes.push(width);
   }
   for (const requiredSize of [16, 24, 32, 48, 64, 256]) {
