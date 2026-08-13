@@ -36,10 +36,8 @@ function ensureReleaseChild(root, candidate, label) {
   const relativePath = relative(root, candidate);
   if (
     !relativePath ||
-    relativePath === ".." ||
-    relativePath.startsWith("../") ||
-    relativePath.startsWith("..\\") ||
-    isAbsolute(relativePath)
+    isAbsolute(relativePath) ||
+    !relativePath.split(/[\\/]/u).every((component) => component.length > 0 && component !== "..")
   ) {
     throw new Error(`${label} must remain inside the release root`);
   }
@@ -108,7 +106,7 @@ async function main() {
   console.log(`[core-runtime-manifest] wrote ${result.manifestPath}`);
 }
 
-if (pathToFileURL(resolve(process.argv[1])) .href === import.meta.url) {
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   main().catch((error) => {
     console.error(`[core-runtime-manifest] FAIL: ${error.message}`);
     process.exitCode = 1;

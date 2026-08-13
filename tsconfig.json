@@ -24,6 +24,9 @@
     "checkJs": false,
     "skipLibCheck": false,
     "resolveJsonModule": true,
+    "types": [
+      "node"
+    ],
     "noEmit": true
   },
   "include": [

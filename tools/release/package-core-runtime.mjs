@@ -139,7 +139,7 @@ async function main() {
   console.log(`[core-runtime-package] wrote ${result.releaseRoot}`);
 }
 
-if (pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   main().catch((error) => {
     console.error(`[core-runtime-package] FAIL: ${error.message}`);
     process.exitCode = 1;

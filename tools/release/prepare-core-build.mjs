@@ -1,0 +1,26 @@
+import { copyFile, mkdir, rm, stat } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const generatedEntrypoint = resolve(projectRoot, ".artifacts/core-build/services/core/src/main.js");
+const outputDirectory = resolve(projectRoot, "services/core/dist");
+const outputEntrypoint = resolve(outputDirectory, "main.js");
+
+async function main() {
+  const information = await stat(generatedEntrypoint).catch(() => null);
+  if (!information?.isFile()) {
+    throw new Error("compiled Core entrypoint is missing from the generated build graph");
+  }
+  await rm(outputDirectory, { recursive: true, force: true });
+  await mkdir(outputDirectory, { recursive: true });
+  await copyFile(generatedEntrypoint, outputEntrypoint);
+  console.log(`[core-build] wrote ${outputEntrypoint}`);
+}
+
+if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+  main().catch((error) => {
+    console.error(`[core-build] FAIL: ${error.message}`);
+    process.exitCode = 1;
+  });
+}

@@ -29,6 +29,7 @@ This inventory is generated from the exact locked dependency graph used by JARVI
 | npm | @rolldown/pluginutils | 1.0.1 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | @tybys/wasm-util | 0.10.3 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | @types/react-dom | 19.2.3 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
+| npm | @types/node | 26.2.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
 | npm | @types/react | 19.2.17 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | csstype | 3.2.3 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | detect-libc | 2.1.2 | Apache-2.0 | DESKTOP_BUILD_OR_TYPECHECK | no |
@@ -58,6 +59,7 @@ This inventory is generated from the exact locked dependency graph used by JARVI
 | npm | tinyglobby | 0.2.17 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | tslib | 2.8.1 | 0BSD | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | typescript | 6.0.3 | Apache-2.0 | DESKTOP_BUILD_OR_TYPECHECK | no |
+| npm | undici-types | 8.3.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
 | npm | vite | 8.1.5 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | cargo | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
 | cargo | aho-corasick | 1.1.5 | Unlicense OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |

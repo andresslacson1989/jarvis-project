@@ -10,7 +10,7 @@
   "scripts": {
     "toolchain:verify": "node tools/toolchain/verify-toolchain.mjs",
     "toolchain:verify:metadata": "node tools/toolchain/verify-toolchain.mjs --metadata-only",
-    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm --filter @jarvis/desktop typecheck",
+    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm --filter @jarvis/core typecheck && pnpm --filter @jarvis/desktop typecheck",
     "test": "node tools/test/run-tests.mjs --profile normal",
     "test:qualification": "node tools/test/run-tests.mjs --profile qualification",
     "architecture:check": "node tools/architecture/check-architecture.mjs",
@@ -23,7 +23,7 @@
     "release:core-runtime-manifest": "node tools/release/generate-core-runtime-manifest.mjs",
     "governance:check": "node tools/ci/check-repository-governance.mjs",
     "phase0:check": "node tools/checkpoints/phase0-checkpoint.mjs",
-    "build": "tsc -p tsconfig.build.json && pnpm --filter @jarvis/desktop build:web",
+    "build": "tsc -p tsconfig.build.json && pnpm --filter @jarvis/core build && pnpm --filter @jarvis/desktop build:web",
     "ci:evidence": "node tools/ci/generate-evidence.mjs",
     "contract:generate": "node tools/contract/generate-contract-artifacts.mjs --write",
     "contract:check-generated": "node tools/contract/generate-contract-artifacts.mjs --check",
@@ -32,6 +32,7 @@
     "contract:check": "pnpm contract:check-generated && pnpm contract:check-manifest && pnpm contract:check-drift"
   },
   "devDependencies": {
+    "@types/node": "26.2.0",
     "typescript": "6.0.3"
   }
 }

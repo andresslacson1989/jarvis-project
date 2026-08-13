@@ -6,4 +6,4 @@ Core owns authoritative mutable application/domain state and policy orchestratio
 
 Core/domain code MUST NOT depend on UI code or directly import Windows/Linux native backend implementations. Native behavior is requested through semantic platform contracts. Provider-native and OS-native types terminate inside their adapters rather than entering canonical domain models.
 
-Executable Core implementation is owned by later matrix subsections; this file establishes responsibility and dependency direction only.
+The current Core slice provides a typed bootstrap boundary, explicit release-root/entrypoint validation, controlled-environment checks, truthful Windows `FULL_HOST` identity, and a fail-closed pre-IPC boundary. It is built with the pinned Node/TypeScript toolchain into `dist/main.js`; authenticated native IPC and authoritative services remain subsequent matrix work.

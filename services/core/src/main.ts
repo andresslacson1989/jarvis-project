@@ -1,0 +1,214 @@
+import { lstat, realpath } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { isAbsolute, relative, resolve } from "node:path";
+import type { IpcEnvelope, IpcResponse } from "../../../packages/protocol/src/ipc.js";
+import type { JarvisError } from "../../../packages/protocol/src/errors.js";
+
+export const CORE_PROTOCOL_MAJOR = 1 as const;
+export const CORE_PLATFORM = "WINDOWS" as const;
+export const CORE_RUNTIME_ROLE = "FULL_HOST" as const;
+export const CORE_ARCHITECTURE = "x64" as const;
+
+export type CoreBootstrapState = "STARTING" | "READY" | "STOPPING" | "STOPPED";
+export type CoreBootstrapFailureCode =
+  | "CORE_RUNTIME_MISSING"
+  | "CORE_RUNTIME_INTEGRITY_FAILED"
+  | "CORE_RUNTIME_INCOMPATIBLE"
+  | "CORE_ENTRYPOINT_MISSING"
+  | "CORE_START_FAILED";
+
+export interface CoreRuntimeEnvironment {
+  readonly releaseRoot: string;
+  readonly entrypoint: string;
+}
+
+export interface CoreStatus {
+  readonly protocolMajor: typeof CORE_PROTOCOL_MAJOR;
+  readonly platform: typeof CORE_PLATFORM;
+  readonly runtimeRole: typeof CORE_RUNTIME_ROLE;
+  readonly architecture: typeof CORE_ARCHITECTURE;
+  readonly state: CoreBootstrapState;
+}
+
+export class CoreBootstrapError extends Error {
+  readonly code: CoreBootstrapFailureCode;
+
+  constructor(code: CoreBootstrapFailureCode, message: string) {
+    super(message);
+    this.name = "CoreBootstrapError";
+    this.code = code;
+  }
+}
+
+function requiredEnvironmentValue(environment: NodeJS.ProcessEnv, key: string): string {
+  const value = environment[key];
+  if (!value) {
+    throw new CoreBootstrapError("CORE_RUNTIME_INCOMPATIBLE", `${key} is required`);
+  }
+  return value;
+}
+
+function isCanonicalChild(root: string, candidate: string): boolean {
+  const child = relative(root, candidate);
+  return (
+    child.length > 0 &&
+    !isAbsolute(child) &&
+    child.split(/[\\/]/u).every((component) => component.length > 0 && component !== "..")
+  );
+}
+
+async function canonicalDirectory(path: string): Promise<string> {
+  let metadata;
+  try {
+    metadata = await lstat(path);
+  } catch {
+    throw new CoreBootstrapError("CORE_RUNTIME_MISSING", "the release-owned Core root is missing");
+  }
+  if (metadata.isSymbolicLink() || !metadata.isDirectory()) {
+    throw new CoreBootstrapError("CORE_RUNTIME_INTEGRITY_FAILED", "the Core root is not a regular directory");
+  }
+  return realpath(path);
+}
+
+/**
+ * Validate the host-provided, controlled Core environment before any service
+ * state is created. The host owns platform identity and process containment;
+ * Core accepts only the explicit release paths it was given.
+ */
+export async function validateCoreEnvironment(
+  environment: NodeJS.ProcessEnv = process.env,
+): Promise<CoreRuntimeEnvironment> {
+  if (environment.NODE_OPTIONS !== undefined || environment.NODE_PATH !== undefined) {
+    throw new CoreBootstrapError(
+      "CORE_RUNTIME_INCOMPATIBLE",
+      "user-controlled Node execution modifiers are not permitted",
+    );
+  }
+
+  const releaseRootInput = requiredEnvironmentValue(environment, "JARVIS_CORE_ROOT");
+  const entrypointInput = requiredEnvironmentValue(environment, "JARVIS_CORE_ENTRYPOINT");
+  if (!isAbsolute(releaseRootInput) || !isAbsolute(entrypointInput)) {
+    throw new CoreBootstrapError(
+      "CORE_RUNTIME_INCOMPATIBLE",
+      "Core release paths must be absolute",
+    );
+  }
+
+  const releaseRoot = await canonicalDirectory(resolve(releaseRootInput));
+  let entryMetadata;
+  try {
+    entryMetadata = await lstat(entrypointInput);
+  } catch {
+    throw new CoreBootstrapError("CORE_ENTRYPOINT_MISSING", "the release-owned Core entrypoint is missing");
+  }
+  if (entryMetadata.isSymbolicLink()) {
+    throw new CoreBootstrapError(
+      "CORE_RUNTIME_INTEGRITY_FAILED",
+      "the Core entrypoint cannot be a symbolic link",
+    );
+  }
+  if (!entryMetadata.isFile()) {
+    throw new CoreBootstrapError(
+      "CORE_RUNTIME_INTEGRITY_FAILED",
+      "the Core entrypoint is not a regular file",
+    );
+  }
+
+  const entrypoint = await realpath(entrypointInput);
+  if (!isCanonicalChild(releaseRoot, entrypoint)) {
+    throw new CoreBootstrapError(
+      "CORE_RUNTIME_INTEGRITY_FAILED",
+      "the Core entrypoint is outside the release root",
+    );
+  }
+  return { releaseRoot, entrypoint };
+}
+
+export interface CoreIpcBoundaryStub {
+  handle(request: IpcEnvelope<unknown>): Promise<IpcResponse<never>>;
+}
+
+/**
+ * The first Core slice has no authenticated native transport yet. Returning a
+ * typed failure is safer and more truthful than accepting an unbound request.
+ */
+export class LockedCoreIpcBoundary implements CoreIpcBoundaryStub {
+  async handle(request: IpcEnvelope<unknown>): Promise<IpcResponse<never>> {
+    const error: JarvisError = {
+      code: "CORE_IPC_NOT_READY",
+      category: "UNSUPPORTED",
+      message: "Core IPC is unavailable until the authenticated native transport is established",
+      retryable: false,
+      correlationId: request.correlationId,
+    };
+    return { ok: false, error };
+  }
+}
+
+export class CoreBootstrap {
+  private state: CoreBootstrapState = "STARTING";
+  private environment: CoreRuntimeEnvironment | undefined;
+
+  async start(environment: NodeJS.ProcessEnv = process.env): Promise<CoreStatus> {
+    if (this.state === "READY") return this.status();
+    if (this.state !== "STARTING") {
+      throw new CoreBootstrapError("CORE_START_FAILED", "Core cannot restart after shutdown");
+    }
+    this.environment = await validateCoreEnvironment(environment);
+    this.state = "READY";
+    return this.status();
+  }
+
+  stop(): CoreStatus {
+    if (this.state === "READY") this.state = "STOPPING";
+    this.state = "STOPPED";
+    return this.status();
+  }
+
+  status(): CoreStatus {
+    return {
+      protocolMajor: CORE_PROTOCOL_MAJOR,
+      platform: CORE_PLATFORM,
+      runtimeRole: CORE_RUNTIME_ROLE,
+      architecture: CORE_ARCHITECTURE,
+      state: this.state,
+    };
+  }
+
+  getRuntimeEnvironment(): CoreRuntimeEnvironment {
+    if (!this.environment) {
+      throw new CoreBootstrapError("CORE_START_FAILED", "Core has not completed bootstrap");
+    }
+    return this.environment;
+  }
+}
+
+async function runEntrypoint(): Promise<void> {
+  const bootstrap = new CoreBootstrap();
+  try {
+    await bootstrap.start();
+  } catch (error) {
+    const code = error instanceof CoreBootstrapError ? error.code : "CORE_START_FAILED";
+    process.stderr.write(`[${code}]\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  // Keep the bootstrap process owned and alive until the authenticated native
+  // transport is attached. This handle is deliberately not a readiness signal;
+  // LockedCoreIpcBoundary remains the only boundary in this pre-IPC slice.
+  const lifecycleHandle = setInterval(() => undefined, 60_000);
+  await new Promise<void>((resolveShutdown) => {
+    const shutdown = () => {
+      clearInterval(lifecycleHandle);
+      bootstrap.stop();
+      resolveShutdown();
+    };
+    process.once("SIGINT", shutdown);
+    process.once("SIGTERM", shutdown);
+  });
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  await runEntrypoint();
+}
