@@ -26,6 +26,7 @@
     "brand:icons": "node tools/assets/generate-brand-icons.mjs",
     "governance:check": "node tools/ci/check-repository-governance.mjs",
     "phase0:check": "node tools/checkpoints/phase0-checkpoint.mjs",
+    "phase1:check": "node tools/checkpoints/phase1-checkpoint.mjs",
     "build": "tsc -p tsconfig.build.json && pnpm --filter @jarvis/core build && pnpm --filter @jarvis/desktop build:web",
     "ci:evidence": "node tools/ci/generate-evidence.mjs",
     "contract:generate": "node tools/contract/generate-contract-artifacts.mjs --write",

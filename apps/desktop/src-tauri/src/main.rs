@@ -3,6 +3,8 @@ mod lifecycle;
 mod platform;
 #[path = "../../../../platform/windows/src/process_supervisor.rs"]
 pub mod process_supervisor;
+#[path = "../../../../platform/windows/src/local_ipc.rs"]
+pub mod local_ipc;
 #[path = "../../../../platform/windows/src/path_identity.rs"]
 pub mod path_identity;
 #[path = "../../../../platform/windows/src/session_system.rs"]
@@ -57,6 +59,8 @@ fn main() {
                 };
 
             let _platform_composition = platform::compose_windows_full_host()
+                .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+            let _local_ipc = local_ipc::NamedPipeServer::bind()
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
             let window_controller = window_controller::PlatformWindowController::new(
                 application_paths.data.join("window-state.json"),
