@@ -487,6 +487,50 @@ This inventory is generated from the exact locked dependency graph used by JARVI
 | cargo | zerovec-derive | 0.11.3 | Unicode-3.0 | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
 | cargo | zerovec | 0.11.6 | Unicode-3.0 | DESKTOP_WINDOWS_RUNTIME | yes |
 | cargo | zmij | 1.0.23 | MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| npm | @tauri-apps/api | 2.11.1 | Apache-2.0 OR MIT | DESKTOP_UI_RUNTIME | yes |
+| npm | @tauri-apps/plugin-opener | 2.5.4 | MIT OR Apache-2.0 | DESKTOP_UI_RUNTIME | yes |
+| cargo | async-broadcast | 0.7.2 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | async-channel | 2.5.0 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | async-executor | 1.14.0 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | async-io | 2.6.0 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | async-lock | 3.4.2 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | async-process | 2.5.0 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | async-recursion | 1.1.1 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | async-signal | 0.2.14 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | async-task | 4.7.1 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | async-trait | 0.1.92 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | blocking | 1.6.2 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | concurrent-queue | 2.5.0 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | endi | 1.1.1 | MIT | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | enumflags2 | 0.7.12 | MIT OR Apache-2.0 | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | enumflags2_derive | 0.7.12 | MIT OR Apache-2.0 | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | errno | 0.3.14 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | event-listener | 5.4.2 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | event-listener-strategy | 0.5.4 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | futures-lite | 2.6.1 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | hermit-abi | 0.5.2 | MIT OR Apache-2.0 | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | is-docker | 0.2.0 | MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | is-wsl | 0.4.0 | MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | open | 5.4.1 | MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | ordered-stream | 0.2.0 | MIT OR Apache-2.0 | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | parking | 2.2.1 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | piper | 0.2.5 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | polling | 3.11.0 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | rustix | 1.1.4 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | tauri-plugin | 2.6.3 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | tauri-plugin-opener | 2.5.4 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | tempfile | 3.27.0 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | tracing-attributes | 0.1.31 | MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | uds_windows | 1.2.1 | MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | zbus | 5.19.0 | MIT | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | zbus_macros | 5.19.0 | MIT | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | zbus_names | 4.3.4 | MIT | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | zcheapstr | 1.1.0 | MIT | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | zvariant | 5.14.0 | MIT | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | zvariant_derive | 5.14.0 | MIT | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
+| cargo | zvariant_utils | 4.0.0 | MIT | DESKTOP_BUILD_OR_TARGET_LOCKED | no |
 
 ## CI actions
 

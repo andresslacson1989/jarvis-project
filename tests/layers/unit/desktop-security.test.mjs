@@ -13,10 +13,13 @@ function readJson(path) {
   return JSON.parse(read(path));
 }
 
-test("1.2 binds exactly one local capability with no native permissions or remote origins", () => {
+test("1.2 binds exactly one local capability with only scoped opener permission and no remote origins", () => {
   const capability = readJson("apps/desktop/src-tauri/capabilities/main-local-ui.json");
   assert.deepEqual(capability.windows, ["main"]);
-  assert.deepEqual(capability.permissions, []);
+  assert.deepEqual(capability.permissions, [{
+    identifier: "opener:allow-open-url",
+    allow: [{ url: "http://*" }, { url: "https://*" }],
+  }]);
   assert.equal(capability.remote, undefined);
 
   const config = readJson("apps/desktop/src-tauri/tauri.conf.json");
@@ -35,7 +38,7 @@ test("1.2 configures restrictive local-only CSP without executable remote conten
   assert.doesNotMatch(JSON.stringify(csp), /unsafe-eval|unsafe-inline/i);
 });
 
-test("1.2 native host blocks remote navigation, new windows, and devtools", () => {
+test("1.2 native host blocks remote navigation, unexpected new windows, and devtools", () => {
   const main = read("apps/desktop/src-tauri/src/main.rs");
   assert.match(main, /on_navigation\(allows_authoritative_navigation\)/);
   assert.match(main, /url\.host_str\(\) == Some\("127\.0\.0\.1"\)/);
@@ -43,6 +46,17 @@ test("1.2 native host blocks remote navigation, new windows, and devtools", () =
   assert.match(main, /on_new_window\(\|_url, _features\| NewWindowResponse::Deny\)/);
   assert.match(main, /\.devtools\(false\)/);
   assert.match(main, /WebviewUrl::External\(\s*"http:\/\/127\.0\.0\.1:1420"/s);
+  assert.match(main, /tauri_plugin_opener::init\(\)/);
+});
+
+test("1.2 external-link path validates HTTP(S) URLs before leaving the privileged WebView", () => {
+  const helper = read("apps/desktop/src/security/externalLink.ts");
+  assert.match(helper, /import \{ openUrl \} from "@tauri-apps\/plugin-opener"/);
+  assert.match(helper, /url\.protocol === "http:" \|\| url\.protocol === "https:"/);
+  assert.match(helper, /url\.username\.length === 0/);
+  assert.match(helper, /url\.password\.length === 0/);
+  assert.match(helper, /await openUrl\(value\)/);
+  assert.doesNotMatch(helper, /window\.open|dangerouslySetInnerHTML|innerHTML/);
 });
 
 test("1.2 renderer keeps untrusted content inert and bounded", () => {

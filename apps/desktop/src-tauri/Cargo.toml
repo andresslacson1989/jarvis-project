@@ -11,3 +11,4 @@ tauri-build = { version = "=2.6.3", features = ["codegen"] }
 
 [dependencies]
 tauri = { version = "=2.11.5", features = [] }
+tauri-plugin-opener = "=2.5.4"

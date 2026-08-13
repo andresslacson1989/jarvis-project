@@ -1,5 +1,6 @@
 use tauri::webview::{NewWindowResponse, WebviewWindowBuilder};
 use tauri::{Url, WebviewUrl};
+use tauri_plugin_opener::OpenerExt;
 
 fn allows_authoritative_navigation(url: &Url) -> bool {
     if cfg!(debug_assertions) {
@@ -13,6 +14,7 @@ fn allows_authoritative_navigation(url: &Url) -> bool {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             #[cfg(debug_assertions)]
             let webview_url = WebviewUrl::External(

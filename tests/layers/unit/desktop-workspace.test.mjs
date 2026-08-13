@@ -80,6 +80,7 @@ test("desktop JavaScript dependencies are exact, production-aged pins", { skip: 
   assert.equal(pkg.type, "module");
   assert.deepEqual(pkg.engines, { node: "24.18.0", pnpm: "11.21.0" });
   assert.deepEqual(pkg.dependencies, {
+    "@tauri-apps/plugin-opener": "2.5.4",
     react: "19.2.8",
     "react-dom": "19.2.8",
   });
