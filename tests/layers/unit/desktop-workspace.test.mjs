@@ -62,6 +62,7 @@ const requiredWorkspaceFiles = [
   "apps/desktop/src-tauri/build.rs",
   "apps/desktop/src-tauri/tauri.conf.json",
   "apps/desktop/src-tauri/src/main.rs",
+  "apps/desktop/src-tauri/capabilities/main-local-ui.json",
   "apps/desktop/src-tauri/icons/README.md",
   "apps/desktop/src-tauri/icons/icon.ico",
 ];
@@ -96,12 +97,9 @@ test("production WebView source is a bundled local frontend and development bind
   const config = readJson("apps/desktop/src-tauri/tauri.conf.json");
   assert.equal(config.build?.frontendDist, "../dist");
   assert.equal(config.build?.devUrl, "http://127.0.0.1:1420");
-  assert.equal(config.app?.windows?.length, 1);
-  assert.equal(config.app.windows[0]?.label, "main");
-  assert.equal(config.app.windows[0]?.title, "JARVIS Mission Control");
-  assert.equal(config.app.windows[0]?.url, undefined, "production window must use bundled frontendDist rather than a remote URL");
+  assert.equal(config.app?.windows, undefined, "the security-sensitive window is created by the native builder");
   assert.deepEqual(config.bundle, { active: false, icon: ["icons/icon.ico"] });
-  assert.doesNotMatch(JSON.stringify(config), /https?:\/\/(?!127\.0\.0\.1:1420)/i);
+  assert.doesNotMatch(JSON.stringify(config), /https?:\/\/(?!127\.0\.0\.1:1420|ipc\.localhost)/i);
 });
 
 test("bootstrap Windows icon uses complete PNG-compressed ICO layers and remains explicitly non-canonical until 1.11", { skip: !existsSync(resolve(desktop, "src-tauri", "icons", "icon.ico")) }, () => {

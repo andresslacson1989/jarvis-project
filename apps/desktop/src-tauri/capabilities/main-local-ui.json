@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-local-ui",
+  "description": "The bundled JARVIS renderer starts with no native command or plugin permissions.",
+  "windows": ["main"],
+  "permissions": []
+}

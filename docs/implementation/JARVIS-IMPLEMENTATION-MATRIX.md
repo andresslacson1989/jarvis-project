@@ -20,8 +20,8 @@ The two files together are one non-normative implementation matrix. They are not
 | Field | Current value |
 |---|---|
 | Active section | `SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core` |
-| Active subsection | `1.1` — Tauri 2 + React desktop workspace with bundled-local authoritative WebView |
-| Next eligible subsection | None while `1.1` is active; `1.2` requires `1.1` VERIFIED |
+| Active subsection | `1.2` — Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security |
+| Next eligible subsection | None while `1.2` is active; `1.3` requires `1.2` VERIFIED |
 | Contract suite | JARVIS v1.0.6 |
 | Authoritative implementation sequence | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` |
 | Reference plan | `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` |
@@ -53,9 +53,9 @@ The two files together are one non-normative implementation matrix. They are not
 
 | Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
 |---|---|---|---|---:|---|---|
-| **SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core** | **IN PROGRESS** | 0.CP | `Phase 1`; checkpoint: Windows Desktop Trust + Mission Control Foundation Ready | — | `1.1` is active | `0.CP` verified; Section 1 rows promoted from the stable reference plan before implementation |
-| ↳ **1.1** Tauri 2 + React desktop workspace with bundled-local authoritative WebView | **IN PROGRESS** | 0.CP | PLAN §3; RT §§2–5; RP §3; UI §8 | — | Desktop Tauri/React workspace and bundled-local renderer are not yet implemented/verified | Execution packet established from current v1.0.6 suite; implementation in progress |
-| ↳ **1.2** Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security | **NOT STARTED** | 1.1 | PLAN §3; IC §6; RT §5; SEC §20; CS §25; VR §12 | — | — | — |
+| **SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core** | **IN PROGRESS** | 0.CP | `Phase 1`; checkpoint: Windows Desktop Trust + Mission Control Foundation Ready | — | `1.2` is active | `0.CP` verified; `1.1` verified on the exact candidate commit; Section 1 rows promoted from the stable reference plan before implementation |
+| ↳ **1.1** Tauri 2 + React desktop workspace with bundled-local authoritative WebView | **VERIFIED** | 0.CP | PLAN §3; RT §§2–5; RP §3; UI §8 | 10 CA / 9 scoped | None within `1.1` scope | Candidate `7981defd48019c13f78f3c1c6d0539cb341bc4fa`; 7/7 `tests/layers/unit/desktop-workspace.test.mjs`; pinned desktop typecheck and bundled frontend build PASS; GitHub run `31668752271` PASS for `windows-desktop` and dependent `static-ci`; native Windows Tauri compile PASS |
+| ↳ **1.2** Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security | **IMPLEMENTED** | 1.1 | PLAN §3; IC §6; RT §5; SEC §20; CS §25; VR §12 | 10 CA / 8 scoped | Native Windows compile/evidence is pending; ordinary external-link opening outside the privileged WebView remains to be implemented before verification | Candidate workspace adds a single permission-empty local capability, restrictive CSP, native authoritative-navigation/new-window/devtools policy, bounded inert renderer text, and 4 adversarial security tests; targeted desktop suite 12/12 PASS; desktop typecheck/build PASS; full runner now uses Windows-safe relative worker paths; local full-suite safety fixture remains affected by checkout line endings |
 | ↳ **1.3** Rust Windows platform host and deterministic Windows composition wiring | **NOT STARTED** | 1.1, 0.5 | PLAN §3; IC §§5,8; PP §§7–9; RP §3 | — | — | — |
 | ↳ **1.4** Single-instance ownership, production data-directory layout, and maintenance-lock foundation | **NOT STARTED** | 1.3 | RT §4; UI §9 | — | — | — |
 | ↳ **1.5** Application-owned Node/Core packaging, controlled environment, integrity states, and no PATH fallback | **NOT STARTED** | 1.3, 0.8 | PLAN §3; IC §7; RT §§3,6; RP §3; VR §§13,32 | — | — | — |

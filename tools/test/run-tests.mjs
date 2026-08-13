@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { loadLayerManifest } from "../../tests/harness/layers.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -68,9 +68,10 @@ function scrubbedEnv() {
 async function runTestFile(path, normalProfile) {
   const args = [];
   if (normalProfile) {
-    args.push("--import", resolve(root, "tests", "harness", "deny-network.mjs"));
+    args.push("--import", "./tests/harness/deny-network.mjs");
   }
-  args.push("--test", path);
+  const relativeTestPath = relative(root, path).split("\\").join("/");
+  args.push("--test", `./${relativeTestPath}`);
   return new Promise((resolvePromise) => {
     const child = spawn(process.execPath, args, {
       cwd: root,
