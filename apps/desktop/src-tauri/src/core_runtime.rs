@@ -76,6 +76,14 @@ pub struct CoreRuntimeLayout {
     core_entrypoint: PathBuf,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CoreLaunchSpec {
+    pub(crate) program: PathBuf,
+    pub(crate) arguments: Vec<OsString>,
+    pub(crate) current_dir: PathBuf,
+    pub(crate) environment: BTreeMap<OsString, OsString>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RuntimeIntegrityManifest {
@@ -381,18 +389,29 @@ impl CoreRuntimeLayout {
         ]))
     }
 
+    /// Build the only production launch shape accepted by the Windows process
+    /// supervisor. Integrity validation happens before this spec is returned.
+    pub(crate) fn launch_spec(&self, manifest_path: &Path) -> Result<CoreLaunchSpec, CoreRuntimeError> {
+        self.validate_integrity(manifest_path)?;
+        Ok(CoreLaunchSpec {
+            program: self.node_executable.clone(),
+            arguments: vec![self.core_entrypoint.as_os_str().to_os_string()],
+            current_dir: self.release_root.clone(),
+            environment: self.controlled_environment()?,
+        })
+    }
+
     /// Construct a command from the exact absolute runtime path. The caller
     /// must still perform signed-manifest/integrity and protocol checks before
     /// spawning the process in the later startup subsections.
     pub fn controlled_command(&self, manifest_path: &Path) -> Result<Command, CoreRuntimeError> {
-        self.validate_integrity(manifest_path)?;
-        let environment = self.controlled_environment()?;
-        let mut command = Command::new(&self.node_executable);
+        let spec = self.launch_spec(manifest_path)?;
+        let mut command = Command::new(&spec.program);
         command
-            .arg(&self.core_entrypoint)
-            .current_dir(&self.release_root)
+            .args(&spec.arguments)
+            .current_dir(&spec.current_dir)
             .env_clear();
-        for (key, value) in environment {
+        for (key, value) in spec.environment {
             command.env(key, value);
         }
         Ok(command)

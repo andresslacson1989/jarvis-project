@@ -80,6 +80,7 @@ test("desktop JavaScript dependencies are exact, production-aged pins", { skip: 
   assert.equal(pkg.type, "module");
   assert.deepEqual(pkg.engines, { node: "24.18.0", pnpm: "11.21.0" });
   assert.deepEqual(pkg.dependencies, {
+    "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-opener": "2.5.4",
     react: "19.2.8",
     "react-dom": "19.2.8",
@@ -158,10 +159,11 @@ test("renderer bootstrap is semantic and has no authoritative/native integration
   }
 });
 
-test("Tauri host is pinned and intentionally minimal before 1.2 and 1.3", { skip: !existsSync(resolve(desktop, "src-tauri", "Cargo.toml")) }, () => {
+test("Tauri host is pinned and keeps the typed UI boundary separate from native supervision", { skip: !existsSync(resolve(desktop, "src-tauri", "Cargo.toml")) }, () => {
   const cargo = read("apps/desktop/src-tauri/Cargo.toml");
   const build = read("apps/desktop/src-tauri/build.rs");
   const rustMain = read("apps/desktop/src-tauri/src/main.rs");
+  const supervisor = read("platform/windows/src/process_supervisor.rs");
   assert.match(cargo, /tauri\s*=\s*\{\s*version\s*=\s*"=2\.11\.5"/);
   assert.match(cargo, /tauri-build\s*=\s*\{\s*version\s*=\s*"=2\.6\.3"\s*,\s*features\s*=\s*\["codegen"\]\s*\}/);
   assert.match(build, /tauri_build::try_build\s*\(/);
@@ -172,7 +174,23 @@ test("Tauri host is pinned and intentionally minimal before 1.2 and 1.3", { skip
   assert.match(rustMain, /tauri::Builder::default\(\)/);
   assert.match(rustMain, /tauri::tauri_build_context!\(\)/);
   assert.doesNotMatch(rustMain, /generate_context!/);
-  assert.doesNotMatch(rustMain, /invoke_handler/);
+  assert.match(rustMain, /invoke_handler\(tauri::generate_handler!\[ui_boundary::get_core_status\]\)/);
+  assert.match(rustMain, /pub mod process_supervisor;/);
+  assert.match(cargo, /windows-sys\s*=\s*\{\s*version\s*=\s*"=0\.61\.2"/);
+  for (const feature of [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+  ]) {
+    assert.match(cargo, new RegExp(`"${feature}"`));
+  }
+  assert.match(supervisor, /CreateProcessW\(/);
+  assert.match(supervisor, /CREATE_SUSPENDED\s*\|\s*CREATE_UNICODE_ENVIRONMENT/);
+  assert.match(supervisor, /self\.job\.assign\(pending\.process_handle\(\)\)/);
+  assert.match(supervisor, /ResumeThread\(pending\.thread_handle\(\)\)/);
+  assert.match(supervisor, /limits\.BasicLimitInformation\.LimitFlags\s*=\s*JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE/);
+  assert.match(supervisor, /const NO_INHERITED_HANDLES: i32 = 0/);
   assert.doesNotMatch(rustMain, /platform::windows|windows_sys|windows::Win32/);
 });
 

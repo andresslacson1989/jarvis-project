@@ -3,12 +3,17 @@ import { fileURLToPath } from "node:url";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { IpcEnvelope, IpcResponse } from "../../../packages/protocol/src/ipc.js";
 import type { JarvisError } from "../../../packages/protocol/src/errors.js";
+import type {
+  CoreServiceStatus,
+  CoreStatusResponse,
+} from "../../../packages/protocol/src/core.js";
 import { admitReleaseRuntime, type ReleaseTrustAdmission } from "./release-trust.js";
 
 export const CORE_PROTOCOL_MAJOR = 1 as const;
 export const CORE_PLATFORM = "WINDOWS" as const;
 export const CORE_RUNTIME_ROLE = "FULL_HOST" as const;
 export const CORE_ARCHITECTURE = "x64" as const;
+const CORE_STATUS_REQUEST = "get_core_status" as const;
 
 export type CoreBootstrapState = "STARTING" | "READY" | "STOPPING" | "STOPPED";
 export type CoreBootstrapFailureCode =
@@ -32,6 +37,15 @@ export interface CoreStatus {
   readonly architecture: typeof CORE_ARCHITECTURE;
   readonly state: CoreBootstrapState;
 }
+
+export const LOCKED_CORE_SERVICE_STATUS: CoreServiceStatus = {
+  protocolMajor: 1,
+  platform: "WINDOWS",
+  runtimeRole: "FULL_HOST",
+  architecture: "x64",
+  serviceState: "LOCKED",
+  transportState: "NOT_CONNECTED",
+};
 
 export class CoreBootstrapError extends Error {
   readonly code: CoreBootstrapFailureCode;
@@ -150,6 +164,74 @@ export async function validateCoreEnvironment(
 
 export interface CoreIpcBoundaryStub {
   handle(request: IpcEnvelope<unknown>): Promise<IpcResponse<never>>;
+}
+
+export interface CoreServiceShellBoundary {
+  handle(request: IpcEnvelope<unknown>): Promise<CoreStatusResponse>;
+}
+
+/**
+ * Shared service-shell stub for the first UI/Core boundary slice. It exposes
+ * only a harmless status request and remains locked until the authenticated
+ * native transport is established; it never fabricates a ready response.
+ */
+export class CoreServiceShell implements CoreServiceShellBoundary {
+  async handle(request: IpcEnvelope<unknown>): Promise<CoreStatusResponse> {
+    if (!isCoreStatusRequest(request)) {
+      return {
+        ok: false,
+        error: {
+          code: "CORE_IPC_REQUEST_INVALID",
+          category: "VALIDATION",
+          message: "Core status requests must use protocol 1, get_core_status, a UUIDv7 correlation ID, and an empty payload",
+          retryable: false,
+          correlationId: request.correlationId,
+        },
+      };
+    }
+
+    return {
+      ok: false,
+      error: {
+        code: "CORE_IPC_NOT_READY",
+        category: "UNSUPPORTED",
+        message: "Core IPC is unavailable until the authenticated native transport is established",
+        retryable: false,
+        correlationId: request.correlationId,
+        details: {
+          request: CORE_STATUS_REQUEST,
+          serviceState: LOCKED_CORE_SERVICE_STATUS.serviceState,
+          transportState: LOCKED_CORE_SERVICE_STATUS.transportState,
+        },
+      },
+    };
+  }
+}
+
+function isCoreStatusRequest(value: unknown): value is IpcEnvelope<Record<string, never>> {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value).sort();
+  return (
+    JSON.stringify(keys) === JSON.stringify(["correlationId", "id", "kind", "name", "payload", "protocolVersion"]) &&
+    value.protocolVersion === 1 &&
+    value.kind === "request" &&
+    (value.id === null || isUuidV7(value.id)) &&
+    value.name === CORE_STATUS_REQUEST &&
+    isUuidV7(value.correlationId) &&
+    isRecord(value.payload) &&
+    Object.keys(value.payload).length === 0
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isUuidV7(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value)
+  );
 }
 
 /**

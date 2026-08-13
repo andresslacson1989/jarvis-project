@@ -7,6 +7,7 @@ import { writeTufReleaseMetadata } from "../../helpers/tuf-release-fixture.mjs";
 import {
   CoreBootstrap,
   CoreBootstrapError,
+  CoreServiceShell,
   LockedCoreIpcBoundary,
   validateCoreEnvironment,
 } from "../../../services/core/src/main.ts";
@@ -109,4 +110,53 @@ test("locked Core IPC boundary rejects requests without fabricating success", as
       correlationId: "018f3b8e-6c68-7abc-8def-0123456789ab",
     },
   });
+});
+
+test("shared Core service shell validates typed status requests and stays locked", async () => {
+  const shell = new CoreServiceShell();
+  const response = await shell.handle({
+    protocolVersion: 1,
+    kind: "request",
+    id: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    name: "get_core_status",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    payload: {},
+  });
+  assert.deepEqual(response, {
+    ok: false,
+    error: {
+      code: "CORE_IPC_NOT_READY",
+      category: "UNSUPPORTED",
+      message: "Core IPC is unavailable until the authenticated native transport is established",
+      retryable: false,
+      correlationId: "018f3b8e-6c68-7abc-8def-0123456789ab",
+      details: {
+        request: "get_core_status",
+        serviceState: "LOCKED",
+        transportState: "NOT_CONNECTED",
+      },
+    },
+  });
+
+  const invalid = await shell.handle({
+    protocolVersion: 1,
+    kind: "request",
+    id: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    name: "get_core_status",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    payload: { unexpected: true },
+  });
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) assert.equal(invalid.error.code, "CORE_IPC_REQUEST_INVALID");
+
+  const invalidCorrelation = await shell.handle({
+    protocolVersion: 1,
+    kind: "request",
+    id: "not-a-uuid",
+    name: "get_core_status",
+    correlationId: "not-a-uuid",
+    payload: {},
+  });
+  assert.equal(invalidCorrelation.ok, false);
+  if (!invalidCorrelation.ok) assert.equal(invalidCorrelation.error.code, "CORE_IPC_REQUEST_INVALID");
 });

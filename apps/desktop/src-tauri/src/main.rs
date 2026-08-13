@@ -1,6 +1,9 @@
 pub mod core_runtime;
 mod lifecycle;
 mod platform;
+#[path = "../../../../platform/windows/src/process_supervisor.rs"]
+pub mod process_supervisor;
+mod ui_boundary;
 
 use tauri::webview::{NewWindowResponse, WebviewWindowBuilder};
 #[cfg(not(debug_assertions))]
@@ -20,6 +23,7 @@ fn allows_authoritative_navigation(url: &Url) -> bool {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![ui_boundary::get_core_status])
         .setup(|app| {
             let application_paths = lifecycle::ApplicationPaths::from_local_app_data()?;
             application_paths.ensure_root()?;
