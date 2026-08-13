@@ -1,0 +1,114 @@
+name: Cargo Lock Materialize
+
+on:
+  push:
+    branches:
+      - impl/phase0-0.1-admission
+    paths:
+      - .github/workflows/cargo-lock-materialize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    name: cargo-lock-materialize
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set profile minimal
+          rustup toolchain install 1.97.1
+          rustup default 1.97.1
+          test "$(rustc --version)" = "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+
+      - name: Generate and validate exact Cargo lock delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock Cargo.lock.before
+          cargo generate-lockfile
+          python - <<'PY'
+          import pathlib
+          import tomllib
+
+          before = tomllib.loads(pathlib.Path("Cargo.lock.before").read_text(encoding="utf-8"))
+          after = tomllib.loads(pathlib.Path("Cargo.lock").read_text(encoding="utf-8"))
+
+          def key(package):
+              return (
+                  package["name"],
+                  package["version"],
+                  package.get("source"),
+                  package.get("checksum"),
+              )
+
+          before_packages = {key(package): package for package in before["package"]}
+          after_packages = {key(package): package for package in after["package"]}
+          if before_packages.keys() != after_packages.keys():
+              raise SystemExit("Cargo lock package identity set changed; refusing materialization")
+
+          changed = []
+          for package_key in sorted(before_packages):
+              old = before_packages[package_key]
+              new = after_packages[package_key]
+              if old != new:
+                  changed.append((package_key, old, new))
+
+          if len(changed) != 1:
+              raise SystemExit(f"expected exactly one changed lock package, got {len(changed)}")
+
+          package_key, old, new = changed[0]
+          if package_key[0:2] != ("tauri-build", "2.6.3"):
+              raise SystemExit(f"unexpected changed package: {package_key[0]} {package_key[1]}")
+
+          changed_fields = {field for field in set(old) | set(new) if old.get(field) != new.get(field)}
+          if changed_fields != {"dependencies"}:
+              raise SystemExit(f"tauri-build changed unexpected fields: {sorted(changed_fields)}")
+
+          old_dependencies = set(old.get("dependencies", []))
+          new_dependencies = set(new.get("dependencies", []))
+          added = new_dependencies - old_dependencies
+          removed = old_dependencies - new_dependencies
+          if removed:
+              raise SystemExit(f"unexpected removed tauri-build dependencies: {sorted(removed)}")
+          if len(added) != 2:
+              raise SystemExit(f"expected exactly two activated tauri-build dependencies, got {sorted(added)}")
+          if not any(dependency == "quote" or dependency.startswith("quote ") for dependency in added):
+              raise SystemExit(f"quote was not activated: {sorted(added)}")
+          if not any(dependency == "tauri-codegen" or dependency.startswith("tauri-codegen ") for dependency in added):
+              raise SystemExit(f"tauri-codegen was not activated: {sorted(added)}")
+
+          print(f"validated lock delta: tauri-build 2.6.3 added {sorted(added)}")
+          PY
+          cargo metadata --locked --format-version 1 > /dev/null
+          test "$(git status --porcelain)" = " M Cargo.lock"
+          git diff -- Cargo.lock
+
+      - name: Revalidate branch tip and push lock only
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/branches/${GITHUB_REF_NAME}"
+          remote_sha="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${api_url}" | python -c 'import json,sys; print(json.load(sys.stdin)["commit"]["sha"])')"
+          test "${remote_sha}" = "${GITHUB_SHA}"
+          test "$(git status --porcelain)" = " M Cargo.lock"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "build(desktop): refresh Cargo lock for Tauri codegen"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${GITHUB_REF_NAME}"
