@@ -64,6 +64,9 @@ const requiredWorkspaceFiles = [
   "apps/desktop/src/main.tsx",
   "apps/desktop/src/App.tsx",
   "apps/desktop/src/styles.css",
+  "apps/desktop/src/design-system/tokens.css",
+  "apps/desktop/src/design-system/components.css",
+  "apps/desktop/src/design-system/components.tsx",
   "apps/desktop/src-tauri/Cargo.toml",
   "apps/desktop/src-tauri/build.rs",
   "apps/desktop/src-tauri/tauri.conf.json",
@@ -185,6 +188,54 @@ test("1.11 packages canonical brand sources, offline Inter, and auditable proven
   assert.match(main, /\.\/styles\.css/);
   assert.match(vite, /publicDir:\s*["']\.\.\/\.\.\/assets["']/);
   assert.doesNotMatch(css, /https?:\/\//i);
+});
+
+test("1.12 centralizes design tokens and exposes accessible presentation primitives", () => {
+  const tokens = read("apps/desktop/src/design-system/tokens.css");
+  const components = read("apps/desktop/src/design-system/components.tsx");
+  const componentStyles = read("apps/desktop/src/design-system/components.css");
+  const app = read("apps/desktop/src/App.tsx");
+
+  for (const tokenGroup of [
+    "--brand-blue",
+    "--surface-canvas",
+    "--text-primary",
+    "--border-subtle",
+    "--status-info",
+    "--space-4",
+    "--radius-control",
+    "--type-body",
+    "--motion-standard",
+    "--focus-color",
+    "--z-skip-link",
+  ]) {
+    assert.match(tokens, new RegExp(`${tokenGroup.replaceAll("-", "\\-")}\\s*:`), `missing centralized token ${tokenGroup}`);
+  }
+  assert.match(tokens, /prefers-reduced-motion:\s*reduce/);
+  assert.match(tokens, /forced-colors:\s*active/);
+  const forcedColorsSystem = `${tokens}\n${componentStyles}`;
+  for (const systemColor of ["Canvas", "CanvasText", "Highlight", "HighlightText", "ButtonText", "GrayText"]) {
+    assert.match(forcedColorsSystem, new RegExp(`\\b${systemColor}\\b`), `forced-colors token missing ${systemColor}`);
+  }
+
+  for (const primitive of ["SkipLink", "Button", "Panel", "TextInput", "StatusChip"]) {
+    assert.match(components, new RegExp(`export function ${primitive}\\b`), `missing reusable primitive ${primitive}`);
+  }
+  assert.match(components, /type=\{props\.type \?\? ["']button["']\}/);
+  assert.match(components, /aria-describedby/);
+  assert.match(components, /aria-invalid/);
+  assert.match(components, /role=\{?"alert"\}?/);
+  assert.match(components, /role=\{?"status"\}?/);
+  assert.match(componentStyles, /\*:focus-visible/);
+  assert.match(componentStyles, /min-width:\s*24px/);
+  assert.match(componentStyles, /min-height:\s*24px/);
+  assert.match(componentStyles, /forced-colors:\s*active/);
+  assert.match(componentStyles, /var\(--motion-(?:fast|standard)\)/);
+  assert.match(app, /<SkipLink/);
+  assert.match(app, /<Panel/);
+  assert.match(app, /<StatusChip/);
+  assert.match(app, /<TextInput/);
+  assert.match(app, /<Button/);
 });
 
 test("renderer bootstrap is semantic and has no authoritative/native integration authority in 1.1", { skip: !existsSync(resolve(desktop, "src", "App.tsx")) }, () => {
