@@ -164,6 +164,7 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   const build = read("apps/desktop/src-tauri/build.rs");
   const rustMain = read("apps/desktop/src-tauri/src/main.rs");
   const supervisor = read("platform/windows/src/process_supervisor.rs");
+  const sessionSystem = read("platform/windows/src/session_system.rs");
   const windowController = read("platform/windows/src/window_controller.rs");
   assert.match(cargo, /tauri\s*=\s*\{\s*version\s*=\s*"=2\.11\.5"/);
   assert.match(cargo, /tauri-build\s*=\s*\{\s*version\s*=\s*"=2\.6\.3"\s*,\s*features\s*=\s*\["codegen"\]\s*\}/);
@@ -177,13 +178,18 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   assert.doesNotMatch(rustMain, /generate_context!/);
   assert.match(rustMain, /invoke_handler\(tauri::generate_handler!\[ui_boundary::get_core_status\]\)/);
   assert.match(rustMain, /pub mod process_supervisor;/);
+  assert.match(rustMain, /pub mod session_system;/);
   assert.match(rustMain, /pub mod window_controller;/);
   assert.match(cargo, /windows-sys\s*=\s*\{\s*version\s*=\s*"=0\.61\.2"/);
   for (const feature of [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_System_JobObjects",
+    "Win32_System_RemoteDesktop",
+    "Win32_System_StationsAndDesktops",
+    "Win32_System_SystemInformation",
     "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
   ]) {
     assert.match(cargo, new RegExp(`"${feature}"`));
   }
@@ -193,6 +199,13 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   assert.match(supervisor, /ResumeThread\(pending\.thread_handle\(\)\)/);
   assert.match(supervisor, /limits\.BasicLimitInformation\.LimitFlags\s*=\s*JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE/);
   assert.match(supervisor, /const NO_INHERITED_HANDLES: i32 = 0/);
+  assert.match(sessionSystem, /enum SessionTrustState/);
+  assert.match(sessionSystem, /OpenInputDesktop\(/);
+  assert.match(sessionSystem, /WTSQuerySessionInformationW\(/);
+  assert.match(sessionSystem, /GetNativeSystemInfo\(/);
+  assert.match(sessionSystem, /GlobalMemoryStatusEx\(/);
+  assert.match(sessionSystem, /HARDWARE_ACCELERATION_CAPABILITY/);
+  assert.match(sessionSystem, /CapabilityAvailability::Unavailable/);
   assert.match(windowController, /enum PresentationMode/);
   assert.match(windowController, /\.focused\(false\)/);
   assert.match(windowController, /\.always_on_top\(false\)/);

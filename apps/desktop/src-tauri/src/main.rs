@@ -3,6 +3,8 @@ mod lifecycle;
 mod platform;
 #[path = "../../../../platform/windows/src/process_supervisor.rs"]
 pub mod process_supervisor;
+#[path = "../../../../platform/windows/src/session_system.rs"]
+pub mod session_system;
 #[path = "../../../../platform/windows/src/window_controller.rs"]
 pub mod window_controller;
 mod ui_boundary;
