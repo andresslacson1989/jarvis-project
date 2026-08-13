@@ -1,6 +1,6 @@
 // GENERATED FILE — DO NOT EDIT.
 // Source: packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json
-// Source SHA-256: 78208f5e6e42d0fa2ee34b173cf0673a20128160dd596902c228f7f40c243ce1
+// Source SHA-256: 4dd1919d111b216748b936a15e5194de525567aff82c17969f9be1219707f081
 
 export const JARVIS_CANONICAL_CONTRACT_VALUES = {
   "schemaVersion": 1,
