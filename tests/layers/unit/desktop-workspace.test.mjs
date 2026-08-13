@@ -164,6 +164,7 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   const build = read("apps/desktop/src-tauri/build.rs");
   const rustMain = read("apps/desktop/src-tauri/src/main.rs");
   const supervisor = read("platform/windows/src/process_supervisor.rs");
+  const pathIdentity = read("platform/windows/src/path_identity.rs");
   const sessionSystem = read("platform/windows/src/session_system.rs");
   const windowController = read("platform/windows/src/window_controller.rs");
   assert.match(cargo, /tauri\s*=\s*\{\s*version\s*=\s*"=2\.11\.5"/);
@@ -178,6 +179,7 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   assert.doesNotMatch(rustMain, /generate_context!/);
   assert.match(rustMain, /invoke_handler\(tauri::generate_handler!\[ui_boundary::get_core_status\]\)/);
   assert.match(rustMain, /pub mod process_supervisor;/);
+  assert.match(rustMain, /pub mod path_identity;/);
   assert.match(rustMain, /pub mod session_system;/);
   assert.match(rustMain, /pub mod window_controller;/);
   assert.match(cargo, /windows-sys\s*=\s*\{\s*version\s*=\s*"=0\.61\.2"/);
@@ -206,6 +208,11 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   assert.match(sessionSystem, /GlobalMemoryStatusEx\(/);
   assert.match(sessionSystem, /HARDWARE_ACCELERATION_CAPABILITY/);
   assert.match(sessionSystem, /CapabilityAvailability::Unavailable/);
+  assert.match(pathIdentity, /resolve_application_paths/);
+  assert.match(pathIdentity, /LOCALAPPDATA/);
+  assert.match(pathIdentity, /reject_reparse/);
+  assert.match(pathIdentity, /case_insensitive_key/);
+  assert.match(pathIdentity, /ParentDir/);
   assert.match(windowController, /enum PresentationMode/);
   assert.match(windowController, /\.focused\(false\)/);
   assert.match(windowController, /\.always_on_top\(false\)/);

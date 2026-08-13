@@ -3,6 +3,8 @@ mod lifecycle;
 mod platform;
 #[path = "../../../../platform/windows/src/process_supervisor.rs"]
 pub mod process_supervisor;
+#[path = "../../../../platform/windows/src/path_identity.rs"]
+pub mod path_identity;
 #[path = "../../../../platform/windows/src/session_system.rs"]
 pub mod session_system;
 #[path = "../../../../platform/windows/src/window_controller.rs"]
@@ -28,7 +30,11 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![ui_boundary::get_core_status])
         .setup(|app| {
-            let application_paths = lifecycle::ApplicationPaths::from_local_app_data()?;
+            let path_backend = path_identity::PlatformPathsAndIdentity::new();
+            let resolved_paths = path_backend
+                .resolve_application_paths()
+                .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+            let application_paths = lifecycle::ApplicationPaths::from_root(resolved_paths.root)?;
             application_paths.ensure_root()?;
             let _instance_ownership = lifecycle::InstanceOwnership::acquire(&application_paths)?;
             application_paths.ensure_layout()?;

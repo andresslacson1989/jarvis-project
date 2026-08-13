@@ -26,17 +26,13 @@ pub struct ApplicationPaths {
 }
 
 impl ApplicationPaths {
-    /// Resolve the fixed per-user root without a temporary, current-directory,
-    /// or PATH-based fallback.
-    pub fn from_local_app_data() -> io::Result<Self> {
-        let local_app_data = std::env::var_os("LOCALAPPDATA").ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::NotFound,
-                "LOCALAPPDATA is required for the JARVIS application data root",
-            )
-        })?;
-        let root = PathBuf::from(local_app_data).join(APPLICATION_DIRECTORY);
-
+    pub fn from_root(root: PathBuf) -> io::Result<Self> {
+        if !root.is_absolute() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "JARVIS application root must be absolute",
+            ));
+        }
         Ok(Self {
             data: root.join("data"),
             backups: root.join("backups"),
@@ -48,6 +44,20 @@ impl ApplicationPaths {
             recovery: root.join("recovery"),
             root,
         })
+    }
+
+    /// Resolve the fixed per-user root without a temporary, current-directory,
+    /// or PATH-based fallback.
+    #[allow(dead_code)]
+    pub fn from_local_app_data() -> io::Result<Self> {
+        let local_app_data = std::env::var_os("LOCALAPPDATA").ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "LOCALAPPDATA is required for the JARVIS application data root",
+            )
+        })?;
+        let root = PathBuf::from(local_app_data).join(APPLICATION_DIRECTORY);
+        Self::from_root(root)
     }
 
     pub fn ensure_root(&self) -> io::Result<()> {
