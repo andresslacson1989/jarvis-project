@@ -38,7 +38,9 @@ test("static CI workflow is least-privileged and uses immutable action SHAs", { 
   }
   assert.match(workflow, /persist-credentials:\s*false/);
   assert.match(workflow, /pnpm audit --audit-level high/);
-  assert.match(workflow, /cargo clippy[^\n]*-D warnings/);
+  assert.match(workflow, /cargo clippy --locked -p jarvis-toolchain-smoke --all-targets --all-features -- -D warnings/);
+  assert.match(workflow, /cargo check --locked -p jarvis-toolchain-smoke --all-targets --all-features/);
+  assert.match(workflow, /cargo check --locked --workspace --target x86_64-pc-windows-msvc/);
   assert.match(workflow, /rustup toolchain install 1\.97\.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc/);
 });
 
