@@ -44,6 +44,9 @@ jobs:
       - name: Install Windows dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Toolchain verifier cross-platform regression
+        run: node --test tests/layers/unit/toolchain-verifier.test.mjs
+
       - name: Verify exact Windows toolchain
         run: pnpm toolchain:verify
 
