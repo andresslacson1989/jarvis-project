@@ -42,8 +42,24 @@ test("static CI workflow is least-privileged and uses immutable action SHAs", { 
   assert.match(workflow, /\n\s*run: cargo audit\n/);
   assert.match(workflow, /cargo clippy --locked -p jarvis-toolchain-smoke --all-targets --all-features -- -D warnings/);
   assert.match(workflow, /cargo check --locked -p jarvis-toolchain-smoke --all-targets --all-features/);
-  assert.match(workflow, /cargo check --locked --workspace --target x86_64-pc-windows-msvc/);
   assert.match(workflow, /rustup toolchain install 1\.97\.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc/);
+});
+
+test("native Windows MSVC build is an unskippable prerequisite of the mandatory static-ci context", { skip: !existsSync(resolve(root, ".github/workflows/static-ci.yml")) }, () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/static-ci.yml"), "utf8");
+  assert.match(
+    workflow,
+    /^  windows-desktop:\s*\n    name: windows-desktop\s*\n    runs-on: windows-2025\s*$/m,
+  );
+  assert.match(
+    workflow,
+    /^  static-ci:\s*\n    name: static-ci\s*\n    needs: windows-desktop\s*\n    runs-on: ubuntu-24\.04\s*$/m,
+  );
+  assert.match(
+    workflow,
+    /cargo check --locked --workspace --target x86_64-pc-windows-msvc/,
+  );
+  assert.doesNotMatch(workflow, /RC_x86_64_pc_windows_msvc|\bRC:\s*llvm-rc|apt(?:-get)?\s+install[^\n]*llvm/i);
 });
 
 test("package scripts expose every static CI gate", () => {
