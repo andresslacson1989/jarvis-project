@@ -159,10 +159,8 @@ const actualNode = process.version.replace(/^v/, "");
 assert(actualNode === EXPECTED.node, `Node mismatch: expected ${EXPECTED.node}, got ${actualNode}`);
 runExact("pnpm", ["--version"], EXPECTED.pnpm, "pnpm");
 
-const tscExecutable = process.platform === "win32"
-  ? resolve(root, "node_modules", ".bin", "tsc.cmd")
-  : resolve(root, "node_modules", ".bin", "tsc");
-runExact(tscExecutable, ["--version"], `Version ${EXPECTED.typescript}`, "TypeScript");
+const tscScript = resolve(root, "node_modules", "typescript", "bin", "tsc");
+runExact(process.execPath, [tscScript, "--version"], `Version ${EXPECTED.typescript}`, "TypeScript");
 runContains("rustc", ["--version"], `rustc ${EXPECTED.rust} `, "rustc");
 runContains("cargo", ["--version"], `cargo ${EXPECTED.rust} `, "cargo");
 runContains("rustfmt", ["--version"], "rustfmt ", "rustfmt");
