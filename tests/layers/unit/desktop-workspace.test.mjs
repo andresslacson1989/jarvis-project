@@ -164,6 +164,7 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   const build = read("apps/desktop/src-tauri/build.rs");
   const rustMain = read("apps/desktop/src-tauri/src/main.rs");
   const supervisor = read("platform/windows/src/process_supervisor.rs");
+  const windowController = read("platform/windows/src/window_controller.rs");
   assert.match(cargo, /tauri\s*=\s*\{\s*version\s*=\s*"=2\.11\.5"/);
   assert.match(cargo, /tauri-build\s*=\s*\{\s*version\s*=\s*"=2\.6\.3"\s*,\s*features\s*=\s*\["codegen"\]\s*\}/);
   assert.match(build, /tauri_build::try_build\s*\(/);
@@ -176,6 +177,7 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   assert.doesNotMatch(rustMain, /generate_context!/);
   assert.match(rustMain, /invoke_handler\(tauri::generate_handler!\[ui_boundary::get_core_status\]\)/);
   assert.match(rustMain, /pub mod process_supervisor;/);
+  assert.match(rustMain, /pub mod window_controller;/);
   assert.match(cargo, /windows-sys\s*=\s*\{\s*version\s*=\s*"=0\.61\.2"/);
   for (const feature of [
     "Win32_Foundation",
@@ -191,6 +193,13 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   assert.match(supervisor, /ResumeThread\(pending\.thread_handle\(\)\)/);
   assert.match(supervisor, /limits\.BasicLimitInformation\.LimitFlags\s*=\s*JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE/);
   assert.match(supervisor, /const NO_INHERITED_HANDLES: i32 = 0/);
+  assert.match(windowController, /enum PresentationMode/);
+  assert.match(windowController, /\.focused\(false\)/);
+  assert.match(windowController, /\.always_on_top\(false\)/);
+  assert.match(windowController, /WindowEvent::CloseRequested/);
+  assert.match(windowController, /available_monitors\(\)/);
+  assert.match(windowController, /recover_geometry/);
+  assert.match(windowController, /logical_width/);
   assert.doesNotMatch(rustMain, /platform::windows|windows_sys|windows::Win32/);
 });
 

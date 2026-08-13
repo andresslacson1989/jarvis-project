@@ -40,11 +40,12 @@ test("1.2 configures restrictive local-only CSP without executable remote conten
 
 test("1.2 native host blocks remote navigation, unexpected new windows, and devtools", () => {
   const main = read("apps/desktop/src-tauri/src/main.rs");
-  assert.match(main, /on_navigation\(allows_authoritative_navigation\)/);
+  const windowController = read("platform/windows/src/window_controller.rs");
+  assert.match(windowController, /\.on_navigation\(navigation_policy\)/);
   assert.match(main, /url\.host_str\(\) == Some\("127\.0\.0\.1"\)/);
   assert.match(main, /url\.host_str\(\) == Some\("localhost"\)/);
-  assert.match(main, /on_new_window\(\|_url, _features\| NewWindowResponse::Deny\)/);
-  assert.match(main, /\.devtools\(false\)/);
+  assert.match(windowController, /on_new_window\(\|_url, _features\| NewWindowResponse::Deny\)/);
+  assert.match(windowController, /\.devtools\(false\)/);
   assert.match(main, /WebviewUrl::External\(\s*"http:\/\/127\.0\.0\.1:1420"/s);
   assert.match(main, /tauri_plugin_opener::init\(\)/);
 });

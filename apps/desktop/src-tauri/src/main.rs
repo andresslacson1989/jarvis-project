@@ -3,9 +3,10 @@ mod lifecycle;
 mod platform;
 #[path = "../../../../platform/windows/src/process_supervisor.rs"]
 pub mod process_supervisor;
+#[path = "../../../../platform/windows/src/window_controller.rs"]
+pub mod window_controller;
 mod ui_boundary;
 
-use tauri::webview::{NewWindowResponse, WebviewWindowBuilder};
 #[cfg(not(debug_assertions))]
 use tauri::Manager;
 use tauri::{Url, WebviewUrl};
@@ -36,6 +37,10 @@ fn main() {
 
             let _platform_composition = platform::compose_windows_full_host()
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+            let window_controller = window_controller::PlatformWindowController::new(
+                application_paths.data.join("window-state.json"),
+            )
+            .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
 
             #[cfg(debug_assertions)]
             let webview_url = WebviewUrl::External(
@@ -46,16 +51,9 @@ fn main() {
             #[cfg(not(debug_assertions))]
             let webview_url = WebviewUrl::App("index.html".into());
 
-            WebviewWindowBuilder::new(app, "main", webview_url)
-                .title("JARVIS Mission Control")
-                .inner_size(1280.0, 800.0)
-                .min_inner_size(800.0, 600.0)
-                .resizable(true)
-                .fullscreen(false)
-                .devtools(false)
-                .on_navigation(allows_authoritative_navigation)
-                .on_new_window(|_url, _features| NewWindowResponse::Deny)
-                .build()?;
+            window_controller
+                .build_primary_window(app, webview_url, allows_authoritative_navigation)
+                .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
 
             Ok(())
         })
