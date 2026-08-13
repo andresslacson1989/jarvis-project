@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
-use std::fs::{File, canonicalize, read};
+use std::fs::{canonicalize, read, symlink_metadata, File};
 use std::io::{self, BufReader, Read};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -117,10 +117,28 @@ impl CoreRuntimeLayout {
                 "release-owned Core entrypoint is missing",
             ));
         }
-        if !self.node_executable.is_file() || !self.core_entrypoint.is_file() {
+        let node_metadata = symlink_metadata(&self.node_executable).map_err(|error| {
+            Self::io_error(
+                CoreRuntimeState::CoreRuntimeIntegrityFailed,
+                "node.exe",
+                error,
+            )
+        })?;
+        let core_metadata = symlink_metadata(&self.core_entrypoint).map_err(|error| {
+            Self::io_error(
+                CoreRuntimeState::CoreRuntimeIntegrityFailed,
+                "Core entrypoint",
+                error,
+            )
+        })?;
+        if !node_metadata.file_type().is_file()
+            || node_metadata.file_type().is_symlink()
+            || !core_metadata.file_type().is_file()
+            || core_metadata.file_type().is_symlink()
+        {
             return Err(Self::error(
                 CoreRuntimeState::CoreRuntimeIntegrityFailed,
-                "release-owned runtime paths are not regular files",
+                "release-owned runtime paths are not regular non-reparse files",
             ));
         }
         Ok(())
@@ -443,6 +461,27 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn non_regular_runtime_target_fails_closed() {
+        let (root, layout) = test_layout();
+        create_dir_all(root.join("runtime")).expect("runtime directory must be creatable");
+        create_dir_all(root.join("core").join("dist")).expect("core directory must be creatable");
+        create_dir_all(root.join("runtime").join("node.exe"))
+            .expect("test directory must be creatable");
+        write(
+            root.join("core").join("dist").join("main.js"),
+            b"synthetic core",
+        )
+        .expect("synthetic entrypoint must be writable");
+
+        let error = layout
+            .validate_structure()
+            .expect_err("a directory cannot be used as node.exe");
+        assert_eq!(error.state, CoreRuntimeState::CoreRuntimeIntegrityFailed);
+        remove_dir_all(root).expect("test runtime directory must be removable");
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn controlled_command_uses_absolute_runtime_and_removes_node_modifiers() {
         let (root, layout) = test_layout();
         create_dir_all(root.join("runtime")).expect("runtime directory must be creatable");
@@ -480,17 +519,13 @@ mod tests {
             .controlled_command(&manifest_path)
             .expect("complete release structure must build a controlled command");
         assert_eq!(command.get_program(), root.join("runtime").join("node.exe"));
-        assert!(
-            command
-                .get_args()
-                .any(|argument| argument == root.join("core").join("dist").join("main.js"))
-        );
+        assert!(command
+            .get_args()
+            .any(|argument| argument == root.join("core").join("dist").join("main.js")));
         let environment: Vec<_> = command.get_envs().collect();
-        assert!(
-            environment
-                .iter()
-                .any(|(key, _)| *key == OsStr::new("JARVIS_CORE_ROOT"))
-        );
+        assert!(environment
+            .iter()
+            .any(|(key, _)| *key == OsStr::new("JARVIS_CORE_ROOT")));
         assert!(!environment.iter().any(|(key, _)| {
             *key == OsStr::new("NODE_OPTIONS") || *key == OsStr::new("NODE_PATH")
         }));
