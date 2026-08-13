@@ -6,6 +6,10 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
+function readWorkflow() {
+  return readFileSync(resolve(root, ".github/workflows/static-ci.yml"), "utf8").replace(/\r\n/g, "\n");
+}
+
 const requiredFiles = [
   ".github/workflows/static-ci.yml",
   "tools/ci/lib.mjs",
@@ -27,7 +31,7 @@ test("0.11 static CI baseline artifacts exist", () => {
 });
 
 test("static CI workflow is least-privileged and uses immutable action SHAs", { skip: !existsSync(resolve(root, ".github/workflows/static-ci.yml")) }, () => {
-  const workflow = readFileSync(resolve(root, ".github/workflows/static-ci.yml"), "utf8");
+  const workflow = readWorkflow();
   assert.match(workflow, /permissions:\s*\n\s*contents:\s*read/);
   assert.doesNotMatch(workflow, /permissions:\s*write-all/);
   const uses = [...workflow.matchAll(/^\s*-?\s*uses:\s*([^\s#]+).*$/gm)].map((match) => match[1]);
@@ -46,7 +50,7 @@ test("static CI workflow is least-privileged and uses immutable action SHAs", { 
 });
 
 test("native Windows MSVC build is an unskippable prerequisite of the mandatory static-ci context", { skip: !existsSync(resolve(root, ".github/workflows/static-ci.yml")) }, () => {
-  const workflow = readFileSync(resolve(root, ".github/workflows/static-ci.yml"), "utf8");
+  const workflow = readWorkflow();
   assert.match(
     workflow,
     /^  windows-desktop:\s*\n    name: windows-desktop\s*\n    runs-on: windows-2025\s*$/m,
