@@ -7,7 +7,7 @@ publish = false
 build = "build.rs"
 
 [build-dependencies]
-tauri-build = { version = "=2.6.3", features = [] }
+tauri-build = { version = "=2.6.3", features = ["codegen"] }
 
 [dependencies]
 tauri = { version = "=2.11.5", features = [] }
