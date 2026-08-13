@@ -15,6 +15,42 @@ function readJson(path) {
   return JSON.parse(read(path));
 }
 
+function validatePngPayload(payload, expectedSize, layerIndex) {
+  assert.deepEqual(
+    payload.subarray(0, pngSignature.length),
+    pngSignature,
+    `ICO layer ${layerIndex} must use PNG compression accepted by modern Windows resource compilation`,
+  );
+
+  let cursor = pngSignature.length;
+  let sawHeader = false;
+  let sawEnd = false;
+  while (cursor < payload.length) {
+    assert.ok(cursor + 12 <= payload.length, `ICO layer ${layerIndex} contains a truncated PNG chunk header`);
+    const chunkLength = payload.readUInt32BE(cursor);
+    const chunkType = payload.toString("ascii", cursor + 4, cursor + 8);
+    const chunkEnd = cursor + 12 + chunkLength;
+    assert.ok(chunkEnd <= payload.length, `ICO layer ${layerIndex} contains a truncated PNG ${chunkType} chunk`);
+
+    if (chunkType === "IHDR") {
+      assert.equal(chunkLength, 13, `ICO layer ${layerIndex} PNG IHDR must be 13 bytes`);
+      assert.equal(payload.readUInt32BE(cursor + 8), expectedSize, `ICO layer ${layerIndex} PNG width must match directory size`);
+      assert.equal(payload.readUInt32BE(cursor + 12), expectedSize, `ICO layer ${layerIndex} PNG height must match directory size`);
+      sawHeader = true;
+    }
+    if (chunkType === "IEND") {
+      assert.equal(chunkLength, 0, `ICO layer ${layerIndex} PNG IEND must be empty`);
+      assert.equal(chunkEnd, payload.length, `ICO layer ${layerIndex} must not contain bytes after PNG IEND`);
+      sawEnd = true;
+      break;
+    }
+    cursor = chunkEnd;
+  }
+
+  assert.equal(sawHeader, true, `ICO layer ${layerIndex} PNG must contain IHDR`);
+  assert.equal(sawEnd, true, `ICO layer ${layerIndex} PNG must contain complete IEND`);
+}
+
 const requiredWorkspaceFiles = [
   "apps/desktop/package.json",
   "apps/desktop/index.html",
@@ -68,13 +104,14 @@ test("production WebView source is a bundled local frontend and development bind
   assert.doesNotMatch(JSON.stringify(config), /https?:\/\/(?!127\.0\.0\.1:1420)/i);
 });
 
-test("bootstrap Windows icon uses modern PNG-compressed ICO layers and remains explicitly non-canonical until 1.11", { skip: !existsSync(resolve(desktop, "src-tauri", "icons", "icon.ico")) }, () => {
+test("bootstrap Windows icon uses complete PNG-compressed ICO layers and remains explicitly non-canonical until 1.11", { skip: !existsSync(resolve(desktop, "src-tauri", "icons", "icon.ico")) }, () => {
   const icon = readFileSync(resolve(desktop, "src-tauri", "icons", "icon.ico"));
   assert.ok(icon.length > 6, "ICO file must contain a directory and image entries");
   assert.equal(icon.readUInt16LE(0), 0, "ICO reserved field must be zero");
   assert.equal(icon.readUInt16LE(2), 1, "ICO type must be icon");
   const count = icon.readUInt16LE(4);
   assert.ok(count >= 6, `ICO must contain at least six image layers, got ${count}`);
+  assert.ok(6 + count * 16 <= icon.length, "ICO directory must be complete");
   const sizes = [];
   for (let index = 0; index < count; index += 1) {
     const offset = 6 + index * 16;
@@ -84,11 +121,10 @@ test("bootstrap Windows icon uses modern PNG-compressed ICO layers and remains e
     const imageOffset = icon.readUInt32LE(offset + 12);
     assert.equal(width, height, `ICO layer ${index} must be square`);
     assert.ok(byteLength > pngSignature.length, `ICO layer ${index} payload must be non-empty`);
-    assert.deepEqual(
-      icon.subarray(imageOffset, imageOffset + pngSignature.length),
-      pngSignature,
-      `ICO layer ${index} must use PNG compression accepted by modern Windows resource compilation`,
-    );
+    assert.ok(imageOffset >= 6 + count * 16, `ICO layer ${index} payload must start after the directory`);
+    assert.ok(imageOffset + byteLength <= icon.length, `ICO layer ${index} directory length must fit inside the file`);
+    const payload = icon.subarray(imageOffset, imageOffset + byteLength);
+    validatePngPayload(payload, width, index);
     sizes.push(width);
   }
   for (const requiredSize of [16, 24, 32, 48, 64, 256]) {
