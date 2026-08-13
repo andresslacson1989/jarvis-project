@@ -22,7 +22,6 @@ test("packaged-Core qualification requires an absolute release root and bounded 
   );
   assert.equal(V1_NODE_VERSION, "24.18.0");
 });
-
 test("packaged-Core qualification fails closed for a missing release root", async () => {
   const root = await mkdtemp(join(tmpdir(), "jarvis-core-qualification-"));
   try {
@@ -34,4 +33,3 @@ test("packaged-Core qualification fails closed for a missing release root", asyn
     await rm(root, { recursive: true, force: true });
   }
 });
-
