@@ -85,11 +85,14 @@ test("renderer bootstrap is semantic and has no authoritative/native integration
 
 test("Tauri host is pinned and intentionally minimal before 1.2 and 1.3", { skip: !existsSync(resolve(desktop, "src-tauri", "Cargo.toml")) }, () => {
   const cargo = read("apps/desktop/src-tauri/Cargo.toml");
+  const build = read("apps/desktop/src-tauri/build.rs");
   const rustMain = read("apps/desktop/src-tauri/src/main.rs");
-  assert.match(cargo, /tauri\s*=\s*\{\s*version\s*=\s*"=2\.11\.2"/);
-  assert.match(cargo, /tauri-build\s*=\s*\{\s*version\s*=\s*"=2\.6\.2"/);
+  assert.match(cargo, /tauri\s*=\s*\{\s*version\s*=\s*"=2\.11\.5"/);
+  assert.match(cargo, /tauri-build\s*=\s*\{\s*version\s*=\s*"=2\.6\.3"/);
+  assert.match(build, /tauri_build::build\(\)/);
   assert.match(rustMain, /tauri::Builder::default\(\)/);
-  assert.match(rustMain, /tauri::generate_context!\(\)/);
+  assert.match(rustMain, /tauri::tauri_build_context!\(\)/);
+  assert.doesNotMatch(rustMain, /generate_context!/);
   assert.doesNotMatch(rustMain, /invoke_handler/);
   assert.doesNotMatch(rustMain, /platform::windows|windows_sys|windows::Win32/);
 });
