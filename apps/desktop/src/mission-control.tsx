@@ -14,6 +14,7 @@ const destinations = [
 ] as const;
 
 export interface MissionControlSnapshot {
+  readonly startupCondition: "LOCKED" | "REPAIR_REQUIRED" | "DEGRADED";
   readonly serviceState: "LOCKED";
   readonly transportState: "NOT_CONNECTED";
   readonly voiceState: "IDLE";
@@ -22,6 +23,7 @@ export interface MissionControlSnapshot {
 }
 
 export const LOCKED_STARTUP_SNAPSHOT: MissionControlSnapshot = {
+  startupCondition: "LOCKED",
   serviceState: "LOCKED",
   transportState: "NOT_CONNECTED",
   voiceState: "IDLE",
@@ -29,13 +31,21 @@ export const LOCKED_STARTUP_SNAPSHOT: MissionControlSnapshot = {
   attentionCount: 0,
 };
 
+export function resolveStartupSnapshot(): MissionControlSnapshot {
+  const startupCondition = new URLSearchParams(window.location.search).get("startup");
+  if (startupCondition !== "REPAIR_REQUIRED" && startupCondition !== "DEGRADED") {
+    return LOCKED_STARTUP_SNAPSHOT;
+  }
+  return { ...LOCKED_STARTUP_SNAPSHOT, startupCondition };
+}
+
 function destinationId(destination: string) {
   return destination.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
 }
 
 export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnapshot }) {
   return (
-    <div className="mission-control" data-service-state={snapshot.serviceState} data-transport-state={snapshot.transportState}>
+    <div className="mission-control" data-service-state={snapshot.serviceState} data-startup-condition={snapshot.startupCondition} data-transport-state={snapshot.transportState}>
       <SkipLink targetId="mission-control-main" />
       <aside aria-label="JARVIS navigation" className="mission-control__rail">
         <a aria-label="JARVIS Mission Control home" className="mission-control__brand" href="#mission-control-main">
@@ -75,17 +85,17 @@ export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnap
           <main aria-labelledby="mission-control-title" className="mission-control__workspace" id="mission-control-main">
             <div className="mission-control__workspace-heading">
               <p className="mission-control__eyebrow">Current workspace</p>
-              <h2 id="mission-control-title">Ready when authenticated</h2>
+              <h2 id="mission-control-title">{snapshot.startupCondition === "REPAIR_REQUIRED" ? "Repair required before Core can start" : snapshot.startupCondition === "DEGRADED" ? "Core is degraded" : "Ready when authenticated"}</h2>
             </div>
-            <Panel heading="JARVIS is locked">
-              <p>{toInertText("The desktop surface is available, but Core transport is not connected. No mission, approval, provider, or project state is being inferred or displayed.")}</p>
-              <StatusChip state="warning">LOCKED · NOT_CONNECTED</StatusChip>
+            <Panel heading={snapshot.startupCondition === "REPAIR_REQUIRED" ? "Core runtime requires repair" : "JARVIS is locked"}>
+              <p>{toInertText(snapshot.startupCondition === "REPAIR_REQUIRED" ? "The release-owned Core runtime did not pass preflight. JARVIS will not use a system Node or an unverified fallback. Repair the packaged runtime before Core can start." : snapshot.startupCondition === "DEGRADED" ? "The desktop surface is available in degraded mode. Core transport is not connected, and no mission, approval, provider, or project state is being inferred or displayed." : "The desktop surface is available, but Core transport is not connected. No mission, approval, provider, or project state is being inferred or displayed.")}</p>
+              <StatusChip state={snapshot.startupCondition === "REPAIR_REQUIRED" ? "error" : snapshot.startupCondition === "DEGRADED" ? "warning" : "warning"}>{snapshot.startupCondition} · {snapshot.transportState}</StatusChip>
             </Panel>
             <Panel heading="What remains available">
               <ul className="mission-control__plain-list">
                 <li>Navigation and visual presentation are available.</li>
                 <li>Native window presentation remains controlled by the desktop host.</li>
-                <li>Authenticated Core state will appear only after the typed boundary reports it.</li>
+                <li>{snapshot.startupCondition === "REPAIR_REQUIRED" ? "Only a verified release-owned runtime may clear this repair state." : "Authenticated Core state will appear only after the typed boundary reports it."}</li>
               </ul>
             </Panel>
           </main>

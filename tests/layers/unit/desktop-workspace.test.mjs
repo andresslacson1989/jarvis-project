@@ -244,16 +244,19 @@ test("1.13 Mission Control has four regions and truthful locked startup state", 
   const styles = read("apps/desktop/src/mission-control.css");
 
   assert.match(app, /MissionControlShell/);
-  assert.match(app, /LOCKED_STARTUP_SNAPSHOT/);
+  assert.match(app, /resolveStartupSnapshot/);
   assert.match(shell, /aria-label="JARVIS navigation"/);
   assert.match(shell, /aria-label="JARVIS system status"/);
   assert.match(shell, /<main[^>]+id="mission-control-main"/);
   assert.match(shell, /aria-label="Context and attention"/);
   assert.match(shell, /serviceState: "LOCKED"/);
+  assert.match(shell, /startupCondition: "LOCKED"/);
   assert.match(shell, /transportState: "NOT_CONNECTED"/);
   assert.match(shell, /voiceState: "IDLE"/);
   assert.match(shell, /No mission, approval, provider, or project state is being inferred/);
   assert.match(shell, /No verified attention items are available while Core is locked/);
+  assert.match(shell, /REPAIR_REQUIRED/);
+  assert.match(shell, /will not use a system Node or an unverified fallback/);
   assert.match(shell, /aria-current/);
   assert.match(styles, /grid-template-columns:\s*minmax\(12rem, 15rem\)/);
   assert.match(styles, /grid-template-columns:\s*minmax\(0, 1fr\) minmax\(16rem, 22rem\)/);
@@ -287,6 +290,7 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   const cargo = read("apps/desktop/src-tauri/Cargo.toml");
   const build = read("apps/desktop/src-tauri/build.rs");
   const rustMain = read("apps/desktop/src-tauri/src/main.rs");
+  const coreRuntime = read("apps/desktop/src-tauri/src/core_runtime.rs");
   const supervisor = read("platform/windows/src/process_supervisor.rs");
   const pathIdentity = read("platform/windows/src/path_identity.rs");
   const sessionSystem = read("platform/windows/src/session_system.rs");
@@ -306,6 +310,12 @@ test("Tauri host is pinned and keeps the typed UI boundary separate from native 
   assert.match(rustMain, /pub mod path_identity;/);
   assert.match(rustMain, /pub mod session_system;/);
   assert.match(rustMain, /pub mod window_controller;/);
+  assert.match(rustMain, /load_verified_layout/);
+  assert.match(rustMain, /REPAIR_REQUIRED/);
+  assert.match(rustMain, /index\.html\?startup=\{startup_condition\}/);
+  assert.match(rustMain, /Core runtime preflight state/);
+  assert.match(coreRuntime, /never searches PATH/);
+  assert.match(coreRuntime, /release-owned Node runtime is missing/);
   assert.match(cargo, /windows-sys\s*=\s*\{\s*version\s*=\s*"=0\.61\.2"/);
   for (const feature of [
     "Win32_Foundation",

@@ -1,5 +1,6 @@
 @import "./design-system/tokens.css";
 @import "./design-system/components.css";
+@import "./mission-control.css";
 
 @font-face {
   font-family: "Inter";

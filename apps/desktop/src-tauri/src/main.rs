@@ -40,8 +40,21 @@ fn main() {
             application_paths.ensure_layout()?;
             let _core_runtime_policy = core_runtime::CoreRuntimePolicy::new();
 
+            #[cfg(debug_assertions)]
+            let startup_condition = "LOCKED";
+
             #[cfg(not(debug_assertions))]
-            _core_runtime_policy.load_verified_layout(app.path().resource_dir()?)?;
+            let startup_condition =
+                match _core_runtime_policy.load_verified_layout(app.path().resource_dir()?) {
+                    Ok(_) => "LOCKED",
+                    Err(error) => {
+                        eprintln!(
+                            "[jarvis] Core runtime preflight state={:?}; repair required",
+                            error.state
+                        );
+                        "REPAIR_REQUIRED"
+                    }
+                };
 
             let _platform_composition = platform::compose_windows_full_host()
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
@@ -57,7 +70,8 @@ fn main() {
                     .expect("development frontend URL must be valid"),
             );
             #[cfg(not(debug_assertions))]
-            let webview_url = WebviewUrl::App("index.html".into());
+            let webview_url =
+                WebviewUrl::App(format!("index.html?startup={startup_condition}").into());
 
             window_controller
                 .build_primary_window(app, webview_url, allows_authoritative_navigation)
