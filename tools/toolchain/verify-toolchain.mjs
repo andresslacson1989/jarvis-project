@@ -1,7 +1,7 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { delimiter, dirname, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
@@ -24,11 +24,11 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-function runExact(command, args, expected, label) {
+function runExact(command, args, expected, label, options = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
     encoding: "utf8",
-    shell: false,
+    shell: options.shell ?? false,
     windowsHide: true,
   });
   if (result.error) fail(`${label} unavailable: ${result.error.message}`);
@@ -52,6 +52,27 @@ function runContains(command, args, expectedFragment, label) {
   }
   const actual = result.stdout.trim();
   assert(actual.includes(expectedFragment), `${label} mismatch: expected ${expectedFragment} in ${actual || "<empty>"}`);
+}
+
+function runPnpmVersion(expected) {
+  if (process.platform !== "win32") {
+    runExact("pnpm", ["--version"], expected, "pnpm");
+    return;
+  }
+
+  const corepackScript = (process.env.Path || "")
+    .split(delimiter)
+    .filter(Boolean)
+    .map((directory) => resolve(directory, "node_modules", "corepack", "dist", "pnpm.js"))
+    .find((candidate) => existsSync(candidate));
+
+  if (corepackScript) {
+    runExact(process.execPath, [corepackScript, "--version"], expected, "pnpm");
+    return;
+  }
+
+  // Fixed command only; no user-controlled command or arguments are accepted.
+  runExact("pnpm", ["--version"], expected, "pnpm", { shell: true });
 }
 
 const baseline = readJson("tools/toolchain/toolchain-baseline.json");
@@ -157,7 +178,7 @@ if (metadataOnly) process.exit(0);
 
 const actualNode = process.version.replace(/^v/, "");
 assert(actualNode === EXPECTED.node, `Node mismatch: expected ${EXPECTED.node}, got ${actualNode}`);
-runExact("pnpm", ["--version"], EXPECTED.pnpm, "pnpm");
+runPnpmVersion(EXPECTED.pnpm);
 
 const tscScript = resolve(root, "node_modules", "typescript", "bin", "tsc");
 runExact(process.execPath, [tscScript, "--version"], `Version ${EXPECTED.typescript}`, "TypeScript");
