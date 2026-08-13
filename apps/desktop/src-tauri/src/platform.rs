@@ -48,14 +48,14 @@ impl Error for UnsupportedHostTarget {}
 pub fn compose_windows_full_host() -> Result<PlatformComposition, UnsupportedHostTarget> {
     #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     {
-        return Ok(PlatformComposition {
+        Ok(PlatformComposition {
             identity: PlatformIdentity {
                 platform: "WINDOWS",
                 runtime_role: "FULL_HOST",
                 architecture: "x64",
                 backend_profile_id: WINDOWS_V1_BACKEND_PROFILE_ID,
             },
-        });
+        })
     }
 
     #[cfg(not(all(target_os = "windows", target_arch = "x86_64")))]
