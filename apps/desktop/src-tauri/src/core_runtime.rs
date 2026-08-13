@@ -15,6 +15,8 @@ use std::process::Command;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+pub const RELEASE_RUNTIME_DIRECTORY: &str = "core-runtime";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CoreRuntimeState {
     CoreRuntimeMissing,
@@ -43,6 +45,23 @@ pub struct CoreRuntimePolicy;
 impl CoreRuntimePolicy {
     pub const fn new() -> Self {
         Self
+    }
+
+    /// Resolve and verify the runtime unit placed in the Tauri resource
+    /// directory by the release packager. This is a preflight only; spawning
+    /// remains owned by the qualified process-supervisor boundary.
+    pub fn load_verified_layout(
+        &self,
+        resource_dir: PathBuf,
+    ) -> Result<CoreRuntimeLayout, CoreRuntimeError> {
+        let release_root = resource_dir.join(RELEASE_RUNTIME_DIRECTORY);
+        let layout = CoreRuntimeLayout::new(
+            release_root.clone(),
+            release_root.join("runtime").join("node.exe"),
+            release_root.join("core").join("dist").join("main.js"),
+        )?;
+        layout.validate_integrity(&release_root.join("runtime-manifest.json"))?;
+        Ok(layout)
     }
 }
 
@@ -457,6 +476,55 @@ mod tests {
             .expect_err("missing release runtime must fail");
         assert_eq!(error.state, CoreRuntimeState::CoreRuntimeMissing);
         assert!(!root.exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn production_resource_preflight_uses_exact_core_runtime_layout() {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("test clock must be after Unix epoch")
+            .as_nanos();
+        let resource_parent = std::env::temp_dir().join(format!("jarvis-core-resource-{suffix}"));
+        let root = resource_parent.join(RELEASE_RUNTIME_DIRECTORY);
+        create_dir_all(root.join("runtime")).expect("runtime directory must be creatable");
+        create_dir_all(root.join("core").join("dist")).expect("core directory must be creatable");
+        write(root.join("runtime").join("node.exe"), b"synthetic node")
+            .expect("synthetic runtime must be writable");
+        write(
+            root.join("core").join("dist").join("main.js"),
+            b"synthetic core",
+        )
+        .expect("synthetic entrypoint must be writable");
+        let manifest = RuntimeIntegrityManifest {
+            schema_version: 1,
+            platform: "WINDOWS".to_owned(),
+            runtime_role: "FULL_HOST".to_owned(),
+            architecture: "x64".to_owned(),
+            node_version: "24.18.0".to_owned(),
+            protocol_major: 1,
+            node_path: "runtime/node.exe".to_owned(),
+            core_entrypoint: "core/dist/main.js".to_owned(),
+            node_sha256: sha256_file(&root.join("runtime").join("node.exe"))
+                .expect("node digest must be computable"),
+            core_sha256: sha256_file(&root.join("core").join("dist").join("main.js"))
+                .expect("Core digest must be computable"),
+        };
+        write(
+            root.join("runtime-manifest.json"),
+            serde_json::to_vec(&manifest).expect("manifest must serialize"),
+        )
+        .expect("manifest must be writable");
+
+        let policy = CoreRuntimePolicy::new();
+        let loaded = policy
+            .load_verified_layout(resource_parent.clone())
+            .expect("resource layout must verify");
+        assert_eq!(
+            loaded.core_entrypoint,
+            root.join("core").join("dist").join("main.js")
+        );
+        remove_dir_all(resource_parent).expect("test resource directory must be removable");
     }
 
     #[cfg(windows)]

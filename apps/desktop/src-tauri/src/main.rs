@@ -3,6 +3,8 @@ mod lifecycle;
 mod platform;
 
 use tauri::webview::{NewWindowResponse, WebviewWindowBuilder};
+#[cfg(not(debug_assertions))]
+use tauri::Manager;
 use tauri::{Url, WebviewUrl};
 
 fn allows_authoritative_navigation(url: &Url) -> bool {
@@ -24,6 +26,9 @@ fn main() {
             let _instance_ownership = lifecycle::InstanceOwnership::acquire(&application_paths)?;
             application_paths.ensure_layout()?;
             let _core_runtime_policy = core_runtime::CoreRuntimePolicy::new();
+
+            #[cfg(not(debug_assertions))]
+            _core_runtime_policy.load_verified_layout(app.path().resource_dir()?)?;
 
             let _platform_composition = platform::compose_windows_full_host()
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
