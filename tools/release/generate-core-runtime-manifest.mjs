@@ -14,10 +14,12 @@ function usage() {
 
 function parseArguments(argv) {
   const values = new Map();
+  const allowedArguments = new Set(["--root", "--node-version", "--output"]);
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (!argument.startsWith("--")) throw new Error(`unexpected argument: ${argument}`);
     const [key, inlineValue] = argument.split("=", 2);
+    if (!allowedArguments.has(key)) throw new Error(`unknown argument: ${key}`);
     const value = inlineValue ?? argv[++index];
     if (!value || value.startsWith("--")) throw new Error(`missing value for ${key}`);
     if (values.has(key)) throw new Error(`duplicate argument: ${key}`);
@@ -35,7 +37,8 @@ function ensureReleaseChild(root, candidate, label) {
   if (
     !relativePath ||
     relativePath === ".." ||
-    relativePath.startsWith(`..${candidate.includes("\\") ? "\\" : "/"}`) ||
+    relativePath.startsWith("../") ||
+    relativePath.startsWith("..\\") ||
     isAbsolute(relativePath)
   ) {
     throw new Error(`${label} must remain inside the release root`);
@@ -58,7 +61,15 @@ async function requireRegularFile(path, label) {
   if (!information.isFile()) throw new Error(`${label} is not a regular file`);
 }
 
-export async function generateRuntimeManifest({ root, nodeVersion, output = DEFAULT_OUTPUT }) {
+export async function generateRuntimeManifest({
+  root,
+  nodeVersion,
+  output = DEFAULT_OUTPUT,
+  ...unknownOptions
+}) {
+  if (Object.keys(unknownOptions).length > 0) {
+    throw new Error(`unknown option: ${Object.keys(unknownOptions)[0]}`);
+  }
   if (!isAbsolute(root)) throw new Error("--root must be an absolute release root");
   if (!/^\d+\.\d+\.\d+$/.test(nodeVersion)) {
     throw new Error("--node-version must use exact x.y.z form");

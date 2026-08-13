@@ -54,3 +54,15 @@ test("runtime manifest generation fails closed for missing files and outside out
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("runtime manifest CLI argument parsing rejects unknown options", async () => {
+  const root = await fixture();
+  try {
+    await assert.rejects(
+      generateRuntimeManifest({ root, nodeVersion: "24.18.0", unknown: "rejected" }),
+      /unknown option/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
