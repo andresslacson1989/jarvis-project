@@ -41,7 +41,7 @@ fn main() {
             let _core_runtime_policy = core_runtime::CoreRuntimePolicy::new();
 
             #[cfg(debug_assertions)]
-            let startup_condition = "LOCKED";
+            let _startup_condition = "LOCKED";
 
             #[cfg(not(debug_assertions))]
             let startup_condition =
