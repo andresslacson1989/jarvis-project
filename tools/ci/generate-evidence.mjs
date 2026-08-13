@@ -20,6 +20,7 @@ const GATES = Object.freeze([
   "architecture-enforcement",
   "normal-tests",
   "dependency-vulnerability-high-plus",
+  "rust-dependency-vulnerability",
   "rustfmt",
   "rust-clippy-warnings-as-errors",
   "rust-host-build",
