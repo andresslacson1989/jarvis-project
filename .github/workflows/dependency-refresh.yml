@@ -26,18 +26,6 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
 
-      - name: Capture live repository tips
-        id: tips
-        shell: bash
-        run: |
-          set -euo pipefail
-          branch_ref='refs/heads/impl/phase0-0.1-admission'
-          master_sha="$(git ls-remote origin refs/heads/master | cut -f1)"
-          branch_sha="$(git ls-remote origin "$branch_ref" | cut -f1)"
-          test "$branch_sha" = "$GITHUB_SHA"
-          printf 'master_sha=%s\n' "$master_sha" >> "$GITHUB_OUTPUT"
-          printf 'branch_sha=%s\n' "$branch_sha" >> "$GITHUB_OUTPUT"
-
       - name: Install pinned pnpm and Node
         uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
         with:
@@ -45,6 +33,28 @@ jobs:
           runtime: node@24.18.0
           install: false
           cache: false
+
+      - name: Capture live repository tips
+        id: tips
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_sha() {
+            local ref="$1"
+            curl --fail --silent --show-error \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/${ref}" \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).object.sha))"
+          }
+          master_sha="$(api_sha heads/master)"
+          branch_sha="$(api_sha heads/impl/phase0-0.1-admission)"
+          test "$branch_sha" = "$GITHUB_SHA"
+          printf 'master_sha=%s\n' "$master_sha" >> "$GITHUB_OUTPUT"
+          printf 'branch_sha=%s\n' "$branch_sha" >> "$GITHUB_OUTPUT"
 
       - name: Install pinned Rust toolchain
         shell: bash
@@ -214,9 +224,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          branch_ref='refs/heads/impl/phase0-0.1-admission'
-          current_master="$(git ls-remote origin refs/heads/master | cut -f1)"
-          current_branch="$(git ls-remote origin "$branch_ref" | cut -f1)"
+          api_sha() {
+            local ref="$1"
+            curl --fail --silent --show-error \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/ref/${ref}" \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.parse(s).object.sha))"
+          }
+          current_master="$(api_sha heads/master)"
+          current_branch="$(api_sha heads/impl/phase0-0.1-admission)"
           test "$current_master" = "$EXPECTED_MASTER_SHA"
           test "$current_branch" = "$GITHUB_SHA"
 
@@ -227,5 +245,5 @@ jobs:
           git commit -m 'build(deps): lock audited desktop dependency graph'
 
           git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin HEAD:"$branch_ref"
+          git push origin HEAD:refs/heads/impl/phase0-0.1-admission
           git remote set-url origin "https://github.com/${GITHUB_REPOSITORY}.git"
