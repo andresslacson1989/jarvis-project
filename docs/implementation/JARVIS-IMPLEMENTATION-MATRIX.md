@@ -19,9 +19,9 @@ The two files together are one non-normative implementation matrix. They are not
 
 | Field | Current value |
 |---|---|
-| Active section | None — `SECTION 0` verified; `SECTION 1` not started |
-| Active subsection | None — `0.CP` verified; `1.1` not started |
-| Next eligible subsection | `1.1` |
+| Active section | `SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core` |
+| Active subsection | `1.1` — Tauri 2 + React desktop workspace with bundled-local authoritative WebView |
+| Next eligible subsection | None while `1.1` is active; `1.2` requires `1.1` VERIFIED |
 | Contract suite | JARVIS v1.0.6 |
 | Authoritative implementation sequence | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` |
 | Reference plan | `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` |
@@ -49,9 +49,30 @@ The two files together are one non-normative implementation matrix. They are not
 | ↳ **0.13** Authoritative `master` repository governance: server-enforced when available, compensating controls when unavailable | **VERIFIED** | 0.11, 0.12 | PLAN §2; IC §28; RP §17; VR §33; ADR-074 | 10 CA / 8 scoped | None within `0.13` scope; hosting residual risk is explicit and contract-approved only while server protection is unavailable | `8996d6947fd60b415e32485ee3777914f80cd590`; `docs/implementation/evidence/0.13-master-protection-blocker.md`; governance mode `COMPENSATING_CONTROLS`; live `master` truthfully `protected=false`; pre-integration run `31637736770` PASS; non-force authoritative integration PASS; post-integration `master` run `31637928189` PASS; server-side mode becomes mandatory when available |
 | ↳ **0.CP** SECTION CHECKPOINT — Phase 0 clean-checkout, governance, platform-boundary, and drift proof | **VERIFIED** | 0.1–0.13 | PLAN §2 Exit; PLAN §26 checkpoint; VR §§6,9,33 | 10 CA / 8 scoped | None | `34a05bd2da4c68583dcfe149efdbaa93a5bc0047`; `docs/implementation/evidence/0.CP-phase0-checkpoint.md`; 12/12 checkpoint adversarial cases PASS; pre-integration run `31640079536` PASS; non-force authoritative integration PASS; post-integration master run `31640209796` PASS; exact Phase-0 CI evidence emitted with all 20 cumulative gates |
 
+### SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core
+
+| Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
+|---|---|---|---|---:|---|---|
+| **SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core** | **IN PROGRESS** | 0.CP | `Phase 1`; checkpoint: Windows Desktop Trust + Mission Control Foundation Ready | — | `1.1` is active | `0.CP` verified; Section 1 rows promoted from the stable reference plan before implementation |
+| ↳ **1.1** Tauri 2 + React desktop workspace with bundled-local authoritative WebView | **IN PROGRESS** | 0.CP | PLAN §3; RT §§2–5; RP §3; UI §8 | — | Desktop Tauri/React workspace and bundled-local renderer are not yet implemented/verified | Execution packet established from current v1.0.6 suite; implementation in progress |
+| ↳ **1.2** Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security | **NOT STARTED** | 1.1 | PLAN §3; IC §6; RT §5; SEC §20; CS §25; VR §12 | — | — | — |
+| ↳ **1.3** Rust Windows platform host and deterministic Windows composition wiring | **NOT STARTED** | 1.1, 0.5 | PLAN §3; IC §§5,8; PP §§7–9; RP §3 | — | — | — |
+| ↳ **1.4** Single-instance ownership, production data-directory layout, and maintenance-lock foundation | **NOT STARTED** | 1.3 | RT §4; UI §9 | — | — | — |
+| ↳ **1.5** Application-owned Node/Core packaging, controlled environment, integrity states, and no PATH fallback | **NOT STARTED** | 1.3, 0.8 | PLAN §3; IC §7; RT §§3,6; RP §3; VR §§13,32 | — | — | — |
+| ↳ **1.6** Shared Core bootstrap/service shell with typed UI↔Rust/Core boundary stubs | **NOT STARTED** | 1.5, 0.6 | PLAN §§3,22; RT §§10–11; CS §§3,7 | — | — | — |
+| ↳ **1.7** Initial PlatformProcessSupervisor Windows Job Object containment for Core startup | **NOT STARTED** | 1.5, 0.4 | PLAN §3; RT §§6,9; IC §18 | — | — | — |
+| ↳ **1.8** PlatformWindowController Windows backend, deterministic presentation states, multi-monitor recovery, and conservative no-focus-steal/privacy defaults before the later full NotificationPolicyEngine | **NOT STARTED** | 1.3, 0.4 | PLAN §3; UI §§9,24; PP §18 | — | — | — |
+| ↳ **1.9** Initial PlatformSessionObserver and PlatformSystemInfo Windows backends | **NOT STARTED** | 1.3, 0.4 | PLAN §3; PP §§17,26–27; RP §3 | — | — | — |
+| ↳ **1.10** Initial PlatformPathsAndIdentity Windows application/data path backend | **NOT STARTED** | 1.3, 0.4 | PLAN §3; PP §13; CS §16 | — | — | — |
+| ↳ **1.11** Canonical brand assets, offline Inter packaging, and asset/license provenance foundation | **NOT STARTED** | 1.1 | PLAN §3; IC §26; UI §§3–5; `assets/brand/README.md`; RP §3 | — | — | — |
+| ↳ **1.12** Central design tokens, reusable components, keyboard/focus, reduced-motion, and forced-colors foundation | **NOT STARTED** | 1.11 | PLAN §3; UI §§6–7,18,20,22–23; CS §25 | — | — | — |
+| ↳ **1.13** Mission Control shell, locked startup surface, and truthful foundational states | **NOT STARTED** | 1.6, 1.8, 1.12 | PLAN §3; IC §§4,6; UI §§8,11,17,25; OPS §§2–3 | — | — | — |
+| ↳ **1.14** Clean Windows 11 x64 standard-non-admin desktop foundation proof: packaged Core, window state, repair/degraded paths, no system Node | **NOT STARTED** | 1.2–1.13 | PLAN §3 Exit; VR §§11–13,32 | — | — | — |
+| ↳ **1.CP** SECTION CHECKPOINT — Windows desktop trust and Mission Control foundation | **NOT STARTED** | 1.1–1.14 | PLAN §3 Exit; PLAN §26 checkpoint; VR §§9,11–13,32 | — | — | — |
+
 ## Future-section status summary
 
-Sections 1–19 remain `NOT STARTED` except contract-permitted optional rows already marked `DEFERRED` in the reference plan. Their complete subsection definitions, dependencies, traceability, and final release-gate ownership remain in `JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` until each parent section becomes active and is promoted into this live board.
+Sections 2–19 remain `NOT STARTED` except contract-permitted optional rows already marked `DEFERRED` in the reference plan. Their complete subsection definitions, dependencies, traceability, and final release-gate ownership remain in `JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` until each parent section becomes active and is promoted into this live board.
 
 ## Maintenance invariants
 
