@@ -61,7 +61,7 @@ test("1.2 external-link path validates HTTP(S) URLs before leaving the privilege
 });
 
 test("1.2 renderer keeps untrusted content inert and bounded", () => {
-  const app = read("apps/desktop/src/App.tsx");
+  const app = read("apps/desktop/src/mission-control.tsx");
   const inert = read("apps/desktop/src/security/inertContent.ts");
   assert.match(app, /toInertText/);
   assert.doesNotMatch(app, /dangerouslySetInnerHTML|innerHTML|outerHTML/);

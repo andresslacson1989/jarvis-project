@@ -67,6 +67,8 @@ const requiredWorkspaceFiles = [
   "apps/desktop/src/design-system/tokens.css",
   "apps/desktop/src/design-system/components.css",
   "apps/desktop/src/design-system/components.tsx",
+  "apps/desktop/src/mission-control.tsx",
+  "apps/desktop/src/mission-control.css",
   "apps/desktop/src-tauri/Cargo.toml",
   "apps/desktop/src-tauri/build.rs",
   "apps/desktop/src-tauri/tauri.conf.json",
@@ -194,7 +196,7 @@ test("1.12 centralizes design tokens and exposes accessible presentation primiti
   const tokens = read("apps/desktop/src/design-system/tokens.css");
   const components = read("apps/desktop/src/design-system/components.tsx");
   const componentStyles = read("apps/desktop/src/design-system/components.css");
-  const app = read("apps/desktop/src/App.tsx");
+  const app = read("apps/desktop/src/mission-control.tsx");
 
   for (const tokenGroup of [
     "--brand-blue",
@@ -234,14 +236,38 @@ test("1.12 centralizes design tokens and exposes accessible presentation primiti
   assert.match(app, /<SkipLink/);
   assert.match(app, /<Panel/);
   assert.match(app, /<StatusChip/);
-  assert.match(app, /<TextInput/);
-  assert.match(app, /<Button/);
+});
+
+test("1.13 Mission Control has four regions and truthful locked startup state", () => {
+  const app = read("apps/desktop/src/App.tsx");
+  const shell = read("apps/desktop/src/mission-control.tsx");
+  const styles = read("apps/desktop/src/mission-control.css");
+
+  assert.match(app, /MissionControlShell/);
+  assert.match(app, /LOCKED_STARTUP_SNAPSHOT/);
+  assert.match(shell, /aria-label="JARVIS navigation"/);
+  assert.match(shell, /aria-label="JARVIS system status"/);
+  assert.match(shell, /<main[^>]+id="mission-control-main"/);
+  assert.match(shell, /aria-label="Context and attention"/);
+  assert.match(shell, /serviceState: "LOCKED"/);
+  assert.match(shell, /transportState: "NOT_CONNECTED"/);
+  assert.match(shell, /voiceState: "IDLE"/);
+  assert.match(shell, /No mission, approval, provider, or project state is being inferred/);
+  assert.match(shell, /No verified attention items are available while Core is locked/);
+  assert.match(shell, /aria-current/);
+  assert.match(styles, /grid-template-columns:\s*minmax\(12rem, 15rem\)/);
+  assert.match(styles, /grid-template-columns:\s*minmax\(0, 1fr\) minmax\(16rem, 22rem\)/);
+  assert.match(styles, /@media \(max-width: 719px\)/);
+  assert.match(styles, /grid-template-columns:\s*1fr/);
+  assert.match(styles, /@media \(forced-colors: active\)/);
+  assert.doesNotMatch(`${app}\n${shell}`, /\b(invoke|fetch|WebSocket|localStorage|indexedDB)\s*\(/);
 });
 
 test("renderer bootstrap is semantic and has no authoritative/native integration authority in 1.1", { skip: !existsSync(resolve(desktop, "src", "App.tsx")) }, () => {
   const app = read("apps/desktop/src/App.tsx");
   const main = read("apps/desktop/src/main.tsx");
-  assert.match(app, /JARVIS Mission Control/);
+  const shell = read("apps/desktop/src/mission-control.tsx");
+  assert.match(shell, /JARVIS Mission Control/);
   assert.match(main, /createRoot/);
   for (const forbidden of [
     /services\/core/,
