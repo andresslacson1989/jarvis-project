@@ -89,7 +89,8 @@ jobs:
 
           print(f"validated lock delta: tauri-build 2.6.3 added {sorted(added)}")
           PY
-          cargo metadata --locked --format-version 1 > /dev/null
+          cargo metadata --locked --no-deps --format-version 1 > /dev/null
+          rm Cargo.lock.before
           test "$(git status --porcelain)" = " M Cargo.lock"
           git diff -- Cargo.lock
 
