@@ -23,6 +23,6 @@ test("TypeScript verification launches the JS entrypoint through the pinned Node
   );
   assert.match(
     source,
-    /function runPnpmVersion\(expected\)[\s\S]*process\.execPath[\s\S]*corepack[\s\S]*pnpm\.js/,
+    /function runPnpmVersion\(expected\)[\s\S]*corepack[\s\S]*pnpm\.js[\s\S]*process\.execPath/,
   );
 });
