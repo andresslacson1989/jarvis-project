@@ -20,8 +20,8 @@ The two files together are one non-normative implementation matrix. They are not
 | Field | Current value |
 |---|---|
 | Active section | `SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core` |
-| Active subsection | `1.3` — Rust Windows platform host and deterministic Windows composition wiring |
-| Next eligible subsection | `1.3` is now active |
+| Active subsection | `1.4` — Single-instance ownership, production data-directory layout, and maintenance-lock foundation |
+| Next eligible subsection | `1.4` is now active |
 | Contract suite | JARVIS v1.0.6 |
 | Authoritative implementation sequence | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` |
 | Reference plan | `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` |
@@ -53,10 +53,10 @@ The two files together are one non-normative implementation matrix. They are not
 
 | Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
 |---|---|---|---|---:|---|---|
-| **SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core** | **IN PROGRESS** | 0.CP | `Phase 1`; checkpoint: Windows Desktop Trust + Mission Control Foundation Ready | — | `1.3` is active | `0.CP` and `1.1–1.2` verified; Section 1 rows promoted from the stable reference plan before implementation |
+| **SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core** | **IN PROGRESS** | 0.CP | `Phase 1`; checkpoint: Windows Desktop Trust + Mission Control Foundation Ready | — | `1.4` is active | `0.CP` and `1.1–1.3` verified; Section 1 rows promoted from the stable reference plan before implementation |
 | ↳ **1.1** Tauri 2 + React desktop workspace with bundled-local authoritative WebView | **VERIFIED** | 0.CP | PLAN §3; RT §§2–5; RP §3; UI §8 | 10 CA / 9 scoped | None within `1.1` scope | Candidate `7981defd48019c13f78f3c1c6d0539cb341bc4fa`; 7/7 `tests/layers/unit/desktop-workspace.test.mjs`; pinned desktop typecheck and bundled frontend build PASS; GitHub run `31668752271` PASS for `windows-desktop` and dependent `static-ci`; native Windows Tauri compile PASS |
 | ↳ **1.2** Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security | **VERIFIED** | 1.1 | PLAN §3; IC §6; RT §5; SEC §20; CS §25; VR §12 | 10 CA / 9 scoped | None within `1.2` scope; native and repository-side evidence complete; mandatory remote CI remains retained but was not triggered for this manual pass | Candidate includes the official pinned opener plugin, narrowly scoped HTTP(S) opener permission, validated external-link helper, restrictive CSP, native authoritative-navigation/new-window/devtools policy, bounded inert renderer text, and 5 adversarial security tests; MSVC-native `cargo check --locked --workspace --target x86_64-pc-windows-msvc` PASS using Visual Studio Community 18.9.12105.275 / MSVC 14.51.36231; local TypeScript typecheck/build PASS; targeted desktop suite 13/13 PASS; normal unit profile 10/10 files PASS; dependency/provenance/schema/architecture checks PASS (`npm=55`, `cargo=470`, 525 approved provenance records); clean LF-normalized worktree format check PASS (`133` files) and Cargo formatting PASS |
-| ↳ **1.3** Rust Windows platform host and deterministic Windows composition wiring | **NOT STARTED** | 1.1, 0.5 | PLAN §3; IC §§5,8; PP §§7–9; RP §3 | — | — | — |
+| ↳ **1.3** Rust Windows platform host and deterministic Windows composition wiring | **VERIFIED** | 1.1, 0.5 | PLAN §3; IC §§5,8; PP §§7–9; RP §3 | 10 CA / 9 scoped | None within `1.3` scope; concrete Windows capability implementations remain owned by later subsections | Rust host invokes a fail-closed composition gate selecting only `WINDOWS` / `FULL_HOST` / `x64` with profile `windows-v1-x64-full-host`; non-Windows/non-x64 targets return a typed unsupported-target error; native Windows x64 Rust test PASS 1/1; MSVC `cargo check --locked --workspace --target x86_64-pc-windows-msvc` PASS; new-module rustfmt check PASS; composition/architecture tests PASS 9/9; normal unit profile PASS 15/15; Phase-0, architecture, schema, and provenance checks PASS; desktop typecheck/build PASS; no remote CI triggered |
 | ↳ **1.4** Single-instance ownership, production data-directory layout, and maintenance-lock foundation | **NOT STARTED** | 1.3 | RT §4; UI §9 | — | — | — |
 | ↳ **1.5** Application-owned Node/Core packaging, controlled environment, integrity states, and no PATH fallback | **NOT STARTED** | 1.3, 0.8 | PLAN §3; IC §7; RT §§3,6; RP §3; VR §§13,32 | — | — | — |
 | ↳ **1.6** Shared Core bootstrap/service shell with typed UI↔Rust/Core boundary stubs | **NOT STARTED** | 1.5, 0.6 | PLAN §§3,22; RT §§10–11; CS §§3,7 | — | — | — |

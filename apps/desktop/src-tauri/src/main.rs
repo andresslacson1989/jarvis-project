@@ -1,3 +1,5 @@
+mod platform;
+
 use tauri::webview::{NewWindowResponse, WebviewWindowBuilder};
 use tauri::{Url, WebviewUrl};
 
@@ -15,6 +17,9 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            let _platform_composition = platform::compose_windows_full_host()
+                .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+
             #[cfg(debug_assertions)]
             let webview_url = WebviewUrl::External(
                 "http://127.0.0.1:1420"
