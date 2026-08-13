@@ -36,5 +36,8 @@
     "tools/**/*.ts",
     "modules/**/*.ts",
     "tests/**/*.ts"
+  ],
+  "exclude": [
+    "apps/desktop/**"
   ]
 }

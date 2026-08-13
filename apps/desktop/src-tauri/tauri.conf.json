@@ -1,0 +1,23 @@
+{
+  "productName": "JARVIS",
+  "version": "0.0.0",
+  "identifier": "com.jarvis.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:1420"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "JARVIS Mission Control",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  }
+}

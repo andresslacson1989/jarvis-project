@@ -1,0 +1,103 @@
+name: Temporary Dependency Refresh
+
+on:
+  push:
+    branches:
+      - 'impl/phase0-0.1-admission'
+    paths:
+      - 'apps/desktop/**'
+      - 'package.json'
+      - 'Cargo.toml'
+      - '.github/workflows/dependency-refresh.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: dependency-refresh
+    if: github.repository == 'andresslacson1989/jarvis-project'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install pinned pnpm and Node
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.21.0
+          runtime: node@24.18.0
+          install: false
+          cache: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.97.1
+          rustup default 1.97.1
+
+      - name: Resolve exact JavaScript lockfile
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
+
+      - name: Resolve exact Rust lockfile
+        run: cargo generate-lockfile
+
+      - name: Collect review inventory
+        shell: bash
+        run: |
+          mkdir -p dependency-refresh
+          cp pnpm-lock.yaml Cargo.lock dependency-refresh/
+          cargo metadata --locked --format-version 1 > dependency-refresh/cargo-metadata.json
+          node <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+
+          const lock = await readFile('pnpm-lock.yaml', 'utf8');
+          const packages = [];
+          let inPackages = false;
+          for (const line of lock.split(/\r?\n/)) {
+            if (line === 'packages:') {
+              inPackages = true;
+              continue;
+            }
+            if (inPackages && /^[^\s]/.test(line) && line.endsWith(':')) break;
+            if (!inPackages) continue;
+            const match = line.match(/^  ([^ ].*):\s*$/);
+            if (!match) continue;
+            let key = match[1].trim();
+            if ((key.startsWith("'") && key.endsWith("'")) || (key.startsWith('"') && key.endsWith('"'))) key = key.slice(1, -1);
+            key = key.replace(/\(.*/, '');
+            const separator = key.lastIndexOf('@');
+            if (separator <= 0) continue;
+            packages.push({ name: key.slice(0, separator), version: key.slice(separator + 1) });
+          }
+
+          const inventory = [];
+          for (const item of packages.sort((a, b) => `${a.name}@${a.version}`.localeCompare(`${b.name}@${b.version}`, 'en'))) {
+            const encoded = item.name.startsWith('@') ? item.name.replace('/', '%2F') : item.name;
+            const response = await fetch(`https://registry.npmjs.org/${encoded}/${item.version}`);
+            if (!response.ok) throw new Error(`npm metadata lookup failed for ${item.name}@${item.version}: ${response.status}`);
+            const metadata = await response.json();
+            inventory.push({
+              name: item.name,
+              version: item.version,
+              license: metadata.license ?? null,
+              repository: metadata.repository ?? null,
+              homepage: metadata.homepage ?? null,
+              integrity: metadata.dist?.integrity ?? null,
+            });
+          }
+          await writeFile('dependency-refresh/npm-registry.json', `${JSON.stringify(inventory, null, 2)}\n`);
+          NODE
+
+      - name: Upload refresh evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dependency-refresh-${{ github.sha }}
+          path: dependency-refresh/
+          retention-days: 1
+          if-no-files-found: error

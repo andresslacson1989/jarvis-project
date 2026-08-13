@@ -10,7 +10,7 @@
   "scripts": {
     "toolchain:verify": "node tools/toolchain/verify-toolchain.mjs",
     "toolchain:verify:metadata": "node tools/toolchain/verify-toolchain.mjs --metadata-only",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm --filter @jarvis/desktop typecheck",
     "test": "node tools/test/run-tests.mjs --profile normal",
     "test:qualification": "node tools/test/run-tests.mjs --profile qualification",
     "architecture:check": "node tools/architecture/check-architecture.mjs",
@@ -21,7 +21,7 @@
     "provenance:check": "node tools/ci/check-provenance.mjs",
     "governance:check": "node tools/ci/check-repository-governance.mjs",
     "phase0:check": "node tools/checkpoints/phase0-checkpoint.mjs",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && pnpm --filter @jarvis/desktop build:web",
     "ci:evidence": "node tools/ci/generate-evidence.mjs",
     "contract:generate": "node tools/contract/generate-contract-artifacts.mjs --write",
     "contract:check-generated": "node tools/contract/generate-contract-artifacts.mjs --check",

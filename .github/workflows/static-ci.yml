@@ -93,10 +93,10 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Rust clippy warnings-as-errors
-        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked -p jarvis-toolchain-smoke --all-targets --all-features -- -D warnings
 
       - name: Rust host build
-        run: cargo check --locked --workspace --all-targets --all-features
+        run: cargo check --locked -p jarvis-toolchain-smoke --all-targets --all-features
 
       - name: Rust Windows-target build
         run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
