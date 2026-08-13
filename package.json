@@ -19,6 +19,7 @@
     "security:secrets": "node tools/ci/scan-secrets.mjs",
     "dependency:check": "node tools/ci/check-dependencies.mjs",
     "provenance:check": "node tools/ci/check-provenance.mjs",
+    "release:core-runtime-manifest": "node tools/release/generate-core-runtime-manifest.mjs",
     "governance:check": "node tools/ci/check-repository-governance.mjs",
     "phase0:check": "node tools/checkpoints/phase0-checkpoint.mjs",
     "build": "tsc -p tsconfig.build.json && pnpm --filter @jarvis/desktop build:web",

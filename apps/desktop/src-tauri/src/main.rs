@@ -1,6 +1,6 @@
-mod platform;
-mod lifecycle;
 pub mod core_runtime;
+mod lifecycle;
+mod platform;
 
 use tauri::webview::{NewWindowResponse, WebviewWindowBuilder};
 use tauri::{Url, WebviewUrl};
