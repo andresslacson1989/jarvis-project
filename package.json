@@ -33,7 +33,10 @@
     "contract:check": "pnpm contract:check-generated && pnpm contract:check-manifest && pnpm contract:check-drift"
   },
   "devDependencies": {
+    "@tufjs/canonical-json": "2.0.0",
+    "@tufjs/models": "5.0.0",
     "@types/node": "26.2.0",
+    "tuf-js": "6.0.0",
     "typescript": "6.0.3"
   }
 }

@@ -3,6 +3,106 @@
   "dependencies": [
     {
       "ecosystem": "npm",
+      "name": "@gar/promise-retry",
+      "version": "1.0.3",
+      "license": "MIT",
+      "source": "https://github.com/wraithgar/node-promise-retry.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@tufjs/canonical-json",
+      "version": "2.0.0",
+      "license": "MIT",
+      "source": "https://github.com/theupdateframework/tuf-js.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@tufjs/models",
+      "version": "5.0.0",
+      "license": "MIT",
+      "source": "https://github.com/theupdateframework/tuf-js.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@types/retry",
+      "version": "0.12.5",
+      "license": "MIT",
+      "source": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "balanced-match",
+      "version": "4.0.4",
+      "license": "MIT",
+      "source": "https://github.com/juliangruber/balanced-match.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "brace-expansion",
+      "version": "5.0.9",
+      "license": "MIT",
+      "source": "https://github.com/juliangruber/brace-expansion.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "debug",
+      "version": "4.4.3",
+      "license": "MIT",
+      "source": "https://github.com/debug-js/debug.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "minimatch",
+      "version": "10.2.6",
+      "license": "BlueOak-1.0.0",
+      "source": "https://github.com/isaacs/minimatch.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "ms",
+      "version": "2.1.3",
+      "license": "MIT",
+      "source": "https://github.com/vercel/ms.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "tuf-js",
+      "version": "6.0.0",
+      "license": "MIT",
+      "source": "https://github.com/theupdateframework/tuf-js.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
       "name": "@emnapi/core",
       "version": "1.11.1",
       "license": "MIT",

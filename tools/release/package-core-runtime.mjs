@@ -1,13 +1,15 @@
 import { constants } from "node:fs";
-import { copyFile, lstat, mkdir, mkdtemp, open, rename, rm } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { copyFile, cp, lstat, mkdir, mkdtemp, open, readFile, realpath, rename, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { generateRuntimeManifest } from "./generate-core-runtime-manifest.mjs";
 
 const V1_NODE_VERSION = "24.18.0";
+const CORE_SUPPORT_FILE = "release-trust.js";
 
 function usage() {
-  return "Usage: node tools/release/package-core-runtime.mjs --node <absolute-node.exe> --core <absolute-core-entrypoint> --output <absolute-release-root> --jarvis-release-version <version> --core-version <version> [--node-version 24.18.0]";
+  return "Usage: node tools/release/package-core-runtime.mjs --node <absolute-node.exe> --core <absolute-core-entrypoint> --output <absolute-release-root> --jarvis-release-version <version> --core-version <version> --source-commit-sha <40-hex-sha> --release-sequence <uint64> --security-epoch <uint64> --tuf-metadata-dir <absolute-dir> [--node-version 24.18.0]";
 }
 
 function parseArguments(argv) {
@@ -19,6 +21,11 @@ function parseArguments(argv) {
     "--node-version",
     "--jarvis-release-version",
     "--core-version",
+    "--source-commit-sha",
+    "--release-sequence",
+    "--security-epoch",
+    "--tuf-metadata-dir",
+    "--core-node-modules",
     "--target",
     "--protocol-version",
     "--minimum-data-schema-version",
@@ -41,11 +48,27 @@ function parseArguments(argv) {
   const nodeVersion = values.get("--node-version") ?? V1_NODE_VERSION;
   const jarvisReleaseVersion = values.get("--jarvis-release-version");
   const coreVersion = values.get("--core-version");
+  const sourceCommitSha = values.get("--source-commit-sha");
+  const releaseSequence = values.get("--release-sequence");
+  const securityEpoch = values.get("--security-epoch");
+  const tufMetadataDirectory = values.get("--tuf-metadata-dir");
+  const coreNodeModules = values.get("--core-node-modules");
   const target = values.get("--target") ?? "WINDOWS_FULL_HOST_X64";
   const protocolVersion = values.get("--protocol-version") ?? "1";
   const minimumDataSchemaVersion = values.get("--minimum-data-schema-version") ?? "1";
   const maximumDataSchemaVersion = values.get("--maximum-data-schema-version") ?? "1";
-  if (!node || !core || !output || !jarvisReleaseVersion || !coreVersion) {
+  if (
+    !node ||
+    !core ||
+    !output ||
+    !jarvisReleaseVersion ||
+    !coreVersion ||
+    !sourceCommitSha ||
+    !releaseSequence ||
+    !securityEpoch ||
+    !tufMetadataDirectory ||
+    !coreNodeModules
+  ) {
     throw new Error(usage());
   }
   return {
@@ -55,6 +78,11 @@ function parseArguments(argv) {
     nodeVersion,
     jarvisReleaseVersion,
     coreVersion,
+    sourceCommitSha,
+    releaseSequence: parseSequence(releaseSequence, "--release-sequence"),
+    securityEpoch: parseSequence(securityEpoch, "--security-epoch"),
+    tufMetadataDirectory,
+    coreNodeModules,
     target,
     protocolVersion: parseVersionNumber(protocolVersion, "--protocol-version"),
     minimumDataSchemaVersion: parseVersionNumber(
@@ -71,6 +99,15 @@ function parseArguments(argv) {
 function parseVersionNumber(value, label) {
   if (!/^\d+$/.test(value)) throw new Error(`${label} must be a non-negative integer`);
   return Number(value);
+}
+
+function parseSequence(value, label) {
+  if (!/^\d+$/.test(value)) throw new Error(`${label} must be a non-negative uint64`);
+  const sequence = Number(value);
+  if (!Number.isSafeInteger(sequence)) {
+    throw new Error(`${label} must be representable exactly by the release tooling`);
+  }
+  return sequence;
 }
 
 async function pathExists(path) {
@@ -127,13 +164,100 @@ function requireAbsolutePath(path, label) {
   return resolve(path);
 }
 
-async function copyReleaseUnit({ node, core, output }) {
+async function copyReleaseUnit({ node, core, coreSupport, coreNodeModules, output }) {
   const runtimeDirectory = join(output, "runtime");
   const coreDirectory = join(output, "core", "dist");
   await mkdir(runtimeDirectory, { recursive: true });
   await mkdir(coreDirectory, { recursive: true });
   await copyFile(node, join(runtimeDirectory, "node.exe"), constants.COPYFILE_EXCL);
   await copyFile(core, join(coreDirectory, "main.js"), constants.COPYFILE_EXCL);
+  await copyFile(coreSupport, join(coreDirectory, CORE_SUPPORT_FILE), constants.COPYFILE_EXCL);
+  await copyCoreDependencies(coreNodeModules, join(output, "core", "node_modules"));
+}
+
+async function resolvePackageRoot(packageName, packageBase) {
+  const packageRequire = createRequire(pathToFileURL(join(packageBase, "package.json")));
+  const entrypoint = packageRequire.resolve(packageName);
+  let current = dirname(entrypoint);
+  while (current !== dirname(current)) {
+    const manifestPath = join(current, "package.json");
+    if (await pathExists(manifestPath)) {
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+      if (manifest.name === packageName) return current;
+    }
+    current = dirname(current);
+  }
+  throw new Error(`cannot resolve package root for ${packageName}`);
+}
+
+async function copyCoreDependencies(sourceNodeModules, destinationNodeModules) {
+  const sourceRoot = resolve(sourceNodeModules);
+  await requireRegularDirectory(sourceRoot, "Core node_modules directory");
+  const corePackageJson = join(dirname(sourceRoot), "package.json");
+  if (!(await pathExists(corePackageJson))) return;
+  const corePackage = JSON.parse(await readFile(corePackageJson, "utf8"));
+  const pending = Object.keys(corePackage.dependencies ?? {}).map((name) => ({
+    name,
+    base: dirname(corePackageJson),
+  }));
+  const copied = new Set();
+  await mkdir(destinationNodeModules, { recursive: true });
+  while (pending.length > 0) {
+    const pendingPackage = pending.shift();
+    const packageName = pendingPackage?.name;
+    if (!packageName || copied.has(packageName)) continue;
+    if (!/^(@[a-z0-9._-]+\/)?[a-z0-9._-]+$/iu.test(packageName)) {
+      throw new Error(`invalid Core dependency package name: ${packageName}`);
+    }
+    const packageRoot = await realpath(await resolvePackageRoot(packageName, pendingPackage.base));
+    const destination = join(destinationNodeModules, ...packageName.split("/"));
+    await mkdir(dirname(destination), { recursive: true });
+    await cp(packageRoot, destination, {
+      recursive: true,
+      dereference: true,
+      force: false,
+      filter: (source) => {
+        const relativeSource = relative(packageRoot, source);
+        return relativeSource === "" || !relativeSource.split(/[\\/]/u).includes("node_modules");
+      },
+    });
+    copied.add(packageName);
+    const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
+    pending.push(
+      ...Object.keys(packageManifest.dependencies ?? {}).map((name) => ({
+        name,
+        base: packageRoot,
+      })),
+      ...Object.keys(packageManifest.optionalDependencies ?? {}).map((name) => ({
+        name,
+        base: packageRoot,
+      })),
+    );
+  }
+}
+
+async function copyTrustMetadata(source, output) {
+  const metadataRoot = resolve(source);
+  await requireRegularDirectory(metadataRoot, "TUF metadata directory");
+  const destination = join(output, "tuf", "metadata");
+  await mkdir(destination, { recursive: true });
+  for (const name of ["root.json", "timestamp.json", "snapshot.json", "targets.json"]) {
+    const sourcePath = join(metadataRoot, name);
+    await requireRegularFile(sourcePath, `TUF metadata ${name}`);
+    await copyFile(sourcePath, join(destination, name), constants.COPYFILE_EXCL);
+  }
+}
+
+async function requireRegularDirectory(path, label) {
+  let information;
+  try {
+    information = await lstat(path);
+  } catch (error) {
+    throw new Error(`${label} is missing: ${error.message}`, { cause: error });
+  }
+  if (information.isSymbolicLink() || !information.isDirectory()) {
+    throw new Error(`${label} must be a regular, non-symbolic-link directory`);
+  }
 }
 
 export async function packageCoreRuntime({
@@ -143,6 +267,11 @@ export async function packageCoreRuntime({
   nodeVersion = V1_NODE_VERSION,
   jarvisReleaseVersion,
   coreVersion,
+  sourceCommitSha,
+  releaseSequence,
+  securityEpoch,
+  tufMetadataDirectory,
+  coreNodeModules,
   target = "WINDOWS_FULL_HOST_X64",
   protocolVersion = 1,
   minimumDataSchemaVersion = 1,
@@ -158,6 +287,7 @@ export async function packageCoreRuntime({
 
   const sourceNode = requireAbsolutePath(node, "--node");
   const sourceCore = requireAbsolutePath(core, "--core");
+  const sourceCoreSupport = join(dirname(sourceCore), CORE_SUPPORT_FILE);
   const releaseRoot = requireAbsolutePath(output, "--output");
 
   await requireRegularFile(sourceNode, "source node.exe");
@@ -169,21 +299,32 @@ export async function packageCoreRuntime({
   if (await pathExists(releaseRoot)) {
     throw new Error("release output root already exists; refusing to overwrite it");
   }
+  await requireRegularFile(sourceCoreSupport, "source Core trust module");
 
   await mkdir(dirname(releaseRoot), { recursive: true });
   const temporaryRoot = await mkdtemp(join(dirname(releaseRoot), ".jarvis-core-runtime-"));
   try {
-    await copyReleaseUnit({ node: sourceNode, core: sourceCore, output: temporaryRoot });
+    await copyReleaseUnit({
+      node: sourceNode,
+      core: sourceCore,
+      coreSupport: sourceCoreSupport,
+      coreNodeModules,
+      output: temporaryRoot,
+    });
     const manifestResult = await generateRuntimeManifest({
       root: temporaryRoot,
       nodeVersion,
       jarvisReleaseVersion,
       coreVersion,
+      sourceCommitSha,
+      releaseSequence,
+      securityEpoch,
       target,
       protocolVersion,
       minimumDataSchemaVersion,
       maximumDataSchemaVersion,
     });
+    await copyTrustMetadata(tufMetadataDirectory, temporaryRoot);
     await rename(temporaryRoot, releaseRoot);
     return { manifest: manifestResult.manifest, releaseRoot };
   } catch (error) {

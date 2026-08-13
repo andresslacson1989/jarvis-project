@@ -6,6 +6,11 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const generatedEntrypoint = resolve(projectRoot, ".artifacts/core-build/services/core/src/main.js");
 const outputDirectory = resolve(projectRoot, "services/core/dist");
 const outputEntrypoint = resolve(outputDirectory, "main.js");
+const generatedTrustModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/release-trust.js",
+);
+const outputTrustModule = resolve(outputDirectory, "release-trust.js");
 
 async function main() {
   const information = await stat(generatedEntrypoint).catch(() => null);
@@ -15,6 +20,7 @@ async function main() {
   await rm(outputDirectory, { recursive: true, force: true });
   await mkdir(outputDirectory, { recursive: true });
   await copyFile(generatedEntrypoint, outputEntrypoint);
+  await copyFile(generatedTrustModule, outputTrustModule);
   console.log(`[core-build] wrote ${outputEntrypoint}`);
 }
 

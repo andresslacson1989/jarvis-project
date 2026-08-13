@@ -6,6 +6,16 @@ This inventory is generated from the exact locked dependency graph used by JARVI
 
 | Ecosystem | Name | Version | License | Role | Packaged |
 |---|---|---|---|---|---|
+| npm | @gar/promise-retry | 1.0.3 | MIT | CORE_RUNTIME | yes |
+| npm | @tufjs/canonical-json | 2.0.0 | MIT | CORE_RUNTIME | yes |
+| npm | @tufjs/models | 5.0.0 | MIT | CORE_RUNTIME | yes |
+| npm | @types/retry | 0.12.5 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | balanced-match | 4.0.4 | MIT | CORE_RUNTIME | yes |
+| npm | brace-expansion | 5.0.9 | MIT | CORE_RUNTIME | yes |
+| npm | debug | 4.4.3 | MIT | CORE_RUNTIME | yes |
+| npm | minimatch | 10.2.6 | BlueOak-1.0.0 | CORE_RUNTIME | yes |
+| npm | ms | 2.1.3 | MIT | CORE_RUNTIME | yes |
+| npm | tuf-js | 6.0.0 | MIT | CORE_RUNTIME | yes |
 | npm | @emnapi/core | 1.11.1 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | @emnapi/runtime | 1.11.1 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | @emnapi/wasi-threads | 1.2.2 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |

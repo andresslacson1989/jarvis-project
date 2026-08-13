@@ -4,7 +4,7 @@
 //! deliberately does not claim that the current repository contains a release
 //! runtime or signed integrity manifest.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
 use std::fs::{canonicalize, read, symlink_metadata, File, Metadata};
@@ -96,6 +96,15 @@ pub struct RuntimeIntegrityManifest {
     pub core_entrypoint: String,
     pub node_sha256: String,
     pub core_sha256: String,
+    #[serde(default)]
+    pub core_support_files: Vec<RuntimeSupportFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeSupportFile {
+    pub path: String,
+    pub sha256: String,
 }
 
 impl CoreRuntimeLayout {
@@ -307,6 +316,48 @@ impl CoreRuntimeLayout {
             ));
         }
 
+        let mut support_paths = BTreeSet::new();
+        for support_file in &manifest.core_support_files {
+            if !support_paths.insert(support_file.path.clone()) {
+                return Err(Self::error(
+                    CoreRuntimeState::CoreRuntimeIncompatible,
+                    "runtime support file paths must be unique",
+                ));
+            }
+            let support_path = self.resolve_manifest_child(&root, &support_file.path, "support path")?;
+            let support = canonicalize(&support_path).map_err(|error| {
+                Self::io_error(
+                    CoreRuntimeState::CoreRuntimeIntegrityFailed,
+                    "Core support file",
+                    error,
+                )
+            })?;
+            let support_metadata = symlink_metadata(&support).map_err(|error| {
+                Self::io_error(
+                    CoreRuntimeState::CoreRuntimeIntegrityFailed,
+                    "Core support file",
+                    error,
+                )
+            })?;
+            if !support_metadata.file_type().is_file()
+                || support_metadata.file_type().is_symlink()
+                || is_reparse_point(&support_metadata)
+                || !is_canonical_child(&root, &support)
+            {
+                return Err(Self::error(
+                    CoreRuntimeState::CoreRuntimeIntegrityFailed,
+                    "Core support file must be a regular non-reparse child of release_root",
+                ));
+            }
+            validate_sha256(&support_file.sha256, "core_support_files.sha256")?;
+            if sha256_file(&support)? != support_file.sha256 {
+                return Err(Self::error(
+                    CoreRuntimeState::CoreRuntimeIntegrityFailed,
+                    "packaged Core support file does not match the integrity manifest",
+                ));
+            }
+        }
+
         Ok(manifest)
     }
 
@@ -322,6 +373,10 @@ impl CoreRuntimeLayout {
             (
                 OsString::from("JARVIS_CORE_ENTRYPOINT"),
                 self.core_entrypoint.as_os_str().to_os_string(),
+            ),
+            (
+                OsString::from("JARVIS_TUF_METADATA_DIR"),
+                self.release_root.join("tuf").join("metadata").as_os_str().to_os_string(),
             ),
         ]))
     }
@@ -518,6 +573,7 @@ mod tests {
             core_entrypoint: "core/dist/main.js".to_owned(),
             node_sha256: "0".repeat(64),
             core_sha256: "0".repeat(64),
+            core_support_files: Vec::new(),
         };
         let manifest_path = root.join("runtime-manifest.json");
         write(
@@ -581,6 +637,7 @@ mod tests {
                 .expect("node digest must be computable"),
             core_sha256: sha256_file(&root.join("core").join("dist").join("main.js"))
                 .expect("Core digest must be computable"),
+            core_support_files: Vec::new(),
         };
         write(
             root.join("runtime-manifest.json"),
@@ -678,6 +735,7 @@ mod tests {
                 .expect("node digest must be computable"),
             core_sha256: sha256_file(&root.join("core").join("dist").join("main.js"))
                 .expect("Core digest must be computable"),
+            core_support_files: Vec::new(),
         };
         let manifest_path = root.join("runtime-manifest.json");
         write(
@@ -736,6 +794,7 @@ mod tests {
             core_entrypoint: "core/dist/main.js".to_owned(),
             node_sha256: "0".repeat(64),
             core_sha256: "0".repeat(64),
+            core_support_files: Vec::new(),
         };
         let manifest_path = root.join("runtime-manifest.json");
         write(

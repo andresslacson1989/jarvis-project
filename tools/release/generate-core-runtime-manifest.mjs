@@ -6,10 +6,11 @@ import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 const NODE_RELATIVE_PATH = "runtime/node.exe";
 const CORE_RELATIVE_PATH = "core/dist/main.js";
+const CORE_SUPPORT_RELATIVE_PATH = "core/dist/release-trust.js";
 const DEFAULT_OUTPUT = "runtime-manifest.json";
 
 function usage() {
-  return "Usage: node tools/release/generate-core-runtime-manifest.mjs --root <absolute-release-root> --node-version <x.y.z> --jarvis-release-version <version> --core-version <version> [--target WINDOWS_FULL_HOST_X64] [--protocol-version 1] [--minimum-data-schema-version 1] [--maximum-data-schema-version 1] [--output <relative-path>]";
+  return "Usage: node tools/release/generate-core-runtime-manifest.mjs --root <absolute-release-root> --node-version <x.y.z> --jarvis-release-version <version> --core-version <version> --source-commit-sha <40-hex-sha> --release-sequence <uint64> --security-epoch <uint64> [--target WINDOWS_FULL_HOST_X64] [--protocol-version 1] [--minimum-data-schema-version 1] [--maximum-data-schema-version 1] [--output <relative-path>]";
 }
 
 function parseArguments(argv) {
@@ -19,6 +20,9 @@ function parseArguments(argv) {
     "--node-version",
     "--jarvis-release-version",
     "--core-version",
+    "--source-commit-sha",
+    "--release-sequence",
+    "--security-epoch",
     "--target",
     "--protocol-version",
     "--minimum-data-schema-version",
@@ -39,17 +43,31 @@ function parseArguments(argv) {
   const nodeVersion = values.get("--node-version");
   const jarvisReleaseVersion = values.get("--jarvis-release-version");
   const coreVersion = values.get("--core-version");
+  const sourceCommitSha = values.get("--source-commit-sha");
+  const releaseSequence = values.get("--release-sequence");
+  const securityEpoch = values.get("--security-epoch");
   const target = values.get("--target") ?? "WINDOWS_FULL_HOST_X64";
   const protocolVersion = values.get("--protocol-version") ?? "1";
   const minimumDataSchemaVersion = values.get("--minimum-data-schema-version") ?? "1";
   const maximumDataSchemaVersion = values.get("--maximum-data-schema-version") ?? "1";
   const output = values.get("--output") ?? DEFAULT_OUTPUT;
-  if (!root || !nodeVersion || !jarvisReleaseVersion || !coreVersion) throw new Error(usage());
+  if (
+    !root ||
+    !nodeVersion ||
+    !jarvisReleaseVersion ||
+    !coreVersion ||
+    !sourceCommitSha ||
+    !releaseSequence ||
+    !securityEpoch
+  ) throw new Error(usage());
   return {
     root,
     nodeVersion,
     jarvisReleaseVersion,
     coreVersion,
+    sourceCommitSha,
+    releaseSequence: parseSequence(releaseSequence, "--release-sequence"),
+    securityEpoch: parseSequence(securityEpoch, "--security-epoch"),
     target,
     protocolVersion: parseVersionNumber(protocolVersion, "--protocol-version"),
     minimumDataSchemaVersion: parseVersionNumber(
@@ -67,6 +85,15 @@ function parseArguments(argv) {
 function parseVersionNumber(value, label) {
   if (!/^\d+$/.test(value)) throw new Error(`${label} must be a non-negative integer`);
   return Number(value);
+}
+
+function parseSequence(value, label) {
+  if (!/^\d+$/.test(value)) throw new Error(`${label} must be a non-negative uint64`);
+  const sequence = Number(value);
+  if (!Number.isSafeInteger(sequence)) {
+    throw new Error(`${label} must be representable exactly by the release tooling`);
+  }
+  return sequence;
 }
 
 function ensureReleaseChild(root, candidate, label) {
@@ -101,6 +128,9 @@ export async function generateRuntimeManifest({
   nodeVersion,
   jarvisReleaseVersion,
   coreVersion,
+  sourceCommitSha,
+  releaseSequence,
+  securityEpoch,
   target = "WINDOWS_FULL_HOST_X64",
   protocolVersion = 1,
   minimumDataSchemaVersion = 1,
@@ -121,6 +151,15 @@ export async function generateRuntimeManifest({
   if (typeof coreVersion !== "string" || coreVersion.length === 0) {
     throw new Error("--core-version is required");
   }
+  if (typeof sourceCommitSha !== "string" || !/^[0-9a-f]{40}$/iu.test(sourceCommitSha)) {
+    throw new Error("--source-commit-sha must be exactly 40 hexadecimal characters");
+  }
+  if (!Number.isSafeInteger(releaseSequence) || releaseSequence < 1) {
+    throw new Error("--release-sequence must be a positive uint64 representable exactly");
+  }
+  if (!Number.isSafeInteger(securityEpoch) || securityEpoch < 1) {
+    throw new Error("--security-epoch must be a positive uint64 representable exactly");
+  }
   if (target !== "WINDOWS_FULL_HOST_X64") {
     throw new Error("--target must be WINDOWS_FULL_HOST_X64");
   }
@@ -137,16 +176,22 @@ export async function generateRuntimeManifest({
   const releaseRoot = resolve(root);
   const nodePath = resolve(releaseRoot, NODE_RELATIVE_PATH);
   const corePath = resolve(releaseRoot, CORE_RELATIVE_PATH);
+  const coreSupportPath = resolve(releaseRoot, CORE_SUPPORT_RELATIVE_PATH);
   const manifestPath = resolve(releaseRoot, output);
   ensureReleaseChild(releaseRoot, manifestPath, "manifest output");
 
   await requireRegularFile(nodePath, "release-owned node.exe");
   await requireRegularFile(corePath, "release-owned Core entrypoint");
+  await requireRegularFile(coreSupportPath, "release-owned Core trust module");
 
   const manifest = {
     manifestVersion: 1,
     jarvisReleaseVersion,
     coreVersion,
+    sourceCommitSha: sourceCommitSha.toLowerCase(),
+    releaseSequence,
+    securityEpoch,
+    tufSpecVersion: "1.0.35",
     target,
     protocolVersion,
     minimumDataSchemaVersion,
@@ -161,6 +206,12 @@ export async function generateRuntimeManifest({
     coreEntrypoint: CORE_RELATIVE_PATH.replaceAll("\\", "/"),
     nodeSha256: await sha256File(nodePath),
     coreSha256: await sha256File(corePath),
+    coreSupportFiles: [
+      {
+        path: CORE_SUPPORT_RELATIVE_PATH.replaceAll("\\", "/"),
+        sha256: await sha256File(coreSupportPath),
+      },
+    ],
   };
 
   await mkdir(dirname(manifestPath), { recursive: true });

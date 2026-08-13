@@ -3,6 +3,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
+import { writeTufReleaseMetadata } from "../../helpers/tuf-release-fixture.mjs";
 import {
   CoreBootstrap,
   CoreBootstrapError,
@@ -16,9 +17,33 @@ test("Core bootstrap accepts only explicit release paths and exposes truthful st
   try {
     await mkdir(join(root, "core", "dist"), { recursive: true });
     await writeFile(entrypoint, "export {};\n");
+    const manifest = {
+      jarvisReleaseVersion: "0.0.0",
+      releaseSequence: 1,
+      securityEpoch: 1,
+      sourceCommitSha: "a".repeat(40),
+    };
+    const manifestBytes = Buffer.from(`${JSON.stringify(manifest)}\n`, "utf8");
+    await writeFile(join(root, "runtime-manifest.json"), manifestBytes);
+    await writeTufReleaseMetadata({
+      metadataDirectory: join(root, "tuf", "metadata"),
+      targetBytes: manifestBytes,
+      custom: {
+        tufSpecVersion: "1.0.35",
+        releaseId: manifest.jarvisReleaseVersion,
+        jarvisVersion: manifest.jarvisReleaseVersion,
+        releaseSequence: manifest.releaseSequence,
+        securityEpoch: manifest.securityEpoch,
+        sourceCommitSha: manifest.sourceCommitSha,
+        platform: "WINDOWS",
+        runtimeRole: "FULL_HOST",
+        architecture: "x64",
+      },
+    });
     const environment = await validateCoreEnvironment({
       JARVIS_CORE_ROOT: root,
       JARVIS_CORE_ENTRYPOINT: entrypoint,
+      JARVIS_TUF_METADATA_DIR: join(root, "tuf", "metadata"),
     });
     assert.equal(environment.entrypoint.endsWith("core\\dist\\main.js"), true);
 
@@ -26,9 +51,20 @@ test("Core bootstrap accepts only explicit release paths and exposes truthful st
     assert.equal((await bootstrap.start({
       JARVIS_CORE_ROOT: root,
       JARVIS_CORE_ENTRYPOINT: entrypoint,
+      JARVIS_TUF_METADATA_DIR: join(root, "tuf", "metadata"),
     })).state, "READY");
     assert.equal(bootstrap.getRuntimeEnvironment().releaseRoot, environment.releaseRoot);
     assert.equal(bootstrap.stop().state, "STOPPED");
+
+    await writeFile(join(root, "runtime-manifest.json"), Buffer.concat([manifestBytes, Buffer.from("tampered", "utf8")]));
+    await assert.rejects(
+      validateCoreEnvironment({
+        JARVIS_CORE_ROOT: root,
+        JARVIS_CORE_ENTRYPOINT: entrypoint,
+        JARVIS_TUF_METADATA_DIR: join(root, "tuf", "metadata"),
+      }),
+      (error) => error instanceof CoreBootstrapError && error.code === "CORE_RUNTIME_INTEGRITY_FAILED",
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -39,6 +75,7 @@ test("Core bootstrap rejects missing paths and inherited Node modifiers", async 
     validateCoreEnvironment({
       JARVIS_CORE_ROOT: join(tmpdir(), "missing-jarvis-core"),
       JARVIS_CORE_ENTRYPOINT: join(tmpdir(), "missing-jarvis-core", "main.js"),
+      JARVIS_TUF_METADATA_DIR: join(tmpdir(), "missing-jarvis-core", "tuf", "metadata"),
     }),
     (error) => error instanceof CoreBootstrapError && error.code === "CORE_RUNTIME_MISSING",
   );

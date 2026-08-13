@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { IpcEnvelope, IpcResponse } from "../../../packages/protocol/src/ipc.js";
 import type { JarvisError } from "../../../packages/protocol/src/errors.js";
+import { admitReleaseRuntime, type ReleaseTrustAdmission } from "./release-trust.js";
 
 export const CORE_PROTOCOL_MAJOR = 1 as const;
 export const CORE_PLATFORM = "WINDOWS" as const;
@@ -20,6 +21,8 @@ export type CoreBootstrapFailureCode =
 export interface CoreRuntimeEnvironment {
   readonly releaseRoot: string;
   readonly entrypoint: string;
+  readonly tufMetadataDirectory: string;
+  readonly releaseTrust: ReleaseTrustAdmission;
 }
 
 export interface CoreStatus {
@@ -33,8 +36,8 @@ export interface CoreStatus {
 export class CoreBootstrapError extends Error {
   readonly code: CoreBootstrapFailureCode;
 
-  constructor(code: CoreBootstrapFailureCode, message: string) {
-    super(message);
+  constructor(code: CoreBootstrapFailureCode, message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "CoreBootstrapError";
     this.code = code;
   }
@@ -87,14 +90,28 @@ export async function validateCoreEnvironment(
 
   const releaseRootInput = requiredEnvironmentValue(environment, "JARVIS_CORE_ROOT");
   const entrypointInput = requiredEnvironmentValue(environment, "JARVIS_CORE_ENTRYPOINT");
+  const tufMetadataDirectoryInput = requiredEnvironmentValue(environment, "JARVIS_TUF_METADATA_DIR");
   if (!isAbsolute(releaseRootInput) || !isAbsolute(entrypointInput)) {
     throw new CoreBootstrapError(
       "CORE_RUNTIME_INCOMPATIBLE",
       "Core release paths must be absolute",
     );
   }
+  if (!isAbsolute(tufMetadataDirectoryInput)) {
+    throw new CoreBootstrapError(
+      "CORE_RUNTIME_INCOMPATIBLE",
+      "TUF metadata paths must be absolute",
+    );
+  }
 
   const releaseRoot = await canonicalDirectory(resolve(releaseRootInput));
+  const tufMetadataDirectory = await canonicalDirectory(resolve(tufMetadataDirectoryInput));
+  if (!isCanonicalChild(releaseRoot, tufMetadataDirectory)) {
+    throw new CoreBootstrapError(
+      "CORE_RUNTIME_INTEGRITY_FAILED",
+      "TUF metadata must remain inside the Core release root",
+    );
+  }
   let entryMetadata;
   try {
     entryMetadata = await lstat(entrypointInput);
@@ -121,7 +138,14 @@ export async function validateCoreEnvironment(
       "the Core entrypoint is outside the release root",
     );
   }
-  return { releaseRoot, entrypoint };
+  let releaseTrust: ReleaseTrustAdmission;
+  try {
+    releaseTrust = await admitReleaseRuntime(releaseRoot, tufMetadataDirectory);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "unknown TUF admission failure";
+    throw new CoreBootstrapError("CORE_RUNTIME_INTEGRITY_FAILED", detail, { cause: error });
+  }
+  return { releaseRoot, entrypoint, tufMetadataDirectory, releaseTrust };
 }
 
 export interface CoreIpcBoundaryStub {

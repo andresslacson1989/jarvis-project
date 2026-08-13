@@ -14,7 +14,7 @@ const TAURI_RESOURCE_ROOT = resolve(
 );
 
 function usage() {
-  return "Usage: node tools/release/package-tauri-core-runtime.mjs --node <absolute-node.exe> --core <absolute-core-entrypoint> --jarvis-release-version <version> --core-version <version> [--node-version 24.18.0]";
+  return "Usage: node tools/release/package-tauri-core-runtime.mjs --node <absolute-node.exe> --core <absolute-core-entrypoint> --jarvis-release-version <version> --core-version <version> --source-commit-sha <40-hex-sha> --release-sequence <uint64> --security-epoch <uint64> --tuf-metadata-dir <absolute-dir> --core-node-modules <absolute-dir> [--node-version 24.18.0]";
 }
 
 function parseArguments(argv) {
@@ -25,6 +25,11 @@ function parseArguments(argv) {
     "--node-version",
     "--jarvis-release-version",
     "--core-version",
+    "--source-commit-sha",
+    "--release-sequence",
+    "--security-epoch",
+    "--tuf-metadata-dir",
+    "--core-node-modules",
     "--target",
     "--protocol-version",
     "--minimum-data-schema-version",
@@ -44,18 +49,47 @@ function parseArguments(argv) {
   const core = values.get("--core");
   const jarvisReleaseVersion = values.get("--jarvis-release-version");
   const coreVersion = values.get("--core-version");
-  if (!node || !core || !jarvisReleaseVersion || !coreVersion) throw new Error(usage());
+  const sourceCommitSha = values.get("--source-commit-sha");
+  const releaseSequence = values.get("--release-sequence");
+  const securityEpoch = values.get("--security-epoch");
+  const tufMetadataDirectory = values.get("--tuf-metadata-dir");
+  const coreNodeModules = values.get("--core-node-modules");
+  if (
+    !node ||
+    !core ||
+    !jarvisReleaseVersion ||
+    !coreVersion ||
+    !sourceCommitSha ||
+    !releaseSequence ||
+    !securityEpoch ||
+    !tufMetadataDirectory ||
+    !coreNodeModules
+  ) throw new Error(usage());
   return {
     node,
     core,
     nodeVersion: values.get("--node-version") ?? "24.18.0",
     jarvisReleaseVersion,
     coreVersion,
+    sourceCommitSha,
+    releaseSequence: parseSequence(releaseSequence, "--release-sequence"),
+    securityEpoch: parseSequence(securityEpoch, "--security-epoch"),
+    tufMetadataDirectory,
+    coreNodeModules,
     target: values.get("--target") ?? "WINDOWS_FULL_HOST_X64",
     protocolVersion: Number(values.get("--protocol-version") ?? "1"),
     minimumDataSchemaVersion: Number(values.get("--minimum-data-schema-version") ?? "1"),
     maximumDataSchemaVersion: Number(values.get("--maximum-data-schema-version") ?? "1"),
   };
+}
+
+function parseSequence(value, label) {
+  if (!/^\d+$/.test(value)) throw new Error(`${label} must be a non-negative uint64`);
+  const sequence = Number(value);
+  if (!Number.isSafeInteger(sequence)) {
+    throw new Error(`${label} must be representable exactly by the release tooling`);
+  }
+  return sequence;
 }
 
 export async function packageTauriCoreRuntime(options) {
