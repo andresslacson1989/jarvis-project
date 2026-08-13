@@ -90,6 +90,10 @@ pub struct RuntimeIntegrityManifest {
     pub manifest_version: u32,
     pub jarvis_release_version: String,
     pub core_version: String,
+    pub source_commit_sha: String,
+    pub release_sequence: u64,
+    pub security_epoch: u64,
+    pub tuf_spec_version: String,
     pub target: String,
     pub protocol_version: u32,
     pub minimum_data_schema_version: u32,
@@ -264,6 +268,10 @@ impl CoreRuntimeLayout {
         if manifest.manifest_version != 1
             || manifest.jarvis_release_version.is_empty()
             || manifest.core_version.is_empty()
+            || !is_sha256_or_commit_sha(&manifest.source_commit_sha, 40)
+            || manifest.release_sequence == 0
+            || manifest.security_epoch == 0
+            || manifest.tuf_spec_version != "1.0.35"
             || manifest.target != V1_RELEASE_TARGET
             || manifest.protocol_version != 1
             || manifest.minimum_data_schema_version == 0
@@ -495,6 +503,12 @@ fn validate_sha256(value: &str, field: &str) -> Result<(), CoreRuntimeError> {
     Ok(())
 }
 
+fn is_sha256_or_commit_sha(value: &str, length: usize) -> bool {
+    value.len() == length
+        && value == value.to_ascii_lowercase()
+        && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 fn sha256_file(path: &Path) -> Result<String, CoreRuntimeError> {
     let file = File::open(path).map_err(|error| {
         CoreRuntimeLayout::io_error(
@@ -578,6 +592,10 @@ mod tests {
             manifest_version: 1,
             jarvis_release_version: "0.0.0".to_owned(),
             core_version: "0.0.0".to_owned(),
+            source_commit_sha: "0".repeat(40),
+            release_sequence: 1,
+            security_epoch: 1,
+            tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
             protocol_version: 1,
             minimum_data_schema_version: 1,
@@ -640,6 +658,10 @@ mod tests {
             manifest_version: 1,
             jarvis_release_version: "0.0.0".to_owned(),
             core_version: "0.0.0".to_owned(),
+            source_commit_sha: "0".repeat(40),
+            release_sequence: 1,
+            security_epoch: 1,
+            tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
             protocol_version: 1,
             minimum_data_schema_version: 1,
@@ -738,6 +760,10 @@ mod tests {
             manifest_version: 1,
             jarvis_release_version: "0.0.0".to_owned(),
             core_version: "0.0.0".to_owned(),
+            source_commit_sha: "0".repeat(40),
+            release_sequence: 1,
+            security_epoch: 1,
+            tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
             protocol_version: 1,
             minimum_data_schema_version: 1,
@@ -799,6 +825,10 @@ mod tests {
             manifest_version: 1,
             jarvis_release_version: "0.0.0".to_owned(),
             core_version: "0.0.0".to_owned(),
+            source_commit_sha: "0".repeat(40),
+            release_sequence: 1,
+            security_epoch: 1,
+            tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
             protocol_version: 1,
             minimum_data_schema_version: 1,
