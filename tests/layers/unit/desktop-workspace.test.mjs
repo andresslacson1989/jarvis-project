@@ -124,7 +124,7 @@ test("Tauri host is pinned and intentionally minimal before 1.2 and 1.3", { skip
   const build = read("apps/desktop/src-tauri/build.rs");
   const rustMain = read("apps/desktop/src-tauri/src/main.rs");
   assert.match(cargo, /tauri\s*=\s*\{\s*version\s*=\s*"=2\.11\.5"/);
-  assert.match(cargo, /tauri-build\s*=\s*\{\s*version\s*=\s*"=2\.6\.3"/);
+  assert.match(cargo, /tauri-build\s*=\s*\{\s*version\s*=\s*"=2\.6\.3"\s*,\s*features\s*=\s*\["codegen"\]\s*\}/);
   assert.match(build, /tauri_build::build\(\)/);
   assert.match(rustMain, /tauri::Builder::default\(\)/);
   assert.match(rustMain, /tauri::tauri_build_context!\(\)/);
