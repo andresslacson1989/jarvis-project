@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -13,6 +14,10 @@ function read(path) {
 
 function readJson(path) {
   return JSON.parse(read(path));
+}
+
+function sha256(path) {
+  return createHash("sha256").update(readFileSync(resolve(root, path))).digest("hex");
 }
 
 function validatePngPayload(payload, expectedSize, layerIndex) {
@@ -58,6 +63,7 @@ const requiredWorkspaceFiles = [
   "apps/desktop/vite.config.ts",
   "apps/desktop/src/main.tsx",
   "apps/desktop/src/App.tsx",
+  "apps/desktop/src/styles.css",
   "apps/desktop/src-tauri/Cargo.toml",
   "apps/desktop/src-tauri/build.rs",
   "apps/desktop/src-tauri/tauri.conf.json",
@@ -108,7 +114,7 @@ test("production WebView source is a bundled local frontend and development bind
   assert.doesNotMatch(JSON.stringify(config), /https?:\/\/(?!127\.0\.0\.1:1420|ipc\.localhost)/i);
 });
 
-test("bootstrap Windows icon uses complete PNG-compressed ICO layers and remains explicitly non-canonical until 1.11", { skip: !existsSync(resolve(desktop, "src-tauri", "icons", "icon.ico")) }, () => {
+test("canonical-derived Windows icon uses complete PNG-compressed ICO layers", { skip: !existsSync(resolve(desktop, "src-tauri", "icons", "icon.ico")) }, () => {
   const icon = readFileSync(resolve(desktop, "src-tauri", "icons", "icon.ico"));
   assert.ok(icon.length > 6, "ICO file must contain a directory and image entries");
   assert.equal(icon.readUInt16LE(0), 0, "ICO reserved field must be zero");
@@ -135,9 +141,50 @@ test("bootstrap Windows icon uses complete PNG-compressed ICO layers and remains
     assert.ok(sizes.includes(requiredSize), `ICO missing required ${requiredSize}x${requiredSize} layer`);
   }
   const note = read("apps/desktop/src-tauri/icons/README.md");
-  assert.match(note, /non-canonical/i);
-  assert.match(note, /1\.11/);
-  assert.match(note, /must be replaced/i);
+  assert.match(note, /canonical-derived/i);
+  assert.match(note, /jarvis-app-icon\.svg/i);
+  assert.doesNotMatch(note, /non-canonical/i);
+});
+
+test("1.11 packages canonical brand sources, offline Inter, and auditable provenance", () => {
+  for (const path of [
+    "assets/brand/jarvis-mark.svg",
+    "assets/brand/jarvis-lockup.svg",
+    "assets/brand/jarvis-app-icon.svg",
+    "assets/brand/fonts/InterVariable.woff2",
+    "assets/brand/third-party/Inter-OFL.txt",
+    "assets/brand/third-party/provenance.json",
+    "tools/assets/generate-brand-icons.mjs",
+  ]) {
+    assert.ok(existsSync(resolve(root, path)), `missing brand/provenance input: ${path}`);
+  }
+
+  const brandSource = [
+    read("assets/brand/jarvis-mark.svg"),
+    read("assets/brand/jarvis-lockup.svg"),
+    read("assets/brand/jarvis-app-icon.svg"),
+  ].join("\n");
+  const colors = [...brandSource.matchAll(/#[0-9A-Fa-f]{6}/g)].map(([value]) => value.toUpperCase());
+  assert.deepEqual([...new Set(colors)].sort(), ["#0B0F14", "#2D7BFF", "#FFFFFF"]);
+
+  const provenance = readJson("assets/brand/third-party/provenance.json");
+  assert.equal(provenance.schemaVersion, 1);
+  assert.equal(provenance.thirdPartyVisualAssets[0].name, "Inter");
+  assert.equal(provenance.thirdPartyVisualAssets[0].version, "4.1");
+  assert.equal(provenance.thirdPartyVisualAssets[0].license, "SIL Open Font License 1.1");
+  assert.equal(provenance.thirdPartyVisualAssets[0].sha256, sha256("assets/brand/fonts/InterVariable.woff2"));
+  assert.equal(provenance.generatedPlatformAssets[0].sha256, sha256("apps/desktop/src-tauri/icons/icon.ico"));
+  assert.deepEqual(provenance.generatedPlatformAssets[0].layers, [16, 24, 32, 48, 64, 256]);
+
+  const css = read("apps/desktop/src/styles.css");
+  const main = read("apps/desktop/src/main.tsx");
+  const vite = read("apps/desktop/vite.config.ts");
+  assert.match(css, /@font-face/);
+  assert.match(css, /\/brand\/fonts\/InterVariable\.woff2/);
+  assert.match(css, /font-weight:\s*100\s+900/);
+  assert.match(main, /\.\/styles\.css/);
+  assert.match(vite, /publicDir:\s*["']\.\.\/\.\.\/assets["']/);
+  assert.doesNotMatch(css, /https?:\/\//i);
 });
 
 test("renderer bootstrap is semantic and has no authoritative/native integration authority in 1.1", { skip: !existsSync(resolve(desktop, "src", "App.tsx")) }, () => {

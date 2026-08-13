@@ -1,7 +1,11 @@
 # Bootstrap Windows Build Icon
 
-`icon.ico` is a **non-canonical bootstrap/build icon** created locally for subsection `1.1` only so the pinned Tauri Windows resource build can compile on the qualified `x86_64-pc-windows-msvc` target.
+`icon.ico` is the canonical-derived Windows application icon for the current
+desktop packaging foundation. It is generated from
+`assets/brand/jarvis-app-icon.svg` by
+`tools/assets/generate-brand-icons.mjs`; the generator emits PNG-compressed
+16, 24, 32, 48, 64, and 256 pixel layers for the pinned Tauri resource path.
 
-It is not a JARVIS brand asset, release identity, production icon, or visual-design decision. It contains the Windows build sizes required by the current Tauri resource path and has no external asset/license dependency.
-
-This file **must be replaced** by the canonical brand-derived Windows icon set in subsection `1.11` before the Section 1 checkpoint and any release qualification that depends on branded packaging.
+The canonical SVG remains the source of truth. Do not redraw or edit the ICO by
+hand. Regenerate it after changing the source and keep the generated hash in
+`assets/brand/third-party/provenance.json`.

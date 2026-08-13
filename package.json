@@ -22,6 +22,7 @@
     "release:package-core-runtime": "node tools/release/package-core-runtime.mjs",
     "release:package-tauri-core-runtime": "node tools/release/package-tauri-core-runtime.mjs",
     "release:core-runtime-manifest": "node tools/release/generate-core-runtime-manifest.mjs",
+    "brand:icons": "node tools/assets/generate-brand-icons.mjs",
     "governance:check": "node tools/ci/check-repository-governance.mjs",
     "phase0:check": "node tools/checkpoints/phase0-checkpoint.mjs",
     "build": "tsc -p tsconfig.build.json && pnpm --filter @jarvis/core build && pnpm --filter @jarvis/desktop build:web",
