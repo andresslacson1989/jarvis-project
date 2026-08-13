@@ -25,6 +25,8 @@ const requiredWorkspaceFiles = [
   "apps/desktop/src-tauri/build.rs",
   "apps/desktop/src-tauri/tauri.conf.json",
   "apps/desktop/src-tauri/src/main.rs",
+  "apps/desktop/src-tauri/icons/README.md",
+  "apps/desktop/src-tauri/icons/icon.ico",
 ];
 
 test("1.1 desktop workspace owns a concrete React and Tauri application skeleton", () => {
@@ -61,7 +63,32 @@ test("production WebView source is a bundled local frontend and development bind
   assert.equal(config.app.windows[0]?.label, "main");
   assert.equal(config.app.windows[0]?.title, "JARVIS Mission Control");
   assert.equal(config.app.windows[0]?.url, undefined, "production window must use bundled frontendDist rather than a remote URL");
+  assert.deepEqual(config.bundle, { active: false, icon: ["icons/icon.ico"] });
   assert.doesNotMatch(JSON.stringify(config), /https?:\/\/(?!127\.0\.0\.1:1420)/i);
+});
+
+test("bootstrap Windows icon is structurally valid and explicitly non-canonical until 1.11", { skip: !existsSync(resolve(desktop, "src-tauri", "icons", "icon.ico")) }, () => {
+  const icon = readFileSync(resolve(desktop, "src-tauri", "icons", "icon.ico"));
+  assert.ok(icon.length > 6, "ICO file must contain a directory and image entries");
+  assert.equal(icon.readUInt16LE(0), 0, "ICO reserved field must be zero");
+  assert.equal(icon.readUInt16LE(2), 1, "ICO type must be icon");
+  const count = icon.readUInt16LE(4);
+  assert.ok(count >= 6, `ICO must contain at least six image layers, got ${count}`);
+  const sizes = [];
+  for (let index = 0; index < count; index += 1) {
+    const offset = 6 + index * 16;
+    const width = icon[offset] === 0 ? 256 : icon[offset];
+    const height = icon[offset + 1] === 0 ? 256 : icon[offset + 1];
+    assert.equal(width, height, `ICO layer ${index} must be square`);
+    sizes.push(width);
+  }
+  for (const requiredSize of [16, 24, 32, 48, 64, 256]) {
+    assert.ok(sizes.includes(requiredSize), `ICO missing required ${requiredSize}x${requiredSize} layer`);
+  }
+  const note = read("apps/desktop/src-tauri/icons/README.md");
+  assert.match(note, /non-canonical/i);
+  assert.match(note, /1\.11/);
+  assert.match(note, /must be replaced/i);
 });
 
 test("renderer bootstrap is semantic and has no authoritative/native integration authority in 1.1", { skip: !existsSync(resolve(desktop, "src", "App.tsx")) }, () => {
