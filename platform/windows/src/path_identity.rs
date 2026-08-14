@@ -112,7 +112,13 @@ impl PlatformPathsAndIdentity {
             return Err(WindowsPathError::UnsupportedRoot(base_identity.root));
         }
 
-        let root = base_identity.canonical_path.join(APPLICATION_DIRECTORY);
+        // `std::fs::canonicalize` may return an extended-length `\\?\\C:`
+        // spelling on Windows. Keep that canonical result for identity and
+        // reparse validation, but use the equivalent ordinary drive spelling
+        // for application-owned paths passed to Core. Core deliberately
+        // rejects device/extended database paths at its persistence boundary.
+        let application_base = ordinary_drive_path(&base_identity.canonical_path)?;
+        let root = application_base.join(APPLICATION_DIRECTORY);
         validate_path_text(&root, false)?;
         let identity = if root.exists() {
             WindowsPathIdentity::existing(&root)?
@@ -128,6 +134,20 @@ impl PlatformPathsAndIdentity {
         }
         Ok(ApplicationPathResolution { root, identity })
     }
+}
+
+fn ordinary_drive_path(path: &Path) -> Result<PathBuf, WindowsPathError> {
+    let text = path.to_string_lossy();
+    let ordinary = text
+        .strip_prefix("\\\\?\\")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| path.to_owned());
+    if classify_root(&ordinary) != WindowsPathRoot::Drive {
+        return Err(WindowsPathError::Invalid(
+            "canonical application path must remain an ordinary local drive path".to_owned(),
+        ));
+    }
+    Ok(ordinary)
 }
 
 fn validate_path_text(path: &Path, allow_missing: bool) -> Result<(), WindowsPathError> {
@@ -234,6 +254,17 @@ mod tests {
                 .to_string_lossy()
                 .to_ascii_lowercase()
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn application_root_uses_an_ordinary_drive_path_for_core() {
+        let resolution = PlatformPathsAndIdentity::new()
+            .resolve_application_paths()
+            .expect("Windows application root must resolve");
+        let text = resolution.root.to_string_lossy();
+        assert!(!text.starts_with("\\\\?\\"));
+        assert!(!text.starts_with("\\\\.\\"));
     }
 
     #[cfg(windows)]
