@@ -214,6 +214,18 @@ fn core_authentication_failure_code(state: local_ipc::LocalIpcState) -> &'static
     }
 }
 
+#[cfg(any(not(debug_assertions), test))]
+fn core_authentication_failure_code_with_process_state(
+    state: local_ipc::LocalIpcState,
+    core_exited: bool,
+) -> &'static str {
+    if core_exited {
+        "CORE_EXITED_DURING_AUTHENTICATION"
+    } else {
+        core_authentication_failure_code(state)
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -421,8 +433,16 @@ fn main() {
                         },
                         Err(error) => {
                             bootstrap.mark_repair_required();
-                            bootstrap_diagnostics
-                                .record_failure(core_authentication_failure_code(error.state))?;
+                            let core_exited = matches!(
+                                core_process.wait(Duration::ZERO).ok(),
+                                Some(process_supervisor::ProcessWait::Exited { .. })
+                            );
+                            bootstrap_diagnostics.record_failure(
+                                core_authentication_failure_code_with_process_state(
+                                    error.state,
+                                    core_exited,
+                                ),
+                            )?;
                             startup_condition = bootstrap.condition().startup_query_value();
                             None
                         }
@@ -463,7 +483,10 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{core_authentication_failure_code, should_start_core};
+    use super::{
+        core_authentication_failure_code, core_authentication_failure_code_with_process_state,
+        should_start_core,
+    };
 
     #[test]
     fn only_locked_startup_condition_can_start_core() {
@@ -494,6 +517,89 @@ mod tests {
             core_authentication_failure_code(super::local_ipc::LocalIpcState::FrameMalformed),
             "CORE_AUTHENTICATION_FAILED_TRANSPORT"
         );
+        assert_eq!(
+            core_authentication_failure_code_with_process_state(
+                super::local_ipc::LocalIpcState::HandshakeTimeout,
+                true,
+            ),
+            "CORE_EXITED_DURING_AUTHENTICATION"
+        );
+        assert_eq!(
+            core_authentication_failure_code_with_process_state(
+                super::local_ipc::LocalIpcState::HandshakeTimeout,
+                false,
+            ),
+            "CORE_AUTHENTICATION_FAILED_TIMEOUT"
+        );
+    }
+
+    #[test]
+    fn supervised_packaged_core_authenticates_with_host_secure_storage_runtime() {
+        let release_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../target/x86_64-pc-windows-msvc/release");
+        let resource_dir = if release_dir
+            .join("resources")
+            .join(super::core_runtime::RELEASE_RUNTIME_DIRECTORY)
+            .is_dir()
+        {
+            release_dir.join("resources")
+        } else {
+            release_dir
+        };
+        let resource_dir = std::fs::canonicalize(resource_dir)
+            .expect("release resource directory must canonicalize");
+        let root = resource_dir.join("core-runtime");
+        if !root.is_dir() {
+            return;
+        }
+        let layout = super::core_runtime::CoreRuntimePolicy::new()
+            .load_verified_layout(resource_dir)
+            .expect("packaged Core runtime must be qualified");
+        let manifest_path = root.join("runtime-manifest.json");
+        let test_root = std::env::temp_dir().join(format!(
+            "jarvis-host-secure-storage-runtime-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&test_root);
+        std::fs::create_dir_all(&test_root).expect("test root must be created");
+        let database_path = test_root.join("state.db");
+        let handle_path = test_root.join("db-dek.handle");
+        let (server, secure_storage_server) =
+            super::local_ipc::NamedPipeServer::bind_with_database_dek_and_secure_storage(
+                [0x5a; 32],
+            )
+            .expect("paired named pipes must bind");
+        let secure_storage_runtime = super::SecureStorageProtectionRuntime::start(
+            secure_storage_server,
+            super::native_broker::WindowsSecureStorageBoundary::new(),
+            handle_path,
+        );
+        let mut bootstrap_channel = server
+            .create_bootstrap_channel()
+            .expect("bootstrap channel must be created");
+        bootstrap_channel
+            .write_material(server.bootstrap_material())
+            .expect("paired bootstrap material must be written");
+        let supervisor = super::process_supervisor::PlatformProcessSupervisor::new()
+            .expect("Job Object must be created");
+        let process = supervisor
+            .launch_core_with_bootstrap_and_database(
+                &layout,
+                &manifest_path,
+                bootstrap_channel.reader_handle(),
+                &database_path,
+            )
+            .expect("supervised Core must launch with host secure-storage runtime");
+        bootstrap_channel.close_reader();
+        let authenticated = server
+            .authenticate_client()
+            .expect("supervised Core must authenticate on the primary endpoint");
+        assert_eq!(authenticated.protocol_major, super::local_ipc::IPC_PROTOCOL_MAJOR);
+        process
+            .terminate(0x4A52_5649)
+            .expect("test Core must terminate");
+        drop(secure_storage_runtime);
+        let _ = std::fs::remove_dir_all(&test_root);
     }
 
     #[cfg(test)]

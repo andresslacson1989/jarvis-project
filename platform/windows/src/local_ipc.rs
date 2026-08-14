@@ -2529,6 +2529,60 @@ mod windows {
         }
 
         #[test]
+        fn supervised_packaged_core_authenticates_with_separate_secure_storage_endpoint() {
+            let release_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../../target/x86_64-pc-windows-msvc/release");
+            let resource_dir = if release_dir
+                .join("resources")
+                .join(crate::core_runtime::RELEASE_RUNTIME_DIRECTORY)
+                .is_dir()
+            {
+                release_dir.join("resources")
+            } else {
+                release_dir
+            };
+            let resource_dir = std::fs::canonicalize(resource_dir)
+                .expect("release resource directory must canonicalize");
+            let root = resource_dir.join("core-runtime");
+            if !root.is_dir() {
+                return;
+            }
+            let layout = crate::core_runtime::CoreRuntimePolicy::new()
+                .load_verified_layout(resource_dir)
+                .expect("packaged Core runtime must be qualified");
+            let manifest_path = root.join("runtime-manifest.json");
+            let database_path = temporary_database_path("supervised-core-separate-storage");
+            let (server, _secure_storage_server) =
+                NamedPipeServer::bind_with_database_dek_and_secure_storage([0x5a; 32])
+                    .expect("paired named pipes must bind");
+            let mut bootstrap_channel = server
+                .create_bootstrap_channel()
+                .expect("bootstrap channel must be created");
+            bootstrap_channel
+                .write_material(server.bootstrap_material())
+                .expect("paired bootstrap material must be written");
+            let supervisor = crate::process_supervisor::PlatformProcessSupervisor::new()
+                .expect("Job Object must be created");
+            let process = supervisor
+                .launch_core_with_bootstrap_and_database(
+                    &layout,
+                    &manifest_path,
+                    bootstrap_channel.reader_handle(),
+                    &database_path,
+                )
+                .expect("supervised Core must launch with paired endpoints");
+            bootstrap_channel.close_reader();
+            let authenticated = server
+                .authenticate_client()
+                .expect("supervised Core must authenticate on the primary endpoint");
+            assert_eq!(authenticated.protocol_major, IPC_PROTOCOL_MAJOR);
+            process
+                .terminate(0x4A52_5649)
+                .expect("test Core must terminate");
+            remove_database_artifacts(&database_path);
+        }
+
+        #[test]
         fn wrong_bootstrap_secret_is_rejected_after_native_session_check() {
             let server = NamedPipeServer::bind().expect("named pipe must bind");
             let endpoint = server.endpoint_name().to_owned();
