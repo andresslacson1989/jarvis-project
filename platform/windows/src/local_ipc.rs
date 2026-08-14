@@ -669,7 +669,7 @@ mod windows {
     const PIPE_EXCHANGE_ACCESS_MASK: u32 = 0x0012_019F;
     const SECURITY_DESCRIPTOR_REVISION: u32 = 1;
     const RANDOM_NAME_BYTES: usize = 16;
-    const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
+const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 
     #[derive(Debug)]
     struct OwnedHandle(HANDLE);
@@ -2470,6 +2470,11 @@ mod windows {
                 .authenticate_client()
                 .expect("packaged Core must authenticate to the native server");
             assert_eq!(authenticated.protocol_major, IPC_PROTOCOL_MAJOR);
+            let status = server
+                .request_locked_status(&authenticated)
+                .expect("packaged Core must return locked status after authentication");
+            assert_eq!(status.service_state, "LOCKED");
+            assert_eq!(status.transport_state, "NOT_CONNECTED");
             let _ = child.kill();
             let _ = child.wait();
             remove_database_artifacts(&database_path);
@@ -2576,6 +2581,11 @@ mod windows {
                 .authenticate_client()
                 .expect("supervised Core must authenticate on the primary endpoint");
             assert_eq!(authenticated.protocol_major, IPC_PROTOCOL_MAJOR);
+            let status = server
+                .request_locked_status(&authenticated)
+                .expect("supervised Core must return locked status on the primary endpoint");
+            assert_eq!(status.service_state, "LOCKED");
+            assert_eq!(status.transport_state, "NOT_CONNECTED");
             process
                 .terminate(0x4A52_5649)
                 .expect("test Core must terminate");

@@ -26,6 +26,9 @@ export interface BootstrapMaterial {
 export interface AuthenticatedTransport {
   readonly socket: Socket;
   readonly protocolMajor: typeof CORE_IPC_PROTOCOL_MAJOR;
+  /** The handshake reader is retained so frames arriving with the welcome
+   * response cannot be discarded before the authenticated service loop starts. */
+  readonly reader: CoreIpcFrameReader;
 }
 
 export interface SessionPasswordVerifier {
@@ -374,7 +377,7 @@ async function authenticateTransport(secret: Buffer, socket: Socket): Promise<Au
     if (!isRecord(welcome) || !exactKeys(welcome, ["kind", "protocolMajor"]) || welcome.kind !== "welcome" || welcome.protocolMajor !== CORE_IPC_PROTOCOL_MAJOR) {
       throw new CoreIpcBootstrapError("IPC_PROTOCOL_MISMATCH", "Core IPC welcome is unsupported");
     }
-    return { socket, protocolMajor: CORE_IPC_PROTOCOL_MAJOR };
+    return { socket, protocolMajor: CORE_IPC_PROTOCOL_MAJOR, reader };
   } catch (error) {
     socket.destroy();
     if (error instanceof CoreIpcBootstrapError) throw error;

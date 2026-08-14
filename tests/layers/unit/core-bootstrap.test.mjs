@@ -14,6 +14,7 @@ import {
   serveAuthenticatedCoreTransport,
   validateCoreEnvironment,
 } from "../../../services/core/src/main.ts";
+import { CoreIpcFrameReader } from "../../../services/core/src/ipc-bootstrap.ts";
 
 function encodeFrame(value) {
   const payload = Buffer.from(JSON.stringify(value), "utf8");
@@ -286,7 +287,7 @@ test("authenticated Core transport serves the bounded locked-status round-trip",
   const [serverSocket, client] = createMemorySocketPair();
   let stopping = false;
   const serving = serveAuthenticatedCoreTransport(
-    { socket: serverSocket, protocolMajor: 1 },
+    { socket: serverSocket, protocolMajor: 1, reader: new CoreIpcFrameReader(serverSocket) },
     () => stopping,
   );
 

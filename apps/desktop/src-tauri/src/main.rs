@@ -215,6 +215,15 @@ fn core_authentication_failure_code(state: local_ipc::LocalIpcState) -> &'static
 }
 
 #[cfg(any(not(debug_assertions), test))]
+fn core_status_failure_code(state: local_ipc::LocalIpcState) -> &'static str {
+    match state {
+        local_ipc::LocalIpcState::ControlPlaneRequestFailed => "CORE_STATUS_RESPONSE_UNAVAILABLE",
+        local_ipc::LocalIpcState::ControlPlaneResponseInvalid => "CORE_STATUS_RESPONSE_INVALID",
+        _ => "CORE_STATUS_REQUEST_FAILED",
+    }
+}
+
+#[cfg(any(not(debug_assertions), test))]
 fn core_authentication_failure_code_with_process_state(
     state: local_ipc::LocalIpcState,
     core_exited: bool,
@@ -471,9 +480,9 @@ fn main() {
                                 }
                                 .into()
                             }
-                            Err(_) => {
+                            Err(error) => {
                                 bootstrap.mark_repair_required();
-                                bootstrap_diagnostics.record_failure("CORE_STATUS_REQUEST_FAILED")?;
+                                bootstrap_diagnostics.record_failure(core_status_failure_code(error.state))?;
                                 startup_condition = bootstrap.condition().startup_query_value();
                                 None
                             }
@@ -538,7 +547,7 @@ fn main() {
 mod tests {
     use super::{
         core_authentication_failure_code, core_authentication_failure_code_with_process_state,
-        should_start_core,
+        core_status_failure_code, should_start_core,
     };
 
     #[test]
@@ -605,6 +614,22 @@ mod tests {
     }
 
     #[test]
+    fn core_status_failure_diagnostics_classify_only_known_transport_states() {
+        assert_eq!(
+            core_status_failure_code(super::local_ipc::LocalIpcState::ControlPlaneRequestFailed),
+            "CORE_STATUS_RESPONSE_UNAVAILABLE"
+        );
+        assert_eq!(
+            core_status_failure_code(super::local_ipc::LocalIpcState::ControlPlaneResponseInvalid),
+            "CORE_STATUS_RESPONSE_INVALID"
+        );
+        assert_eq!(
+            core_status_failure_code(super::local_ipc::LocalIpcState::FrameMalformed),
+            "CORE_STATUS_REQUEST_FAILED"
+        );
+    }
+
+    #[test]
     fn supervised_packaged_core_authenticates_with_host_secure_storage_runtime() {
         let release_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../../target/x86_64-pc-windows-msvc/release");
@@ -635,15 +660,22 @@ mod tests {
         std::fs::create_dir_all(&test_root).expect("test root must be created");
         let database_path = test_root.join("state.db");
         let handle_path = test_root.join("db-dek.handle");
+        let native_broker = super::native_broker::WindowsNativeBroker::with_secure_storage_root(
+            test_root.join("secure-storage"),
+        )
+        .expect("test secure storage must initialize");
+        let (_db_dek_handle, db_dek) = native_broker
+            .open_or_create_db_dek(&handle_path, &database_path)
+            .expect("test DB_DEK must be opened or created");
         let (server, secure_storage_server) =
             super::local_ipc::NamedPipeServer::bind_with_database_dek_and_secure_storage(
-                [0x5a; 32],
+                *db_dek.as_bytes(),
             )
             .expect("paired named pipes must bind");
         let secure_storage_runtime = super::SecureStorageProtectionRuntime::start(
             secure_storage_server,
-            super::native_broker::WindowsSecureStorageBoundary::new(),
-            handle_path,
+            native_broker.secure_storage_boundary(),
+            handle_path.clone(),
         );
         let mut bootstrap_channel = server
             .create_bootstrap_channel()
@@ -666,6 +698,15 @@ mod tests {
             .authenticate_client()
             .expect("supervised Core must authenticate on the primary endpoint");
         assert_eq!(authenticated.protocol_major, super::local_ipc::IPC_PROTOCOL_MAJOR);
+        assert!(matches!(
+            process.wait(std::time::Duration::ZERO).expect("Core wait must work"),
+            super::process_supervisor::ProcessWait::TimedOut
+        ));
+        let status = server
+            .request_locked_status(&authenticated)
+            .expect("supervised Core must return locked status on the primary endpoint");
+        assert_eq!(status.service_state, "LOCKED");
+        assert_eq!(status.transport_state, "NOT_CONNECTED");
         process
             .terminate(0x4A52_5649)
             .expect("test Core must terminate");

@@ -481,7 +481,7 @@ export async function serveAuthenticatedCoreTransport(
   transport: AuthenticatedTransport,
   isStopping: () => boolean = () => false,
 ): Promise<void> {
-  const reader = new CoreIpcFrameReader(transport.socket);
+  const reader = transport.reader;
   const shell = new AuthenticatedCoreServiceShell();
   while (!isStopping()) {
     let payload: Buffer;
