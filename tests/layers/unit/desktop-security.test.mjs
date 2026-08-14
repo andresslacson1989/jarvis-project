@@ -69,3 +69,19 @@ test("1.2 renderer keeps untrusted content inert and bounded", () => {
   assert.match(inert, /MAX_INERT_CONTENT_LENGTH/);
   assert.match(inert, /slice\(0, MAX_INERT_CONTENT_LENGTH\)/);
 });
+
+test("2.3 renderer cannot open the privileged Core channel directly", () => {
+  const bridge = read("apps/desktop/src/coreBridge.ts");
+  const rendererSources = [
+    read("apps/desktop/src/main.tsx"),
+    read("apps/desktop/src/App.tsx"),
+    read("apps/desktop/src/mission-control.tsx"),
+    bridge,
+  ].join("\n");
+  assert.match(bridge, /@tauri-apps\/api\/core/);
+  assert.match(bridge, /invoke\("get_core_status"/);
+  assert.doesNotMatch(rendererSources, /node:net|node:dgram|named pipe|CreateFileW|\\\\\.\\pipe\\/i);
+  assert.doesNotMatch(rendererSources, /fetch\s*\(|WebSocket\s*\(|XMLHttpRequest\s*\(/);
+  assert.match(bridge, /isCoreStatusResponse/);
+  assert.match(bridge, /native Core status response failed runtime validation/);
+});

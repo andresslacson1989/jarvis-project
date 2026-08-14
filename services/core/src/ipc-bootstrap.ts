@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createConnection, type Socket } from "node:net";
 import type { Readable } from "node:stream";
 
@@ -8,17 +8,35 @@ const BOOTSTRAP_FRAME_CEILING = 64 * 1024;
 const BOOTSTRAP_SECRET_BYTES = 32;
 const HANDSHAKE_NONCE_BYTES = 32;
 const HANDSHAKE_DOMAIN = Buffer.from("JARVIS-CORE-IPC-BOOTSTRAP-V1\0", "utf8");
+const SECURE_STORAGE_DOMAIN = Buffer.from("JARVIS-CORE-SECURE-STORAGE-V1\0", "utf8");
+const SESSION_PASSWORD_KDF_DOMAIN = Buffer.from("JARVIS-CORE-SESSION-PASSWORD-KDF-V1\0", "utf8");
+const SESSION_PASSWORD_MAX_BYTES = 4096;
 const HANDSHAKE_TIMEOUT_MS = 5_000;
 
 export interface BootstrapMaterial {
   readonly endpoint: string;
   readonly protocolMajor: typeof CORE_IPC_PROTOCOL_MAJOR;
   readonly secret: Buffer;
+  readonly databaseDek: Buffer;
+  readonly secureStorageEndpoint: string;
+  readonly secureStorageSecret: Buffer;
 }
 
 export interface AuthenticatedTransport {
   readonly socket: Socket;
   readonly protocolMajor: typeof CORE_IPC_PROTOCOL_MAJOR;
+}
+
+export interface SessionPasswordVerifier {
+  readonly profileId: string;
+  readonly purpose: "SESSION_PASSWORD";
+  readonly algorithm: "ARGON2ID";
+  readonly version: 0x13;
+  readonly memoryKiB: number;
+  readonly iterations: number;
+  readonly parallelism: 4;
+  readonly salt: Buffer;
+  readonly verifier: Buffer;
 }
 
 export type CoreIpcFailureCode =
@@ -69,12 +87,27 @@ function encodeFrame(payload: Buffer, ceiling: number): Buffer {
   return frame;
 }
 
+export function encodeCoreIpcJsonFrame(value: unknown): Buffer {
+  let payload: Buffer;
+  try {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) throw new Error("value is not JSON-serializable");
+    payload = Buffer.from(encoded, "utf8");
+  } catch (error) {
+    throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "Core IPC response could not be encoded", { cause: error });
+  }
+  return encodeFrame(payload, CORE_IPC_FRAME_CEILING);
+}
+
 export function encodeBootstrapFrame(material: BootstrapMaterial): Buffer {
   const payload = Buffer.from(
     JSON.stringify({
       endpoint: material.endpoint,
       protocolMajor: material.protocolMajor,
       secret: material.secret.toString("hex"),
+      databaseDek: material.databaseDek.toString("hex"),
+      secureStorageEndpoint: material.secureStorageEndpoint,
+      secureStorageSecret: material.secureStorageSecret.toString("hex"),
     }),
     "utf8",
   );
@@ -98,17 +131,24 @@ export function parseBootstrapFrame(frame: Buffer): BootstrapMaterial {
   } catch (error) {
     throw new CoreIpcBootstrapError("BOOTSTRAP_MALFORMED", "bootstrap payload is not valid JSON", { cause: error });
   }
-  if (!isRecord(parsed) || !exactKeys(parsed, ["endpoint", "protocolMajor", "secret"])) {
+  if (!isRecord(parsed) || !exactKeys(parsed, ["databaseDek", "endpoint", "protocolMajor", "secret", "secureStorageEndpoint", "secureStorageSecret"])) {
     throw new CoreIpcBootstrapError("BOOTSTRAP_MALFORMED", "bootstrap payload shape is invalid");
   }
   const endpoint = parsed.endpoint;
   const protocolMajor = parsed.protocolMajor;
   const secretText = parsed.secret;
+  const databaseDekText = parsed.databaseDek;
+  const secureStorageEndpoint = parsed.secureStorageEndpoint;
+  const secureStorageSecretText = parsed.secureStorageSecret;
   if (
     typeof endpoint !== "string" ||
     !/^\\\\\.\\pipe\\jarvis-core-[0-9a-f]{32}$/u.test(endpoint) ||
     protocolMajor !== CORE_IPC_PROTOCOL_MAJOR ||
-    typeof secretText !== "string"
+    typeof secretText !== "string" ||
+    typeof databaseDekText !== "string" ||
+    typeof secureStorageEndpoint !== "string" ||
+    !/^\\\\\.\\pipe\\jarvis-core-[0-9a-f]{32}$/u.test(secureStorageEndpoint) ||
+    typeof secureStorageSecretText !== "string"
   ) {
     throw new CoreIpcBootstrapError("BOOTSTRAP_MALFORMED", "bootstrap identity or protocol is invalid");
   }
@@ -116,7 +156,15 @@ export function parseBootstrapFrame(frame: Buffer): BootstrapMaterial {
   if (!secret) {
     throw new CoreIpcBootstrapError("BOOTSTRAP_MALFORMED", "bootstrap secret encoding is invalid");
   }
-  return { endpoint, protocolMajor, secret };
+  const databaseDek = decodeHex(databaseDekText, BOOTSTRAP_SECRET_BYTES);
+  if (!databaseDek) {
+    throw new CoreIpcBootstrapError("BOOTSTRAP_MALFORMED", "bootstrap database key encoding is invalid");
+  }
+  const secureStorageSecret = decodeHex(secureStorageSecretText, BOOTSTRAP_SECRET_BYTES);
+  if (!secureStorageSecret) {
+    throw new CoreIpcBootstrapError("BOOTSTRAP_MALFORMED", "secure-storage bootstrap secret encoding is invalid");
+  }
+  return { endpoint, protocolMajor, secret, databaseDek, secureStorageEndpoint, secureStorageSecret };
 }
 
 export async function readBootstrapMaterial(input: Readable): Promise<BootstrapMaterial> {
@@ -153,7 +201,7 @@ function safeEqual(left: Buffer, right: Buffer): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-class FrameReader {
+export class CoreIpcFrameReader {
   private buffered = Buffer.alloc(0);
   private readonly socket: Socket;
 
@@ -253,8 +301,50 @@ export function connectCoreTransport(endpoint: string): Promise<Socket> {
   });
 }
 
+async function closeCoreTransport(socket: Socket): Promise<void> {
+  if (socket.destroyed) return;
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, HANDSHAKE_TIMEOUT_MS);
+    socket.once("close", () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    socket.destroy();
+  });
+}
+
+async function connectAuthenticatedSecureStorage(
+  material: Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret">,
+): Promise<Socket> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let socket: Socket | undefined;
+    try {
+      socket = await connectCoreTransport(material.secureStorageEndpoint);
+      await authenticateTransport(material.secureStorageSecret, socket);
+      return socket;
+    } catch (error) {
+      lastError = error;
+      if (socket) await closeCoreTransport(socket);
+      if (
+        !(error instanceof CoreIpcBootstrapError) ||
+        (error.code !== "IPC_CONNECT_FAILED" && error.code !== "IPC_HANDSHAKE_TIMEOUT") ||
+        attempt === 2
+      ) {
+        throw error;
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new CoreIpcBootstrapError("IPC_CONNECT_FAILED", "secure-storage connection failed");
+}
+
 export async function authenticateCoreTransport(material: BootstrapMaterial, socket: Socket): Promise<AuthenticatedTransport> {
-  const reader = new FrameReader(socket);
+  return authenticateTransport(material.secret, socket);
+}
+
+async function authenticateTransport(secret: Buffer, socket: Socket): Promise<AuthenticatedTransport> {
+  const reader = new CoreIpcFrameReader(socket);
   try {
     const challenge = parseJson<unknown>(await reader.read(CORE_IPC_FRAME_CEILING, HANDSHAKE_TIMEOUT_MS), "Core IPC challenge");
     if (
@@ -274,7 +364,7 @@ export async function authenticateCoreTransport(material: BootstrapMaterial, soc
       JSON.stringify({
         kind: "hello",
         protocolMajor: CORE_IPC_PROTOCOL_MAJOR,
-        proof: proof(material.secret, CORE_IPC_PROTOCOL_MAJOR, nonce).toString("hex"),
+        proof: proof(secret, CORE_IPC_PROTOCOL_MAJOR, nonce).toString("hex"),
       }),
       "utf8",
     );
@@ -288,6 +378,238 @@ export async function authenticateCoreTransport(material: BootstrapMaterial, soc
     socket.destroy();
     if (error instanceof CoreIpcBootstrapError) throw error;
     throw new CoreIpcBootstrapError("IPC_AUTHENTICATION_FAILED", "Core IPC authentication failed", { cause: error });
+  }
+}
+
+function secureStorageProof(secret: Buffer, correlationId: string, databaseDek: Buffer): Buffer {
+  return createHmac("sha256", secret)
+    .update(Buffer.concat([SECURE_STORAGE_DOMAIN, Buffer.from(correlationId, "utf8"), databaseDek]))
+    .digest();
+}
+
+function sessionPasswordKdfProof(secret: Buffer, correlationId: string, password: Buffer): Buffer {
+  return createHmac("sha256", secret)
+    .update(Buffer.concat([SESSION_PASSWORD_KDF_DOMAIN, Buffer.from(correlationId, "utf8"), password]))
+    .digest();
+}
+
+function randomUuidV7(): string {
+  const bytes = randomBytes(16);
+  const timestamp = BigInt(Date.now());
+  for (let index = 0; index < 6; index += 1) {
+    bytes[index] = Number((timestamp >> BigInt(40 - index * 8)) & 0xffn);
+  }
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x70;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function secureStorageHandleProof(
+  secret: Buffer,
+  operation: string,
+  correlationId: string,
+  handle: string,
+): Buffer {
+  return createHmac("sha256", secret)
+    .update(
+      Buffer.concat([
+        SECURE_STORAGE_DOMAIN,
+        Buffer.from(operation, "utf8"),
+        Buffer.from([0]),
+        Buffer.from(correlationId, "utf8"),
+        Buffer.from([0]),
+        Buffer.from(handle, "utf8"),
+      ]),
+    )
+    .digest();
+}
+
+export interface RestoreDbDekProtectionLease {
+  readonly handle: string;
+  commit(): Promise<void>;
+  abort(): Promise<void>;
+}
+
+async function sendSecureStorageOperation(
+  material: Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret">,
+  operation: string,
+  handle?: string,
+  databaseDek?: Buffer,
+): Promise<string> {
+  const correlationId = randomUuidV7();
+  const socket = await connectAuthenticatedSecureStorage(material);
+  try {
+    const request = databaseDek
+      ? {
+          protocolVersion: CORE_IPC_PROTOCOL_MAJOR,
+          kind: "request",
+          operation,
+          correlationId,
+          databaseDek: databaseDek.toString("hex"),
+          proof: secureStorageProof(material.secureStorageSecret, correlationId, databaseDek).toString("hex"),
+        }
+      : {
+          protocolVersion: CORE_IPC_PROTOCOL_MAJOR,
+          kind: "request",
+          operation,
+          correlationId,
+          handle,
+          proof: secureStorageHandleProof(material.secureStorageSecret, operation, correlationId, handle ?? "").toString("hex"),
+        };
+    socket.write(encodeCoreIpcJsonFrame(request));
+    const reader = new CoreIpcFrameReader(socket);
+    const response = JSON.parse(
+      (await reader.read(CORE_IPC_FRAME_CEILING, HANDSHAKE_TIMEOUT_MS)).toString("utf8"),
+    ) as unknown;
+    if (
+      !isRecord(response) ||
+      !exactKeys(response, ["correlationId", "errorCode", "handle", "ok"]) ||
+      response.correlationId !== correlationId ||
+      response.ok !== true ||
+      typeof response.handle !== "string" ||
+      response.handle.length === 0 ||
+      response.errorCode !== null
+    ) {
+      throw new CoreIpcBootstrapError(
+        "IPC_AUTHENTICATION_FAILED",
+        `native secure-storage operation ${operation} was rejected`,
+      );
+    }
+    socket.write(
+      encodeCoreIpcJsonFrame({
+        kind: "response_ack",
+        correlationId,
+      }),
+    );
+    return response.handle;
+  } catch (error) {
+    if (error instanceof CoreIpcBootstrapError) throw error;
+    throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "native secure-storage response was invalid", { cause: error });
+  } finally {
+    await closeCoreTransport(socket);
+  }
+}
+
+/**
+ * Typed Core-to-host boundary for the restore-generated DB_DEK. The endpoint
+ * and secret arrive only through authenticated native bootstrap material; no
+ * generic command or renderer-controlled channel is exposed.
+ */
+export async function protectNewDbDekThroughNativeStorage(
+  material: Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret">,
+  databaseDek: Buffer,
+): Promise<RestoreDbDekProtectionLease> {
+  if (databaseDek.length !== 32) {
+    throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "restore DB_DEK must be exactly 256 bits");
+  }
+  const handle = await sendSecureStorageOperation(material, "protect_new_database_dek", undefined, databaseDek);
+  let settled = false;
+  return {
+    handle,
+    async commit(): Promise<void> {
+      if (settled) return;
+      await sendSecureStorageOperation(material, "commit_staged_database_dek", handle);
+      settled = true;
+    },
+    async abort(): Promise<void> {
+      if (settled) return;
+      await sendSecureStorageOperation(material, "abort_staged_database_dek", handle);
+      settled = true;
+    },
+  };
+}
+
+/**
+ * Derive a new session-password verifier through the native Windows KDF
+ * boundary. Core receives only the versioned verifier metadata, salt, and
+ * derived verifier; the plaintext password never crosses into persistence.
+ */
+export async function deriveNewSessionPasswordThroughNativeStorage(
+  material: Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret">,
+  password: Buffer,
+): Promise<SessionPasswordVerifier> {
+  const passwordBytes = Buffer.from(password);
+  let canonicalPassword: Buffer | undefined;
+  try {
+    const passwordText = passwordBytes.toString("utf8");
+    if (passwordText.length === 0 || !Buffer.from(passwordText, "utf8").equals(passwordBytes)) {
+      throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "session password must be valid non-empty UTF-8");
+    }
+    canonicalPassword = Buffer.from(passwordText.normalize("NFC"), "utf8");
+    if (canonicalPassword.length === 0 || canonicalPassword.length > SESSION_PASSWORD_MAX_BYTES) {
+      throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "session password exceeds its bounded size");
+    }
+    const correlationId = randomUuidV7();
+    const socket = await connectAuthenticatedSecureStorage(material);
+    try {
+      const request = {
+        protocolVersion: CORE_IPC_PROTOCOL_MAJOR,
+        kind: "request",
+        operation: "derive_session_password_verifier",
+        correlationId,
+        password: canonicalPassword.toString("hex"),
+        proof: sessionPasswordKdfProof(material.secureStorageSecret, correlationId, canonicalPassword).toString("hex"),
+      };
+      socket.write(encodeCoreIpcJsonFrame(request));
+      const reader = new CoreIpcFrameReader(socket);
+      const response = parseJson<unknown>(
+        await reader.read(CORE_IPC_FRAME_CEILING, HANDSHAKE_TIMEOUT_MS),
+        "native session-password verifier response",
+      );
+      if (
+        !isRecord(response) ||
+        !exactKeys(response, [
+          "algorithm",
+          "correlationId",
+          "errorCode",
+          "iterations",
+          "memoryKiB",
+          "ok",
+          "parallelism",
+          "profileId",
+          "salt",
+          "verifier",
+          "version",
+        ]) ||
+        response.correlationId !== correlationId ||
+        response.ok !== true ||
+        response.errorCode !== null ||
+        response.profileId !== "session-password-v1" ||
+        response.algorithm !== "ARGON2ID" ||
+        response.version !== 0x13 ||
+        response.memoryKiB !== 65_536 ||
+        response.iterations !== 3 ||
+        response.parallelism !== 4 ||
+        typeof response.salt !== "string" ||
+        typeof response.verifier !== "string"
+      ) {
+        throw new CoreIpcBootstrapError("IPC_AUTHENTICATION_FAILED", "native session-password derivation was rejected");
+      }
+      const salt = decodeHex(response.salt, 16);
+      const verifier = decodeHex(response.verifier, 32);
+      if (!salt || !verifier) {
+        throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "native session-password verifier encoding is invalid");
+      }
+      socket.write(encodeCoreIpcJsonFrame({ kind: "response_ack", correlationId }));
+      return {
+        profileId: "session-password-v1",
+        purpose: "SESSION_PASSWORD",
+        algorithm: "ARGON2ID",
+        version: 0x13,
+        memoryKiB: 65_536,
+        iterations: 3,
+        parallelism: 4,
+        salt,
+        verifier,
+      };
+    } finally {
+      await closeCoreTransport(socket);
+      canonicalPassword.fill(0);
+    }
+  } finally {
+    canonicalPassword?.fill(0);
+    passwordBytes.fill(0);
   }
 }
 

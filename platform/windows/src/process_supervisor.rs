@@ -19,6 +19,7 @@ pub enum ProcessSupervisorState {
     ResumeFailed,
     WaitFailed,
     TerminationFailed,
+    TerminationVerificationFailed,
     ExitCodeFailed,
 }
 
@@ -54,19 +55,23 @@ mod windows {
     use std::mem::size_of;
     use std::os::windows::ffi::OsStrExt;
     use std::path::{Path, PathBuf};
-    use std::ptr::null;
+    use std::ptr::{null, null_mut};
     use std::sync::Arc;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
     use windows_sys::Win32::Foundation::{
         CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, WAIT_FAILED, WAIT_OBJECT_0,
         WAIT_TIMEOUT,
     };
-    #[cfg(test)]
-    use windows_sys::Win32::System::JobObjects::QueryInformationJobObject;
+    use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
+    use windows_sys::Win32::Storage::FileSystem::{
+        CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+        OPEN_EXISTING,
+    };
     use windows_sys::Win32::System::JobObjects::{
         AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-        SetInformationJobObject, TerminateJobObject,
+        JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
+        QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
     };
     use windows_sys::Win32::System::Threading::{
         CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
@@ -182,6 +187,49 @@ mod windows {
             }
         }
 
+        fn active_processes(&self) -> Result<u32, ProcessSupervisorError> {
+            let mut accounting = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
+            let mut returned = 0;
+            // SAFETY: `accounting` is a correctly sized writable output
+            // buffer, `returned` is a valid output pointer, and the handle is
+            // owned by this supervisor.
+            let queried = unsafe {
+                QueryInformationJobObject(
+                    self.handle.raw(),
+                    JobObjectBasicAccountingInformation,
+                    (&mut accounting as *mut JOBOBJECT_BASIC_ACCOUNTING_INFORMATION).cast(),
+                    size_of::<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>() as u32,
+                    &mut returned,
+                )
+            };
+            if queried == 0 {
+                Err(win32_error(
+                    ProcessSupervisorState::TerminationVerificationFailed,
+                    "QueryInformationJobObject failed while reading active process count",
+                ))
+            } else {
+                Ok(accounting.ActiveProcesses)
+            }
+        }
+
+        fn wait_until_empty(&self, timeout: Duration) -> Result<(), ProcessSupervisorError> {
+            let started = Instant::now();
+            loop {
+                if self.active_processes()? == 0 {
+                    return Ok(());
+                }
+                if started.elapsed() >= timeout {
+                    return Err(ProcessSupervisorError {
+                        state: ProcessSupervisorState::TerminationVerificationFailed,
+                        detail: "owned Job Object still has active processes after termination"
+                            .to_owned(),
+                        win32_error: None,
+                    });
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+
         #[cfg(test)]
         fn limit_flags(&self) -> Result<u32, ProcessSupervisorError> {
             let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
@@ -234,6 +282,36 @@ mod windows {
         Exited { code: u32 },
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum ProcessShutdownOutcome {
+        Graceful {
+            code: u32,
+            reason: ProcessShutdownReason,
+        },
+        Forced {
+            code: u32,
+            reason: ProcessShutdownReason,
+        },
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum ProcessShutdownReason {
+        UserCancel,
+        Timeout,
+        ProviderFailure,
+        ProviderSetupRepair,
+        PausePreemption,
+        ProcessTermination,
+        AppShutdown,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct ProcessContainmentDiagnostics {
+        pub process_id: u32,
+        pub process_exited: bool,
+        pub active_job_processes: u32,
+    }
+
     #[derive(Debug)]
     pub struct SupervisedCoreProcess {
         process: OwnedHandle,
@@ -278,6 +356,54 @@ mod windows {
             }
         }
 
+        pub fn containment_diagnostics(
+            &self,
+        ) -> Result<ProcessContainmentDiagnostics, ProcessSupervisorError> {
+            let process_exited = matches!(self.wait(Duration::ZERO)?, ProcessWait::Exited { .. });
+            Ok(ProcessContainmentDiagnostics {
+                process_id: self.process_id,
+                process_exited,
+                active_job_processes: self.job.active_processes()?,
+            })
+        }
+
+        /// Complete the supervisor-owned escalation after the owning lifecycle
+        /// layer has already requested cooperative shutdown through the
+        /// process's semantic protocol. The supervisor deliberately does not
+        /// invent a generic child protocol: it waits the bounded grace period,
+        /// force-terminates the complete Job Object if needed, and verifies
+        /// that both the root and all assigned descendants are gone.
+        pub fn shutdown_after_cooperative_request(
+            &self,
+            grace: Duration,
+            exit_code: u32,
+            verification_timeout: Duration,
+            reason: ProcessShutdownReason,
+        ) -> Result<ProcessShutdownOutcome, ProcessSupervisorError> {
+            match self.wait(grace)? {
+                ProcessWait::Exited { code } => {
+                    self.job.wait_until_empty(verification_timeout)?;
+                    Ok(ProcessShutdownOutcome::Graceful { code, reason })
+                }
+                ProcessWait::TimedOut => {
+                    self.job.terminate(exit_code)?;
+                    let code = match self.wait(verification_timeout)? {
+                        ProcessWait::Exited { code } => code,
+                        ProcessWait::TimedOut => {
+                            return Err(ProcessSupervisorError {
+                                state: ProcessSupervisorState::TerminationVerificationFailed,
+                                detail: "root process remained active after Job Object termination"
+                                    .to_owned(),
+                                win32_error: None,
+                            });
+                        }
+                    };
+                    self.job.wait_until_empty(verification_timeout)?;
+                    Ok(ProcessShutdownOutcome::Forced { code, reason })
+                }
+            }
+        }
+
         /// Terminate the complete owned Job Object, including any descendants
         /// already assigned to it. Cooperative cancellation and grace periods
         /// are owned by the later lifecycle layer; this is the hard-stop path.
@@ -312,9 +438,10 @@ mod windows {
             self.spawn_spec(spec.into())
         }
 
-        /// Launch Core with a single inherited anonymous bootstrap reader.
-        /// The handle-list attribute is the complete inheritance allowlist;
-        /// the bootstrap secret itself never enters the command line or env.
+        /// Launch Core with one inherited anonymous bootstrap reader and
+        /// host-controlled NUL stdout/stderr handles. The handle-list
+        /// attribute is the complete inheritance allowlist; the bootstrap
+        /// secret itself never enters the command line or environment.
         pub fn launch_core_with_bootstrap(
             &self,
             layout: &CoreRuntimeLayout,
@@ -325,6 +452,60 @@ mod windows {
                 .launch_spec(manifest_path)
                 .map_err(core_runtime_error)?;
             let mut spec: ProcessLaunchSpec = spec.into();
+            spec.bootstrap_reader = Some(bootstrap_reader);
+            self.spawn_spec(spec)
+        }
+
+        /// Launch Core with the authenticated bootstrap channel and the
+        /// release-owned database path. The database key itself is transferred
+        /// only through the inherited bootstrap channel; this path is merely
+        /// the explicit local persistence location Core must open.
+        pub fn launch_core_with_bootstrap_and_database(
+            &self,
+            layout: &CoreRuntimeLayout,
+            manifest_path: &Path,
+            bootstrap_reader: HANDLE,
+            database_path: &Path,
+        ) -> Result<SupervisedCoreProcess, ProcessSupervisorError> {
+            self.launch_core_with_bootstrap_and_database_mode(
+                layout,
+                manifest_path,
+                bootstrap_reader,
+                database_path,
+                false,
+            )
+        }
+
+        /// Launch Core with the explicit bounded recovery-mode environment.
+        /// Recovery mode is host-selected from the app-owned recovery marker;
+        /// it is never inferred from user input or a renderer request.
+        pub fn launch_core_with_bootstrap_and_database_mode(
+            &self,
+            layout: &CoreRuntimeLayout,
+            manifest_path: &Path,
+            bootstrap_reader: HANDLE,
+            database_path: &Path,
+            recovery_mode: bool,
+        ) -> Result<SupervisedCoreProcess, ProcessSupervisorError> {
+            if !database_path.is_absolute() {
+                return Err(invalid_spec(
+                    "Core database path must be absolute and release-owned",
+                ));
+            }
+            let spec = layout
+                .launch_spec(manifest_path)
+                .map_err(core_runtime_error)?;
+            let mut spec: ProcessLaunchSpec = spec.into();
+            spec.environment.insert(
+                OsString::from("JARVIS_DATABASE_PATH"),
+                database_path.as_os_str().to_os_string(),
+            );
+            if recovery_mode {
+                spec.environment.insert(
+                    OsString::from("JARVIS_RECOVERY_MODE"),
+                    OsString::from("1"),
+                );
+            }
             spec.bootstrap_reader = Some(bootstrap_reader);
             self.spawn_spec(spec)
         }
@@ -347,15 +528,24 @@ mod windows {
                 ..Default::default()
             };
             let mut attribute_storage: Vec<usize> = Vec::new();
+            let mut inherited_handles: Vec<HANDLE> = Vec::new();
+            let mut stdio_handles: Vec<OwnedHandle> = Vec::new();
             let mut attributes_initialized = false;
             let mut creation_flags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
             let inherit_handles = if let Some(reader) = spec.bootstrap_reader {
                 startup_info_ex.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
                 startup_info_ex.StartupInfo.dwFlags |= STARTF_USESTDHANDLES;
                 startup_info_ex.StartupInfo.hStdInput = reader;
+                let stdout = open_nul_output_handle()?;
+                let stderr = open_nul_output_handle()?;
+                startup_info_ex.StartupInfo.hStdOutput = stdout.raw();
+                startup_info_ex.StartupInfo.hStdError = stderr.raw();
+                stdio_handles.extend([stdout, stderr]);
+                inherited_handles.extend([reader, stdio_handles[0].raw(), stdio_handles[1].raw()]);
                 let mut required_bytes = 0usize;
                 // SAFETY: the first call intentionally supplies a null list
-                // to obtain the bounded attribute-list size for one handle.
+                // to obtain the bounded attribute-list size for the explicit
+                // stdin/stdout/stderr handle allowlist.
                 unsafe {
                     InitializeProcThreadAttributeList(
                         std::ptr::null_mut(),
@@ -373,7 +563,8 @@ mod windows {
                 attribute_storage.resize(required_bytes.div_ceil(size_of::<usize>()), 0);
                 startup_info_ex.lpAttributeList = attribute_storage.as_mut_ptr().cast();
                 // SAFETY: the storage is aligned and sized from the Windows
-                // query; the list is initialized for one inherited handle.
+                // query; the list is initialized for the explicit three-handle
+                // inheritance allowlist.
                 if unsafe {
                     InitializeProcThreadAttributeList(
                         startup_info_ex.lpAttributeList,
@@ -389,15 +580,15 @@ mod windows {
                     ));
                 }
                 attributes_initialized = true;
-                // SAFETY: the attribute list is initialized and `reader` is
-                // the one valid inherited HANDLE selected by the host.
+                // SAFETY: the attribute list is initialized and the three
+                // handles are valid, inheritable handles selected by the host.
                 if unsafe {
                     UpdateProcThreadAttribute(
                         startup_info_ex.lpAttributeList,
                         0,
                         PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
-                        (&reader as *const HANDLE).cast(),
-                        size_of::<HANDLE>(),
+                        inherited_handles.as_ptr().cast(),
+                        size_of::<HANDLE>() * inherited_handles.len(),
                         std::ptr::null_mut(),
                         std::ptr::null(),
                     )
@@ -419,11 +610,12 @@ mod windows {
             // SAFETY: all wide strings are NUL-terminated and remain alive
             // through the synchronous CreateProcessW call; startup and
             // process-information structures are valid initialized buffers.
-            // Null security attributes and bInheritHandles=FALSE implement the
-            // explicit empty handle allowlist.
-            // SAFETY: the pointers above remain valid for this synchronous
-            // Windows API call and no handles are inherited.
+            // Null security attributes and the explicit handle-list attribute
+            // implement the bounded inheritance allowlist. The host-owned NUL
+            // output handles remain alive until CreateProcessW returns.
             let startup_ptr = &startup_info_ex.StartupInfo as *const STARTUPINFOW;
+            // SAFETY: the initialized startup/process buffers and bounded
+            // UTF-16 pointers remain valid for the synchronous native call.
             let created = unsafe {
                 CreateProcessW(
                     application_name.as_ptr(),
@@ -644,6 +836,35 @@ mod windows {
         Ok(quoted)
     }
 
+    fn open_nul_output_handle() -> Result<OwnedHandle, ProcessSupervisorError> {
+        let attributes = SECURITY_ATTRIBUTES {
+            nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: std::ptr::null_mut(),
+            bInheritHandle: 1,
+        };
+        let nul = wide_null(OsStr::new("NUL"), "NUL output device")?;
+        // SAFETY: the path is a fixed NUL-terminated device name, the output
+        // handle requests only write access, and the security attributes make
+        // this handle eligible for the explicit process handle list.
+        let handle = unsafe {
+            CreateFileW(
+                nul.as_ptr(),
+                FILE_GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                &attributes,
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                null_mut(),
+            )
+        };
+        OwnedHandle::new(handle).ok_or_else(|| {
+            win32_error(
+                ProcessSupervisorState::ProcessCreationFailed,
+                "CreateFileW failed for controlled Core output",
+            )
+        })
+    }
+
     fn wide_null(value: &OsStr, label: &str) -> Result<Vec<u16>, ProcessSupervisorError> {
         validate_no_nul(value, label)?;
         let mut result: Vec<u16> = value.encode_wide().collect();
@@ -695,10 +916,19 @@ mod windows {
         use sha2::{Digest, Sha256};
         use std::fs::{copy, create_dir_all, remove_dir_all, write};
         use std::os::windows::ffi::OsStringExt;
-        use std::time::{SystemTime, UNIX_EPOCH};
+        use std::thread::sleep;
+        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+        use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation};
+        use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
+        use windows_sys::Win32::Storage::FileSystem::WriteFile;
+        use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
+            TH32CS_SNAPPROCESS,
+        };
         use windows_sys::Win32::System::JobObjects::{
             JOB_OBJECT_LIMIT_BREAKAWAY_OK, JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
         };
+        use windows_sys::Win32::System::Pipes::CreatePipe;
         use windows_sys::Win32::System::Threading::{
             OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE,
         };
@@ -722,6 +952,36 @@ mod windows {
                 )]),
                 bootstrap_reader: None,
             }
+        }
+
+        fn find_child_process(parent_id: u32) -> Option<u32> {
+            // SAFETY: the snapshot is a Windows-owned read-only process list;
+            // the output entry is correctly sized and writable.
+            let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+            if snapshot == INVALID_HANDLE_VALUE {
+                return None;
+            }
+            let mut entry = PROCESSENTRY32W {
+                dwSize: size_of::<PROCESSENTRY32W>() as u32,
+                ..Default::default()
+            };
+            let mut found = None;
+            // SAFETY: `entry` remains valid for each Toolhelp iteration and
+            // the snapshot handle is valid until the explicit close below.
+            let mut has_entry = unsafe { Process32FirstW(snapshot, &mut entry) } != 0;
+            while has_entry {
+                if entry.th32ParentProcessID == parent_id {
+                    found = Some(entry.th32ProcessID);
+                    break;
+                }
+                // SAFETY: same valid snapshot and writable entry as above.
+                has_entry = unsafe { Process32NextW(snapshot, &mut entry) } != 0;
+            }
+            // SAFETY: this test owns the snapshot handle.
+            unsafe {
+                CloseHandle(snapshot);
+            }
+            found
         }
 
         fn sha256_file(path: &Path) -> String {
@@ -758,6 +1018,9 @@ mod windows {
                 source_commit_sha: "0".repeat(40),
                 release_sequence: 1,
                 security_epoch: 1,
+                persistence_qualification: Some(
+                    crate::core_runtime::RuntimePersistenceQualification::default(),
+                ),
                 tuf_spec_version: "1.0.35".to_owned(),
                 target: "WINDOWS_FULL_HOST_X64".to_owned(),
                 protocol_version: 1,
@@ -809,6 +1072,34 @@ mod windows {
         }
 
         #[test]
+        fn cooperative_graceful_shutdown_reports_exit_and_empty_job() {
+            let supervisor = PlatformProcessSupervisor::new().expect("Job Object must be created");
+            let process = supervisor
+                .launch_test_process(ping_spec("2"))
+                .expect("short-lived process must be contained");
+            let outcome = process
+                .shutdown_after_cooperative_request(
+                    Duration::from_secs(10),
+                    TEST_TERMINATION_CODE,
+                    Duration::from_secs(5),
+                    ProcessShutdownReason::AppShutdown,
+                )
+                .expect("graceful shutdown must be verified");
+            assert!(matches!(
+                outcome,
+                ProcessShutdownOutcome::Graceful {
+                    reason: ProcessShutdownReason::AppShutdown,
+                    ..
+                }
+            ));
+            let diagnostics = process
+                .containment_diagnostics()
+                .expect("containment diagnostics must remain available after exit");
+            assert!(diagnostics.process_exited);
+            assert_eq!(diagnostics.active_job_processes, 0);
+        }
+
+        #[test]
         fn integrity_validated_core_launch_uses_the_supervisor_path() {
             let (root, layout, manifest_path) = core_fixture();
             let supervisor = PlatformProcessSupervisor::new().expect("Job Object must be created");
@@ -825,6 +1116,85 @@ mod windows {
             assert!(matches!(result, ProcessWait::Exited { .. }));
             drop(supervisor);
             remove_dir_all(root).expect("Core fixture must be removable");
+        }
+
+        #[test]
+        fn inherited_bootstrap_reader_reaches_application_owned_node() {
+            let system_root = std::env::var_os("SystemRoot").expect("Windows sets SystemRoot");
+            let node = PathBuf::from(r"C:\Program Files\nodejs\node.exe");
+            assert!(
+                node.is_file(),
+                "the pinned Node development runtime must exist"
+            );
+            let attributes = SECURITY_ATTRIBUTES {
+                nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
+                lpSecurityDescriptor: std::ptr::null_mut(),
+                bInheritHandle: 1,
+            };
+            let mut reader = std::ptr::null_mut();
+            let mut writer = std::ptr::null_mut();
+            assert_ne!(
+                // SAFETY: the output pointers and security attributes are
+                // initialized writable buffers for this synchronous call.
+                unsafe { CreatePipe(&mut reader, &mut writer, &attributes, 0) },
+                0,
+                "bootstrap test pipe must be created"
+            );
+            assert_ne!(
+                // SAFETY: `writer` is the valid handle returned by CreatePipe
+                // and the flag update is a bounded synchronous native call.
+                unsafe { SetHandleInformation(writer, HANDLE_FLAG_INHERIT, 0) },
+                0,
+                "bootstrap writer must stay host-owned"
+            );
+            let supervisor = PlatformProcessSupervisor::new().expect("Job Object must be created");
+            let process = supervisor
+                .launch_test_process(ProcessLaunchSpec {
+                    program: node,
+                    arguments: vec![
+                        OsString::from("-e"),
+                        OsString::from(
+                            "process.stdout.write('ready');process.stderr.write('ready');process.stdin.once('data',()=>process.exit(0));setTimeout(()=>process.exit(2),5000)",
+                        ),
+                    ],
+                    current_dir: PathBuf::from(system_root),
+                    environment: BTreeMap::from([
+                        (OsString::from("SystemRoot"), std::env::var_os("SystemRoot").unwrap()),
+                        (OsString::from("WINDIR"), std::env::var_os("WINDIR").unwrap()),
+                    ]),
+                    bootstrap_reader: Some(reader),
+                })
+                .expect("Node process with the inherited bootstrap reader must launch");
+            // SAFETY: `reader` is the valid bootstrap handle transferred to
+            // the child and is closed exactly once by this test owner.
+            unsafe { CloseHandle(reader) };
+            let byte = [0x4a_u8];
+            let mut written = 0u32;
+            assert_ne!(
+                // SAFETY: `writer` is a valid host-owned pipe handle and all
+                // output pointers refer to initialized writable storage.
+                unsafe {
+                    WriteFile(
+                        writer,
+                        byte.as_ptr().cast(),
+                        1,
+                        &mut written,
+                        std::ptr::null_mut(),
+                    )
+                },
+                0,
+                "bootstrap byte must be written"
+            );
+            // SAFETY: `writer` is the valid bootstrap handle owned by this
+            // test and is closed exactly once after the write completes.
+            unsafe { CloseHandle(writer) };
+            assert_eq!(written, 1);
+            assert_eq!(
+                process
+                    .wait(Duration::from_secs(10))
+                    .expect("child wait must succeed"),
+                ProcessWait::Exited { code: 0 }
+            );
         }
 
         #[test]
@@ -867,6 +1237,90 @@ mod windows {
         }
 
         #[test]
+        fn closing_supervisor_job_terminates_a_live_descendant() {
+            let system_root = std::env::var_os("SystemRoot").expect("Windows sets SystemRoot");
+            let cmd = PathBuf::from(system_root.as_os_str())
+                .join("System32")
+                .join("cmd.exe");
+            assert!(cmd.is_file(), "Windows command interpreter must exist");
+            let system32 = PathBuf::from(system_root.as_os_str()).join("System32");
+            let supervisor = PlatformProcessSupervisor::new().expect("Job Object must be created");
+            let process = supervisor
+                .launch_test_process(ProcessLaunchSpec {
+                    program: cmd,
+                    arguments: vec![
+                        OsString::from("/d"),
+                        OsString::from("/c ping.exe -n 60 127.0.0.1"),
+                    ],
+                    current_dir: system32,
+                    environment: BTreeMap::from([(
+                        OsString::from("SystemRoot"),
+                        std::env::var_os("SystemRoot").unwrap(),
+                    )]),
+                    bootstrap_reader: None,
+                })
+                .expect("supervised command parent must launch");
+
+            let descendant_pid = (0..100).find_map(|_| {
+                let child = find_child_process(process.process_id());
+                if child.is_none() {
+                    sleep(Duration::from_millis(50));
+                }
+                child
+            });
+            let descendant_pid =
+                descendant_pid.expect("supervised descendant must be discoverable");
+            // SAFETY: the PID came from the live child relationship of the
+            // supervised process; rights are limited to synchronization and
+            // liveness inspection.
+            let external_process_handle = unsafe {
+                OpenProcess(
+                    PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+                    0,
+                    descendant_pid,
+                )
+            };
+            assert!(
+                !external_process_handle.is_null()
+                    && external_process_handle != INVALID_HANDLE_VALUE,
+                "test must obtain a synchronization handle to the live descendant"
+            );
+            let outcome = process
+                .shutdown_after_cooperative_request(
+                    Duration::ZERO,
+                    TEST_TERMINATION_CODE,
+                    Duration::from_secs(5),
+                    ProcessShutdownReason::Timeout,
+                )
+                .expect("forced shutdown must verify the complete Job Object");
+            assert!(matches!(
+                outcome,
+                ProcessShutdownOutcome::Forced {
+                    reason: ProcessShutdownReason::Timeout,
+                    ..
+                }
+            ));
+            let diagnostics = process
+                .containment_diagnostics()
+                .expect("containment diagnostics must verify an empty Job Object");
+            assert!(diagnostics.process_exited);
+            assert_eq!(diagnostics.active_job_processes, 0);
+
+            // SAFETY: the handle was validated above and remains open until
+            // the explicit close below. Job kill-on-close must terminate the
+            // descendant, not only the direct supervised parent.
+            let wait = unsafe { WaitForSingleObject(external_process_handle, 5_000) };
+            assert_eq!(
+                wait, WAIT_OBJECT_0,
+                "Job Object close must end the descendant"
+            );
+            // SAFETY: this test owns the synchronization handle.
+            unsafe {
+                CloseHandle(external_process_handle);
+            }
+        }
+
+        #[test]
         fn relative_or_embedded_nul_launch_specs_fail_closed() {
             let supervisor = PlatformProcessSupervisor::new().expect("Job Object must be created");
             let relative = ProcessLaunchSpec {
@@ -899,7 +1353,10 @@ mod windows {
 }
 
 #[cfg(windows)]
-pub use windows::{PlatformProcessSupervisor, ProcessWait, SupervisedCoreProcess};
+pub use windows::{
+    PlatformProcessSupervisor, ProcessContainmentDiagnostics, ProcessShutdownOutcome,
+    ProcessShutdownReason, ProcessWait, SupervisedCoreProcess,
+};
 
 #[cfg(not(windows))]
 #[derive(Debug)]

@@ -6,6 +6,48 @@ This inventory is generated from the exact locked dependency graph used by JARVI
 
 | Ecosystem | Name | Version | License | Role | Packaged |
 |---|---|---|---|---|---|
+| cargo | argon2 | 0.5.3 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | base64ct | 1.8.3 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | blake2 | 0.10.6 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | password-hash | 0.5.0 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | rand_core | 0.6.4 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | subtle | 2.6.1 | BSD-3-Clause | DESKTOP_WINDOWS_RUNTIME | yes |
+| npm | base64-js | 1.5.1 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | better-sqlite3-multiple-ciphers | 12.11.1 | MIT | CORE_RUNTIME | yes |
+| npm | bindings | 1.5.0 | MIT | CORE_RUNTIME | yes |
+| npm | buffer | 5.7.1 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | chownr | 1.1.4 | ISC | CORE_BUILD_OR_TYPECHECK | no |
+| npm | decompress-response | 6.0.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | deep-extend | 0.6.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | end-of-stream | 1.4.5 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | expand-template | 2.0.3 | MIT OR WTFPL | CORE_BUILD_OR_TYPECHECK | no |
+| npm | file-uri-to-path | 1.0.0 | MIT | CORE_RUNTIME | yes |
+| npm | fs-constants | 1.0.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | github-from-package | 0.0.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | ieee754 | 1.2.1 | BSD-3-Clause | CORE_BUILD_OR_TYPECHECK | no |
+| npm | inherits | 2.0.4 | ISC | CORE_BUILD_OR_TYPECHECK | no |
+| npm | ini | 1.3.8 | ISC | CORE_BUILD_OR_TYPECHECK | no |
+| npm | mimic-response | 3.1.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | minimist | 1.2.8 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | mkdirp-classic | 0.5.3 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | napi-build-utils | 2.0.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | node-abi | 3.94.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | once | 1.4.0 | ISC | CORE_BUILD_OR_TYPECHECK | no |
+| npm | prebuild-install | 7.1.3 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | pump | 3.0.4 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | rc | 1.2.8 | BSD-2-Clause OR MIT OR Apache-2.0 | CORE_BUILD_OR_TYPECHECK | no |
+| npm | readable-stream | 3.6.2 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | safe-buffer | 5.2.1 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | semver | 7.8.5 | ISC | CORE_BUILD_OR_TYPECHECK | no |
+| npm | simple-concat | 1.0.1 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | simple-get | 4.0.1 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | string_decoder | 1.3.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | strip-json-comments | 2.0.1 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | tar-fs | 2.1.5 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | tar-stream | 2.2.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | tunnel-agent | 0.6.0 | Apache-2.0 | CORE_BUILD_OR_TYPECHECK | no |
+| npm | util-deprecate | 1.0.2 | MIT | CORE_BUILD_OR_TYPECHECK | no |
+| npm | wrappy | 1.0.2 | ISC | CORE_BUILD_OR_TYPECHECK | no |
 | npm | @gar/promise-retry | 1.0.3 | MIT | CORE_RUNTIME | yes |
 | npm | @tufjs/canonical-json | 2.0.0 | MIT | CORE_RUNTIME | yes |
 | npm | @tufjs/models | 5.0.0 | MIT | CORE_RUNTIME | yes |

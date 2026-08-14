@@ -7,10 +7,34 @@ import { dirname, isAbsolute, relative, resolve } from "node:path";
 const NODE_RELATIVE_PATH = "runtime/node.exe";
 const CORE_RELATIVE_PATH = "core/dist/main.js";
 const CORE_SUPPORT_RELATIVE_PATHS = [
+  "core/package.json",
   "core/dist/release-trust.js",
   "core/dist/ipc-bootstrap.js",
+  "core/dist/persistence.js",
+  "core/dist/schema.js",
+  "core/dist/backup-descriptor.js",
+  "core/dist/backup-manifest.js",
+  "core/dist/backup-chunks.js",
+  "core/dist/backup-recovery.js",
+  "core/dist/backup-package.js",
+  "core/dist/backup-payload.js",
 ];
 const DEFAULT_OUTPUT = "runtime-manifest.json";
+const DEFAULT_PERSISTENCE_QUALIFICATION = Object.freeze({
+  binding: "better-sqlite3-multiple-ciphers",
+  bindingVersion: "12.11.1",
+  cipher: "sqlcipher",
+  cipherProfile: "sqlcipher-legacy-v4",
+  sqliteVersion: "3.53.2",
+  sqliteSourceId:
+    "2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24",
+  walResetFixEvidence: {
+    upstreamFixedSince: "3.51.3",
+    qualifiedSourceId:
+      "2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24",
+  },
+  snapshotMechanism: "attached-sqlcipher-schema-export-v1",
+});
 
 function usage() {
   return "Usage: node tools/release/generate-core-runtime-manifest.mjs --root <absolute-release-root> --node-version <x.y.z> --jarvis-release-version <version> --core-version <version> --source-commit-sha <40-hex-sha> --release-sequence <uint64> --security-epoch <uint64> [--target WINDOWS_FULL_HOST_X64] [--protocol-version 1] [--minimum-data-schema-version 1] [--maximum-data-schema-version 1] [--output <relative-path>]";
@@ -139,6 +163,7 @@ export async function generateRuntimeManifest({
   minimumDataSchemaVersion = 1,
   maximumDataSchemaVersion = 1,
   output = DEFAULT_OUTPUT,
+  persistenceQualification = DEFAULT_PERSISTENCE_QUALIFICATION,
   ...unknownOptions
 }) {
   if (Object.keys(unknownOptions).length > 0) {
@@ -167,6 +192,23 @@ export async function generateRuntimeManifest({
     throw new Error("--target must be WINDOWS_FULL_HOST_X64");
   }
   if (protocolVersion !== 1) throw new Error("--protocol-version must be 1");
+  if (
+    !persistenceQualification ||
+    typeof persistenceQualification !== "object" ||
+    persistenceQualification.binding !== DEFAULT_PERSISTENCE_QUALIFICATION.binding ||
+    persistenceQualification.bindingVersion !== DEFAULT_PERSISTENCE_QUALIFICATION.bindingVersion ||
+    persistenceQualification.cipher !== DEFAULT_PERSISTENCE_QUALIFICATION.cipher ||
+    persistenceQualification.cipherProfile !== DEFAULT_PERSISTENCE_QUALIFICATION.cipherProfile ||
+    persistenceQualification.sqliteVersion !== DEFAULT_PERSISTENCE_QUALIFICATION.sqliteVersion ||
+    persistenceQualification.sqliteSourceId !== DEFAULT_PERSISTENCE_QUALIFICATION.sqliteSourceId ||
+    persistenceQualification.snapshotMechanism !== DEFAULT_PERSISTENCE_QUALIFICATION.snapshotMechanism ||
+    persistenceQualification.walResetFixEvidence?.upstreamFixedSince !==
+      DEFAULT_PERSISTENCE_QUALIFICATION.walResetFixEvidence.upstreamFixedSince ||
+    persistenceQualification.walResetFixEvidence?.qualifiedSourceId !==
+      DEFAULT_PERSISTENCE_QUALIFICATION.walResetFixEvidence.qualifiedSourceId
+  ) {
+    throw new Error("persistence qualification metadata does not match the release-qualified V1 identity");
+  }
   if (
     !Number.isInteger(minimumDataSchemaVersion) ||
     !Number.isInteger(maximumDataSchemaVersion) ||
@@ -204,6 +246,7 @@ export async function generateRuntimeManifest({
     protocolVersion,
     minimumDataSchemaVersion,
     maximumDataSchemaVersion,
+    persistenceQualification,
     schemaVersion: 1,
     platform: "WINDOWS",
     runtimeRole: "FULL_HOST",

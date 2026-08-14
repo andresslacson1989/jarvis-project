@@ -21,11 +21,17 @@ test("bootstrap material is bounded, exact, and secret-bearing only in memory", 
     endpoint: "\\\\.\\pipe\\jarvis-core-0123456789abcdef0123456789abcdef",
     protocolMajor: 1,
     secret: Buffer.alloc(secretBytes, 0x42),
+    databaseDek: Buffer.alloc(32, 0x24),
+    secureStorageEndpoint: "\\\\.\\pipe\\jarvis-core-fedcba9876543210fedcba9876543210",
+    secureStorageSecret: Buffer.alloc(secretBytes, 0x43),
   };
   const frame = encodeBootstrapFrame(material);
   const decoded = parseBootstrapFrame(frame);
   assert.equal(decoded.endpoint, material.endpoint);
   assert.deepEqual(decoded.secret, material.secret);
+  assert.deepEqual(decoded.databaseDek, material.databaseDek);
+  assert.equal(decoded.secureStorageEndpoint, material.secureStorageEndpoint);
+  assert.deepEqual(decoded.secureStorageSecret, material.secureStorageSecret);
   assert.throws(
     () => parseBootstrapFrame(Buffer.concat([Buffer.from([0xff, 0xff, 0xff, 0x7f]), Buffer.alloc(8)])),
     (error) => error.code === "BOOTSTRAP_TOO_LARGE",
@@ -52,6 +58,9 @@ test("Core-side named-pipe handshake proves protocol and bootstrap secret", {
     endpoint,
     protocolMajor: 1,
     secret: Buffer.alloc(secretBytes, 0x5a),
+    databaseDek: Buffer.alloc(32, 0x24),
+    secureStorageEndpoint: endpoint,
+    secureStorageSecret: Buffer.alloc(secretBytes, 0x5b),
   };
   const server = createServer((socket) => {
     const nonce = Buffer.alloc(nonceBytes, 0x19);

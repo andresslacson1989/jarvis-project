@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { EventEmitter } from "node:events";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -7,10 +8,76 @@ import { writeTufReleaseMetadata } from "../../helpers/tuf-release-fixture.mjs";
 import {
   CoreBootstrap,
   CoreBootstrapError,
+  AuthenticatedCoreServiceShell,
   CoreServiceShell,
   LockedCoreIpcBoundary,
+  serveAuthenticatedCoreTransport,
   validateCoreEnvironment,
 } from "../../../services/core/src/main.ts";
+
+function encodeFrame(value) {
+  const payload = Buffer.from(JSON.stringify(value), "utf8");
+  const frame = Buffer.allocUnsafe(payload.length + 4);
+  frame.writeUInt32LE(payload.length, 0);
+  payload.copy(frame, 4);
+  return frame;
+}
+
+function readFrame(socket) {
+  return new Promise((resolve, reject) => {
+    let buffered = Buffer.alloc(0);
+    const cleanup = () => {
+      socket.off("data", onData);
+      socket.off("error", onError);
+      socket.off("close", onClose);
+    };
+    const onError = (error) => {
+      cleanup();
+      reject(error);
+    };
+    const onClose = () => {
+      cleanup();
+      reject(new Error("socket closed before a complete frame arrived"));
+    };
+    const onData = (chunk) => {
+      buffered = Buffer.concat([buffered, chunk]);
+      if (buffered.length < 4) return;
+      const length = buffered.readUInt32LE(0);
+      if (buffered.length < length + 4) return;
+      const payload = buffered.subarray(4, length + 4);
+      cleanup();
+      resolve(JSON.parse(payload.toString("utf8")));
+    };
+    socket.on("data", onData);
+    socket.once("error", onError);
+    socket.once("close", onClose);
+  });
+}
+
+function createMemorySocketPair() {
+  class MemorySocket extends EventEmitter {
+    peer;
+
+    write(chunk, callback) {
+      queueMicrotask(() => {
+        this.peer.emit("data", Buffer.from(chunk));
+        callback?.();
+      });
+      return true;
+    }
+
+    destroy() {
+      this.emit("close");
+      this.peer.emit("close");
+    }
+  }
+
+  const left = new MemorySocket();
+  const right = new MemorySocket();
+  left.peer = right;
+  right.peer = left;
+  return [left, right];
+}
 
 test("Core bootstrap accepts only explicit release paths and exposes truthful status", async () => {
   const root = join(tmpdir(), `jarvis-core-${Date.now()}-${Math.random().toString(16).slice(2)}`);
@@ -56,6 +123,26 @@ test("Core bootstrap accepts only explicit release paths and exposes truthful st
     })).state, "READY");
     assert.equal(bootstrap.getRuntimeEnvironment().releaseRoot, environment.releaseRoot);
     assert.equal(bootstrap.stop().state, "STOPPED");
+
+    const recoveryBootstrap = new CoreBootstrap();
+    assert.equal((await recoveryBootstrap.start({
+      JARVIS_CORE_ROOT: root,
+      JARVIS_CORE_ENTRYPOINT: entrypoint,
+      JARVIS_TUF_METADATA_DIR: join(root, "tuf", "metadata"),
+      JARVIS_RECOVERY_MODE: "1",
+    })).state, "RECOVERY");
+    assert.equal(recoveryBootstrap.getRuntimeEnvironment().recoveryMode, true);
+    assert.equal(recoveryBootstrap.stop().state, "STOPPED");
+
+    await assert.rejects(
+      validateCoreEnvironment({
+        JARVIS_CORE_ROOT: root,
+        JARVIS_CORE_ENTRYPOINT: entrypoint,
+        JARVIS_TUF_METADATA_DIR: join(root, "tuf", "metadata"),
+        JARVIS_RECOVERY_MODE: "true",
+      }),
+      (error) => error instanceof CoreBootstrapError && error.code === "CORE_RUNTIME_INCOMPATIBLE",
+    );
 
     await writeFile(join(root, "runtime-manifest.json"), Buffer.concat([manifestBytes, Buffer.from("tampered", "utf8")]));
     await assert.rejects(
@@ -159,4 +246,75 @@ test("shared Core service shell validates typed status requests and stays locked
   });
   assert.equal(invalidCorrelation.ok, false);
   if (!invalidCorrelation.ok) assert.equal(invalidCorrelation.error.code, "CORE_IPC_REQUEST_INVALID");
+});
+
+test("authenticated Core control plane returns only the deterministic locked status", async () => {
+  const shell = new AuthenticatedCoreServiceShell();
+  const response = await shell.handle({
+    protocolVersion: 1,
+    kind: "request",
+    id: null,
+    name: "get_core_status",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    payload: {},
+  });
+  assert.deepEqual(response, {
+    ok: true,
+    result: {
+      protocolMajor: 1,
+      platform: "WINDOWS",
+      runtimeRole: "FULL_HOST",
+      architecture: "x64",
+      serviceState: "LOCKED",
+      transportState: "NOT_CONNECTED",
+    },
+  });
+
+  const rejected = await shell.handle({
+    protocolVersion: 1,
+    kind: "request",
+    id: null,
+    name: "execute_any_command",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    payload: {},
+  });
+  assert.equal(rejected.ok, false);
+  if (!rejected.ok) assert.equal(rejected.error.code, "CORE_IPC_REQUEST_INVALID");
+});
+
+test("authenticated Core transport serves the bounded locked-status round-trip", async () => {
+  const [serverSocket, client] = createMemorySocketPair();
+  let stopping = false;
+  const serving = serveAuthenticatedCoreTransport(
+    { socket: serverSocket, protocolMajor: 1 },
+    () => stopping,
+  );
+
+  client.write(
+    encodeFrame({
+      protocolVersion: 1,
+      kind: "request",
+      id: null,
+      name: "get_core_status",
+      correlationId: "018f3b8e-6c68-7abc-8def-0123456789ab",
+      payload: {},
+    }),
+  );
+  const response = await readFrame(client);
+  assert.deepEqual(response, {
+    ok: true,
+    result: {
+      protocolMajor: 1,
+      platform: "WINDOWS",
+      runtimeRole: "FULL_HOST",
+      architecture: "x64",
+      serviceState: "LOCKED",
+      transportState: "NOT_CONNECTED",
+    },
+  });
+
+  stopping = true;
+  client.destroy();
+  serverSocket.destroy();
+  await serving;
 });

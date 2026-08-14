@@ -1,7 +1,8 @@
 import { execFile, spawn } from "node:child_process";
 import { createHmac, randomBytes } from "node:crypto";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { lstat, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -85,9 +86,16 @@ function encodeFrame(value, ceiling = IPC_FRAME_CEILING) {
   return frame;
 }
 
-function bootstrapFrame(endpoint, secret) {
+function bootstrapFrame({ endpoint, secret, databaseDek, secureStorageEndpoint, secureStorageSecret }) {
   return encodeFrame(
-    { endpoint, protocolMajor: IPC_PROTOCOL_MAJOR, secret: secret.toString("hex") },
+    {
+      endpoint,
+      protocolMajor: IPC_PROTOCOL_MAJOR,
+      secret: secret.toString("hex"),
+      databaseDek: databaseDek.toString("hex"),
+      secureStorageEndpoint,
+      secureStorageSecret: secureStorageSecret.toString("hex"),
+    },
     BOOTSTRAP_FRAME_CEILING,
   );
 }
@@ -248,14 +256,19 @@ export async function qualifyPackagedCore({
   if (typeof coreModule.validateCoreEnvironment !== "function") {
     throw new Error("release-owned Core does not expose its typed environment validator");
   }
+  const qualificationDatabaseRoot = await mkdtemp(join(tmpdir(), "jarvis-core-runtime-qualification-"));
   const environment = {
     JARVIS_CORE_ROOT: releaseRoot,
     JARVIS_CORE_ENTRYPOINT: entrypoint,
     JARVIS_TUF_METADATA_DIR: metadataDirectory,
+    JARVIS_DATABASE_PATH: join(qualificationDatabaseRoot, "state.db"),
   };
   const validated = await coreModule.validateCoreEnvironment(environment);
   const endpoint = `\\\\.\\pipe\\jarvis-core-${randomBytes(16).toString("hex")}`;
   const secret = randomBytes(32);
+  const secureStorageEndpoint = `\\\\.\\pipe\\jarvis-core-${randomBytes(16).toString("hex")}`;
+  const databaseDek = randomBytes(32);
+  const secureStorageSecret = randomBytes(32);
   const qualificationServer = createQualificationCoreServer(endpoint, secret);
   await new Promise((resolveListen, rejectListen) => {
     qualificationServer.server.once("error", rejectListen);
@@ -267,7 +280,9 @@ export async function qualifyPackagedCore({
     windowsHide: true,
     stdio: ["pipe", "pipe", "pipe"],
   });
-  child.stdin?.end(bootstrapFrame(endpoint, secret));
+  child.stdin?.end(
+    bootstrapFrame({ endpoint, secret, databaseDek, secureStorageEndpoint, secureStorageSecret }),
+  );
   let stderr = "";
   let stdout = "";
   child.stdout?.on("data", (chunk) => {
@@ -311,6 +326,7 @@ export async function qualifyPackagedCore({
       await stopChild(child, stopTimeoutMs);
     }
     qualificationServer.server.close();
+    await rm(qualificationDatabaseRoot, { recursive: true, force: true });
   }
 }
 

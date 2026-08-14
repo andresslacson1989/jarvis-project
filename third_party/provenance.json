@@ -2,6 +2,66 @@
   "schemaVersion": 1,
   "dependencies": [
     {
+      "ecosystem": "cargo",
+      "name": "argon2",
+      "version": "0.5.3",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/RustCrypto/password-hashes/tree/master/argon2",
+      "role": "DESKTOP_WINDOWS_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "base64ct",
+      "version": "1.8.3",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/RustCrypto/formats",
+      "role": "DESKTOP_WINDOWS_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "blake2",
+      "version": "0.10.6",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/RustCrypto/hashes",
+      "role": "DESKTOP_WINDOWS_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "password-hash",
+      "version": "0.5.0",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/RustCrypto/traits/tree/master/password-hash",
+      "role": "DESKTOP_WINDOWS_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "rand_core",
+      "version": "0.6.4",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/rust-random/rand",
+      "role": "DESKTOP_WINDOWS_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "subtle",
+      "version": "2.6.1",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/dalek-cryptography/subtle",
+      "role": "DESKTOP_WINDOWS_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
       "ecosystem": "npm",
       "name": "@gar/promise-retry",
       "version": "1.0.3",
@@ -337,6 +397,376 @@
       "version": "26.2.0",
       "license": "MIT",
       "source": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "base64-js",
+      "version": "1.5.1",
+      "license": "MIT",
+      "source": "https://github.com/beatgammit/base64-js.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "better-sqlite3-multiple-ciphers",
+      "version": "12.11.1",
+      "license": "MIT",
+      "source": "https://github.com/m4heshd/better-sqlite3-multiple-ciphers.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "bindings",
+      "version": "1.5.0",
+      "license": "MIT",
+      "source": "https://github.com/TooTallNate/node-bindings.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "bl",
+      "version": "4.1.0",
+      "license": "MIT",
+      "source": "https://github.com/rvagg/bl.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "buffer",
+      "version": "5.7.1",
+      "license": "MIT",
+      "source": "https://github.com/feross/buffer.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "chownr",
+      "version": "1.1.4",
+      "license": "ISC",
+      "source": "https://github.com/isaacs/chownr.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "decompress-response",
+      "version": "6.0.0",
+      "license": "MIT",
+      "source": "https://github.com/sindresorhus/decompress-response.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "deep-extend",
+      "version": "0.6.0",
+      "license": "MIT",
+      "source": "https://github.com/unclechu/node-deep-extend.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "end-of-stream",
+      "version": "1.4.5",
+      "license": "MIT",
+      "source": "https://github.com/mafintosh/end-of-stream.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "expand-template",
+      "version": "2.0.3",
+      "license": "MIT OR WTFPL",
+      "source": "https://github.com/ralphtheninja/expand-template.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "file-uri-to-path",
+      "version": "1.0.0",
+      "license": "MIT",
+      "source": "https://github.com/TooTallNate/file-uri-to-path.git",
+      "role": "CORE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "fs-constants",
+      "version": "1.0.0",
+      "license": "MIT",
+      "source": "https://github.com/mafintosh/fs-constants.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "github-from-package",
+      "version": "0.0.0",
+      "license": "MIT",
+      "source": "https://github.com/substack/github-from-package.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "ieee754",
+      "version": "1.2.1",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/feross/ieee754.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "inherits",
+      "version": "2.0.4",
+      "license": "ISC",
+      "source": "https://github.com/isaacs/inherits.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "ini",
+      "version": "1.3.8",
+      "license": "ISC",
+      "source": "https://github.com/isaacs/ini.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "mimic-response",
+      "version": "3.1.0",
+      "license": "MIT",
+      "source": "https://github.com/sindresorhus/mimic-response.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "minimist",
+      "version": "1.2.8",
+      "license": "MIT",
+      "source": "https://github.com/minimistjs/minimist.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "mkdirp-classic",
+      "version": "0.5.3",
+      "license": "MIT",
+      "source": "https://github.com/mafintosh/mkdirp-classic.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "napi-build-utils",
+      "version": "2.0.0",
+      "license": "MIT",
+      "source": "https://github.com/inspiredware/napi-build-utils.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "node-abi",
+      "version": "3.94.0",
+      "license": "MIT",
+      "source": "https://github.com/electron/node-abi.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "once",
+      "version": "1.4.0",
+      "license": "ISC",
+      "source": "https://github.com/isaacs/once.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "prebuild-install",
+      "version": "7.1.3",
+      "license": "MIT",
+      "source": "https://github.com/prebuild/prebuild-install.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pump",
+      "version": "3.0.4",
+      "license": "MIT",
+      "source": "https://github.com/mafintosh/pump.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "rc",
+      "version": "1.2.8",
+      "license": "BSD-2-Clause OR MIT OR Apache-2.0",
+      "source": "https://github.com/dominictarr/rc.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "readable-stream",
+      "version": "3.6.2",
+      "license": "MIT",
+      "source": "https://github.com/nodejs/readable-stream.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "safe-buffer",
+      "version": "5.2.1",
+      "license": "MIT",
+      "source": "https://github.com/feross/safe-buffer.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "semver",
+      "version": "7.8.5",
+      "license": "ISC",
+      "source": "https://github.com/npm/node-semver.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "simple-concat",
+      "version": "1.0.1",
+      "license": "MIT",
+      "source": "https://github.com/feross/simple-concat.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "simple-get",
+      "version": "4.0.1",
+      "license": "MIT",
+      "source": "https://github.com/feross/simple-get.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "string_decoder",
+      "version": "1.3.0",
+      "license": "MIT",
+      "source": "https://github.com/nodejs/string_decoder.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "strip-json-comments",
+      "version": "2.0.1",
+      "license": "MIT",
+      "source": "https://github.com/sindresorhus/strip-json-comments.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "tar-fs",
+      "version": "2.1.5",
+      "license": "MIT",
+      "source": "https://github.com/mafintosh/tar-fs.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "tar-stream",
+      "version": "2.2.0",
+      "license": "MIT",
+      "source": "https://github.com/mafintosh/tar-stream.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "tunnel-agent",
+      "version": "0.6.0",
+      "license": "Apache-2.0",
+      "source": "https://github.com/mikeal/tunnel-agent.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "util-deprecate",
+      "version": "1.0.2",
+      "license": "MIT",
+      "source": "https://github.com/TooTallNate/util-deprecate.git",
+      "role": "CORE_BUILD_OR_TYPECHECK",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "wrappy",
+      "version": "1.0.2",
+      "license": "ISC",
+      "source": "https://github.com/npm/wrappy.git",
       "role": "CORE_BUILD_OR_TYPECHECK",
       "packaged": false,
       "reviewStatus": "APPROVED"

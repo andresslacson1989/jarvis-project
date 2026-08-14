@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { readdir, rmdir } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { packageCoreRuntime } from "./package-core-runtime.mjs";
+import { validateReleaseSource } from "./validate-source-commit.mjs";
 
 const REPOSITORY_ROOT = resolve(fileURLToPath(new URL("../../", import.meta.url)));
 const TAURI_RESOURCE_ROOT = resolve(
@@ -108,7 +109,9 @@ export async function packageTauriCoreRuntime(options) {
 }
 
 async function main() {
-  const result = await packageTauriCoreRuntime(parseArguments(process.argv.slice(2)));
+  const arguments_ = parseArguments(process.argv.slice(2));
+  await validateReleaseSource({ sourceCommitSha: arguments_.sourceCommitSha, repositoryRoot: REPOSITORY_ROOT });
+  const result = await packageTauriCoreRuntime(arguments_);
   console.log(`[tauri-core-runtime-package] wrote ${result.releaseRoot}`);
 }
 

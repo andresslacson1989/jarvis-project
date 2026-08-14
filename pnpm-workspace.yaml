@@ -18,7 +18,8 @@ trustLockfile: false
 blockExoticSubdeps: true
 strictPeerDependencies: true
 strictDepBuilds: true
-allowBuilds: {}
+allowBuilds:
+  better-sqlite3-multiple-ciphers: true
 verifyDepsBeforeRun: error
 saveExact: true
 autoInstallPeers: false

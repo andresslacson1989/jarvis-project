@@ -8,11 +8,24 @@ import type {
   CoreStatusResponse,
 } from "../../../packages/protocol/src/core.js";
 import { admitReleaseRuntime, type ReleaseTrustAdmission } from "./release-trust.js";
+import { openCoreDatabase, type CoreDatabaseConnection } from "./persistence.js";
+import { applyCoreMigrations } from "./schema.js";
+import {
+  restoreVerifiedPortableBackup,
+  type RestoreVerifiedPortableBackupInputV1,
+  type RestoredPortableBackupV1,
+} from "./backup-package.js";
 import {
   authenticateCoreTransport,
   connectCoreTransport,
   CoreIpcBootstrapError,
+  CoreIpcFrameReader,
+  CORE_IPC_FRAME_CEILING,
+  deriveNewSessionPasswordThroughNativeStorage,
+  protectNewDbDekThroughNativeStorage,
+  encodeCoreIpcJsonFrame,
   readBootstrapMaterial,
+  type BootstrapMaterial,
   type AuthenticatedTransport,
 } from "./ipc-bootstrap.js";
 
@@ -22,7 +35,7 @@ export const CORE_RUNTIME_ROLE = "FULL_HOST" as const;
 export const CORE_ARCHITECTURE = "x64" as const;
 const CORE_STATUS_REQUEST = "get_core_status" as const;
 
-export type CoreBootstrapState = "STARTING" | "READY" | "STOPPING" | "STOPPED";
+export type CoreBootstrapState = "STARTING" | "RECOVERY" | "READY" | "STOPPING" | "STOPPED";
 export type CoreBootstrapFailureCode =
   | "CORE_RUNTIME_MISSING"
   | "CORE_RUNTIME_INTEGRITY_FAILED"
@@ -35,6 +48,8 @@ export interface CoreRuntimeEnvironment {
   readonly entrypoint: string;
   readonly tufMetadataDirectory: string;
   readonly releaseTrust: ReleaseTrustAdmission;
+  readonly databasePath?: string;
+  readonly recoveryMode: boolean;
 }
 
 export interface CoreStatus {
@@ -112,6 +127,14 @@ export async function validateCoreEnvironment(
   const releaseRootInput = requiredEnvironmentValue(environment, "JARVIS_CORE_ROOT");
   const entrypointInput = requiredEnvironmentValue(environment, "JARVIS_CORE_ENTRYPOINT");
   const tufMetadataDirectoryInput = requiredEnvironmentValue(environment, "JARVIS_TUF_METADATA_DIR");
+  const databasePathInput = environment.JARVIS_DATABASE_PATH;
+  const recoveryModeInput = environment.JARVIS_RECOVERY_MODE;
+  if (recoveryModeInput !== undefined && recoveryModeInput !== "1") {
+    throw new CoreBootstrapError(
+      "CORE_RUNTIME_INCOMPATIBLE",
+      "JARVIS_RECOVERY_MODE must be exactly 1 when present",
+    );
+  }
   if (!isAbsolute(releaseRootInput) || !isAbsolute(entrypointInput)) {
     throw new CoreBootstrapError(
       "CORE_RUNTIME_INCOMPATIBLE",
@@ -166,7 +189,14 @@ export async function validateCoreEnvironment(
     const detail = error instanceof Error ? error.message : "unknown TUF admission failure";
     throw new CoreBootstrapError("CORE_RUNTIME_INTEGRITY_FAILED", detail, { cause: error });
   }
-  return { releaseRoot, entrypoint, tufMetadataDirectory, releaseTrust };
+  return {
+    releaseRoot,
+    entrypoint,
+    tufMetadataDirectory,
+    releaseTrust,
+    recoveryMode: recoveryModeInput === "1",
+    ...(databasePathInput === undefined ? {} : { databasePath: databasePathInput }),
+  };
 }
 
 export interface CoreIpcBoundaryStub {
@@ -185,16 +215,7 @@ export interface CoreServiceShellBoundary {
 export class CoreServiceShell implements CoreServiceShellBoundary {
   async handle(request: IpcEnvelope<unknown>): Promise<CoreStatusResponse> {
     if (!isCoreStatusRequest(request)) {
-      return {
-        ok: false,
-        error: {
-          code: "CORE_IPC_REQUEST_INVALID",
-          category: "VALIDATION",
-          message: "Core status requests must use protocol 1, get_core_status, a UUIDv7 correlation ID, and an empty payload",
-          retryable: false,
-          correlationId: request.correlationId,
-        },
-      };
+      return invalidCoreStatusResponse(request);
     }
 
     return {
@@ -213,6 +234,39 @@ export class CoreServiceShell implements CoreServiceShellBoundary {
       },
     };
   }
+}
+
+/**
+ * The authenticated native transport is the first point at which Core may
+ * return a real status result. This shell still owns no mutable mission state
+ * and exposes no tools or provider operations.
+ */
+export class AuthenticatedCoreServiceShell implements CoreServiceShellBoundary {
+  async handle(request: IpcEnvelope<unknown>): Promise<CoreStatusResponse> {
+    if (!isCoreStatusRequest(request)) return invalidCoreStatusResponse(request);
+    return { ok: true, result: LOCKED_CORE_SERVICE_STATUS };
+  }
+}
+
+const FALLBACK_CORRELATION_ID = "018f3b8e-6c68-7abc-8def-0123456789ab";
+
+function invalidCoreStatusResponse(request: unknown): CoreStatusResponse {
+  return {
+    ok: false,
+    error: {
+      code: "CORE_IPC_REQUEST_INVALID",
+      category: "VALIDATION",
+      message: "Core status requests must use protocol 1, get_core_status, a UUIDv7 correlation ID, and an empty payload",
+      retryable: false,
+      correlationId: correlationIdFor(request),
+    },
+  };
+}
+
+function correlationIdFor(value: unknown): string {
+  return isRecord(value) && isUuidV7(value.correlationId)
+    ? value.correlationId
+    : FALLBACK_CORRELATION_ID;
 }
 
 function isCoreStatusRequest(value: unknown): value is IpcEnvelope<Record<string, never>> {
@@ -261,19 +315,49 @@ export class LockedCoreIpcBoundary implements CoreIpcBoundaryStub {
 export class CoreBootstrap {
   private state: CoreBootstrapState = "STARTING";
   private environment: CoreRuntimeEnvironment | undefined;
+  private database: CoreDatabaseConnection | undefined;
+  private secureStorageMaterial:
+    Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret"> | undefined;
 
-  async start(environment: NodeJS.ProcessEnv = process.env): Promise<CoreStatus> {
+  async start(
+    environment: NodeJS.ProcessEnv = process.env,
+    databaseDek?: Buffer,
+    bootstrapMaterial?: Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret">,
+  ): Promise<CoreStatus> {
     if (this.state === "READY") return this.status();
     if (this.state !== "STARTING") {
       throw new CoreBootstrapError("CORE_START_FAILED", "Core cannot restart after shutdown");
     }
     this.environment = await validateCoreEnvironment(environment);
-    this.state = "READY";
+    if (bootstrapMaterial) {
+      this.secureStorageMaterial = {
+        secureStorageEndpoint: bootstrapMaterial.secureStorageEndpoint,
+        secureStorageSecret: Buffer.from(bootstrapMaterial.secureStorageSecret),
+      };
+    }
+    if (databaseDek !== undefined) {
+      if (!this.environment.databasePath) {
+        throw new CoreBootstrapError("CORE_RUNTIME_INCOMPATIBLE", "JARVIS_DATABASE_PATH is required with a DB_DEK");
+      }
+      try {
+        this.database = openCoreDatabase(this.environment.databasePath, { dbDek: databaseDek });
+        applyCoreMigrations(this.database);
+      } catch (error) {
+        this.database?.close();
+        this.database = undefined;
+        throw new CoreBootstrapError("CORE_START_FAILED", "Core persistence bootstrap failed", { cause: error });
+      }
+    }
+    this.state = this.environment.recoveryMode ? "RECOVERY" : "READY";
     return this.status();
   }
 
   stop(): CoreStatus {
-    if (this.state === "READY") this.state = "STOPPING";
+    this.database?.close();
+    this.database = undefined;
+    this.secureStorageMaterial?.secureStorageSecret.fill(0);
+    this.secureStorageMaterial = undefined;
+    if (this.state === "READY" || this.state === "RECOVERY") this.state = "STOPPING";
     this.state = "STOPPED";
     return this.status();
   }
@@ -294,10 +378,93 @@ export class CoreBootstrap {
     }
     return this.environment;
   }
+
+  async restorePortableBackup(
+    input: Omit<RestoreVerifiedPortableBackupInputV1, "protectNewDbDek" | "sessionPasswordVerifier"> & {
+      readonly newSessionPassword: Buffer;
+    },
+  ): Promise<RestoredPortableBackupV1> {
+    const material = this.secureStorageMaterial;
+    if (!material) {
+      throw new CoreBootstrapError(
+        "CORE_START_FAILED",
+        "portable restore requires an authenticated native secure-storage boundary",
+      );
+    }
+    this.database?.close();
+    this.database = undefined;
+    const newSessionPassword = Buffer.from(input.newSessionPassword);
+    try {
+      const sessionPasswordVerifier = await deriveNewSessionPasswordThroughNativeStorage(
+        material,
+        newSessionPassword,
+      );
+      try {
+        const { newSessionPassword: _discardedPassword, ...restoreInput } = input;
+        return await restoreVerifiedPortableBackup({
+          ...restoreInput,
+          sessionPasswordVerifier,
+          protectNewDbDek: (dbDek) => protectNewDbDekThroughNativeStorage(material, dbDek),
+        });
+      } finally {
+        sessionPasswordVerifier.salt.fill(0);
+        sessionPasswordVerifier.verifier.fill(0);
+      }
+    } finally {
+      newSessionPassword.fill(0);
+      input.newSessionPassword.fill(0);
+    }
+  }
 }
 
 export interface CoreTransportRuntime {
   readonly transport: AuthenticatedTransport;
+}
+
+async function writeCoreFrame(transport: AuthenticatedTransport, value: unknown): Promise<void> {
+  const frame = encodeCoreIpcJsonFrame(value);
+  await new Promise<void>((resolve, reject) => {
+    transport.socket.write(frame, (error?: Error | null) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+export async function serveAuthenticatedCoreTransport(
+  transport: AuthenticatedTransport,
+  isStopping: () => boolean = () => false,
+): Promise<void> {
+  const reader = new CoreIpcFrameReader(transport.socket);
+  const shell = new AuthenticatedCoreServiceShell();
+  while (!isStopping()) {
+    let payload: Buffer;
+    try {
+      payload = await reader.read(CORE_IPC_FRAME_CEILING, 60_000);
+    } catch (error) {
+      if (
+        error instanceof CoreIpcBootstrapError &&
+        error.code === "IPC_HANDSHAKE_TIMEOUT" &&
+        !isStopping()
+      ) {
+        continue;
+      }
+      return;
+    }
+
+    let request: unknown;
+    try {
+      request = JSON.parse(payload.toString("utf8")) as unknown;
+    } catch {
+      request = undefined;
+    }
+    const response = await shell.handle(request as IpcEnvelope<unknown>);
+    try {
+      await writeCoreFrame(transport, response);
+    } catch {
+      return;
+    }
+  }
 }
 
 async function runEntrypoint(): Promise<void> {
@@ -305,7 +472,11 @@ async function runEntrypoint(): Promise<void> {
   let transport: AuthenticatedTransport | undefined;
   try {
     const bootstrapMaterial = await readBootstrapMaterial(process.stdin);
-    await bootstrap.start();
+    try {
+      await bootstrap.start(process.env, bootstrapMaterial.databaseDek, bootstrapMaterial);
+    } finally {
+      bootstrapMaterial.databaseDek.fill(0);
+    }
     const socket = await connectCoreTransport(bootstrapMaterial.endpoint);
     transport = await authenticateCoreTransport(bootstrapMaterial, socket);
   } catch (error) {
@@ -318,20 +489,24 @@ async function runEntrypoint(): Promise<void> {
     return;
   }
 
-  // Keep the bootstrap process owned and alive until the authenticated native
-  // transport is attached. This handle is deliberately not a readiness signal;
-  // LockedCoreIpcBoundary remains the only boundary in this pre-IPC slice.
-  const lifecycleHandle = setInterval(() => undefined, 60_000);
-  await new Promise<void>((resolveShutdown) => {
-    const shutdown = () => {
-      clearInterval(lifecycleHandle);
-      transport?.socket.destroy();
-      bootstrap.stop();
-      resolveShutdown();
-    };
-    process.once("SIGINT", shutdown);
-    process.once("SIGTERM", shutdown);
-  });
+  const authenticatedTransport = transport;
+  if (!authenticatedTransport) {
+    process.stderr.write("[CORE_START_FAILED]\n");
+    process.exitCode = 1;
+    return;
+  }
+  let stopping = false;
+  const shutdown = () => {
+    stopping = true;
+    authenticatedTransport.socket.destroy();
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+  await serveAuthenticatedCoreTransport(authenticatedTransport, () => stopping);
+  process.off("SIGINT", shutdown);
+  process.off("SIGTERM", shutdown);
+  authenticatedTransport.socket.destroy();
+  bootstrap.stop();
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

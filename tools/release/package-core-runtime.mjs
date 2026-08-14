@@ -1,12 +1,26 @@
 import { constants } from "node:fs";
-import { copyFile, cp, lstat, mkdir, mkdtemp, open, readFile, realpath, rename, rm } from "node:fs/promises";
+import { copyFile, cp, lstat, mkdir, mkdtemp, open, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { generateRuntimeManifest } from "./generate-core-runtime-manifest.mjs";
+import { validateReleaseSource } from "./validate-source-commit.mjs";
 
 const V1_NODE_VERSION = "24.18.0";
-const CORE_SUPPORT_FILES = ["release-trust.js", "ipc-bootstrap.js"];
+const CORE_SUPPORT_FILES = [
+  "release-trust.js",
+  "ipc-bootstrap.js",
+  "persistence.js",
+  "schema.js",
+  "backup-descriptor.js",
+  "backup-manifest.js",
+  "backup-chunks.js",
+  "backup-recovery.js",
+  "backup-package.js",
+  "backup-payload.js",
+];
+const CORE_RUNTIME_INSTALL_ONLY_DEPENDENCIES = new Set(["prebuild-install"]);
+const CORE_PACKAGE_JSON = '{"type":"module"}\n';
 
 function usage() {
   return "Usage: node tools/release/package-core-runtime.mjs --node <absolute-node.exe> --core <absolute-core-entrypoint> --output <absolute-release-root> --jarvis-release-version <version> --core-version <version> --source-commit-sha <40-hex-sha> --release-sequence <uint64> --security-epoch <uint64> --tuf-metadata-dir <absolute-dir> [--node-version 24.18.0]";
@@ -169,6 +183,7 @@ async function copyReleaseUnit({ node, core, coreSupports, coreNodeModules, outp
   const coreDirectory = join(output, "core", "dist");
   await mkdir(runtimeDirectory, { recursive: true });
   await mkdir(coreDirectory, { recursive: true });
+  await writeFile(join(output, "core", "package.json"), CORE_PACKAGE_JSON, { flag: "wx" });
   await copyFile(node, join(runtimeDirectory, "node.exe"), constants.COPYFILE_EXCL);
   await copyFile(core, join(coreDirectory, "main.js"), constants.COPYFILE_EXCL);
   for (const support of coreSupports) {
@@ -198,10 +213,12 @@ async function copyCoreDependencies(sourceNodeModules, destinationNodeModules) {
   const corePackageJson = join(dirname(sourceRoot), "package.json");
   if (!(await pathExists(corePackageJson))) return;
   const corePackage = JSON.parse(await readFile(corePackageJson, "utf8"));
-  const pending = Object.keys(corePackage.dependencies ?? {}).map((name) => ({
-    name,
-    base: dirname(corePackageJson),
-  }));
+  const pending = Object.keys(corePackage.dependencies ?? {})
+    .filter((name) => !CORE_RUNTIME_INSTALL_ONLY_DEPENDENCIES.has(name))
+    .map((name) => ({
+      name,
+      base: dirname(corePackageJson),
+    }));
   const copied = new Set();
   await mkdir(destinationNodeModules, { recursive: true });
   while (pending.length > 0) {
@@ -226,14 +243,15 @@ async function copyCoreDependencies(sourceNodeModules, destinationNodeModules) {
     copied.add(packageName);
     const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
     pending.push(
-      ...Object.keys(packageManifest.dependencies ?? {}).map((name) => ({
-        name,
-        base: packageRoot,
-      })),
-      ...Object.keys(packageManifest.optionalDependencies ?? {}).map((name) => ({
-        name,
-        base: packageRoot,
-      })),
+      ...[
+        ...Object.keys(packageManifest.dependencies ?? {}),
+        ...Object.keys(packageManifest.optionalDependencies ?? {}),
+      ]
+        .filter((name) => !CORE_RUNTIME_INSTALL_ONLY_DEPENDENCIES.has(name))
+        .map((name) => ({
+          name,
+          base: packageRoot,
+        })),
     );
   }
 }
@@ -308,6 +326,26 @@ export async function packageCoreRuntime({
     await requireRegularFile(support.source, `source Core support module ${support.name}`);
   }
 
+  const persistenceSupport = sourceCoreSupports.find(({ name }) => name === "persistence.js");
+  if (!persistenceSupport) throw new Error("source Core persistence support module is missing");
+  const persistenceModule = await import(pathToFileURL(persistenceSupport.source).href);
+  const persistenceQualification = {
+    binding: persistenceModule.QUALIFIED_SQLITE_BINDING,
+    bindingVersion: persistenceModule.QUALIFIED_SQLITE_BINDING_VERSION,
+    cipher: persistenceModule.QUALIFIED_SQLITE_CIPHER,
+    cipherProfile: persistenceModule.QUALIFIED_SQLCIPHER_PROFILE,
+    sqliteVersion: persistenceModule.QUALIFIED_SQLITE_VERSION,
+    sqliteSourceId: persistenceModule.QUALIFIED_SQLITE_SOURCE_ID,
+    walResetFixEvidence: {
+      upstreamFixedSince: persistenceModule.QUALIFIED_SQLITE_WAL_RESET_FIX_VERSION,
+      qualifiedSourceId: persistenceModule.QUALIFIED_SQLITE_SOURCE_ID,
+    },
+    snapshotMechanism: persistenceModule.SQLCIPHER_SNAPSHOT_MECHANISM,
+  };
+  if (Object.values(persistenceQualification).some((value) => value === undefined)) {
+    throw new Error("source Core persistence module does not expose complete qualification metadata");
+  }
+
   await mkdir(dirname(releaseRoot), { recursive: true });
   const temporaryRoot = await mkdtemp(join(dirname(releaseRoot), ".jarvis-core-runtime-"));
   try {
@@ -330,6 +368,7 @@ export async function packageCoreRuntime({
       protocolVersion,
       minimumDataSchemaVersion,
       maximumDataSchemaVersion,
+      persistenceQualification,
     });
     await copyTrustMetadata(tufMetadataDirectory, temporaryRoot);
     await rename(temporaryRoot, releaseRoot);
@@ -342,6 +381,7 @@ export async function packageCoreRuntime({
 
 async function main() {
   const arguments_ = parseArguments(process.argv.slice(2));
+  await validateReleaseSource({ sourceCommitSha: arguments_.sourceCommitSha });
   const result = await packageCoreRuntime(arguments_);
   console.log(`[core-runtime-package] wrote ${result.releaseRoot}`);
 }

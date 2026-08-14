@@ -12,6 +12,9 @@ use std::io::{self, BufReader, Read};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
+#[cfg(windows)]
+use std::os::windows::ffi::{OsStrExt, OsStringExt};
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -93,6 +96,8 @@ pub struct RuntimeIntegrityManifest {
     pub source_commit_sha: String,
     pub release_sequence: u64,
     pub security_epoch: u64,
+    #[serde(default)]
+    pub persistence_qualification: Option<RuntimePersistenceQualification>,
     pub tuf_spec_version: String,
     pub target: String,
     pub protocol_version: u32,
@@ -110,6 +115,44 @@ pub struct RuntimeIntegrityManifest {
     pub core_sha256: String,
     #[serde(default)]
     pub core_support_files: Vec<RuntimeSupportFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimePersistenceQualification {
+    pub binding: String,
+    pub binding_version: String,
+    pub cipher: String,
+    pub cipher_profile: String,
+    pub sqlite_version: String,
+    pub sqlite_source_id: String,
+    pub wal_reset_fix_evidence: RuntimeWalResetFixEvidence,
+    pub snapshot_mechanism: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeWalResetFixEvidence {
+    pub upstream_fixed_since: String,
+    pub qualified_source_id: String,
+}
+
+impl Default for RuntimePersistenceQualification {
+    fn default() -> Self {
+        Self {
+            binding: "better-sqlite3-multiple-ciphers".to_owned(),
+            binding_version: "12.11.1".to_owned(),
+            cipher: "sqlcipher".to_owned(),
+            cipher_profile: "sqlcipher-legacy-v4".to_owned(),
+            sqlite_version: "3.53.2".to_owned(),
+            sqlite_source_id: "2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24".to_owned(),
+            wal_reset_fix_evidence: RuntimeWalResetFixEvidence {
+                upstream_fixed_since: "3.51.3".to_owned(),
+                qualified_source_id: "2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24".to_owned(),
+            },
+            snapshot_mechanism: "attached-sqlcipher-schema-export-v1".to_owned(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -282,6 +325,8 @@ impl CoreRuntimeLayout {
             || manifest.architecture != "x64"
             || manifest.node_version != V1_NODE_VERSION
             || manifest.protocol_major != 1
+            || manifest.persistence_qualification.as_ref()
+                != Some(&RuntimePersistenceQualification::default())
         {
             return Err(Self::error(
                 CoreRuntimeState::CoreRuntimeIncompatible,
@@ -381,18 +426,24 @@ impl CoreRuntimeLayout {
     /// User-controlled Node execution modifiers are never copied through.
     pub fn controlled_environment(&self) -> Result<BTreeMap<OsString, OsString>, CoreRuntimeError> {
         self.validate_structure()?;
+        let system_root = required_windows_environment("SystemRoot")?;
+        let windows_directory = required_windows_environment("WINDIR")?;
+        let release_root = launch_path(&self.release_root);
+        let entrypoint = launch_path(&self.core_entrypoint);
         Ok(BTreeMap::from([
+            (OsString::from("SystemRoot"), system_root),
+            (OsString::from("WINDIR"), windows_directory),
             (
                 OsString::from("JARVIS_CORE_ROOT"),
-                self.release_root.as_os_str().to_os_string(),
+                release_root.as_os_str().to_os_string(),
             ),
             (
                 OsString::from("JARVIS_CORE_ENTRYPOINT"),
-                self.core_entrypoint.as_os_str().to_os_string(),
+                entrypoint.as_os_str().to_os_string(),
             ),
             (
                 OsString::from("JARVIS_TUF_METADATA_DIR"),
-                self.release_root.join("tuf").join("metadata").as_os_str().to_os_string(),
+                release_root.join("tuf").join("metadata").as_os_str().to_os_string(),
             ),
         ]))
     }
@@ -402,9 +453,9 @@ impl CoreRuntimeLayout {
     pub(crate) fn launch_spec(&self, manifest_path: &Path) -> Result<CoreLaunchSpec, CoreRuntimeError> {
         self.validate_integrity(manifest_path)?;
         Ok(CoreLaunchSpec {
-            program: self.node_executable.clone(),
-            arguments: vec![self.core_entrypoint.as_os_str().to_os_string()],
-            current_dir: self.release_root.clone(),
+            program: launch_path(&self.node_executable),
+            arguments: vec![launch_path(&self.core_entrypoint).into_os_string()],
+            current_dir: launch_path(&self.release_root),
             environment: self.controlled_environment()?,
         })
     }
@@ -456,6 +507,44 @@ impl CoreRuntimeLayout {
         }
         Ok(root.join(relative_path))
     }
+}
+
+#[cfg(windows)]
+fn launch_path(path: &Path) -> PathBuf {
+    let units: Vec<u16> = path.as_os_str().encode_wide().collect();
+    let verbatim = ['\\' as u16, '\\' as u16, '?' as u16, '\\' as u16];
+    let unc_verbatim = [
+        '\\' as u16,
+        '\\' as u16,
+        '?' as u16,
+        '\\' as u16,
+        'U' as u16,
+        'N' as u16,
+        'C' as u16,
+        '\\' as u16,
+    ];
+    if units.starts_with(&unc_verbatim) {
+        let mut normal = vec!['\\' as u16, '\\' as u16];
+        normal.extend_from_slice(&units[unc_verbatim.len()..]);
+        PathBuf::from(OsString::from_wide(&normal))
+    } else if units.starts_with(&verbatim) {
+        PathBuf::from(OsString::from_wide(&units[verbatim.len()..]))
+    } else {
+        path.to_owned()
+    }
+}
+
+#[cfg(not(windows))]
+fn launch_path(path: &Path) -> PathBuf {
+    path.to_owned()
+}
+
+fn required_windows_environment(name: &str) -> Result<OsString, CoreRuntimeError> {
+    let value = std::env::var_os(name).filter(|value| !value.is_empty());
+    value.ok_or_else(|| CoreRuntimeError {
+        state: CoreRuntimeState::CoreRuntimeIncompatible,
+        detail: format!("required Windows runtime environment value {name} is missing"),
+    })
 }
 
 fn is_release_child(root: &Path, candidate: &Path) -> bool {
@@ -595,6 +684,7 @@ mod tests {
             source_commit_sha: "0".repeat(40),
             release_sequence: 1,
             security_epoch: 1,
+            persistence_qualification: Some(RuntimePersistenceQualification::default()),
             tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
             protocol_version: 1,
@@ -661,6 +751,7 @@ mod tests {
             source_commit_sha: "0".repeat(40),
             release_sequence: 1,
             security_epoch: 1,
+            persistence_qualification: Some(RuntimePersistenceQualification::default()),
             tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
             protocol_version: 1,
@@ -763,6 +854,7 @@ mod tests {
             source_commit_sha: "0".repeat(40),
             release_sequence: 1,
             security_epoch: 1,
+            persistence_qualification: Some(RuntimePersistenceQualification::default()),
             tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
             protocol_version: 1,
@@ -828,6 +920,7 @@ mod tests {
             source_commit_sha: "0".repeat(40),
             release_sequence: 1,
             security_epoch: 1,
+            persistence_qualification: Some(RuntimePersistenceQualification::default()),
             tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
             protocol_version: 1,

@@ -1,6 +1,6 @@
 {
   "name": "jarvis-project",
-  "version": "0.0.0",
+  "version": "1.0.6",
   "private": true,
   "packageManager": "pnpm@11.21.0",
   "engines": {

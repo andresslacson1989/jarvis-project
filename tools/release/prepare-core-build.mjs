@@ -16,6 +16,46 @@ const generatedIpcModule = resolve(
   ".artifacts/core-build/services/core/src/ipc-bootstrap.js",
 );
 const outputIpcModule = resolve(outputDirectory, "ipc-bootstrap.js");
+const generatedPersistenceModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/persistence.js",
+);
+const outputPersistenceModule = resolve(outputDirectory, "persistence.js");
+const generatedSchemaModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/schema.js",
+);
+const outputSchemaModule = resolve(outputDirectory, "schema.js");
+const generatedBackupDescriptorModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/backup-descriptor.js",
+);
+const outputBackupDescriptorModule = resolve(outputDirectory, "backup-descriptor.js");
+const generatedBackupManifestModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/backup-manifest.js",
+);
+const outputBackupManifestModule = resolve(outputDirectory, "backup-manifest.js");
+const generatedBackupChunksModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/backup-chunks.js",
+);
+const outputBackupChunksModule = resolve(outputDirectory, "backup-chunks.js");
+const generatedBackupRecoveryModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/backup-recovery.js",
+);
+const outputBackupRecoveryModule = resolve(outputDirectory, "backup-recovery.js");
+const generatedBackupPackageModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/backup-package.js",
+);
+const outputBackupPackageModule = resolve(outputDirectory, "backup-package.js");
+const generatedBackupPayloadModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/backup-payload.js",
+);
+const outputBackupPayloadModule = resolve(outputDirectory, "backup-payload.js");
 
 async function main() {
   const information = await stat(generatedEntrypoint).catch(() => null);
@@ -27,6 +67,14 @@ async function main() {
   await copyFile(generatedEntrypoint, outputEntrypoint);
   await copyFile(generatedTrustModule, outputTrustModule);
   await copyFile(generatedIpcModule, outputIpcModule);
+  await copyFile(generatedPersistenceModule, outputPersistenceModule);
+  await copyFile(generatedSchemaModule, outputSchemaModule);
+  await copyFile(generatedBackupDescriptorModule, outputBackupDescriptorModule);
+  await copyFile(generatedBackupManifestModule, outputBackupManifestModule);
+  await copyFile(generatedBackupChunksModule, outputBackupChunksModule);
+  await copyFile(generatedBackupRecoveryModule, outputBackupRecoveryModule);
+  await copyFile(generatedBackupPackageModule, outputBackupPackageModule);
+  await copyFile(generatedBackupPayloadModule, outputBackupPayloadModule);
   console.log(`[core-build] wrote ${outputEntrypoint}`);
 }
 
