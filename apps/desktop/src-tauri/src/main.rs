@@ -26,6 +26,8 @@ use tauri::Manager;
 use tauri::{Url, WebviewUrl};
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+#[cfg(not(debug_assertions))]
+use std::time::Duration;
 #[cfg(any(not(debug_assertions), test))]
 use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
 
@@ -202,6 +204,16 @@ fn should_start_core(startup_condition: &str) -> bool {
     matches!(startup_condition, "LOCKED" | "RECOVERY_REQUIRED")
 }
 
+#[cfg(any(not(debug_assertions), test))]
+fn core_authentication_failure_code(state: local_ipc::LocalIpcState) -> &'static str {
+    match state {
+        local_ipc::LocalIpcState::AuthenticationFailed => "CORE_AUTHENTICATION_FAILED_PROOF",
+        local_ipc::LocalIpcState::ProtocolMismatch => "CORE_AUTHENTICATION_FAILED_PROTOCOL",
+        local_ipc::LocalIpcState::HandshakeTimeout => "CORE_AUTHENTICATION_FAILED_TIMEOUT",
+        _ => "CORE_AUTHENTICATION_FAILED_TRANSPORT",
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -292,7 +304,7 @@ fn main() {
             let _startup_condition = bootstrap.condition().startup_query_value();
 
             #[cfg(not(debug_assertions))]
-            let startup_condition =
+            let mut startup_condition =
                 match _core_runtime_policy.load_verified_layout(resource_dir.clone()) {
                     Ok(_) => {
                         bootstrap.record(lifecycle::BootstrapStage::RuntimeIntegrityVerified)?;
@@ -368,28 +380,54 @@ fn main() {
                     bootstrap.condition(),
                 )?;
                 bootstrap_channel.close_reader();
-                let authenticated = local_ipc
-                    .authenticate_client()
-                    .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
-                let core_status = local_ipc
-                    .request_locked_status(&authenticated)
-                    .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
-                bootstrap.record(lifecycle::BootstrapStage::CoreAuthenticated)?;
-                bootstrap_diagnostics.record(
-                    lifecycle::BootstrapStage::CoreAuthenticated,
-                    bootstrap.condition(),
-                )?;
-                HostRuntime {
-                    local_ipc: Mutex::new(local_ipc),
-                    _secure_storage_runtime: secure_storage_runtime,
-                    process_supervisor,
-                    core_process,
-                    authenticated,
-                    core_status,
-                    _db_dek_handle: db_dek_handle,
-                    _db_dek: db_dek,
+                let core_exited = matches!(
+                    core_process
+                        .wait(Duration::ZERO)
+                        .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?,
+                    process_supervisor::ProcessWait::Exited { .. }
+                );
+                if core_exited {
+                    bootstrap.mark_repair_required();
+                    bootstrap_diagnostics.record_failure("CORE_EXITED_BEFORE_AUTHENTICATION")?;
+                    startup_condition = bootstrap.condition().startup_query_value();
+                    None
+                } else {
+                    match local_ipc.authenticate_client() {
+                        Ok(authenticated) => match local_ipc.request_locked_status(&authenticated) {
+                            Ok(core_status) => {
+                                bootstrap.record(lifecycle::BootstrapStage::CoreAuthenticated)?;
+                                bootstrap_diagnostics.record(
+                                    lifecycle::BootstrapStage::CoreAuthenticated,
+                                    bootstrap.condition(),
+                                )?;
+                                HostRuntime {
+                                    local_ipc: Mutex::new(local_ipc),
+                                    _secure_storage_runtime: secure_storage_runtime,
+                                    process_supervisor,
+                                    core_process,
+                                    authenticated,
+                                    core_status,
+                                    _db_dek_handle: db_dek_handle,
+                                    _db_dek: db_dek,
+                                }
+                                .into()
+                            }
+                            Err(_) => {
+                                bootstrap.mark_repair_required();
+                                bootstrap_diagnostics.record_failure("CORE_STATUS_REQUEST_FAILED")?;
+                                startup_condition = bootstrap.condition().startup_query_value();
+                                None
+                            }
+                        },
+                        Err(error) => {
+                            bootstrap.mark_repair_required();
+                            bootstrap_diagnostics
+                                .record_failure(core_authentication_failure_code(error.state))?;
+                            startup_condition = bootstrap.condition().startup_query_value();
+                            None
+                        }
+                    }
                 }
-                .into()
             } else {
                 None
             };
@@ -425,7 +463,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::should_start_core;
+    use super::{core_authentication_failure_code, should_start_core};
 
     #[test]
     fn only_locked_startup_condition_can_start_core() {
@@ -434,6 +472,28 @@ mod tests {
         assert!(!should_start_core("DEGRADED"));
         assert!(!should_start_core("REPAIR_REQUIRED"));
         assert!(!should_start_core("UNKNOWN"));
+    }
+
+    #[test]
+    fn core_authentication_diagnostics_remain_bounded_and_non_secret() {
+        assert_eq!(
+            core_authentication_failure_code(
+                super::local_ipc::LocalIpcState::AuthenticationFailed
+            ),
+            "CORE_AUTHENTICATION_FAILED_PROOF"
+        );
+        assert_eq!(
+            core_authentication_failure_code(super::local_ipc::LocalIpcState::ProtocolMismatch),
+            "CORE_AUTHENTICATION_FAILED_PROTOCOL"
+        );
+        assert_eq!(
+            core_authentication_failure_code(super::local_ipc::LocalIpcState::HandshakeTimeout),
+            "CORE_AUTHENTICATION_FAILED_TIMEOUT"
+        );
+        assert_eq!(
+            core_authentication_failure_code(super::local_ipc::LocalIpcState::FrameMalformed),
+            "CORE_AUTHENTICATION_FAILED_TRANSPORT"
+        );
     }
 
     #[cfg(test)]
