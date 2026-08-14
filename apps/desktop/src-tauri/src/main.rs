@@ -91,6 +91,32 @@ impl SecureStorageProtectionRuntime {
                             result,
                         );
                     }
+                    local_ipc::SecureStorageOperation::ProtectLocalBackupDek(request) => {
+                        let result = storage
+                            .protect_backup_dek(&request.backup_dek, &request.descriptor_digest)
+                            .map_err(|_| "LOCAL_BACKUP_DEK_PROTECTION_FAILED");
+                        let _ = server.respond_local_backup_dek(
+                            &session,
+                            request.correlation_id.clone(),
+                            "protect_local_backup_dek",
+                            result,
+                        );
+                    }
+                    local_ipc::SecureStorageOperation::UnprotectLocalBackupDek(request) => {
+                        let result = storage
+                            .unprotect_backup_dek(
+                                &request.protected_backup_dek,
+                                &request.descriptor_digest,
+                            )
+                            .map(|backup_dek| backup_dek.as_bytes().to_vec())
+                            .map_err(|_| "LOCAL_BACKUP_DEK_UNPROTECTION_FAILED");
+                        let _ = server.respond_local_backup_dek(
+                            &session,
+                            request.correlation_id.clone(),
+                            "unprotect_local_backup_dek",
+                            result,
+                        );
+                    }
                     local_ipc::SecureStorageOperation::Commit(request) => {
                         let result = secure_storage::SecureStorageHandle::parse(&request.handle)
                             .and_then(|handle| {
@@ -453,11 +479,33 @@ mod tests {
         let script = r#"
             const chunks = [];
             for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
-            const { parseBootstrapFrame, protectNewDbDekThroughNativeStorage } = await import(process.env.JARVIS_TEST_IPC_MODULE);
+            const { parseBootstrapFrame, protectNewDbDekThroughNativeStorage, protectLocalBackupDekThroughNativeStorage, unprotectLocalBackupDekThroughNativeStorage } = await import(process.env.JARVIS_TEST_IPC_MODULE);
             const material = parseBootstrapFrame(Buffer.concat(chunks));
-            const lease = await protectNewDbDekThroughNativeStorage(material, Buffer.alloc(32, Number(process.env.JARVIS_TEST_KEY)));
-            if (process.argv[1] === "commit") await lease.commit();
-            else await lease.abort();
+            if (process.argv[1] === "local" && typeof protectLocalBackupDekThroughNativeStorage !== "function") {
+                process.stdout.write("LEGACY");
+                process.exit(0);
+            }
+            if (process.argv[1] === "local") {
+                const backupDek = Buffer.alloc(32, Number(process.env.JARVIS_TEST_KEY));
+                const descriptorDigest = Buffer.alloc(32, 0x77);
+                const protectedBackupDek = await protectLocalBackupDekThroughNativeStorage(material, backupDek, descriptorDigest);
+                const recovered = await unprotectLocalBackupDekThroughNativeStorage(material, protectedBackupDek, descriptorDigest);
+                if (!recovered.equals(backupDek)) throw new Error("local BackupDEK round-trip mismatch");
+                try {
+                    await unprotectLocalBackupDekThroughNativeStorage(material, protectedBackupDek, Buffer.alloc(32, 0x78));
+                    throw new Error("local BackupDEK accepted mismatched descriptor binding");
+                } catch (error) {
+                    if (error?.message === "local BackupDEK accepted mismatched descriptor binding") throw error;
+                }
+                backupDek.fill(0);
+                descriptorDigest.fill(0);
+                protectedBackupDek.fill(0);
+                recovered.fill(0);
+            } else {
+                const lease = await protectNewDbDekThroughNativeStorage(material, Buffer.alloc(32, Number(process.env.JARVIS_TEST_KEY)));
+                if (process.argv[1] === "commit") await lease.commit();
+                else await lease.abort();
+            }
             process.stdout.write("OK");
         "#;
         let run_client = |mode: &str, key: u8| {
@@ -495,7 +543,12 @@ mod tests {
                 "secure-storage client failed: {}",
                 String::from_utf8_lossy(&output.stderr)
             );
-            assert_eq!(String::from_utf8_lossy(&output.stdout), "OK");
+            let output_text = String::from_utf8_lossy(&output.stdout);
+            if mode == "local" {
+                assert!(output_text == "OK" || output_text == "LEGACY");
+            } else {
+                assert_eq!(output_text, "OK");
+            }
         };
 
         run_client("commit", 0x44);
@@ -508,6 +561,7 @@ mod tests {
             std::fs::read_to_string(&handle_path).expect("active handle must remain"),
             active_handle
         );
+        run_client("local", 0x66);
         drop(runtime);
         let _ = std::fs::remove_dir_all(root);
     }

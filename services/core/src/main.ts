@@ -11,7 +11,9 @@ import { admitReleaseRuntime, type ReleaseTrustAdmission } from "./release-trust
 import { openCoreDatabase, type CoreDatabaseConnection } from "./persistence.js";
 import { applyCoreMigrations } from "./schema.js";
 import {
+  restoreVerifiedLocalBackup,
   restoreVerifiedPortableBackup,
+  type RestoreVerifiedLocalBackupInputV1,
   type RestoreVerifiedPortableBackupInputV1,
   type RestoredPortableBackupV1,
 } from "./backup-package.js";
@@ -22,6 +24,7 @@ import {
   CoreIpcFrameReader,
   CORE_IPC_FRAME_CEILING,
   deriveNewSessionPasswordThroughNativeStorage,
+  unprotectLocalBackupDekThroughNativeStorage,
   protectNewDbDekThroughNativeStorage,
   encodeCoreIpcJsonFrame,
   readBootstrapMaterial,
@@ -404,6 +407,45 @@ export class CoreBootstrap {
         return await restoreVerifiedPortableBackup({
           ...restoreInput,
           sessionPasswordVerifier,
+          protectNewDbDek: (dbDek) => protectNewDbDekThroughNativeStorage(material, dbDek),
+        });
+      } finally {
+        sessionPasswordVerifier.salt.fill(0);
+        sessionPasswordVerifier.verifier.fill(0);
+      }
+    } finally {
+      newSessionPassword.fill(0);
+      input.newSessionPassword.fill(0);
+    }
+  }
+
+  async restoreLocalBackup(
+    input: Omit<RestoreVerifiedLocalBackupInputV1, "protectNewDbDek" | "sessionPasswordVerifier" | "unprotectBackupDek"> & {
+      readonly newSessionPassword: Buffer;
+    },
+  ): Promise<RestoredPortableBackupV1> {
+    const material = this.secureStorageMaterial;
+    if (!material) {
+      throw new CoreBootstrapError(
+        "CORE_START_FAILED",
+        "local restore requires an authenticated native secure-storage boundary",
+      );
+    }
+    this.database?.close();
+    this.database = undefined;
+    const newSessionPassword = Buffer.from(input.newSessionPassword);
+    try {
+      const sessionPasswordVerifier = await deriveNewSessionPasswordThroughNativeStorage(
+        material,
+        newSessionPassword,
+      );
+      try {
+        const { newSessionPassword: _discardedPassword, ...restoreInput } = input;
+        return await restoreVerifiedLocalBackup({
+          ...restoreInput,
+          sessionPasswordVerifier,
+          unprotectBackupDek: (protectedBackupDek, descriptorDigest) =>
+            unprotectLocalBackupDekThroughNativeStorage(material, protectedBackupDek, descriptorDigest),
           protectNewDbDek: (dbDek) => protectNewDbDekThroughNativeStorage(material, dbDek),
         });
       } finally {

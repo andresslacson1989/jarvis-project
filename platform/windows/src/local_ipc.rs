@@ -17,6 +17,7 @@ const BOOTSTRAP_SECRET_BYTES: usize = 32;
 const BOOTSTRAP_DATABASE_DEK_BYTES: usize = 32;
 const HANDSHAKE_NONCE_BYTES: usize = 32;
 const MAX_SESSION_PASSWORD_BYTES: usize = 4096;
+const MAX_LOCAL_BACKUP_SLOT_BYTES: usize = 64 * 1024;
 const HMAC_BLOCK_BYTES: usize = 64;
 const HANDSHAKE_DOMAIN: &[u8] = b"JARVIS-CORE-IPC-BOOTSTRAP-V1\0";
 
@@ -201,6 +202,20 @@ pub struct SecureStorageProtectionRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalBackupDekProtectionRequest {
+    pub correlation_id: String,
+    pub backup_dek: [u8; BOOTSTRAP_DATABASE_DEK_BYTES],
+    pub descriptor_digest: [u8; 32],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalBackupDekUnprotectionRequest {
+    pub correlation_id: String,
+    pub protected_backup_dek: Vec<u8>,
+    pub descriptor_digest: [u8; 32],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecureStorageHandleOperationRequest {
     pub operation: String,
     pub correlation_id: String,
@@ -228,6 +243,8 @@ pub struct SessionPasswordVerifier {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SecureStorageOperation {
     Protect(SecureStorageProtectionRequest),
+    ProtectLocalBackupDek(LocalBackupDekProtectionRequest),
+    UnprotectLocalBackupDek(LocalBackupDekUnprotectionRequest),
     Commit(SecureStorageHandleOperationRequest),
     Abort(SecureStorageHandleOperationRequest),
     DeriveSessionPassword(SessionPasswordDerivationRequest),
@@ -236,6 +253,20 @@ pub enum SecureStorageOperation {
 impl Drop for SessionPasswordDerivationRequest {
     fn drop(&mut self) {
         self.password.fill(0);
+    }
+}
+
+impl Drop for LocalBackupDekProtectionRequest {
+    fn drop(&mut self) {
+        self.backup_dek.fill(0);
+        self.descriptor_digest.fill(0);
+    }
+}
+
+impl Drop for LocalBackupDekUnprotectionRequest {
+    fn drop(&mut self) {
+        self.protected_backup_dek.fill(0);
+        self.descriptor_digest.fill(0);
     }
 }
 
@@ -339,6 +370,30 @@ struct SecureStorageProtectionRequestWire {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LocalBackupDekProtectionRequestWire {
+    protocol_version: u32,
+    kind: String,
+    operation: String,
+    correlation_id: String,
+    backup_dek: String,
+    descriptor_digest: String,
+    proof: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LocalBackupDekUnprotectionRequestWire {
+    protocol_version: u32,
+    kind: String,
+    operation: String,
+    correlation_id: String,
+    protected_backup_dek: String,
+    descriptor_digest: String,
+    proof: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SecureStorageHandleOperationRequestWire {
     protocol_version: u32,
     kind: String,
@@ -365,6 +420,17 @@ struct SecureStorageProtectionResponseWire {
     ok: bool,
     correlation_id: String,
     handle: Option<String>,
+    error_code: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalBackupDekResponseWire {
+    ok: bool,
+    correlation_id: String,
+    operation: &'static str,
+    protected_backup_dek: Option<String>,
+    backup_dek: Option<String>,
     error_code: Option<&'static str>,
 }
 
@@ -473,6 +539,33 @@ fn secure_storage_proof(
     hmac_sha256(secret, &message)
 }
 
+fn local_backup_dek_proof(
+    secret: &[u8],
+    operation: &str,
+    correlation_id: &str,
+    protected_or_plaintext: &[u8],
+    descriptor_digest: &[u8; 32],
+) -> [u8; 32] {
+    const DOMAIN: &[u8] = b"JARVIS-CORE-SECURE-STORAGE-V1\0";
+    let mut message = Vec::with_capacity(
+        DOMAIN.len()
+            + operation.len()
+            + correlation_id.len()
+            + protected_or_plaintext.len()
+            + descriptor_digest.len()
+            + 3,
+    );
+    message.extend_from_slice(DOMAIN);
+    message.extend_from_slice(operation.as_bytes());
+    message.push(0);
+    message.extend_from_slice(correlation_id.as_bytes());
+    message.push(0);
+    message.extend_from_slice(protected_or_plaintext);
+    message.push(0);
+    message.extend_from_slice(descriptor_digest);
+    hmac_sha256(secret, &message)
+}
+
 fn secure_storage_handle_proof(
     secret: &[u8],
     operation: &str,
@@ -518,7 +611,10 @@ mod windows {
         AuthenticatedCoreSession, AuthenticatedCoreStatus, BootstrapMaterial, ChallengeWire,
         CoreStatusRequestWire, CoreStatusResponseWire, EmptyPayloadWire, HANDSHAKE_NONCE_BYTES,
         HelloWire, IPC_PROTOCOL_MAJOR, LocalIpcError, LocalIpcState,
-        MAX_IPC_FRAME_BYTES, BOOTSTRAP_DATABASE_DEK_BYTES, SecureStorageOperation,
+        MAX_IPC_FRAME_BYTES, BOOTSTRAP_DATABASE_DEK_BYTES, MAX_LOCAL_BACKUP_SLOT_BYTES,
+        SecureStorageOperation, LocalBackupDekProtectionRequest,
+        LocalBackupDekProtectionRequestWire, LocalBackupDekResponseWire,
+        LocalBackupDekUnprotectionRequest, LocalBackupDekUnprotectionRequestWire,
         SecureStorageProtectionRequest, SecureStorageHandleOperationRequest,
         SecureStorageHandleOperationRequestWire,
         SecureStorageProtectionRequestWire, SecureStorageProtectionResponseWire,
@@ -1429,6 +1525,152 @@ mod windows {
                         },
                     ))
                 }
+                "protect_local_backup_dek" => {
+                    let request: LocalBackupDekProtectionRequestWire =
+                        serde_json::from_value(value).map_err(|_| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "local backup-dek protection request shape is invalid",
+                            )
+                        })?;
+                    if request.protocol_version != IPC_PROTOCOL_MAJOR
+                        || request.kind != "request"
+                        || request.operation != operation
+                        || !is_uuid_v7(&request.correlation_id)
+                    {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneRequestFailed,
+                            "local backup-dek operation identity is invalid",
+                        ));
+                    }
+                    let backup_dek = super::hex_decode(
+                        &request.backup_dek,
+                        BOOTSTRAP_DATABASE_DEK_BYTES,
+                    )
+                    .ok_or_else(|| {
+                        plain_error(
+                            LocalIpcState::ControlPlaneRequestFailed,
+                            "local backup-dek encoding is invalid",
+                        )
+                    })?;
+                    let backup_dek: [u8; BOOTSTRAP_DATABASE_DEK_BYTES] =
+                        backup_dek.try_into().map_err(|_| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "local backup-dek length is invalid",
+                            )
+                        })?;
+                    let descriptor_digest = super::hex_decode(&request.descriptor_digest, 32)
+                        .ok_or_else(|| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "local backup-dek descriptor binding is invalid",
+                            )
+                        })?;
+                    let descriptor_digest: [u8; 32] = descriptor_digest.try_into().map_err(|_| {
+                        plain_error(
+                            LocalIpcState::ControlPlaneRequestFailed,
+                            "local backup-dek descriptor binding length is invalid",
+                        )
+                    })?;
+                    let received = super::hex_decode(&request.proof, 32).ok_or_else(|| {
+                        plain_error(
+                            LocalIpcState::AuthenticationFailed,
+                            "local backup-dek proof encoding is invalid",
+                        )
+                    })?;
+                    let expected = super::local_backup_dek_proof(
+                        self.bootstrap_material.secure_storage_secret(),
+                        &operation,
+                        &request.correlation_id,
+                        &backup_dek,
+                        &descriptor_digest,
+                    );
+                    if !super::constant_time_equal(&received, &expected) {
+                        return Err(plain_error(
+                            LocalIpcState::AuthenticationFailed,
+                            "local backup-dek operation authentication failed",
+                        ));
+                    }
+                    Ok(SecureStorageOperation::ProtectLocalBackupDek(
+                        LocalBackupDekProtectionRequest {
+                            correlation_id: request.correlation_id,
+                            backup_dek,
+                            descriptor_digest,
+                        },
+                    ))
+                }
+                "unprotect_local_backup_dek" => {
+                    let request: LocalBackupDekUnprotectionRequestWire =
+                        serde_json::from_value(value).map_err(|_| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "local backup-dek unprotection request shape is invalid",
+                            )
+                        })?;
+                    if request.protocol_version != IPC_PROTOCOL_MAJOR
+                        || request.kind != "request"
+                        || request.operation != operation
+                        || !is_uuid_v7(&request.correlation_id)
+                    {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneRequestFailed,
+                            "local backup-dek operation identity is invalid",
+                        ));
+                    }
+                    let protected_backup_dek = super::hex_decode(
+                        &request.protected_backup_dek,
+                        request.protected_backup_dek.len() / 2,
+                    )
+                    .filter(|value| {
+                        !value.is_empty() && value.len() <= MAX_LOCAL_BACKUP_SLOT_BYTES
+                    })
+                    .ok_or_else(|| {
+                        plain_error(
+                            LocalIpcState::ControlPlaneRequestFailed,
+                            "local backup-dek protected blob is invalid",
+                        )
+                    })?;
+                    let descriptor_digest = super::hex_decode(&request.descriptor_digest, 32)
+                        .ok_or_else(|| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "local backup-dek descriptor binding is invalid",
+                            )
+                        })?;
+                    let descriptor_digest: [u8; 32] = descriptor_digest.try_into().map_err(|_| {
+                        plain_error(
+                            LocalIpcState::ControlPlaneRequestFailed,
+                            "local backup-dek descriptor binding length is invalid",
+                        )
+                    })?;
+                    let received = super::hex_decode(&request.proof, 32).ok_or_else(|| {
+                        plain_error(
+                            LocalIpcState::AuthenticationFailed,
+                            "local backup-dek proof encoding is invalid",
+                        )
+                    })?;
+                    let expected = super::local_backup_dek_proof(
+                        self.bootstrap_material.secure_storage_secret(),
+                        &operation,
+                        &request.correlation_id,
+                        &protected_backup_dek,
+                        &descriptor_digest,
+                    );
+                    if !super::constant_time_equal(&received, &expected) {
+                        return Err(plain_error(
+                            LocalIpcState::AuthenticationFailed,
+                            "local backup-dek operation authentication failed",
+                        ));
+                    }
+                    Ok(SecureStorageOperation::UnprotectLocalBackupDek(
+                        LocalBackupDekUnprotectionRequest {
+                            correlation_id: request.correlation_id,
+                            protected_backup_dek,
+                            descriptor_digest,
+                        },
+                    ))
+                }
                 "commit_staged_database_dek" | "abort_staged_database_dek" => {
                     let request: SecureStorageHandleOperationRequestWire =
                         serde_json::from_value(value).map_err(|_| {
@@ -1567,6 +1809,62 @@ mod windows {
                 return Err(plain_error(
                     LocalIpcState::ControlPlaneResponseInvalid,
                     "secure-storage response acknowledgement was invalid",
+                ));
+            }
+            Ok(())
+        }
+
+        pub fn respond_local_backup_dek(
+            &self,
+            session: &AuthenticatedCoreSession,
+            correlation_id: String,
+            operation: &'static str,
+            mut value: Result<Vec<u8>, &'static str>,
+        ) -> Result<(), LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "local backup-dek response requires the current authenticated session",
+                ));
+            }
+            let response = match &value {
+                Ok(value) if operation == "protect_local_backup_dek" => LocalBackupDekResponseWire {
+                    ok: true,
+                    correlation_id: correlation_id.clone(),
+                    operation,
+                    protected_backup_dek: Some(super::hex_encode(value)),
+                    backup_dek: None,
+                    error_code: None,
+                },
+                Ok(value) => LocalBackupDekResponseWire {
+                    ok: true,
+                    correlation_id: correlation_id.clone(),
+                    operation,
+                    protected_backup_dek: None,
+                    backup_dek: Some(super::hex_encode(value)),
+                    error_code: None,
+                },
+                Err(error_code) => LocalBackupDekResponseWire {
+                    ok: false,
+                    correlation_id: correlation_id.clone(),
+                    operation,
+                    protected_backup_dek: None,
+                    backup_dek: None,
+                    error_code: Some(error_code),
+                },
+            };
+            if let Ok(bytes) = value.as_mut() {
+                bytes.fill(0);
+            }
+            write_json_frame(self.handle.raw(), &response)?;
+            let acknowledgement: SecureStorageResponseAckWire =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if acknowledgement.kind != "response_ack"
+                || acknowledgement.correlation_id != correlation_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "local backup-dek response acknowledgement was invalid",
                 ));
             }
             Ok(())

@@ -24,9 +24,12 @@ import { buildAuthenticatedBackupPayload } from "../../../services/core/src/back
 import {
   BackupPackageVerificationError,
   acquirePortableRestoreMaintenanceLock,
+  createAuthenticatedLocalBackupPackage,
   createAuthenticatedBackupPackage,
+  restoreVerifiedLocalBackup,
   restoreVerifiedPortableBackup,
   verifyAuthenticatedBackupPackage,
+  verifyAuthenticatedLocalBackupPackage,
   verifySqlcipherSnapshotFile,
   verifyBackupPackagePrimitives,
 } from "../../../services/core/src/backup-package.ts";
@@ -223,6 +226,71 @@ test("authenticated payload envelope carries only wrapped SnapshotDBKey and veri
   verified.snapshotDbKey.fill(0);
 });
 
+test("local recovery package binds the opaque DPAPI slot to the authenticated descriptor digest", async () => {
+  const localSnapshot = Buffer.from("local", "utf8");
+  const localManifest = buildBackupPayloadManifest({
+    backupId,
+    createdAt: "2026-08-14T00:00:00.000Z",
+    protectionClass: "LOCAL_RECOVERY",
+    jarvisVersion: "1.0.6",
+    protocolVersion: 1,
+    schemaVersion: 1,
+    snapshot: {
+      logicalType: "SQLCIPHER_SNAPSHOT",
+      path: "database/state.db",
+      bytes: String(localSnapshot.length),
+      sha256: createHash("sha256").update(localSnapshot).digest("base64url"),
+    },
+    objects: [],
+    keySlotProfiles: ["WINDOWS_DPAPI_V1"],
+  });
+  const protectedEntropy = { value: undefined };
+  const created = await createAuthenticatedLocalBackupPackage({
+    backupId,
+    createdAt: "2026-08-14T00:00:00.000Z",
+    protectionClass: "LOCAL_RECOVERY",
+    manifestBytes: localManifest.canonicalBytes,
+    snapshotDbKey: Buffer.alloc(32, 0x65),
+    backupDek,
+    slotId: "windows-dpapi-01",
+    objects: [{ path: "database/state.db", data: localSnapshot }],
+    noncePrefix,
+    protectBackupDek: async (value, entropy) => {
+      assert.deepEqual(value, backupDek);
+      protectedEntropy.value = Buffer.from(entropy);
+      return Buffer.concat([Buffer.from("DPAPI-V1\0", "utf8"), value, entropy]);
+    },
+  });
+  assert.deepEqual(protectedEntropy.value, created.descriptorDigest);
+  assert.equal(created.localRecoverySlot.slotType, "LOCAL_RECOVERY");
+  const verified = await verifyAuthenticatedLocalBackupPackage({
+    descriptor: created.descriptorBytes,
+    chunks: created.chunks,
+    localRecoverySlot: created.localRecoverySlot,
+    noncePrefix: created.noncePrefix,
+    unprotectBackupDek: async (protectedBlob, entropy) => {
+      assert.equal(protectedBlob.subarray(0, 9).toString("utf8"), "DPAPI-V1\0");
+      assert.deepEqual(entropy, created.descriptorDigest);
+      assert.deepEqual(protectedBlob.subarray(9, 41), backupDek);
+      return Buffer.from(protectedBlob.subarray(9, 41));
+    },
+  });
+  assert.deepEqual(verified.objects[0].data, localSnapshot);
+  verified.snapshotDbKey.fill(0);
+  for (const object of verified.objects) object.data.fill(0);
+  protectedEntropy.value.fill(0);
+  await assert.rejects(
+    () => verifyAuthenticatedLocalBackupPackage({
+      descriptor: created.descriptorBytes,
+      chunks: created.chunks,
+      localRecoverySlot: created.localRecoverySlot,
+      noncePrefix: created.noncePrefix,
+      unprotectBackupDek: async () => Buffer.alloc(31),
+    }),
+    (error) => error instanceof BackupPackageVerificationError && error.code === "BACKUP_PACKAGE_SLOT_INVALID",
+  );
+});
+
 test("authenticated package verification reopens the qualified SQLCipher snapshot under recovered SnapshotDBKey", async () => {
   const root = await mkdtemp(join(tmpdir(), "jarvis-backup-package-"));
   await mkdir(join(root, "recovery"), { recursive: true });
@@ -316,6 +384,60 @@ test("authenticated package verification reopens the qualified SQLCipher snapsho
     } finally {
       cleanProfile.close();
     }
+    const localManifest = buildBackupPayloadManifest({
+      backupId,
+      createdAt: "2026-08-14T00:00:00.000Z",
+      protectionClass: "LOCAL_RECOVERY",
+      jarvisVersion: "1.0.6",
+      protocolVersion: 1,
+      schemaVersion: 1,
+      snapshot: { logicalType: "SQLCIPHER_SNAPSHOT", path: "database/state.db", bytes: snapshotBytes.length.toString(10), sha256: snapshotHash },
+      objects: [],
+      keySlotProfiles: ["WINDOWS_DPAPI_V1"],
+    });
+    const localPackage = await createAuthenticatedLocalBackupPackage({
+      backupId,
+      createdAt: "2026-08-14T00:00:00.000Z",
+      protectionClass: "LOCAL_RECOVERY",
+      manifestBytes: localManifest.canonicalBytes,
+      snapshotDbKey,
+      backupDek,
+      slotId: "windows-dpapi-sqlcipher",
+      objects: [{ path: "database/state.db", data: snapshotBytes }],
+      noncePrefix: Buffer.from([9, 10, 11, 12]),
+      protectBackupDek: async (value, entropy) => {
+        assert.deepEqual(value, backupDek);
+        assert.equal(entropy.length, 32);
+        return Buffer.concat([Buffer.from("opaque-local-slot", "utf8"), value]);
+      },
+    });
+    const localRestored = await restoreVerifiedLocalBackup({
+      descriptor: localPackage.descriptorBytes,
+      chunks: localPackage.chunks,
+      localRecoverySlot: localPackage.localRecoverySlot,
+      noncePrefix: localPackage.noncePrefix,
+      unprotectBackupDek: async (protectedBlob, entropy) => {
+        assert.equal(protectedBlob.subarray(0, 17).toString("utf8"), "opaque-local-slot");
+        assert.deepEqual(entropy, localPackage.descriptorDigest);
+        return Buffer.from(protectedBlob.subarray(17));
+      },
+      destinationPath: join(root, "local-clean-profile.db"),
+      maintenanceLockPath: join(root, "local-maintenance.lock"),
+      recoveryMarkerPath: join(root, "recovery", "local-restore-required.marker"),
+      sessionPasswordVerifier: buildSessionPasswordVerifier(),
+      protectNewDbDek: async () => ({
+        handle: "dpapi-v1-local-test-handle",
+        commit: async () => undefined,
+        abort: async () => undefined,
+      }),
+      newDbDek,
+      now: "2026-08-14T02:00:00.000Z",
+    });
+    assert.deepEqual(localRestored.affectedIntegrationAccountIds, ["package-account"]);
+    assert.equal(
+      (await readFile(join(root, "recovery", "local-restore-required.marker"), "utf8")),
+      "JARVIS_RECOVERY_REQUIRED_V1\n",
+    );
     const entriesBeforeRejectedRestores = (await readdir(root)).sort();
     const wrongFactorDestination = join(root, "wrong-factor.db");
     await assert.rejects(

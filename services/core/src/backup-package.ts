@@ -74,6 +74,15 @@ export interface VerifyAuthenticatedBackupPackageInputV1 {
   readonly noncePrefix: Buffer;
 }
 
+export interface VerifyAuthenticatedLocalBackupPackageInputV1 {
+  readonly descriptor: Buffer | string;
+  readonly chunks: readonly BackupChunkRecordV1[];
+  readonly localRecoverySlot: LocalRecoverySlotV1;
+  readonly noncePrefix: Buffer;
+  /** Unprotects only the transient BackupDEK using descriptorDigest entropy. */
+  readonly unprotectBackupDek: (protectedBackupDek: Buffer, descriptorDigest: Buffer) => Promise<Buffer>;
+}
+
 export interface CreateAuthenticatedBackupPackageInputV1 {
   readonly backupId: string;
   readonly createdAt: string;
@@ -87,6 +96,24 @@ export interface CreateAuthenticatedBackupPackageInputV1 {
   readonly noncePrefix?: Buffer;
 }
 
+export interface CreateAuthenticatedLocalBackupPackageInputV1
+  extends Omit<CreateAuthenticatedBackupPackageInputV1, "recoverySecret" | "slotId"> {
+  /**
+   * Windows-native DPAPI/PlatformSecureStorage boundary. The callback must
+   * bind the supplied descriptor digest as additional entropy and return only
+   * the opaque protected BackupDEK blob.
+   */
+  readonly protectBackupDek: (backupDek: Buffer, descriptorDigest: Buffer) => Promise<Buffer>;
+  readonly slotId: string;
+}
+
+export interface LocalRecoverySlotV1 {
+  readonly slotId: string;
+  readonly slotType: "LOCAL_RECOVERY";
+  readonly protection: "WINDOWS_DPAPI_V1";
+  readonly protectedBackupDek: Buffer;
+}
+
 export interface CreatedAuthenticatedBackupPackageV1 {
   readonly descriptor: BackupPackageDescriptorV1;
   readonly descriptorBytes: Buffer;
@@ -94,6 +121,15 @@ export interface CreatedAuthenticatedBackupPackageV1 {
   readonly noncePrefix: Buffer;
   readonly chunks: readonly BackupChunkRecordV1[];
   readonly generatedRecoverySlot: GeneratedRecoverySlotV1;
+}
+
+export interface CreatedAuthenticatedLocalBackupPackageV1 {
+  readonly descriptor: BackupPackageDescriptorV1;
+  readonly descriptorBytes: Buffer;
+  readonly descriptorDigest: Buffer;
+  readonly noncePrefix: Buffer;
+  readonly chunks: readonly BackupChunkRecordV1[];
+  readonly localRecoverySlot: LocalRecoverySlotV1;
 }
 
 export interface VerifiedAuthenticatedBackupPackageV1 {
@@ -117,6 +153,16 @@ export interface RestoreVerifiedPortableBackupInputV1 extends VerifyAuthenticate
    */
   readonly protectNewDbDek: (dbDek: Buffer) => Promise<RestoreDbDekProtectionLease>;
   /** Fresh verifier established by the authenticated clean-profile restore password. */
+  readonly sessionPasswordVerifier: SessionPasswordVerifier;
+  readonly newDbDek: Buffer;
+  readonly now: string;
+}
+
+export interface RestoreVerifiedLocalBackupInputV1 extends VerifyAuthenticatedLocalBackupPackageInputV1 {
+  readonly destinationPath: string;
+  readonly maintenanceLockPath: string;
+  readonly recoveryMarkerPath: string;
+  readonly protectNewDbDek: (dbDek: Buffer) => Promise<RestoreDbDekProtectionLease>;
   readonly sessionPasswordVerifier: SessionPasswordVerifier;
   readonly newDbDek: Buffer;
   readonly now: string;
@@ -410,40 +456,27 @@ export function verifyBackupPackagePrimitives(
   }
 }
 
-export function verifyAuthenticatedBackupPackage(
-  input: VerifyAuthenticatedBackupPackageInputV1,
-): VerifiedAuthenticatedBackupPackageV1 {
-  let descriptor: BackupPackageDescriptorV1;
-  try {
-    descriptor = parseBackupDescriptor(input.descriptor);
-  } catch (error) {
-    return fail("BACKUP_PACKAGE_DESCRIPTOR_INVALID", "backup descriptor validation failed", { cause: error });
-  }
-  const descriptorDigest = digestBackupDescriptor(descriptor);
+function verifyAuthenticatedBackupPackageWithBackupDek(input: {
+  readonly descriptor: BackupPackageDescriptorV1;
+  readonly chunks: readonly BackupChunkRecordV1[];
+  readonly noncePrefix: Buffer;
+  readonly descriptorDigest: Buffer;
+  readonly backupDek: Buffer;
+}): VerifiedAuthenticatedBackupPackageV1 {
+  const { descriptor, chunks, noncePrefix, descriptorDigest, backupDek } = input;
   const descriptorNoncePrefix = Buffer.from(descriptor.noncePrefix, "base64url");
-  if (!descriptorNoncePrefix.equals(input.noncePrefix)) {
+  if (!descriptorNoncePrefix.equals(noncePrefix)) {
     return fail("BACKUP_PACKAGE_BINDING_INVALID", "descriptor and supplied nonce prefix are not bound");
-  }
-  let backupDek: Buffer;
-  try {
-    backupDek = unwrapGeneratedRecoverySlot(
-      input.generatedRecoverySlot,
-      input.recoverySecret,
-      descriptorDigest,
-      descriptor.backupId,
-    );
-  } catch (error) {
-    return fail("BACKUP_PACKAGE_SLOT_INVALID", "generated recovery slot could not unwrap BackupDEK", { cause: error });
   }
   try {
     let payload: Buffer;
     try {
       payload = decryptBackupChunks(
         descriptor,
-        input.chunks,
+        chunks,
         backupDek,
         descriptorDigest,
-        input.noncePrefix,
+        noncePrefix,
       );
     } catch (error) {
       return fail("BACKUP_PACKAGE_AUTHENTICATION_FAILED", "encrypted payload authentication failed", { cause: error });
@@ -476,6 +509,86 @@ export function verifyAuthenticatedBackupPackage(
   }
 }
 
+export function verifyAuthenticatedBackupPackage(
+  input: VerifyAuthenticatedBackupPackageInputV1,
+): VerifiedAuthenticatedBackupPackageV1 {
+  let descriptor: BackupPackageDescriptorV1;
+  try {
+    descriptor = parseBackupDescriptor(input.descriptor);
+  } catch (error) {
+    return fail("BACKUP_PACKAGE_DESCRIPTOR_INVALID", "backup descriptor validation failed", { cause: error });
+  }
+  const descriptorDigest = digestBackupDescriptor(descriptor);
+  let backupDek: Buffer;
+  try {
+    backupDek = unwrapGeneratedRecoverySlot(
+      input.generatedRecoverySlot,
+      input.recoverySecret,
+      descriptorDigest,
+      descriptor.backupId,
+    );
+  } catch (error) {
+    return fail("BACKUP_PACKAGE_SLOT_INVALID", "generated recovery slot could not unwrap BackupDEK", { cause: error });
+  }
+  return verifyAuthenticatedBackupPackageWithBackupDek({
+    descriptor,
+    chunks: input.chunks,
+    noncePrefix: input.noncePrefix,
+    descriptorDigest,
+    backupDek,
+  });
+}
+
+export async function verifyAuthenticatedLocalBackupPackage(
+  input: VerifyAuthenticatedLocalBackupPackageInputV1,
+): Promise<VerifiedAuthenticatedBackupPackageV1> {
+  let descriptor: BackupPackageDescriptorV1;
+  try {
+    descriptor = parseBackupDescriptor(input.descriptor);
+  } catch (error) {
+    return fail("BACKUP_PACKAGE_DESCRIPTOR_INVALID", "backup descriptor validation failed", { cause: error });
+  }
+  if (descriptor.protectionClass !== "LOCAL_RECOVERY") {
+    return fail("BACKUP_PACKAGE_BINDING_INVALID", "local recovery requires a LOCAL_RECOVERY descriptor");
+  }
+  if (
+    input.localRecoverySlot.slotType !== "LOCAL_RECOVERY" ||
+    input.localRecoverySlot.protection !== "WINDOWS_DPAPI_V1" ||
+    input.localRecoverySlot.slotId.length === 0 ||
+    input.localRecoverySlot.protectedBackupDek.length === 0 ||
+    input.localRecoverySlot.protectedBackupDek.length > 64 * 1024
+  ) {
+    return fail("BACKUP_PACKAGE_SLOT_INVALID", "local recovery slot metadata is invalid");
+  }
+  const descriptorDigest = digestBackupDescriptor(descriptor);
+  const entropy = Buffer.from(descriptorDigest);
+  const protectedBackupDek = Buffer.from(input.localRecoverySlot.protectedBackupDek);
+  let backupDek: Buffer;
+  try {
+    backupDek = await input.unprotectBackupDek(protectedBackupDek, entropy);
+  } catch (error) {
+    throw new BackupPackageVerificationError(
+      "BACKUP_PACKAGE_SLOT_INVALID",
+      "Windows local-recovery slot could not unwrap BackupDEK",
+      { cause: error },
+    );
+  } finally {
+    entropy.fill(0);
+    protectedBackupDek.fill(0);
+  }
+  if (!Buffer.isBuffer(backupDek) || backupDek.length !== 32) {
+    backupDek?.fill(0);
+    return fail("BACKUP_PACKAGE_SLOT_INVALID", "Windows local-recovery slot returned an invalid BackupDEK");
+  }
+  return verifyAuthenticatedBackupPackageWithBackupDek({
+    descriptor,
+    chunks: input.chunks,
+    noncePrefix: input.noncePrefix,
+    descriptorDigest,
+    backupDek,
+  });
+}
+
 export function verifySqlcipherSnapshotFile(snapshotPath: string, snapshotDbKey: Buffer): void {
   const snapshot = openSqlcipherSnapshot(snapshotPath, snapshotDbKey);
   try {
@@ -489,6 +602,30 @@ export async function restoreVerifiedPortableBackup(
   input: RestoreVerifiedPortableBackupInputV1,
 ): Promise<RestoredPortableBackupV1> {
   const verified = verifyAuthenticatedBackupPackage(input);
+  return restoreVerifiedBackupPackage(verified, input);
+}
+
+export async function restoreVerifiedLocalBackup(
+  input: RestoreVerifiedLocalBackupInputV1,
+): Promise<RestoredPortableBackupV1> {
+  const verified = await verifyAuthenticatedLocalBackupPackage(input);
+  return restoreVerifiedBackupPackage(verified, input);
+}
+
+interface RestoreVerifiedBackupExecutionInputV1 {
+  readonly destinationPath: string;
+  readonly maintenanceLockPath: string;
+  readonly recoveryMarkerPath: string;
+  readonly protectNewDbDek: (dbDek: Buffer) => Promise<RestoreDbDekProtectionLease>;
+  readonly sessionPasswordVerifier: SessionPasswordVerifier;
+  readonly newDbDek: Buffer;
+  readonly now: string;
+}
+
+async function restoreVerifiedBackupPackage(
+  verified: VerifiedAuthenticatedBackupPackageV1,
+  input: RestoreVerifiedBackupExecutionInputV1,
+): Promise<RestoredPortableBackupV1> {
   let snapshotStagingPath: string | undefined;
   let databaseStagingPath: string | undefined;
   let maintenanceLock: PortableRestoreMaintenanceLock | undefined;
@@ -585,9 +722,17 @@ export async function restoreVerifiedPortableBackup(
   }
 }
 
-export function createAuthenticatedBackupPackage(
-  input: CreateAuthenticatedBackupPackageInputV1,
-): CreatedAuthenticatedBackupPackageV1 {
+interface AuthenticatedBackupEnvelopeV1 {
+  readonly descriptor: BackupPackageDescriptorV1;
+  readonly descriptorBytes: Buffer;
+  readonly descriptorDigest: Buffer;
+  readonly noncePrefix: Buffer;
+  readonly chunks: readonly BackupChunkRecordV1[];
+}
+
+function createAuthenticatedBackupEnvelope(
+  input: Omit<CreateAuthenticatedBackupPackageInputV1, "recoverySecret" | "slotId">,
+): AuthenticatedBackupEnvelopeV1 {
   let manifest: BackupPayloadManifestV1;
   try {
     manifest = parseBackupPayloadManifest(input.manifestBytes);
@@ -636,13 +781,6 @@ export function createAuthenticatedBackupPackage(
   });
   if (payload.length !== plaintextBytes) return fail("BACKUP_PACKAGE_BINDING_INVALID", "payload length changed after descriptor binding");
   const encrypted = encryptBackupChunks(descriptor, payload, input.backupDek, descriptorDigest, noncePrefix);
-  const generatedRecoverySlot = createGeneratedRecoverySlot({
-    backupId: input.backupId,
-    descriptorDigest,
-    slotId: input.slotId,
-    recoverySecret: input.recoverySecret,
-    backupDek: input.backupDek,
-  });
   placeholderPayload.fill(0);
   payload.fill(0);
   return Object.freeze({
@@ -651,6 +789,57 @@ export function createAuthenticatedBackupPackage(
     descriptorDigest,
     noncePrefix,
     chunks: encrypted.chunks,
-    generatedRecoverySlot,
   });
+}
+
+export function createAuthenticatedBackupPackage(
+  input: CreateAuthenticatedBackupPackageInputV1,
+): CreatedAuthenticatedBackupPackageV1 {
+  const envelope = createAuthenticatedBackupEnvelope(input);
+  const generatedRecoverySlot = createGeneratedRecoverySlot({
+    backupId: input.backupId,
+    descriptorDigest: envelope.descriptorDigest,
+    slotId: input.slotId,
+    recoverySecret: input.recoverySecret,
+    backupDek: input.backupDek,
+  });
+  return Object.freeze({ ...envelope, generatedRecoverySlot });
+}
+
+export async function createAuthenticatedLocalBackupPackage(
+  input: CreateAuthenticatedLocalBackupPackageInputV1,
+): Promise<CreatedAuthenticatedLocalBackupPackageV1> {
+  const envelope = createAuthenticatedBackupEnvelope(input);
+  const backupDek = Buffer.from(input.backupDek);
+  let protectedBackupDek: Buffer;
+  try {
+    protectedBackupDek = await input.protectBackupDek(backupDek, Buffer.from(envelope.descriptorDigest));
+  } catch (error) {
+    throw new BackupPackageVerificationError(
+      "BACKUP_PACKAGE_SLOT_INVALID",
+      "Windows local-recovery protection of BackupDEK failed",
+      { cause: error },
+    );
+  } finally {
+    backupDek.fill(0);
+  }
+  if (
+    !Buffer.isBuffer(protectedBackupDek) ||
+    protectedBackupDek.length === 0 ||
+    protectedBackupDek.length > 64 * 1024
+  ) {
+    protectedBackupDek?.fill(0);
+    throw new BackupPackageVerificationError(
+      "BACKUP_PACKAGE_SLOT_INVALID",
+      "Windows local-recovery protected BackupDEK blob is outside the bounded slot size",
+    );
+  }
+  const slot: LocalRecoverySlotV1 = Object.freeze({
+    slotId: input.slotId,
+    slotType: "LOCAL_RECOVERY",
+    protection: "WINDOWS_DPAPI_V1",
+    protectedBackupDek: Buffer.from(protectedBackupDek),
+  });
+  protectedBackupDek.fill(0);
+  return Object.freeze({ ...envelope, localRecoverySlot: slot });
 }

@@ -11,6 +11,7 @@ const HANDSHAKE_DOMAIN = Buffer.from("JARVIS-CORE-IPC-BOOTSTRAP-V1\0", "utf8");
 const SECURE_STORAGE_DOMAIN = Buffer.from("JARVIS-CORE-SECURE-STORAGE-V1\0", "utf8");
 const SESSION_PASSWORD_KDF_DOMAIN = Buffer.from("JARVIS-CORE-SESSION-PASSWORD-KDF-V1\0", "utf8");
 const SESSION_PASSWORD_MAX_BYTES = 4096;
+const LOCAL_BACKUP_SLOT_MAX_BYTES = 64 * 1024;
 const HANDSHAKE_TIMEOUT_MS = 5_000;
 
 export interface BootstrapMaterial {
@@ -387,6 +388,29 @@ function secureStorageProof(secret: Buffer, correlationId: string, databaseDek: 
     .digest();
 }
 
+function localBackupDekProof(
+  secret: Buffer,
+  operation: string,
+  correlationId: string,
+  protectedOrPlaintext: Buffer,
+  descriptorDigest: Buffer,
+): Buffer {
+  return createHmac("sha256", secret)
+    .update(
+      Buffer.concat([
+        SECURE_STORAGE_DOMAIN,
+        Buffer.from(operation, "utf8"),
+        Buffer.from([0]),
+        Buffer.from(correlationId, "utf8"),
+        Buffer.from([0]),
+        protectedOrPlaintext,
+        Buffer.from([0]),
+        descriptorDigest,
+      ]),
+    )
+    .digest();
+}
+
 function sessionPasswordKdfProof(secret: Buffer, correlationId: string, password: Buffer): Buffer {
   return createHmac("sha256", secret)
     .update(Buffer.concat([SESSION_PASSWORD_KDF_DOMAIN, Buffer.from(correlationId, "utf8"), password]))
@@ -489,6 +513,116 @@ async function sendSecureStorageOperation(
   } finally {
     await closeCoreTransport(socket);
   }
+}
+
+async function sendLocalBackupDekOperation(
+  material: Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret">,
+  operation: "protect_local_backup_dek" | "unprotect_local_backup_dek",
+  value: Buffer,
+  descriptorDigest: Buffer,
+): Promise<Buffer> {
+  if (descriptorDigest.length !== 32) {
+    throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "local recovery descriptor digest must be exactly 256 bits");
+  }
+  if (
+    operation === "protect_local_backup_dek" && value.length !== 32
+  ) {
+    throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "local recovery BackupDEK must be exactly 256 bits");
+  }
+  if (
+    operation === "unprotect_local_backup_dek" &&
+    (value.length === 0 || value.length > LOCAL_BACKUP_SLOT_MAX_BYTES)
+  ) {
+    throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "local recovery protected slot is outside its bounded size");
+  }
+  const valueBytes = Buffer.from(value);
+  const entropyBytes = Buffer.from(descriptorDigest);
+  const correlationId = randomUuidV7();
+  const socket = await connectAuthenticatedSecureStorage(material);
+  try {
+    const request = {
+      protocolVersion: CORE_IPC_PROTOCOL_MAJOR,
+      kind: "request",
+      operation,
+      correlationId,
+      ...(operation === "protect_local_backup_dek"
+        ? { backupDek: valueBytes.toString("hex") }
+        : { protectedBackupDek: valueBytes.toString("hex") }),
+      descriptorDigest: entropyBytes.toString("hex"),
+      proof: localBackupDekProof(
+        material.secureStorageSecret,
+        operation,
+        correlationId,
+        valueBytes,
+        entropyBytes,
+      ).toString("hex"),
+    };
+    socket.write(encodeCoreIpcJsonFrame(request));
+    const reader = new CoreIpcFrameReader(socket);
+    const response = parseJson<unknown>(
+      await reader.read(CORE_IPC_FRAME_CEILING, HANDSHAKE_TIMEOUT_MS),
+      "native local backup-dek response",
+    );
+    if (
+      !isRecord(response) ||
+      !exactKeys(response, [
+        "backupDek",
+        "correlationId",
+        "errorCode",
+        "ok",
+        "operation",
+        "protectedBackupDek",
+      ]) ||
+      response.correlationId !== correlationId ||
+      response.operation !== operation ||
+      response.ok !== true ||
+      response.errorCode !== null
+    ) {
+      throw new CoreIpcBootstrapError("IPC_AUTHENTICATION_FAILED", `native ${operation} was rejected`);
+    }
+    const encoded = operation === "protect_local_backup_dek"
+      ? response.protectedBackupDek
+      : response.backupDek;
+    if (
+      typeof encoded !== "string" ||
+      !/^[0-9a-f]+$/u.test(encoded) ||
+      encoded.length % 2 !== 0 ||
+      encoded.length === 0 ||
+      encoded.length > LOCAL_BACKUP_SLOT_MAX_BYTES * 2
+    ) {
+      throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", `native ${operation} response encoding is invalid`);
+    }
+    const result = Buffer.from(encoded, "hex");
+    if (operation === "unprotect_local_backup_dek" && result.length !== 32) {
+      result.fill(0);
+      throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "native local recovery returned an invalid BackupDEK");
+    }
+    socket.write(encodeCoreIpcJsonFrame({ kind: "response_ack", correlationId }));
+    return result;
+  } catch (error) {
+    if (error instanceof CoreIpcBootstrapError) throw error;
+    throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "native local backup-dek response was invalid", { cause: error });
+  } finally {
+    valueBytes.fill(0);
+    entropyBytes.fill(0);
+    await closeCoreTransport(socket);
+  }
+}
+
+export function protectLocalBackupDekThroughNativeStorage(
+  material: Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret">,
+  backupDek: Buffer,
+  descriptorDigest: Buffer,
+): Promise<Buffer> {
+  return sendLocalBackupDekOperation(material, "protect_local_backup_dek", backupDek, descriptorDigest);
+}
+
+export function unprotectLocalBackupDekThroughNativeStorage(
+  material: Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret">,
+  protectedBackupDek: Buffer,
+  descriptorDigest: Buffer,
+): Promise<Buffer> {
+  return sendLocalBackupDekOperation(material, "unprotect_local_backup_dek", protectedBackupDek, descriptorDigest);
 }
 
 /**
