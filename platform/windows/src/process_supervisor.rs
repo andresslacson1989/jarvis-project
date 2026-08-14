@@ -56,16 +56,16 @@ mod windows {
     use std::os::windows::ffi::OsStrExt;
     use std::path::{Path, PathBuf};
     use std::ptr::{null, null_mut};
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
     use windows_sys::Win32::Foundation::{
-        CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, WAIT_FAILED, WAIT_OBJECT_0,
-        WAIT_TIMEOUT,
+        CloseHandle, GetLastError, HANDLE, HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE,
+        SetHandleInformation, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
     };
     use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
     use windows_sys::Win32::Storage::FileSystem::{
         CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE,
-        OPEN_EXISTING,
+        OPEN_EXISTING, ReadFile,
     };
     use windows_sys::Win32::System::JobObjects::{
         AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
@@ -80,6 +80,7 @@ mod windows {
         ResumeThread, STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW, TerminateProcess,
         UpdateProcThreadAttribute, WaitForSingleObject,
     };
+    use windows_sys::Win32::System::Pipes::CreatePipe;
 
     const NO_INHERITED_HANDLES: i32 = 0;
     const RESUME_FAILURE: u32 = u32::MAX;
@@ -317,11 +318,48 @@ mod windows {
         process: OwnedHandle,
         process_id: u32,
         job: Arc<JobObject>,
+        stderr_read: Mutex<Option<OwnedHandle>>,
     }
 
     impl SupervisedCoreProcess {
         pub fn process_id(&self) -> u32 {
             self.process_id
+        }
+
+        /// Read one bounded, bracketed startup failure code after the process
+        /// has exited. Core emits only stable error codes on stderr; arbitrary
+        /// child output is never admitted into native diagnostics.
+        pub fn startup_failure_code(&self) -> Option<String> {
+            let handle = self.stderr_read.lock().ok()?.take()?;
+            let mut buffer = [0_u8; 256];
+            let mut bytes_read = 0_u32;
+            // SAFETY: the handle is an owned read end of the host-created pipe,
+            // the buffer is writable, and this method is called after the
+            // supervised process has exited so the child write end is closed.
+            let read = unsafe {
+                ReadFile(
+                    handle.raw(),
+                    buffer.as_mut_ptr().cast(),
+                    buffer.len() as u32,
+                    &mut bytes_read,
+                    std::ptr::null_mut(),
+                )
+            };
+            if read == 0 || bytes_read == 0 {
+                return None;
+            }
+            let text = std::str::from_utf8(&buffer[..bytes_read as usize]).ok()?;
+            let text = text.trim_end_matches(&['\r', '\n'][..]);
+            let code = text.strip_prefix('[')?.strip_suffix(']')?;
+            if code.is_empty()
+                || code.len() > 64
+                || !code
+                    .bytes()
+                    .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
+            {
+                return None;
+            }
+            Some(code.to_owned())
         }
 
         pub fn wait(&self, timeout: Duration) -> Result<ProcessWait, ProcessSupervisorError> {
@@ -530,6 +568,7 @@ mod windows {
             let mut attribute_storage: Vec<usize> = Vec::new();
             let mut inherited_handles: Vec<HANDLE> = Vec::new();
             let mut stdio_handles: Vec<OwnedHandle> = Vec::new();
+            let mut stderr_read: Option<OwnedHandle> = None;
             let mut attributes_initialized = false;
             let mut creation_flags = CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
             let inherit_handles = if let Some(reader) = spec.bootstrap_reader {
@@ -537,7 +576,8 @@ mod windows {
                 startup_info_ex.StartupInfo.dwFlags |= STARTF_USESTDHANDLES;
                 startup_info_ex.StartupInfo.hStdInput = reader;
                 let stdout = open_nul_output_handle()?;
-                let stderr = open_nul_output_handle()?;
+                let (captured_stderr_read, stderr) = create_stderr_capture()?;
+                stderr_read = captured_stderr_read;
                 startup_info_ex.StartupInfo.hStdOutput = stdout.raw();
                 startup_info_ex.StartupInfo.hStdError = stderr.raw();
                 stdio_handles.extend([stdout, stderr]);
@@ -715,6 +755,7 @@ mod windows {
                 process,
                 process_id: process_information.dwProcessId,
                 job: Arc::clone(&self.job),
+                stderr_read: Mutex::new(stderr_read),
             })
         }
 
@@ -863,6 +904,53 @@ mod windows {
                 "CreateFileW failed for controlled Core output",
             )
         })
+    }
+
+    fn create_stderr_capture() -> Result<(Option<OwnedHandle>, OwnedHandle), ProcessSupervisorError> {
+        let attributes = SECURITY_ATTRIBUTES {
+            nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
+            lpSecurityDescriptor: std::ptr::null_mut(),
+            bInheritHandle: 1,
+        };
+        let mut reader = null_mut();
+        let mut writer = null_mut();
+        // SAFETY: the output handle pointers and security attributes are
+        // initialized writable buffers for this synchronous call.
+        if unsafe { CreatePipe(&mut reader, &mut writer, &attributes, 0) } == 0 {
+            return Err(win32_error(
+                ProcessSupervisorState::ProcessCreationFailed,
+                "CreatePipe failed for bounded Core diagnostics",
+            ));
+        }
+        let reader = OwnedHandle::new(reader).ok_or_else(|| {
+            // SAFETY: CreatePipe returned a writer that must be closed when
+            // the reader result is invalid.
+            unsafe { CloseHandle(writer) };
+            ProcessSupervisorError {
+                state: ProcessSupervisorState::ProcessCreationFailed,
+                detail: "CreatePipe returned an invalid diagnostic reader".to_owned(),
+                win32_error: None,
+            }
+        })?;
+        let writer = match OwnedHandle::new(writer) {
+            Some(handle) => handle,
+            None => {
+                return Err(ProcessSupervisorError {
+                    state: ProcessSupervisorState::ProcessCreationFailed,
+                    detail: "CreatePipe returned an invalid diagnostic writer".to_owned(),
+                    win32_error: None,
+                });
+            }
+        };
+        // SAFETY: the reader is host-owned and must not enter the child's
+        // explicit handle allowlist.
+        if unsafe { SetHandleInformation(reader.raw(), HANDLE_FLAG_INHERIT, 0) } == 0 {
+            return Err(win32_error(
+                ProcessSupervisorState::ProcessCreationFailed,
+                "SetHandleInformation failed for bounded Core diagnostics",
+            ));
+        }
+        Ok((Some(reader), writer))
     }
 
     fn wide_null(value: &OsStr, label: &str) -> Result<Vec<u16>, ProcessSupervisorError> {
@@ -1116,6 +1204,72 @@ mod windows {
             assert!(matches!(result, ProcessWait::Exited { .. }));
             drop(supervisor);
             remove_dir_all(root).expect("Core fixture must be removable");
+        }
+
+        #[test]
+        fn bounded_core_stderr_code_is_captured_without_arbitrary_output() {
+            let system_root = std::env::var_os("SystemRoot").expect("Windows sets SystemRoot");
+            let node = PathBuf::from(r"C:\Program Files\nodejs\node.exe");
+            assert!(
+                node.is_file(),
+                "the pinned Node development runtime must exist"
+            );
+            let attributes = SECURITY_ATTRIBUTES {
+                nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
+                lpSecurityDescriptor: std::ptr::null_mut(),
+                bInheritHandle: 1,
+            };
+            let mut reader = std::ptr::null_mut();
+            let mut writer = std::ptr::null_mut();
+            assert_ne!(
+                // SAFETY: the output pointers and security attributes are
+                // initialized writable buffers for this synchronous call.
+                unsafe { CreatePipe(&mut reader, &mut writer, &attributes, 0) },
+                0,
+                "bootstrap test pipe must be created"
+            );
+            assert_ne!(
+                // SAFETY: the writer is host-owned and must not be inherited;
+                // the child only needs the reader as its standard input.
+                unsafe { SetHandleInformation(writer, HANDLE_FLAG_INHERIT, 0) },
+                0,
+                "bootstrap writer must stay host-owned"
+            );
+            let supervisor = PlatformProcessSupervisor::new().expect("Job Object must be created");
+            let process = supervisor
+                .launch_test_process(ProcessLaunchSpec {
+                    program: node,
+                    arguments: vec![
+                        OsString::from("-e"),
+                        OsString::from(
+                            "process.stderr.write('[CORE_START_FAILED]\\n');process.exit(1)",
+                        ),
+                    ],
+                    current_dir: PathBuf::from(system_root),
+                    environment: BTreeMap::from([
+                        (
+                            OsString::from("SystemRoot"),
+                            std::env::var_os("SystemRoot").unwrap(),
+                        ),
+                        (OsString::from("WINDIR"), std::env::var_os("WINDIR").unwrap()),
+                    ]),
+                    bootstrap_reader: Some(reader),
+                })
+                .expect("Core diagnostic capture process must launch");
+            // SAFETY: the host owns both test pipe handles and closes them
+            // after the child has received the inherited reader handle.
+            unsafe {
+                CloseHandle(reader);
+                CloseHandle(writer);
+            }
+            assert!(matches!(
+                process.wait(Duration::from_secs(5)).expect("process wait must succeed"),
+                ProcessWait::Exited { .. }
+            ));
+            assert_eq!(
+                process.startup_failure_code().as_deref(),
+                Some("CORE_START_FAILED")
+            );
         }
 
         #[test]

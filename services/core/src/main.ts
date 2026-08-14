@@ -8,8 +8,12 @@ import type {
   CoreStatusResponse,
 } from "../../../packages/protocol/src/core.js";
 import { admitReleaseRuntime, type ReleaseTrustAdmission } from "./release-trust.js";
-import { openCoreDatabase, type CoreDatabaseConnection } from "./persistence.js";
-import { applyCoreMigrations } from "./schema.js";
+import {
+  CorePersistenceError,
+  openCoreDatabase,
+  type CoreDatabaseConnection,
+} from "./persistence.js";
+import { applyCoreMigrations, CoreSchemaError } from "./schema.js";
 import {
   restoreVerifiedLocalBackup,
   restoreVerifiedPortableBackup,
@@ -522,10 +526,7 @@ async function runEntrypoint(): Promise<void> {
     const socket = await connectCoreTransport(bootstrapMaterial.endpoint);
     transport = await authenticateCoreTransport(bootstrapMaterial, socket);
   } catch (error) {
-    const code =
-      error instanceof CoreBootstrapError || error instanceof CoreIpcBootstrapError
-        ? error.code
-        : "CORE_START_FAILED";
+    const code = coreStartupFailureCode(error);
     process.stderr.write(`[${code}]\n`);
     process.exitCode = 1;
     return;
@@ -549,6 +550,18 @@ async function runEntrypoint(): Promise<void> {
   process.off("SIGTERM", shutdown);
   authenticatedTransport.socket.destroy();
   bootstrap.stop();
+}
+
+function coreStartupFailureCode(error: unknown): string {
+  if (error instanceof CoreBootstrapError) {
+    const cause = error.cause;
+    if (cause instanceof CorePersistenceError || cause instanceof CoreSchemaError) {
+      return cause.code;
+    }
+    return error.code;
+  }
+  if (error instanceof CoreIpcBootstrapError) return error.code;
+  return "CORE_START_FAILED";
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

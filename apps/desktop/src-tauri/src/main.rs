@@ -218,7 +218,54 @@ fn core_authentication_failure_code(state: local_ipc::LocalIpcState) -> &'static
 fn core_authentication_failure_code_with_process_state(
     state: local_ipc::LocalIpcState,
     core_exited: bool,
+    startup_failure_code: Option<&str>,
 ) -> &'static str {
+    if let Some(code) = startup_failure_code {
+        return match code {
+            "BOOTSTRAP_MALFORMED" => "CORE_BOOTSTRAP_MALFORMED",
+            "BOOTSTRAP_REQUIRED" => "CORE_BOOTSTRAP_REQUIRED",
+            "BOOTSTRAP_TOO_LARGE" => "CORE_BOOTSTRAP_TOO_LARGE",
+            "CORE_ENTRYPOINT_MISSING" => "CORE_ENTRYPOINT_MISSING",
+            "CORE_RUNTIME_INCOMPATIBLE" => "CORE_RUNTIME_INCOMPATIBLE",
+            "CORE_RUNTIME_INTEGRITY_FAILED" => "CORE_RUNTIME_INTEGRITY_FAILED",
+            "CORE_RUNTIME_MISSING" => "CORE_RUNTIME_MISSING",
+            "CORE_START_FAILED" => "CORE_START_FAILED",
+            "IPC_AUTHENTICATION_FAILED" => "CORE_IPC_AUTHENTICATION_FAILED",
+            "IPC_CONNECT_FAILED" => "CORE_IPC_CONNECT_FAILED",
+            "IPC_FRAME_MALFORMED" => "CORE_IPC_FRAME_MALFORMED",
+            "IPC_FRAME_TOO_LARGE" => "CORE_IPC_FRAME_TOO_LARGE",
+            "IPC_HANDSHAKE_TIMEOUT" => "CORE_IPC_HANDSHAKE_TIMEOUT",
+            "IPC_PROTOCOL_MISMATCH" => "CORE_IPC_PROTOCOL_MISMATCH",
+            "PERSISTENCE_CONFLICT" => "PERSISTENCE_CONFLICT",
+            "PERSISTENCE_IDENTITY_FAILED" => "PERSISTENCE_IDENTITY_FAILED",
+            "PERSISTENCE_INIT_FAILED" => "PERSISTENCE_INIT_FAILED",
+            "PERSISTENCE_INTEGRITY_FAILED" => "PERSISTENCE_INTEGRITY_FAILED",
+            "PERSISTENCE_KEY_INVALID" => "PERSISTENCE_KEY_INVALID",
+            "PERSISTENCE_KEY_REQUIRED" => "PERSISTENCE_KEY_REQUIRED",
+            "PERSISTENCE_PATH_INVALID" => "PERSISTENCE_PATH_INVALID",
+            "PERSISTENCE_PATH_NOT_READY" => "PERSISTENCE_PATH_NOT_READY",
+            "PERSISTENCE_RESTORE_DESTINATION_EXISTS" => "PERSISTENCE_RESTORE_DESTINATION_EXISTS",
+            "PERSISTENCE_RESTORE_DESTINATION_INVALID" => "PERSISTENCE_RESTORE_DESTINATION_INVALID",
+            "PERSISTENCE_RESTORE_FAILED" => "PERSISTENCE_RESTORE_FAILED",
+            "PERSISTENCE_RESTORE_INTEGRITY_FAILED" => "PERSISTENCE_RESTORE_INTEGRITY_FAILED",
+            "PERSISTENCE_SCHEMA_INVALID" => "PERSISTENCE_SCHEMA_INVALID",
+            "PERSISTENCE_SCHEMA_UNSUPPORTED" => "PERSISTENCE_SCHEMA_UNSUPPORTED",
+            "PERSISTENCE_SNAPSHOT_ACTIVE_TRANSACTION" => "PERSISTENCE_SNAPSHOT_ACTIVE_TRANSACTION",
+            "PERSISTENCE_SNAPSHOT_DESTINATION_EXISTS" => "PERSISTENCE_SNAPSHOT_DESTINATION_EXISTS",
+            "PERSISTENCE_SNAPSHOT_DESTINATION_INVALID" => "PERSISTENCE_SNAPSHOT_DESTINATION_INVALID",
+            "PERSISTENCE_SNAPSHOT_FAILED" => "PERSISTENCE_SNAPSHOT_FAILED",
+            "PERSISTENCE_SNAPSHOT_INTEGRITY_FAILED" => "PERSISTENCE_SNAPSHOT_INTEGRITY_FAILED",
+            "PERSISTENCE_SNAPSHOT_KEY_REQUIRED" => "PERSISTENCE_SNAPSHOT_KEY_REQUIRED",
+            "PERSISTENCE_SNAPSHOT_SCHEMA_UNSUPPORTED" => "PERSISTENCE_SNAPSHOT_SCHEMA_UNSUPPORTED",
+            _ => {
+                if core_exited {
+                    "CORE_EXITED_DURING_AUTHENTICATION"
+                } else {
+                    core_authentication_failure_code(state)
+                }
+            }
+        };
+    }
     if core_exited {
         "CORE_EXITED_DURING_AUTHENTICATION"
     } else {
@@ -437,10 +484,16 @@ fn main() {
                                 core_process.wait(Duration::ZERO).ok(),
                                 Some(process_supervisor::ProcessWait::Exited { .. })
                             );
+                            let startup_failure_code = if core_exited {
+                                core_process.startup_failure_code()
+                            } else {
+                                None
+                            };
                             bootstrap_diagnostics.record_failure(
                                 core_authentication_failure_code_with_process_state(
                                     error.state,
                                     core_exited,
+                                    startup_failure_code.as_deref(),
                                 ),
                             )?;
                             startup_condition = bootstrap.condition().startup_query_value();
@@ -521,6 +574,7 @@ mod tests {
             core_authentication_failure_code_with_process_state(
                 super::local_ipc::LocalIpcState::HandshakeTimeout,
                 true,
+                None,
             ),
             "CORE_EXITED_DURING_AUTHENTICATION"
         );
@@ -528,8 +582,25 @@ mod tests {
             core_authentication_failure_code_with_process_state(
                 super::local_ipc::LocalIpcState::HandshakeTimeout,
                 false,
+                None,
             ),
             "CORE_AUTHENTICATION_FAILED_TIMEOUT"
+        );
+        assert_eq!(
+            core_authentication_failure_code_with_process_state(
+                super::local_ipc::LocalIpcState::HandshakeTimeout,
+                true,
+                Some("CORE_START_FAILED"),
+            ),
+            "CORE_START_FAILED"
+        );
+        assert_eq!(
+            core_authentication_failure_code_with_process_state(
+                super::local_ipc::LocalIpcState::HandshakeTimeout,
+                true,
+                Some("untrusted detail"),
+            ),
+            "CORE_EXITED_DURING_AUTHENTICATION"
         );
     }
 
