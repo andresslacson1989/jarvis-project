@@ -230,6 +230,16 @@ not performed, record the exact remaining location and reason. A task is not
 complete when an important artifact is left undocumented or its location is
 left for the next agent to infer.
 
+### Mandatory shipped-desktop visual verification
+
+After every newly built, installed, or shipped desktop build, the agent SHALL
+perform a real launch check and inspect the visible Mission Control window
+before handoff. The check SHALL confirm that the window is visible, the UI is
+not blank, the displayed Core badge/state matches the latest bootstrap evidence,
+and no stale lock or error state remains. Process existence or log success
+alone is insufficient; if visual inspection cannot be performed, the build
+must be reported as visually unverified.
+
 ## No ADR/history overlay
 
 Historical contracts/ADRs may explain why a rule exists but SHALL NOT be required to determine current behavior.
