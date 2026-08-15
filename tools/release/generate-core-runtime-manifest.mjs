@@ -9,6 +9,7 @@ const CORE_RELATIVE_PATH = "core/dist/main.js";
 const CORE_SUPPORT_RELATIVE_PATHS = [
   "core/package.json",
   "core/dist/release-trust.js",
+  "core/dist/authority-canonical.js",
   "core/dist/ipc-bootstrap.js",
   "core/dist/persistence.js",
   "core/dist/schema.js",

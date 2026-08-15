@@ -11,6 +11,7 @@ const REPOSITORY_ROOT = resolve(fileURLToPath(new URL("../../", import.meta.url)
 const V1_NODE_VERSION = "24.18.0";
 const CORE_SUPPORT_FILES = [
   "release-trust.js",
+  "authority-canonical.js",
   "ipc-bootstrap.js",
   "persistence.js",
   "schema.js",

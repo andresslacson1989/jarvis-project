@@ -10,6 +10,11 @@ const generatedTrustModule = resolve(
   projectRoot,
   ".artifacts/core-build/services/core/src/release-trust.js",
 );
+const generatedAuthorityCanonicalModule = resolve(
+  projectRoot,
+  ".artifacts/core-build/services/core/src/authority-canonical.js",
+);
+const outputAuthorityCanonicalModule = resolve(outputDirectory, "authority-canonical.js");
 const outputTrustModule = resolve(outputDirectory, "release-trust.js");
 const generatedIpcModule = resolve(
   projectRoot,
@@ -65,6 +70,7 @@ async function main() {
   await rm(outputDirectory, { recursive: true, force: true });
   await mkdir(outputDirectory, { recursive: true });
   await copyFile(generatedEntrypoint, outputEntrypoint);
+  await copyFile(generatedAuthorityCanonicalModule, outputAuthorityCanonicalModule);
   await copyFile(generatedTrustModule, outputTrustModule);
   await copyFile(generatedIpcModule, outputIpcModule);
   await copyFile(generatedPersistenceModule, outputPersistenceModule);
