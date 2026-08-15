@@ -1,12 +1,24 @@
 import { useEffect, useState } from "react";
-import { requestProviderSetupStart, requestProviderSetupStatus } from "./coreBridge";
-import { MissionControlShell, resolveStartupSnapshot, type ProviderSetupModel } from "./mission-control";
+import { authenticateSession, initializeSession, requestProviderSetupStart, requestProviderSetupStatus, requestSessionStatus, type SessionStatusResponse } from "./coreBridge";
+import { MissionControlShell, resolveStartupSnapshot, type ProviderSetupModel, type SessionControlModel } from "./mission-control";
 
 export function App() {
   const [providerSetup, setProviderSetup] = useState<ProviderSetupModel | undefined>();
+  const [sessionControl, setSessionControl] = useState<SessionControlModel | undefined>();
   const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     let active = true;
+    void requestSessionStatus().then((status) => {
+      if (active) setSessionControl(buildSessionControl(status, setSessionControl, setRefresh));
+    }).catch((error) => { if (active) setSessionControl({ initialized: false, state: "LOCKED", errorMessage: error instanceof Error ? error.message : "Session status is unavailable." }); });
+    return () => { active = false; };
+  }, [refresh]);
+  useEffect(() => {
+    let active = true;
+    if (sessionControl?.state !== "UNLOCKED") {
+      setProviderSetup(undefined);
+      return () => { active = false; };
+    }
     void requestProviderSetupStatus().then((records) => {
       if (!active || records.length === 0) return;
       const record = records.at(0);
@@ -16,8 +28,28 @@ export function App() {
       } });
     }).catch(() => { if (active) setProviderSetup(undefined); });
     return () => { active = false; };
-  }, [refresh]);
-  return <MissionControlShell snapshot={{ ...resolveStartupSnapshot(), ...(providerSetup ? { providerSetup } : {}) }} />;
+  }, [refresh, sessionControl?.state]);
+  return <MissionControlShell snapshot={{ ...resolveStartupSnapshot(), ...(providerSetup ? { providerSetup } : {}), ...(sessionControl ? { sessionControl } : {}) }} />;
+}
+
+function buildSessionControl(status: SessionStatusResponse, setSessionControl: (value: SessionControlModel) => void, setRefresh: (value: (current: number) => number) => void): SessionControlModel {
+  const state = status.state?.state ?? "LOCKED";
+  return {
+    initialized: status.initialized,
+    state,
+    ...(status.initialized ? {} : { onInitialize: async (password: string) => {
+      const result = await initializeSession(password);
+      setSessionControl(buildSessionControl(result, setSessionControl, setRefresh));
+      setRefresh((value) => value + 1);
+    } }),
+    ...(status.initialized && state !== "UNLOCKED" ? { onUnlock: async (password: string) => {
+      const result = await authenticateSession(password);
+      const next = buildSessionControl({ initialized: true, state: result.state }, setSessionControl, setRefresh);
+      setSessionControl({ ...next, retryAfterMs: result.retryAfterMs, ...(result.status === "UNLOCKED" ? {} : { errorMessage: result.status === "COOLDOWN" ? "The session is cooling down after failed attempts." : "The session password was not accepted." }) });
+      if (result.status === "DENIED" || result.status === "COOLDOWN") throw new Error(result.status === "COOLDOWN" ? "The session is cooling down after failed attempts." : "The session password was not accepted.");
+      setRefresh((value) => value + 1);
+    } } : {}),
+  };
 }
 
 function uuidV7(): `${string}-${string}-7${string}-${string}-${string}` {

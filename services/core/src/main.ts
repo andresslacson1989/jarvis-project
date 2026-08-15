@@ -16,6 +16,7 @@ import {
   type CoreDatabaseConnection,
 } from "./persistence.js";
 import { applyCoreMigrations, CoreSchemaError, CoreStateRepository } from "./schema.js";
+import type { SessionSecurityState } from "../../../packages/protocol/src/session.js";
 import {
   restoreVerifiedLocalBackup,
   restoreVerifiedPortableBackup,
@@ -30,6 +31,7 @@ import {
   CoreIpcFrameReader,
   CORE_IPC_FRAME_CEILING,
   deriveNewSessionPasswordThroughNativeStorage,
+  verifySessionPasswordThroughNativeStorage,
   unprotectLocalBackupDekThroughNativeStorage,
   protectNewDbDekThroughNativeStorage,
   encodeCoreIpcJsonFrame,
@@ -46,6 +48,9 @@ export const CORE_PLATFORM = "WINDOWS" as const;
 export const CORE_RUNTIME_ROLE = "FULL_HOST" as const;
 export const CORE_ARCHITECTURE = "x64" as const;
 const CORE_STATUS_REQUEST = "get_core_status" as const;
+const SESSION_STATUS_REQUEST = "get_session_status" as const;
+const SESSION_INITIALIZE_REQUEST = "initialize_session" as const;
+const SESSION_AUTHENTICATE_REQUEST = "authenticate_session" as const;
 
 export type CoreBootstrapState = "STARTING" | "RECOVERY" | "READY" | "STOPPING" | "STOPPED";
 export type CoreBootstrapFailureCode =
@@ -225,6 +230,9 @@ type ProviderSetupStartResponse = IpcResponse<{
 }>;
 type ProviderSetupCompleteResponse = IpcResponse<{ readonly requestId: string; readonly state: "SETUP_READY" | "SETUP_FAILED" }>;
 type ProviderSetupStatusResponse = IpcResponse<{ readonly providers: readonly ProviderSetupRecord[] }>;
+type SessionStatusResponse = IpcResponse<{ readonly initialized: boolean; readonly state: SessionSecurityState | null }>;
+type SessionInitializeResponse = IpcResponse<{ readonly initialized: true; readonly state: SessionSecurityState }>;
+type SessionAuthenticateResponse = IpcResponse<{ readonly status: "UNLOCKED" | "DENIED" | "COOLDOWN"; readonly retryAfterMs: number; readonly state: SessionSecurityState }>;
 
 /**
  * Shared service-shell stub for the first UI/Core boundary slice. It exposes
@@ -264,11 +272,17 @@ export class AuthenticatedCoreServiceShell implements CoreServiceShellBoundary {
   private readonly startProviderSetup: ((request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>) | undefined;
   private readonly completeProviderSetup: ((request: IpcEnvelope<unknown>) => ProviderSetupCompleteResponse | Promise<ProviderSetupCompleteResponse>) | undefined;
   private readonly providerSetupStatus: ((request: IpcEnvelope<unknown>) => ProviderSetupStatusResponse | Promise<ProviderSetupStatusResponse>) | undefined;
+  private readonly sessionStatus: ((request: IpcEnvelope<unknown>) => SessionStatusResponse | Promise<SessionStatusResponse>) | undefined;
+  private readonly initializeSession: ((request: IpcEnvelope<unknown>) => SessionInitializeResponse | Promise<SessionInitializeResponse>) | undefined;
+  private readonly authenticateSession: ((request: IpcEnvelope<unknown>) => SessionAuthenticateResponse | Promise<SessionAuthenticateResponse>) | undefined;
 
-  constructor(startProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>, completeProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupCompleteResponse | Promise<ProviderSetupCompleteResponse>, providerSetupStatus?: (request: IpcEnvelope<unknown>) => ProviderSetupStatusResponse | Promise<ProviderSetupStatusResponse>) {
+  constructor(startProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>, completeProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupCompleteResponse | Promise<ProviderSetupCompleteResponse>, providerSetupStatus?: (request: IpcEnvelope<unknown>) => ProviderSetupStatusResponse | Promise<ProviderSetupStatusResponse>, sessionStatus?: (request: IpcEnvelope<unknown>) => SessionStatusResponse | Promise<SessionStatusResponse>, initializeSession?: (request: IpcEnvelope<unknown>) => SessionInitializeResponse | Promise<SessionInitializeResponse>, authenticateSession?: (request: IpcEnvelope<unknown>) => SessionAuthenticateResponse | Promise<SessionAuthenticateResponse>) {
     this.startProviderSetup = startProviderSetup;
     this.completeProviderSetup = completeProviderSetup;
     this.providerSetupStatus = providerSetupStatus;
+    this.sessionStatus = sessionStatus;
+    this.initializeSession = initializeSession;
+    this.authenticateSession = authenticateSession;
   }
 
   async handle(request: IpcEnvelope<unknown>): Promise<IpcResponse<unknown>> {
@@ -290,9 +304,43 @@ export class AuthenticatedCoreServiceShell implements CoreServiceShellBoundary {
       try { return this.providerSetupStatus ? await this.providerSetupStatus(request) : providerSetupStatusNotReadyResponse(request); }
       catch (error) { return providerSetupStatusFailureResponse(request, error); }
     }
+    if (isSessionStatusRequest(request)) {
+      try { return this.sessionStatus ? await this.sessionStatus(request) : sessionStatusNotReadyResponse(request); }
+      catch (error) { return sessionStatusFailureResponse(request, error); }
+    }
+    if (isSessionInitializeRequest(request)) {
+      try { return this.initializeSession ? await this.initializeSession(request) : sessionInitializeNotReadyResponse(request); }
+      catch (error) { return sessionMutationFailureResponse(request, error); }
+    }
+    if (isSessionAuthenticateRequest(request)) {
+      try { return this.authenticateSession ? await this.authenticateSession(request) : sessionAuthenticateNotReadyResponse(request); }
+      catch (error) { return sessionMutationFailureResponse(request, error); }
+    }
     if (!isCoreStatusRequest(request)) return invalidCoreStatusResponse(request);
     return { ok: true, result: LOCKED_CORE_SERVICE_STATUS };
   }
+}
+
+function sessionStatusNotReadyResponse(request: IpcEnvelope<unknown>): SessionStatusResponse {
+  return { ok: false, error: { code: "CORE_SESSION_STATUS_NOT_READY", category: "UNSUPPORTED", message: "Session status is not available until the authenticated Core persistence boundary is attached", retryable: true, correlationId: request.correlationId } };
+}
+
+function sessionStatusFailureResponse(request: IpcEnvelope<unknown>, error: unknown): SessionStatusResponse {
+  const code = error instanceof CoreSchemaError || error instanceof CorePersistenceError ? error.code : "CORE_SESSION_STATUS_FAILED";
+  return { ok: false, error: { code, category: "INTERNAL", message: "Session status could not be read", retryable: true, correlationId: request.correlationId } };
+}
+
+function sessionInitializeNotReadyResponse(request: IpcEnvelope<unknown>): SessionInitializeResponse {
+  return { ok: false, error: { code: "CORE_SESSION_INITIALIZE_NOT_READY", category: "UNSUPPORTED", message: "Session initialization is not available until the authenticated Core persistence and secure-storage boundaries are attached", retryable: true, correlationId: request.correlationId } };
+}
+
+function sessionAuthenticateNotReadyResponse(request: IpcEnvelope<unknown>): SessionAuthenticateResponse {
+  return { ok: false, error: { code: "CORE_SESSION_AUTHENTICATION_NOT_READY", category: "UNSUPPORTED", message: "Session authentication is not available until the authenticated Core persistence and secure-storage boundaries are attached", retryable: true, correlationId: request.correlationId } };
+}
+
+function sessionMutationFailureResponse(request: IpcEnvelope<unknown>, error: unknown): SessionInitializeResponse | SessionAuthenticateResponse {
+  const code = error instanceof CoreSchemaError || error instanceof CorePersistenceError || error instanceof CoreIpcBootstrapError ? error.code : "CORE_SESSION_MUTATION_FAILED";
+  return { ok: false, error: { code, category: "INTERNAL", message: "JARVIS session transition failed", retryable: true, correlationId: request.correlationId } };
 }
 
 function providerSetupStatusNotReadyResponse(request: IpcEnvelope<unknown>): ProviderSetupStatusResponse {
@@ -395,6 +443,29 @@ function isProviderSetupCompleteRequest(value: unknown): value is IpcEnvelope<{ 
 function isProviderSetupStatusRequest(value: unknown): value is IpcEnvelope<Record<string, never>> {
   if (!isRecord(value) || value.protocolVersion !== 1 || value.kind !== "request" || value.name !== "get_provider_setup_status" || !isUuidV7(value.id) || !isUuidV7(value.correlationId) || !isRecord(value.payload)) return false;
   return Object.keys(value.payload).length === 0;
+}
+
+function isSessionStatusRequest(value: unknown): value is IpcEnvelope<Record<string, never>> {
+  if (!isRecord(value) || value.protocolVersion !== 1 || value.kind !== "request" || value.name !== SESSION_STATUS_REQUEST || !isUuidV7(value.id) || !isUuidV7(value.correlationId) || !isRecord(value.payload)) return false;
+  return Object.keys(value.payload).length === 0;
+}
+
+function isSessionInitializeRequest(value: unknown): value is IpcEnvelope<{ readonly userId: string; readonly password: string }> {
+  if (!isRecord(value) || value.protocolVersion !== 1 || value.kind !== "request" || value.name !== SESSION_INITIALIZE_REQUEST || !isUuidV7(value.id) || !isUuidV7(value.correlationId) || !isRecord(value.payload)) return false;
+  return Object.keys(value.payload).sort().join(",") === "password,userId" && boundedSecretText(value.payload.password) && boundedUserId(value.payload.userId);
+}
+
+function isSessionAuthenticateRequest(value: unknown): value is IpcEnvelope<{ readonly userId: string; readonly password: string }> {
+  if (!isRecord(value) || value.protocolVersion !== 1 || value.kind !== "request" || value.name !== SESSION_AUTHENTICATE_REQUEST || !isUuidV7(value.id) || !isUuidV7(value.correlationId) || !isRecord(value.payload)) return false;
+  return Object.keys(value.payload).sort().join(",") === "password,userId" && boundedSecretText(value.payload.password) && boundedUserId(value.payload.userId);
+}
+
+function boundedSecretText(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 4096 && !value.includes("\0");
+}
+
+function boundedUserId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 256 && !value.includes("\0");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -547,6 +618,47 @@ export class CoreBootstrap {
     return { ok: true, result: { providers: new CoreStateRepository(this.database).listProviderSetupStates() } };
   }
 
+  sessionStatus(request: IpcEnvelope<unknown>): SessionStatusResponse {
+    if (!isSessionStatusRequest(request) || !this.database) return sessionStatusNotReadyResponse(request);
+    const state = new CoreStateRepository(this.database).getSessionSecurityState();
+    return { ok: true, result: { initialized: state !== undefined, state: state ?? null } };
+  }
+
+  async initializeSession(request: IpcEnvelope<unknown>): Promise<SessionInitializeResponse> {
+    if (!isSessionInitializeRequest(request) || !this.database || !this.secureStorageMaterial) return sessionInitializeNotReadyResponse(request);
+    const password = Buffer.from(request.payload.password, "utf8");
+    let verifier;
+    try {
+      verifier = await deriveNewSessionPasswordThroughNativeStorage(this.secureStorageMaterial, password);
+      const now = new Date().toISOString();
+      const result = new CoreStateRepository(this.database).initializeSession({ userId: request.payload.userId, sessionId: request.id as string, now, eventId: request.id as string, eventType: "SESSION_INIT", correlationId: request.correlationId }, verifier);
+      return { ok: true, result: { initialized: true, state: result.state } };
+    } finally {
+      password.fill(0);
+      verifier?.salt.fill(0);
+      verifier?.verifier.fill(0);
+    }
+  }
+
+  async authenticateSession(request: IpcEnvelope<unknown>): Promise<SessionAuthenticateResponse> {
+    if (!isSessionAuthenticateRequest(request) || !this.database || !this.secureStorageMaterial) return sessionAuthenticateNotReadyResponse(request);
+    const repository = new CoreStateRepository(this.database);
+    const current = repository.getSessionSecurityState();
+    const verifier = repository.getSessionPasswordVerifier();
+    if (!current || !verifier) return sessionAuthenticateNotReadyResponse(request);
+    const password = Buffer.from(request.payload.password, "utf8");
+    try {
+      const passwordVerified = await verifySessionPasswordThroughNativeStorage(this.secureStorageMaterial, password, verifier);
+      const now = new Date().toISOString();
+      const result = repository.authenticateSession({ userId: request.payload.userId, sessionId: request.id as string, now, eventId: request.id as string, eventType: passwordVerified ? "SESSION_AUTHENTICATION" : "SESSION_AUTH_COOLDOWN", correlationId: request.correlationId, passwordVerified });
+      return { ok: true, result: { status: result.status, retryAfterMs: result.retryAfterMs, state: result.state } };
+    } finally {
+      password.fill(0);
+      verifier.salt.fill(0);
+      verifier.verifier.fill(0);
+    }
+  }
+
   async restorePortableBackup(
     input: Omit<RestoreVerifiedPortableBackupInputV1, "protectNewDbDek" | "sessionPasswordVerifier"> & {
       readonly newSessionPassword: Buffer;
@@ -644,9 +756,12 @@ export async function serveAuthenticatedCoreTransport(
   startProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>,
   completeProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupCompleteResponse | Promise<ProviderSetupCompleteResponse>,
   providerSetupStatus?: (request: IpcEnvelope<unknown>) => ProviderSetupStatusResponse | Promise<ProviderSetupStatusResponse>,
+  sessionStatus?: (request: IpcEnvelope<unknown>) => SessionStatusResponse | Promise<SessionStatusResponse>,
+  initializeSession?: (request: IpcEnvelope<unknown>) => SessionInitializeResponse | Promise<SessionInitializeResponse>,
+  authenticateSession?: (request: IpcEnvelope<unknown>) => SessionAuthenticateResponse | Promise<SessionAuthenticateResponse>,
 ): Promise<void> {
   const reader = transport.reader;
-  const shell = new AuthenticatedCoreServiceShell(startProviderSetup, completeProviderSetup, providerSetupStatus);
+  const shell = new AuthenticatedCoreServiceShell(startProviderSetup, completeProviderSetup, providerSetupStatus, sessionStatus, initializeSession, authenticateSession);
   while (!isStopping()) {
     let payload: Buffer;
     try {
@@ -709,7 +824,7 @@ async function runEntrypoint(): Promise<void> {
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
-  await serveAuthenticatedCoreTransport(authenticatedTransport, () => stopping, (request) => bootstrap.startProviderSetup(request), (request) => bootstrap.completeProviderSetup(request), (request) => bootstrap.providerSetupStatus(request));
+  await serveAuthenticatedCoreTransport(authenticatedTransport, () => stopping, (request) => bootstrap.startProviderSetup(request), (request) => bootstrap.completeProviderSetup(request), (request) => bootstrap.providerSetupStatus(request), (request) => bootstrap.sessionStatus(request), (request) => bootstrap.initializeSession(request), (request) => bootstrap.authenticateSession(request));
   process.off("SIGINT", shutdown);
   process.off("SIGTERM", shutdown);
   authenticatedTransport.socket.destroy();

@@ -395,6 +395,74 @@ test("authenticated Core returns sanitized provider setup status only through th
   if (!invalid.ok) assert.equal(invalid.error.code, "CORE_IPC_REQUEST_INVALID");
 });
 
+test("authenticated Core returns session initialization state without secret material", async () => {
+  const request = {
+    protocolVersion: 1,
+    kind: "request",
+    id: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    name: "get_session_status",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ac",
+    payload: {},
+  };
+  const shell = new AuthenticatedCoreServiceShell(undefined, undefined, undefined, async () => ({
+    ok: true,
+    result: { initialized: false, state: null },
+  }));
+  assert.deepEqual(await shell.handle(request), {
+    ok: true,
+    result: { initialized: false, state: null },
+  });
+  const invalid = await shell.handle({ ...request, payload: { password: "must-not-cross-status" } });
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) assert.equal(invalid.error.code, "CORE_IPC_REQUEST_INVALID");
+});
+
+test("authenticated Core routes bounded session initialization and authentication through typed callbacks", async () => {
+  const initializationRequest = {
+    protocolVersion: 1,
+    kind: "request",
+    id: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    name: "initialize_session",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ac",
+    payload: { userId: "S-1-5-21-1000", password: "initial-password" },
+  };
+  const authenticationRequest = {
+    ...initializationRequest,
+    id: "018f3b8e-6c68-7abc-8def-0123456789ad",
+    name: "authenticate_session",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ae",
+    payload: { userId: "S-1-5-21-1000", password: "unlock-password" },
+  };
+  let initializedPassword;
+  let authenticatedPassword;
+  const shell = new AuthenticatedCoreServiceShell(
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    async (request) => {
+      initializedPassword = request.payload.password;
+      return { ok: true, result: { initialized: true, state: { state: "LOCKED" } } };
+    },
+    async (request) => {
+      authenticatedPassword = request.payload.password;
+      return { ok: true, result: { status: "UNLOCKED", retryAfterMs: 0, state: { state: "UNLOCKED" } } };
+    },
+  );
+  assert.deepEqual(await shell.handle(initializationRequest), { ok: true, result: { initialized: true, state: { state: "LOCKED" } } });
+  assert.equal(initializedPassword, "initial-password");
+  assert.deepEqual(await shell.handle(authenticationRequest), { ok: true, result: { status: "UNLOCKED", retryAfterMs: 0, state: { state: "UNLOCKED" } } });
+  assert.equal(authenticatedPassword, "unlock-password");
+
+  const invalid = await shell.handle({ ...initializationRequest, payload: { ...initializationRequest.payload, extra: true } });
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) assert.equal(invalid.error.code, "CORE_IPC_REQUEST_INVALID");
+
+  const notReady = await new AuthenticatedCoreServiceShell().handle(initializationRequest);
+  assert.equal(notReady.ok, false);
+  if (!notReady.ok) assert.equal(notReady.error.code, "CORE_SESSION_INITIALIZE_NOT_READY");
+});
+
 test("authenticated Core transport serves the bounded locked-status round-trip", async () => {
   const [serverSocket, client] = createMemorySocketPair();
   let stopping = false;

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   CoreStatusResponse,
+  SessionSecurityState,
   UUIDv7,
 } from "../../../packages/protocol/src/index";
 
@@ -29,6 +30,17 @@ export interface ProviderSetupStatusRecord {
   readonly sanitizedFailureReason?: string;
 }
 
+export interface SessionStatusResponse {
+  readonly initialized: boolean;
+  readonly state: SessionSecurityState | null;
+}
+
+export interface SessionAuthenticationResponse {
+  readonly status: "UNLOCKED" | "DENIED" | "COOLDOWN";
+  readonly retryAfterMs: number;
+  readonly state: SessionSecurityState;
+}
+
 export async function requestProviderSetupStart(request: ProviderSetupStartRequest): Promise<ProviderSetupStartResponse> {
   const response: unknown = await invoke("start_provider_setup", { request });
   if (!isProviderSetupStartResponse(response)) {
@@ -41,6 +53,30 @@ export async function requestProviderSetupStatus(): Promise<readonly ProviderSet
   const response: unknown = await invoke("get_provider_setup_status");
   if (!Array.isArray(response) || !response.every(isProviderSetupStatusRecord)) {
     throw new Error("native provider setup status failed runtime validation");
+  }
+  return response;
+}
+
+export async function requestSessionStatus(): Promise<SessionStatusResponse> {
+  const response: unknown = await invoke("get_session_status");
+  if (!isSessionStatusResponse(response)) {
+    throw new Error("native session status response failed runtime validation");
+  }
+  return response;
+}
+
+export async function initializeSession(password: string): Promise<SessionStatusResponse> {
+  const response: unknown = await invoke("initialize_session", { request: { password } });
+  if (!isSessionStatusResponse(response)) {
+    throw new Error("native session initialization response failed runtime validation");
+  }
+  return response;
+}
+
+export async function authenticateSession(password: string): Promise<SessionAuthenticationResponse> {
+  const response: unknown = await invoke("authenticate_session", { request: { password } });
+  if (!isSessionAuthenticationResponse(response)) {
+    throw new Error("native session authentication response failed runtime validation");
   }
   return response;
 }
@@ -76,6 +112,34 @@ function isProviderSetupStartResponse(value: unknown): value is ProviderSetupSta
 
 function isProviderSetupStatusRecord(value: unknown): value is ProviderSetupStatusRecord {
   return isRecord(value) && typeof value.providerId === "string" && typeof value.distributionId === "string" && typeof value.adapterVersion === "string" && ["NOT_REQUIRED", "SETUP_REQUIRED", "SETUP_IN_PROGRESS", "SETUP_READY", "REPAIR_REQUIRED", "SETUP_FAILED"].includes(value.state as string) && (value.sanitizedFailureReason === undefined || typeof value.sanitizedFailureReason === "string");
+}
+
+function isSessionStatusResponse(value: unknown): value is SessionStatusResponse {
+  if (!isRecord(value) || Object.keys(value).sort().join(",") !== "initialized,state" || typeof value.initialized !== "boolean") return false;
+  if (value.state === null) return value.initialized === false;
+  if (!value.initialized || !isRecord(value.state)) return false;
+  return isSessionSecurityState(value.state);
+}
+
+function isSessionAuthenticationResponse(value: unknown): value is SessionAuthenticationResponse {
+  if (!isRecord(value) || Object.keys(value).sort().join(",") !== "retryAfterMs,state,status" || !["UNLOCKED", "DENIED", "COOLDOWN"].includes(value.status as string) || typeof value.retryAfterMs !== "number" || !Number.isSafeInteger(value.retryAfterMs) || value.retryAfterMs < 0 || !isRecord(value.state)) return false;
+  return isSessionSecurityState(value.state);
+}
+
+function isSessionSecurityState(value: unknown): value is SessionSecurityState {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value).sort().join(",");
+  if (keys !== "cooldownUntil,failedUnlockAttempts,lockedReason,sessionId,state,unlockedAt,userId") return false;
+  if (typeof value.userId !== "string" || value.userId.length === 0 || value.userId.length > 256) return false;
+  if (!("LOCKED" === value.state || "UNLOCKING" === value.state || "UNLOCKED" === value.state || "LOCKING" === value.state)) return false;
+  if (!(value.sessionId === null || isUuidV7(value.sessionId))) return false;
+  if (!(value.unlockedAt === null || typeof value.unlockedAt === "string")) return false;
+  if (!(value.lockedReason === null || ["STARTUP", "USER", "OS_SESSION_LOCK", "OS_SESSION_END", "IDLE", "SECURITY"].includes(value.lockedReason as string))) return false;
+  if (typeof value.failedUnlockAttempts !== "number" || !Number.isSafeInteger(value.failedUnlockAttempts) || value.failedUnlockAttempts < 0 || value.failedUnlockAttempts > 31) return false;
+  if (!(value.cooldownUntil === null || typeof value.cooldownUntil === "string")) return false;
+  return value.state === "UNLOCKED"
+    ? value.sessionId !== null && value.unlockedAt !== null && value.lockedReason === null
+    : value.unlockedAt === null && (value.state !== "LOCKED" || value.lockedReason !== null);
 }
 
 function isCoreServiceStatus(value: unknown): boolean {

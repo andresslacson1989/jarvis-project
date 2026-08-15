@@ -83,6 +83,39 @@ struct ProviderSetupStatusCommandRecord {
     sanitized_failure_reason: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionStatusCommandResponse {
+    initialized: bool,
+    state: Option<SessionSecurityStateCommandRecord>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionSecurityStateCommandRecord {
+    user_id: String,
+    state: String,
+    session_id: Option<String>,
+    unlocked_at: Option<String>,
+    locked_reason: Option<String>,
+    failed_unlock_attempts: u32,
+    cooldown_until: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionPasswordCommandRequest {
+    password: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionAuthenticationCommandResponse {
+    status: String,
+    retry_after_ms: u64,
+    state: SessionSecurityStateCommandRecord,
+}
+
 #[cfg(not(debug_assertions))]
 #[tauri::command]
 fn start_provider_setup(
@@ -149,6 +182,87 @@ fn get_provider_setup_status(
         .map_err(|error| format!("{:?}", error.state))
 }
 
+#[cfg(not(debug_assertions))]
+#[tauri::command]
+fn get_session_status(
+    state: tauri::State<'_, HostRuntime>,
+) -> Result<SessionStatusCommandResponse, String> {
+    let local_ipc = state.local_ipc.lock().map_err(|_| "CORE_IPC_LOCK_FAILED".to_owned())?;
+    local_ipc.request_session_status(&state.authenticated)
+        .map(|status| SessionStatusCommandResponse {
+            initialized: status.initialized,
+            state: status.state.map(|value| SessionSecurityStateCommandRecord {
+                user_id: value.user_id,
+                state: value.state,
+                session_id: value.session_id,
+                unlocked_at: value.unlocked_at,
+                locked_reason: value.locked_reason,
+                failed_unlock_attempts: value.failed_unlock_attempts,
+                cooldown_until: value.cooldown_until,
+            }),
+        })
+        .map_err(|error| format!("{:?}", error.state))
+}
+
+#[cfg(not(debug_assertions))]
+#[tauri::command]
+fn initialize_session(
+    state: tauri::State<'_, HostRuntime>,
+    request: SessionPasswordCommandRequest,
+) -> Result<SessionStatusCommandResponse, String> {
+    let mut password = request.password.into_bytes();
+    let result = match state.local_ipc.lock() {
+        Ok(local_ipc) => local_ipc
+            .request_session_initialize(&state.authenticated, password.clone())
+            .map(|status| SessionStatusCommandResponse {
+                initialized: status.initialized,
+                state: status.state.map(|value| SessionSecurityStateCommandRecord {
+                    user_id: value.user_id,
+                    state: value.state,
+                    session_id: value.session_id,
+                    unlocked_at: value.unlocked_at,
+                    locked_reason: value.locked_reason,
+                    failed_unlock_attempts: value.failed_unlock_attempts,
+                    cooldown_until: value.cooldown_until,
+                }),
+            })
+            .map_err(|error| format!("{:?}", error.state)),
+        Err(_) => Err("CORE_IPC_LOCK_FAILED".to_owned()),
+    };
+    password.fill(0);
+    result
+}
+
+#[cfg(not(debug_assertions))]
+#[tauri::command]
+fn authenticate_session(
+    state: tauri::State<'_, HostRuntime>,
+    request: SessionPasswordCommandRequest,
+) -> Result<SessionAuthenticationCommandResponse, String> {
+    let mut password = request.password.into_bytes();
+    let result = match state.local_ipc.lock() {
+        Ok(local_ipc) => local_ipc
+            .request_session_authenticate(&state.authenticated, password.clone())
+            .map(|result| SessionAuthenticationCommandResponse {
+                status: result.status,
+                retry_after_ms: result.retry_after_ms,
+                state: SessionSecurityStateCommandRecord {
+                    user_id: result.state.user_id,
+                    state: result.state.state,
+                    session_id: result.state.session_id,
+                    unlocked_at: result.state.unlocked_at,
+                    locked_reason: result.state.locked_reason,
+                    failed_unlock_attempts: result.state.failed_unlock_attempts,
+                    cooldown_until: result.state.cooldown_until,
+                },
+            })
+            .map_err(|error| format!("{:?}", error.state)),
+        Err(_) => Err("CORE_IPC_LOCK_FAILED".to_owned()),
+    };
+    password.fill(0);
+    result
+}
+
 #[cfg(debug_assertions)]
 #[tauri::command]
 fn start_provider_setup(
@@ -160,6 +274,24 @@ fn start_provider_setup(
 #[cfg(debug_assertions)]
 #[tauri::command]
 fn get_provider_setup_status() -> Result<Vec<ProviderSetupStatusCommandRecord>, String> {
+    Err("CORE_IPC_NOT_READY".to_owned())
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn get_session_status() -> Result<SessionStatusCommandResponse, String> {
+    Err("CORE_IPC_NOT_READY".to_owned())
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn initialize_session(_request: SessionPasswordCommandRequest) -> Result<SessionStatusCommandResponse, String> {
+    Err("CORE_IPC_NOT_READY".to_owned())
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn authenticate_session(_request: SessionPasswordCommandRequest) -> Result<SessionAuthenticationCommandResponse, String> {
     Err("CORE_IPC_NOT_READY".to_owned())
 }
 
@@ -432,7 +564,7 @@ fn core_authentication_failure_code_with_process_state(
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![ui_boundary::get_core_status, start_provider_setup, get_provider_setup_status])
+        .invoke_handler(tauri::generate_handler![ui_boundary::get_core_status, start_provider_setup, get_provider_setup_status, get_session_status, initialize_session, authenticate_session])
         .setup(|app| {
             let path_backend = path_identity::PlatformPathsAndIdentity::new();
             let resolved_paths = path_backend

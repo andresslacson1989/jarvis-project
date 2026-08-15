@@ -222,6 +222,30 @@ pub struct ProviderSetupStatusRecord {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionStatus {
+    pub initialized: bool,
+    pub state: Option<SessionSecurityState>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionAuthenticationResult {
+    pub status: String,
+    pub retry_after_ms: u64,
+    pub state: SessionSecurityState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionSecurityState {
+    pub user_id: String,
+    pub state: String,
+    pub session_id: Option<String>,
+    pub unlocked_at: Option<String>,
+    pub locked_reason: Option<String>,
+    pub failed_unlock_attempts: u32,
+    pub cooldown_until: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecureStorageProtectionRequest {
     pub correlation_id: String,
     pub database_dek: [u8; BOOTSTRAP_DATABASE_DEK_BYTES],
@@ -493,6 +517,104 @@ struct ProviderSetupStatusRecordWire {
     adapter_version: String,
     state: String,
     sanitized_failure_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionStatusRequestWire {
+    protocol_version: u32,
+    kind: &'static str,
+    id: String,
+    name: &'static str,
+    correlation_id: String,
+    payload: EmptyPayloadWire,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionStatusResponseWire {
+    ok: bool,
+    result: Option<SessionStatusResultWire>,
+    error: Option<CoreStatusErrorWire>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionMutationRequestWire {
+    protocol_version: u32,
+    kind: &'static str,
+    id: String,
+    name: &'static str,
+    correlation_id: String,
+    payload: SessionMutationPayloadWire,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionMutationPayloadWire {
+    user_id: String,
+    password: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionInitializeResponseWire {
+    ok: bool,
+    result: Option<SessionInitializeResultWire>,
+    error: Option<CoreStatusErrorWire>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionInitializeResultWire {
+    initialized: bool,
+    state: Option<SessionSecurityStateWire>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionAuthenticateRequestWire {
+    protocol_version: u32,
+    kind: &'static str,
+    id: String,
+    name: &'static str,
+    correlation_id: String,
+    payload: SessionMutationPayloadWire,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionAuthenticateResponseWire {
+    ok: bool,
+    result: Option<SessionAuthenticateResultWire>,
+    error: Option<CoreStatusErrorWire>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionAuthenticateResultWire {
+    status: String,
+    retry_after_ms: u64,
+    state: Option<SessionSecurityStateWire>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionStatusResultWire {
+    initialized: bool,
+    state: Option<SessionSecurityStateWire>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionSecurityStateWire {
+    user_id: String,
+    state: String,
+    session_id: Option<String>,
+    unlocked_at: Option<String>,
+    locked_reason: Option<String>,
+    failed_unlock_attempts: u32,
+    cooldown_until: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -822,14 +944,19 @@ mod windows {
         ProviderSetupStartPayloadWire, ProviderSetupStartRequest, ProviderSetupStartRequestWire,
         ProviderSetupStartResponse, ProviderSetupStartResponseWire,
         ProviderSetupStatusRecord, ProviderSetupStatusRequestWire,
-        ProviderSetupStatusResponseWire,
+        ProviderSetupStatusResponseWire, SessionAuthenticateRequestWire,
+        SessionAuthenticateResponseWire, SessionAuthenticationResult,
+        SessionInitializeResponseWire, SessionMutationPayloadWire,
+        SessionMutationRequestWire, SessionPasswordVerifierResponseWire,
+        SessionSecurityState, SessionSecurityStateWire, SessionStatus, SessionStatusRequestWire,
+        SessionStatusResponseWire,
         SecureStorageHandleOperationRequest, SecureStorageHandleOperationRequestWire,
         SecureStorageOperation, SecureStorageProtectionRequest, SecureStorageProtectionRequestWire,
         SecureStorageProtectionResponseWire, SecureStorageResponseAckWire,
         SessionPasswordDerivationRequest, SessionPasswordDerivationRequestWire,
         SessionPasswordVerificationRequest, SessionPasswordVerificationRequestWire,
         SessionPasswordVerificationResponseWire, SessionPasswordVerifier,
-        SessionPasswordVerifierResponseWire, WelcomeWire, BOOTSTRAP_DATABASE_DEK_BYTES,
+        WelcomeWire, BOOTSTRAP_DATABASE_DEK_BYTES,
         HANDSHAKE_NONCE_BYTES, IPC_PROTOCOL_MAJOR, MAX_IPC_FRAME_BYTES,
         MAX_LOCAL_BACKUP_SLOT_BYTES, MAX_SESSION_PASSWORD_BYTES,
     };
@@ -1298,6 +1425,39 @@ mod windows {
         } else {
             Ok(session_id)
         }
+    }
+
+    fn decode_session_security_state(value: SessionSecurityStateWire) -> Result<SessionSecurityState, LocalIpcError> {
+        if value.user_id.is_empty() || value.user_id.len() > 256 || value.user_id.contains('\0') {
+            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session user identity is invalid"));
+        }
+        if !matches!(value.state.as_str(), "LOCKED" | "UNLOCKING" | "UNLOCKED" | "LOCKING") {
+            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session state is invalid"));
+        }
+        if let Some(session_id) = value.session_id.as_ref() {
+            if !is_uuid_v7(session_id) { return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session id is invalid")); }
+        }
+        if value.failed_unlock_attempts > 31 {
+            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session retry state is invalid"));
+        }
+        if value.state == "UNLOCKED" && (value.session_id.is_none() || value.unlocked_at.is_none() || value.locked_reason.is_some()) {
+            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core unlocked session state is inconsistent"));
+        }
+        if value.state != "UNLOCKED" && value.unlocked_at.is_some() {
+            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core locked session state is inconsistent"));
+        }
+        if value.state == "LOCKED" && value.locked_reason.is_none() {
+            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core locked session reason is missing"));
+        }
+        Ok(SessionSecurityState {
+            user_id: value.user_id,
+            state: value.state,
+            session_id: value.session_id,
+            unlocked_at: value.unlocked_at,
+            locked_reason: value.locked_reason,
+            failed_unlock_attempts: value.failed_unlock_attempts,
+            cooldown_until: value.cooldown_until,
+        })
     }
 
     fn is_uuid_v7(value: &str) -> bool {
@@ -1808,6 +1968,144 @@ mod windows {
                 state: record.state,
                 sanitized_failure_reason: record.sanitized_failure_reason,
             }).collect())
+        }
+
+        pub fn request_session_status(
+            &self,
+            session: &AuthenticatedCoreSession,
+        ) -> Result<SessionStatus, LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+                return Err(plain_error(LocalIpcState::AuthenticationFailed, "session status requires the current authenticated session"));
+            }
+            let request_id = random_uuid_v7()?;
+            let correlation_id = random_uuid_v7()?;
+            write_json_frame(self.handle.raw(), &SessionStatusRequestWire {
+                protocol_version: IPC_PROTOCOL_MAJOR,
+                kind: "request",
+                id: request_id,
+                name: "get_session_status",
+                correlation_id,
+                payload: EmptyPayloadWire {},
+            })?;
+            let response: SessionStatusResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if !response.ok || response.error.is_some() {
+                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the session status request"));
+            }
+            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session status omitted its result"))?;
+            if (!result.initialized && result.state.is_some()) || (result.initialized && result.state.is_none()) {
+                return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session status initialization flag does not match its state"));
+            }
+            let state = result.state.map(|value| {
+                if value.user_id.is_empty() || value.user_id.len() > 256 || value.user_id.contains('\0') {
+                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session user identity is invalid"));
+                }
+                if !matches!(value.state.as_str(), "LOCKED" | "UNLOCKING" | "UNLOCKED" | "LOCKING") {
+                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session state is invalid"));
+                }
+                if let Some(session_id) = value.session_id.as_ref() {
+                    if !is_uuid_v7(session_id) { return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session id is invalid")); }
+                }
+                if value.failed_unlock_attempts > 31 {
+                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session retry state is invalid"));
+                }
+                if value.state == "UNLOCKED" && (value.session_id.is_none() || value.unlocked_at.is_none() || value.locked_reason.is_some()) {
+                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core unlocked session state is inconsistent"));
+                }
+                if value.state != "UNLOCKED" && value.unlocked_at.is_some() {
+                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core locked session state is inconsistent"));
+                }
+                if value.state == "LOCKED" && value.locked_reason.is_none() {
+                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core locked session reason is missing"));
+                }
+                Ok(SessionSecurityState {
+                    user_id: value.user_id,
+                    state: value.state,
+                    session_id: value.session_id,
+                    unlocked_at: value.unlocked_at,
+                    locked_reason: value.locked_reason,
+                    failed_unlock_attempts: value.failed_unlock_attempts,
+                    cooldown_until: value.cooldown_until,
+                })
+            }).transpose()?;
+            Ok(SessionStatus { initialized: result.initialized, state })
+        }
+
+        pub fn request_session_initialize(
+            &self,
+            session: &AuthenticatedCoreSession,
+            password: Vec<u8>,
+        ) -> Result<SessionStatus, LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+                return Err(plain_error(LocalIpcState::AuthenticationFailed, "session initialization requires the current authenticated session"));
+            }
+            let result = (|| {
+                let user_id = current_user_sid_string()?;
+                let password_text = String::from_utf8(password.clone()).map_err(|_| plain_error(LocalIpcState::ControlPlaneRequestFailed, "session password must be valid UTF-8"))?;
+                if password_text.is_empty() || password_text.len() > MAX_SESSION_PASSWORD_BYTES || password_text.contains('\0') {
+                    return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "session password is outside the bounded limit"));
+                }
+                let request_id = random_uuid_v7()?;
+                let correlation_id = random_uuid_v7()?;
+                let wire = SessionMutationRequestWire {
+                    protocol_version: IPC_PROTOCOL_MAJOR,
+                    kind: "request",
+                    id: request_id,
+                    name: "initialize_session",
+                    correlation_id,
+                    payload: SessionMutationPayloadWire { user_id, password: password_text },
+                };
+                write_json_frame(self.handle.raw(), &wire)?;
+                wire.payload.password.into_bytes().fill(0);
+                let response: SessionInitializeResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+                if !response.ok || response.error.is_some() {
+                    return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the session initialization request"));
+                }
+                let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session initialization omitted its result"))?;
+                let state = result.state.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session initialization omitted its state"))?;
+                Ok(SessionStatus { initialized: result.initialized, state: Some(decode_session_security_state(state)?) })
+            })();
+            let mut password = password;
+            password.fill(0);
+            result
+        }
+
+        pub fn request_session_authenticate(
+            &self,
+            session: &AuthenticatedCoreSession,
+            password: Vec<u8>,
+        ) -> Result<SessionAuthenticationResult, LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+                return Err(plain_error(LocalIpcState::AuthenticationFailed, "session authentication requires the current authenticated session"));
+            }
+            let result = (|| {
+                let user_id = current_user_sid_string()?;
+                let password_text = String::from_utf8(password.clone()).map_err(|_| plain_error(LocalIpcState::ControlPlaneRequestFailed, "session password must be valid UTF-8"))?;
+                if password_text.is_empty() || password_text.len() > MAX_SESSION_PASSWORD_BYTES || password_text.contains('\0') {
+                    return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "session password is outside the bounded limit"));
+                }
+                let request_id = random_uuid_v7()?;
+                let correlation_id = random_uuid_v7()?;
+                let wire = SessionAuthenticateRequestWire {
+                    protocol_version: IPC_PROTOCOL_MAJOR,
+                    kind: "request",
+                    id: request_id,
+                    name: "authenticate_session",
+                    correlation_id,
+                    payload: SessionMutationPayloadWire { user_id, password: password_text },
+                };
+                write_json_frame(self.handle.raw(), &wire)?;
+                wire.payload.password.into_bytes().fill(0);
+                let response: SessionAuthenticateResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+                if !response.ok || response.error.is_some() {
+                    return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the session authentication request"));
+                }
+                let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session authentication omitted its result"))?;
+                let state = result.state.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session authentication omitted its state"))?;
+                Ok(SessionAuthenticationResult { status: result.status, retry_after_ms: result.retry_after_ms, state: decode_session_security_state(state)? })
+            })();
+            let mut password = password;
+            password.fill(0);
+            result
         }
 
         pub fn receive_secure_storage_operation(

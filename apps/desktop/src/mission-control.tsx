@@ -1,5 +1,6 @@
+import { useState, type FormEvent } from "react";
 import { toInertText } from "./security/inertContent";
-import { Button, Panel, SkipLink, StatusChip } from "./design-system/components";
+import { Button, Panel, SkipLink, StatusChip, TextInput } from "./design-system/components";
 
 const destinations = [
   "Mission Control",
@@ -23,6 +24,7 @@ export interface MissionControlSnapshot {
   readonly approval?: ApprovalReviewModel;
   readonly projectPolicy?: ProjectPolicyDiagnosticModel;
   readonly providerSetup?: ProviderSetupModel;
+  readonly sessionControl?: SessionControlModel;
 }
 
 export type ProviderSetupState = "NOT_REQUIRED" | "SETUP_REQUIRED" | "SETUP_IN_PROGRESS" | "SETUP_READY" | "REPAIR_REQUIRED" | "SETUP_FAILED";
@@ -34,6 +36,15 @@ export interface ProviderSetupModel {
   readonly state: ProviderSetupState;
   readonly failureMessage?: string;
   readonly onStart?: () => void;
+}
+
+export interface SessionControlModel {
+  readonly initialized: boolean;
+  readonly state: "LOCKED" | "UNLOCKING" | "UNLOCKED" | "LOCKING";
+  readonly retryAfterMs?: number;
+  readonly errorMessage?: string;
+  readonly onInitialize?: (password: string) => Promise<void>;
+  readonly onUnlock?: (password: string) => Promise<void>;
 }
 
 export type ProjectPolicyDiagnosticStatus = "NO_POLICY_CANDIDATE" | "POLICY_DECISION_REQUIRED" | "TRUSTED_POLICY" | "POLICY_CHANGED_REVIEW_REQUIRED" | "POLICY_DISABLED" | "POLICY_REVOKED" | "POLICY_PATH_VALIDATION_ERROR";
@@ -162,6 +173,46 @@ export function ProviderSetupPanel({ model }: { model: ProviderSetupModel }) {
   );
 }
 
+export function SessionControlPanel({ model }: { model: SessionControlModel }) {
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [localError, setLocalError] = useState<string | undefined>();
+  const initializing = !model.initialized;
+  const ready = model.state === "UNLOCKED";
+  if (ready) {
+    return <Panel heading="JARVIS session" className="mission-control__session"><StatusChip state="success">UNLOCKED</StatusChip><p className="mission-control__muted">The authenticated JARVIS session is active. Protected mission state may now be requested through Core.</p></Panel>;
+  }
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLocalError(undefined);
+    if (password.length === 0) { setLocalError("Enter a session password."); return; }
+    if (initializing && password !== confirmation) { setLocalError("The password confirmation does not match."); return; }
+    try {
+      if (initializing) await model.onInitialize?.(password);
+      else await model.onUnlock?.(password);
+      setPassword("");
+      setConfirmation("");
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : "The session request failed.");
+    } finally {
+      setPassword("");
+      setConfirmation("");
+    }
+  };
+  return <Panel heading="JARVIS session" className="mission-control__session">
+    <div aria-live="polite"><StatusChip state={model.state === "LOCKED" ? "warning" : "waiting"}>{initializing ? "NOT_INITIALIZED" : model.state}</StatusChip></div>
+    <p className="mission-control__muted">{initializing ? "Create the local JARVIS session password. It is used only to establish JARVIS session trust." : "Unlock JARVIS with the session password. Windows sign-in does not bypass this gate."}</p>
+    {model.retryAfterMs && model.retryAfterMs > 0 ? <p className="mission-control__provider-setup-error">Try again after {Math.ceil(model.retryAfterMs / 1000)} seconds.</p> : null}
+    {model.errorMessage ? <p className="mission-control__provider-setup-error">{toInertText(model.errorMessage)}</p> : null}
+    {localError ? <p className="mission-control__provider-setup-error">{toInertText(localError)}</p> : null}
+    <form onSubmit={submit}>
+      <TextInput autoComplete={initializing ? "new-password" : "current-password"} id="jarvis-session-password" label="Session password" onChange={(event) => setPassword(event.target.value)} type="password" value={password} />
+      {initializing ? <TextInput autoComplete="new-password" id="jarvis-session-password-confirm" label="Confirm session password" onChange={(event) => setConfirmation(event.target.value)} type="password" value={confirmation} /> : null}
+      <Button disabled={model.state === "UNLOCKING" || (model.retryAfterMs ?? 0) > 0} type="submit" variant="primary">{initializing ? "Create session" : "Unlock JARVIS"}</Button>
+    </form>
+  </Panel>;
+}
+
 export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnapshot }) {
   return (
     <div className="mission-control" data-service-state={snapshot.serviceState} data-startup-condition={snapshot.startupCondition} data-transport-state={snapshot.transportState}>
@@ -220,6 +271,7 @@ export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnap
           </main>
 
           <aside aria-label="Context and attention" className="mission-control__context">
+            {snapshot.sessionControl ? <SessionControlPanel model={snapshot.sessionControl} /> : null}
             {snapshot.approval ? <ApprovalReview approval={snapshot.approval} /> : null}
             {snapshot.providerSetup ? <ProviderSetupPanel model={snapshot.providerSetup} /> : null}
             {snapshot.projectPolicy ? <ProjectPolicyDiagnostics model={snapshot.projectPolicy} /> : <Panel heading="Context"><p className="mission-control__muted">No selected mission, task, project, or artifact.</p></Panel>}
