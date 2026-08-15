@@ -384,7 +384,11 @@ impl PlatformWindowController {
                 api.prevent_close();
                 if let Some(window) = app_handle.get_webview_window(PRIMARY_WINDOW_LABEL) {
                     let _ = window.hide();
-                    if let Ok(state) = capture_state(&window, PresentationMode::Hidden) {
+                    // Closing the native window hides it for this process, but a
+                    // normal relaunch must present the dashboard. Persist the
+                    // last usable presentation mode instead of making every
+                    // subsequent launch start hidden.
+                    if let Ok(state) = capture_state(&window, PresentationMode::Windowed) {
                         let _ = store.save(&state);
                     }
                 }
