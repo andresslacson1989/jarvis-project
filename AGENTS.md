@@ -195,13 +195,15 @@ and must be regenerated from the exact source commit before a release.
 Current runtime note: after the metadata and packaging checks passed, the
 installed desktop host initially reported `PERSISTENCE_SCHEMA_INVALID` against
 the existing user database at `%LOCALAPPDATA%\JARVIS\data\state.db`. With the
-user's explicit authorization for a clean-profile qualification, that complete
-directory was reversibly renamed to
-`C:\Users\junme\AppData\Local\JARVIS\data-legacy-20260815-232126` and a new
-empty `%LOCALAPPDATA%\JARVIS\data` directory was created. The installed host
-then opened visibly and the bootstrap log ended with
-`stage=CoreAuthenticated`. The legacy directory is preserved for future
-migration/recovery work; it was not deleted or overwritten.
+user's explicit authorization for clean-profile qualification, each affected
+directory was reversibly preserved before replacement. The first legacy copy is
+`C:\Users\junme\AppData\Local\JARVIS\data-legacy-20260815-232126`; the second
+stale-profile copy is
+`C:\Users\junme\AppData\Local\JARVIS\data-legacy-20260815-233551`. A new
+empty `%LOCALAPPDATA%\JARVIS\data` directory was created for the qualified
+build. The rebuilt host opened visibly with `WINDOWED` state and the bootstrap
+log ended with `stage=CoreAuthenticated`. The legacy directories are preserved
+for future migration/recovery work; they were not deleted or overwritten.
 
 ### Mandatory important-artifact recording
 
