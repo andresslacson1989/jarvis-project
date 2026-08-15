@@ -207,14 +207,14 @@ export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnap
               <h2 id="mission-control-title">{snapshot.startupCondition === "REPAIR_REQUIRED" ? "Repair required before Core can start" : snapshot.startupCondition === "DEGRADED" ? "Core is degraded" : "Ready when authenticated"}</h2>
             </div>
             <Panel heading={snapshot.startupCondition === "REPAIR_REQUIRED" ? "Core runtime requires repair" : "JARVIS is locked"}>
-              <p>{toInertText(snapshot.startupCondition === "REPAIR_REQUIRED" ? "The release-owned Core runtime did not pass preflight. JARVIS will not use a system Node or an unverified fallback. Repair the packaged runtime before Core can start." : snapshot.startupCondition === "DEGRADED" ? "The desktop surface is available in degraded mode. Core transport is not connected, and no mission, approval, provider, or project state is being inferred or displayed." : "The desktop surface is available, but Core transport is not connected. No mission, approval, provider, or project state is being inferred or displayed.")}</p>
-              <StatusChip state={snapshot.startupCondition === "REPAIR_REQUIRED" ? "error" : snapshot.startupCondition === "DEGRADED" ? "warning" : "warning"}>{snapshot.startupCondition} · {snapshot.transportState}</StatusChip>
+              <p>{toInertText(snapshot.startupCondition === "REPAIR_REQUIRED" ? "The release-owned Core runtime did not pass preflight. JARVIS will not use a system Node or an unverified fallback. Repair the packaged runtime before Core can start." : snapshot.startupCondition === "DEGRADED" ? "The desktop surface is available in degraded mode. Core transport is not available, and no mission, approval, provider, or project state is being inferred or displayed." : "The desktop surface is available and the protected Core transport is authenticated. The JARVIS user session is still locked, so no mission, approval, provider, or project state is being displayed.")}</p>
+              <StatusChip state={snapshot.startupCondition === "REPAIR_REQUIRED" ? "error" : "warning"}>{snapshot.startupCondition} · {snapshot.startupCondition === "LOCKED" ? "SESSION_LOCKED" : snapshot.transportState}</StatusChip>
             </Panel>
             <Panel heading="What remains available">
               <ul className="mission-control__plain-list">
                 <li>Navigation and visual presentation are available.</li>
                 <li>Native window presentation remains controlled by the desktop host.</li>
-                <li>{snapshot.startupCondition === "REPAIR_REQUIRED" ? "Only a verified release-owned runtime may clear this repair state." : "Authenticated Core state will appear only after the typed boundary reports it."}</li>
+                <li>{snapshot.startupCondition === "REPAIR_REQUIRED" ? "Only a verified release-owned runtime may clear this repair state." : "Protected mission state will appear only after the JARVIS user session is unlocked through the typed boundary."}</li>
               </ul>
             </Panel>
           </main>
