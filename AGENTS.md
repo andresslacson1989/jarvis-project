@@ -158,6 +158,24 @@ Signing procedure:
 
 Private-key files SHALL remain mode `600`, owned by the dedicated signer account. Do not print, log, commit, upload, or paste private key contents. The current CT setup is a controlled qualification signer, but its role keys are presently co-located on that CT; until independent offline root-key custody evidence exists, report `keyCustodyEvidence=EXTERNAL_REQUIRED` and do not claim production signing qualification or `Production Complete`.
 
+### Current signing/custody record (2026-08-15)
+
+This record is intentionally secret-free and exists so a future agent can locate
+the inputs without guessing. It does not authorize a signing operation by itself.
+
+| Item | Location / identity | Contents or use | Current state |
+|---|---|---|---|
+| Offline TUF root custody copy A | `K:\TUF-ROOT-CUSTODY\` | `root-1.private.pem`, `root-2.private.pem`, `root-3.private.pem`; root role only, 2-of-3 | Present; do not print or copy contents |
+| Offline TUF root custody copy B | `L:\TUF-ROOT-CUSTODY\` | Matching three root private-key filenames; independent custody copy | Present; do not print or copy contents |
+| TUF release-signing workspace | `jarvisadmin@192.168.99.77:/srv/jarvis-tuf-signing/` (signing CT) | `keys/targets`, `keys/modules`, `keys/snapshot`, and `keys/timestamp` are the role-signing locations; `metadata/` contains public outputs | Required for the signing ceremony; do not assume it is mounted or reachable |
+| Release-owned TUF metadata | `<candidate-release-root>/tuf/metadata/` | Public `root.json`, `targets.json`, `snapshot.json`, and `timestamp.json` consumed by Core admission | Copy public outputs here only after signing |
+| Windows private/internal certificate | Current user's Windows certificate stores; thumbprint `23DA4DA3E340B66EC4240B4CC845E4387E5BBDD3` | Authenticode/Tauri private-internal artifact signing | Enrolled for this machine/user; not public CA trust |
+
+The USBs currently contain root keys only. They do **not** contain the separate
+targets, modules, snapshot, or timestamp private keys. Therefore a new release
+still requires the authorized signing workspace and role keys above; never use
+root keys as substitute role keys and never weaken TUF admission to proceed.
+
 ## No ADR/history overlay
 
 Historical contracts/ADRs may explain why a rule exists but SHALL NOT be required to determine current behavior.
