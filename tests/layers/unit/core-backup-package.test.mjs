@@ -222,6 +222,10 @@ test("authenticated payload envelope carries only wrapped SnapshotDBKey and veri
   });
   assert.deepEqual(verified.snapshotDbKey, snapshotDbKey);
   assert.deepEqual(verified.objects[0].data, Buffer.from("snap!!", "utf8"));
+  assert.equal(verified.recoveryEvidence.type, "GENERATED_RECOVERY_V1");
+  assert.equal(verified.recoveryEvidence.backupId, backupId);
+  assert.equal(verified.recoveryEvidence.slotId, "generated-envelope");
+  assert.equal(Object.values(verified.recoveryEvidence).some((value) => String(value).includes(recoverySecret.toString("base64url"))), false);
   assert.equal(payload.includes(snapshotDbKey), false);
   verified.snapshotDbKey.fill(0);
 });
@@ -276,6 +280,7 @@ test("local recovery package binds the opaque DPAPI slot to the authenticated de
     },
   });
   assert.deepEqual(verified.objects[0].data, localSnapshot);
+  assert.equal(verified.recoveryEvidence, undefined);
   verified.snapshotDbKey.fill(0);
   for (const object of verified.objects) object.data.fill(0);
   protectedEntropy.value.fill(0);
@@ -509,6 +514,43 @@ test("authenticated package verification reopens the qualified SQLCipher snapsho
       (error) => error instanceof BackupPackageVerificationError && error.code === "BACKUP_PACKAGE_DB_DEK_PROTECTION_FAILED",
     );
     await assert.rejects(() => readFile(join(root, "protection-failed.db")));
+    const commitFailedDestination = join(root, "commit-failed.db");
+    const commitFailedMarker = join(root, "recovery", "commit-failed.marker");
+    let commitAttempted = false;
+    let abortAttempted = false;
+    await assert.rejects(
+      () => restoreVerifiedPortableBackup({
+        descriptor: builtPackage.descriptorBytes,
+        chunks: builtPackage.chunks,
+        generatedRecoverySlot: builtPackage.generatedRecoverySlot,
+        recoverySecret,
+        noncePrefix: builtPackage.noncePrefix,
+        destinationPath: commitFailedDestination,
+        maintenanceLockPath: join(root, "commit-failed.maintenance.lock"),
+        recoveryMarkerPath: commitFailedMarker,
+        sessionPasswordVerifier: buildSessionPasswordVerifier(),
+        protectNewDbDek: async () => ({
+          handle: "dpapi-v1-commit-failed-test-handle",
+          commit: async () => {
+            commitAttempted = true;
+            throw new Error("simulated secure-storage commit failure");
+          },
+          abort: async () => {
+            abortAttempted = true;
+          },
+        }),
+        newDbDek: Buffer.alloc(32, 0x74),
+        now: "2026-08-14T01:00:00.000Z",
+      }),
+      (error) =>
+        error instanceof BackupPackageVerificationError &&
+        error.code === "BACKUP_PACKAGE_DB_DEK_PROTECTION_FAILED" &&
+        /recovery state was preserved/u.test(error.message),
+    );
+    assert.equal(commitAttempted, true);
+    assert.equal(abortAttempted, false);
+    assert.equal((await readFile(commitFailedDestination)).length > 0, true);
+    assert.equal(await readFile(commitFailedMarker, "utf8"), "JARVIS_RECOVERY_REQUIRED_V1\n");
     await assert.rejects(
       () => restoreVerifiedPortableBackup({
         descriptor: builtPackage.descriptorBytes,

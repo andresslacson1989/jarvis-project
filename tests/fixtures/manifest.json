@@ -8,6 +8,14 @@
       "provenance": "SYNTHETIC",
       "containsRealCredentials": false,
       "sha256": "a3a43851b866eb475c768ac68d6fbf7b8ce1c1e6e2df7641118f872f0af34000"
+    },
+    {
+      "id": "backup-v1-golden",
+      "path": "backup-v1-golden.json",
+      "mediaType": "application/json",
+      "provenance": "SYNTHETIC",
+      "containsRealCredentials": false,
+      "sha256": "fb4a0227d94b38bd6aaeb96c7d575cea2275db2e6cbd97cedd001843ffcfe2b0"
     }
   ]
 }

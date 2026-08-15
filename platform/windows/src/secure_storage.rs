@@ -5,7 +5,7 @@
 //! DB_DEK material exists only in the transient `DatabaseDek` value and is
 //! wiped on drop.
 
-use std::fs::{create_dir_all, read, remove_file, rename, symlink_metadata, File, OpenOptions};
+use std::fs::{File, OpenOptions, create_dir_all, read, remove_file, rename, symlink_metadata};
 use std::io::{self, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
@@ -13,18 +13,23 @@ use std::path::{Component, Path, PathBuf};
 use std::os::windows::ffi::OsStrExt;
 
 #[cfg(windows)]
-use windows_sys::Win32::Storage::FileSystem::{MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH};
+use windows_sys::Win32::Storage::FileSystem::{
+    MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
+};
 
 use crate::path_identity::{WindowsPathIdentity, WindowsPathRoot};
 
 const DB_DEK_BYTES: usize = 32;
 const HANDLE_PREFIX: &str = "dpapi-v1-";
 const MAX_PROTECTED_BLOB_BYTES: usize = 16 * 1024;
+const MAX_CREDENTIAL_BYTES: usize = 8 * 1024;
 
 #[derive(Debug)]
 pub enum WindowsSecureStorageError {
     InvalidRoot(&'static str),
     InvalidHandle,
+    InvalidCredentialContext,
+    InvalidCredentialValue,
     PathIdentity(String),
     Io {
         operation: &'static str,
@@ -46,6 +51,8 @@ impl std::fmt::Display for WindowsSecureStorageError {
         match self {
             Self::InvalidRoot(detail) => write!(formatter, "invalid secure-storage root: {detail}"),
             Self::InvalidHandle => write!(formatter, "invalid secure-storage handle"),
+            Self::InvalidCredentialContext => write!(formatter, "invalid credential context"),
+            Self::InvalidCredentialValue => write!(formatter, "invalid credential value"),
             Self::PathIdentity(detail) => {
                 write!(formatter, "secure-storage path identity failed: {detail}")
             }
@@ -71,16 +78,77 @@ impl std::fmt::Display for WindowsSecureStorageError {
                 write!(formatter, "database key metadata is invalid")
             }
             Self::DatabaseKeyRestorePending => {
-                write!(formatter, "database key restore is pending and has no database")
+                write!(
+                    formatter,
+                    "database key restore is pending and has no database"
+                )
             }
             Self::DatabaseKeyRestoreHandleMismatch => {
-                write!(formatter, "database key restore handle does not match staged metadata")
+                write!(
+                    formatter,
+                    "database key restore handle does not match staged metadata"
+                )
             }
         }
     }
 }
 
 impl std::error::Error for WindowsSecureStorageError {}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CredentialContext {
+    pub integration_account_id: String,
+    pub capability_id: String,
+    pub purpose: String,
+}
+
+impl CredentialContext {
+    pub fn new(
+        integration_account_id: impl Into<String>,
+        capability_id: impl Into<String>,
+        purpose: impl Into<String>,
+    ) -> Result<Self, WindowsSecureStorageError> {
+        let context = Self {
+            integration_account_id: integration_account_id.into(),
+            capability_id: capability_id.into(),
+            purpose: purpose.into(),
+        };
+        if [
+            &context.integration_account_id,
+            &context.capability_id,
+            &context.purpose,
+        ]
+        .iter()
+        .any(|value| value.is_empty() || value.len() > 256 || value.contains('\0'))
+        {
+            return Err(WindowsSecureStorageError::InvalidCredentialContext);
+        }
+        Ok(context)
+    }
+
+    fn entropy(&self) -> Vec<u8> {
+        format!(
+            "jarvis.credential.v1\0{}\0{}\0{}",
+            self.integration_account_id, self.capability_id, self.purpose
+        )
+        .into_bytes()
+    }
+}
+
+#[derive(Debug)]
+pub struct CredentialSecret(Vec<u8>);
+
+impl CredentialSecret {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl Drop for CredentialSecret {
+    fn drop(&mut self) {
+        self.0.fill(0);
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SecureStorageHandle(String);
@@ -348,6 +416,65 @@ impl WindowsSecureStorage {
         Ok(BackupDek(value))
     }
 
+    /// Store a designated integration credential behind the current-user
+    /// secure-storage boundary. The context is bound as DPAPI entropy, and
+    /// only the opaque handle is intended to cross into Core state.
+    pub fn put_secret(
+        &self,
+        context: &CredentialContext,
+        value: &[u8],
+    ) -> Result<SecureStorageHandle, WindowsSecureStorageError> {
+        let entropy = context.entropy();
+        validate_additional_entropy(&entropy)?;
+        if value.is_empty() || value.len() > MAX_CREDENTIAL_BYTES {
+            return Err(WindowsSecureStorageError::InvalidCredentialValue);
+        }
+        let protected = protect_with_entropy(value, &entropy)?;
+        let handle = new_handle()?;
+        self.write_blob(&handle, &protected)?;
+        Ok(handle)
+    }
+
+    /// Resolve a credential only with the independently resolved context. No
+    /// enumeration API exists, and the returned value is transient/wiped on
+    /// drop.
+    pub fn get_secret(
+        &self,
+        handle: &SecureStorageHandle,
+        context: &CredentialContext,
+    ) -> Result<CredentialSecret, WindowsSecureStorageError> {
+        let entropy = context.entropy();
+        validate_additional_entropy(&entropy)?;
+        let protected = self.read_blob(handle)?;
+        let mut plaintext = unprotect_with_entropy(&protected, &entropy)?;
+        if plaintext.is_empty() || plaintext.len() > MAX_CREDENTIAL_BYTES {
+            plaintext.fill(0);
+            return Err(WindowsSecureStorageError::InvalidCredentialValue);
+        }
+        Ok(CredentialSecret(std::mem::take(&mut plaintext)))
+    }
+
+    pub fn rotate_secret(
+        &self,
+        previous: &SecureStorageHandle,
+        context: &CredentialContext,
+        replacement: &[u8],
+    ) -> Result<SecureStorageHandle, WindowsSecureStorageError> {
+        let next = self.put_secret(context, replacement)?;
+        if let Err(error) = self.delete_secret(previous) {
+            let _ = self.delete_secret(&next);
+            return Err(error);
+        }
+        Ok(next)
+    }
+
+    pub fn delete_secret(
+        &self,
+        handle: &SecureStorageHandle,
+    ) -> Result<(), WindowsSecureStorageError> {
+        self.delete(handle)
+    }
+
     pub fn rotate_db_dek(
         &self,
         previous: &SecureStorageHandle,
@@ -466,7 +593,7 @@ fn validate_additional_entropy(entropy: &[u8]) -> Result<(), WindowsSecureStorag
 #[cfg(windows)]
 fn fill_random(bytes: &mut [u8]) -> Result<(), WindowsSecureStorageError> {
     use windows_sys::Win32::Security::Cryptography::{
-        BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+        BCRYPT_USE_SYSTEM_PREFERRED_RNG, BCryptGenRandom,
     };
     let status = unsafe {
         BCryptGenRandom(
@@ -505,7 +632,7 @@ fn protect_with_entropy(
     additional_entropy: &[u8],
 ) -> Result<Vec<u8>, WindowsSecureStorageError> {
     use windows_sys::Win32::Security::Cryptography::{
-        CryptProtectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
+        CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData,
     };
     let input = CRYPT_INTEGER_BLOB {
         cbData: plaintext.len() as u32,
@@ -570,7 +697,7 @@ fn unprotect_with_entropy(
     additional_entropy: &[u8],
 ) -> Result<Vec<u8>, WindowsSecureStorageError> {
     use windows_sys::Win32::Security::Cryptography::{
-        CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
+        CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptUnprotectData,
     };
     let input = CRYPT_INTEGER_BLOB {
         cbData: protected.len() as u32,
@@ -685,8 +812,8 @@ fn pending_handle_path(handle_path: &Path) -> Result<PathBuf, WindowsSecureStora
 }
 
 fn read_handle_file(path: &Path) -> Result<SecureStorageHandle, WindowsSecureStorageError> {
-    let metadata = symlink_metadata(path)
-        .map_err(|error| io_error("inspect DB_DEK handle", error))?;
+    let metadata =
+        symlink_metadata(path).map_err(|error| io_error("inspect DB_DEK handle", error))?;
     if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
         return Err(WindowsSecureStorageError::DatabaseKeyMetadataInvalid);
     }
@@ -697,11 +824,22 @@ fn read_handle_file(path: &Path) -> Result<SecureStorageHandle, WindowsSecureSto
         .map_err(|_| WindowsSecureStorageError::DatabaseKeyMetadataInvalid)
 }
 
-fn replace_handle_file(temporary: &Path, destination: &Path) -> Result<(), WindowsSecureStorageError> {
+fn replace_handle_file(
+    temporary: &Path,
+    destination: &Path,
+) -> Result<(), WindowsSecureStorageError> {
     #[cfg(windows)]
     {
-        let source_text: Vec<u16> = temporary.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-        let destination_text: Vec<u16> = destination.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let source_text: Vec<u16> = temporary
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let destination_text: Vec<u16> = destination
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
         // SAFETY: both paths are validated application-owned local paths and
         // the buffers remain alive for the duration of the Windows call.
         let result = unsafe {
@@ -712,7 +850,10 @@ fn replace_handle_file(temporary: &Path, destination: &Path) -> Result<(), Windo
             )
         };
         if result == 0 {
-            return Err(io_error("publish DB_DEK handle", io::Error::last_os_error()));
+            return Err(io_error(
+                "publish DB_DEK handle",
+                io::Error::last_os_error(),
+            ));
         }
         Ok(())
     }
@@ -769,10 +910,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn staged_db_dek_handle_is_restart_safe_and_commit_is_idempotent() {
-        let root = std::env::temp_dir().join(format!(
-            "jarvis-db-key-staged-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("jarvis-db-key-staged-{}", std::process::id()));
         let storage_root = root.join("secure-storage");
         let data_root = root.join("data");
         std::fs::create_dir_all(&data_root).expect("test data root should exist");
@@ -818,6 +957,46 @@ mod tests {
         assert_eq!(key.as_bytes()[0], 0xff);
         key.0.fill(0);
         assert_eq!(key.as_bytes()[0], 0);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn credential_broker_is_context_bound_rotatable_non_enumerable_and_wiped() {
+        let root =
+            std::env::temp_dir().join(format!("jarvis-credential-broker-{}", std::process::id()));
+        let storage =
+            WindowsSecureStorage::open(root.clone()).expect("secure storage should initialize");
+        let context =
+            CredentialContext::new("account-1", "GITHUB_REPOSITORY_READ", "integration-token")
+                .expect("credential context should validate");
+        let wrong_context =
+            CredentialContext::new("account-2", "GITHUB_REPOSITORY_READ", "integration-token")
+                .expect("wrong test context should validate structurally");
+        let first = b"synthetic-token-v1";
+        let second = b"synthetic-token-v2";
+        let handle = storage
+            .put_secret(&context, first)
+            .expect("credential should be stored behind DPAPI");
+        assert_eq!(
+            storage.get_secret(&handle, &context).unwrap().as_bytes(),
+            first
+        );
+        assert!(storage.get_secret(&handle, &wrong_context).is_err());
+        let rotated = storage
+            .rotate_secret(&handle, &context, second)
+            .expect("credential rotation should publish a new opaque handle");
+        assert_ne!(rotated, handle);
+        assert!(storage.get_secret(&handle, &context).is_err());
+        assert_eq!(
+            storage.get_secret(&rotated, &context).unwrap().as_bytes(),
+            second
+        );
+        storage
+            .delete_secret(&rotated)
+            .expect("credential deletion should remove the handle");
+        assert!(storage.get_secret(&rotated, &context).is_err());
+        assert!(!root.join(format!("{}.bin", rotated.as_str())).exists());
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[cfg(windows)]
@@ -868,9 +1047,11 @@ mod tests {
             .unprotect_backup_dek(&protected, entropy)
             .expect("backup key should recover for the same user/context");
         assert_eq!(recovered.as_bytes(), &backup_dek);
-        assert!(storage
-            .unprotect_backup_dek(&protected, b"different-context")
-            .is_err());
+        assert!(
+            storage
+                .unprotect_backup_dek(&protected, b"different-context")
+                .is_err()
+        );
         assert!(storage.protect_backup_dek(&backup_dek, &[]).is_err());
         let _ = std::fs::remove_dir_all(root);
     }

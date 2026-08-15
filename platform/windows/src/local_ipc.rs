@@ -94,7 +94,10 @@ impl std::fmt::Debug for BootstrapMaterial {
 
 impl BootstrapMaterial {
     #[cfg(windows)]
-    fn new(endpoint_name: &str, database_dek: &[u8; BOOTSTRAP_DATABASE_DEK_BYTES]) -> Result<Self, LocalIpcError> {
+    fn new(
+        endpoint_name: &str,
+        database_dek: &[u8; BOOTSTRAP_DATABASE_DEK_BYTES],
+    ) -> Result<Self, LocalIpcError> {
         let secret = windows::random_bytes::<BOOTSTRAP_SECRET_BYTES>()?;
         Ok(Self {
             endpoint_name: endpoint_name.to_owned(),
@@ -196,6 +199,29 @@ pub struct AuthenticatedCoreStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderSetupStartRequest {
+    pub request_id: String,
+    pub provider_id: String,
+    pub distribution_id: String,
+    pub adapter_version: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderSetupStartResponse {
+    pub request_id: String,
+    pub state: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderSetupStatusRecord {
+    pub provider_id: String,
+    pub distribution_id: String,
+    pub adapter_version: String,
+    pub state: String,
+    pub sanitized_failure_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SecureStorageProtectionRequest {
     pub correlation_id: String,
     pub database_dek: [u8; BOOTSTRAP_DATABASE_DEK_BYTES],
@@ -229,6 +255,19 @@ pub struct SessionPasswordDerivationRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionPasswordVerificationRequest {
+    pub correlation_id: String,
+    pub password: Vec<u8>,
+    pub profile_id: String,
+    pub version: u32,
+    pub memory_kib: u32,
+    pub iterations: u32,
+    pub parallelism: u32,
+    pub salt: Vec<u8>,
+    pub verifier: Vec<u8>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SessionPasswordVerifier {
     pub profile_id: String,
     pub algorithm: String,
@@ -248,11 +287,20 @@ pub enum SecureStorageOperation {
     Commit(SecureStorageHandleOperationRequest),
     Abort(SecureStorageHandleOperationRequest),
     DeriveSessionPassword(SessionPasswordDerivationRequest),
+    VerifySessionPassword(SessionPasswordVerificationRequest),
 }
 
 impl Drop for SessionPasswordDerivationRequest {
     fn drop(&mut self) {
         self.password.fill(0);
+    }
+}
+
+impl Drop for SessionPasswordVerificationRequest {
+    fn drop(&mut self) {
+        self.password.fill(0);
+        self.salt.fill(0);
+        self.verifier.fill(0);
     }
 }
 
@@ -357,6 +405,96 @@ struct CoreStatusErrorWire {
     details: Option<serde_json::Value>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupStartRequestWire {
+    protocol_version: u32,
+    kind: &'static str,
+    id: Option<String>,
+    name: &'static str,
+    correlation_id: String,
+    payload: ProviderSetupStartPayloadWire,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupStartPayloadWire {
+    request_id: String,
+    provider_id: String,
+    distribution_id: String,
+    adapter_version: String,
+    action: &'static str,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupStartResponseWire {
+    ok: bool,
+    result: Option<ProviderSetupStartResultWire>,
+    error: Option<CoreStatusErrorWire>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupStartResultWire {
+    request_id: String,
+    state: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupCompleteRequestWire {
+    protocol_version: u32,
+    kind: &'static str,
+    id: String,
+    name: &'static str,
+    correlation_id: String,
+    payload: ProviderSetupCompletePayloadWire,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupCompletePayloadWire {
+    request_id: String,
+    provider_id: String,
+    action: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupStatusRequestWire {
+    protocol_version: u32,
+    kind: &'static str,
+    id: String,
+    name: &'static str,
+    correlation_id: String,
+    payload: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupStatusResponseWire {
+    ok: bool,
+    result: Option<ProviderSetupStatusResultWire>,
+    error: Option<CoreStatusErrorWire>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupStatusResultWire {
+    providers: Vec<ProviderSetupStatusRecordWire>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupStatusRecordWire {
+    provider_id: String,
+    distribution_id: String,
+    adapter_version: String,
+    state: String,
+    sanitized_failure_reason: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SecureStorageProtectionRequestWire {
@@ -414,6 +552,25 @@ struct SessionPasswordDerivationRequestWire {
     proof: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SessionPasswordVerificationRequestWire {
+    protocol_version: u32,
+    kind: String,
+    operation: String,
+    correlation_id: String,
+    password: String,
+    profile_id: String,
+    version: u32,
+    #[serde(rename = "memoryKiB")]
+    memory_kib: u32,
+    iterations: u32,
+    parallelism: u32,
+    salt: String,
+    verifier: String,
+    proof: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SecureStorageProtectionResponseWire {
@@ -448,6 +605,15 @@ struct SessionPasswordVerifierResponseWire {
     parallelism: Option<u32>,
     salt: Option<String>,
     verifier: Option<String>,
+    error_code: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionPasswordVerificationResponseWire {
+    ok: bool,
+    correlation_id: String,
+    verified: bool,
     error_code: Option<&'static str>,
 }
 
@@ -594,6 +760,45 @@ fn session_password_proof(secret: &[u8], correlation_id: &str, password: &[u8]) 
     hmac_sha256(secret, &message)
 }
 
+fn session_password_verification_proof(
+    secret: &[u8],
+    correlation_id: &str,
+    password: &[u8],
+    profile_id: &str,
+    version: u32,
+    memory_kib: u32,
+    iterations: u32,
+    parallelism: u32,
+    salt: &[u8],
+    verifier: &[u8],
+) -> [u8; 32] {
+    const DOMAIN: &[u8] = b"JARVIS-CORE-SESSION-PASSWORD-VERIFY-V1\0";
+    let mut message = Vec::with_capacity(
+        DOMAIN.len()
+            + correlation_id.len()
+            + profile_id.len()
+            + password.len()
+            + salt.len()
+            + verifier.len()
+            + 24,
+    );
+    message.extend_from_slice(DOMAIN);
+    message.extend_from_slice(correlation_id.as_bytes());
+    message.push(0);
+    message.extend_from_slice(profile_id.as_bytes());
+    message.push(0);
+    message.extend_from_slice(&version.to_le_bytes());
+    message.extend_from_slice(&memory_kib.to_le_bytes());
+    message.extend_from_slice(&iterations.to_le_bytes());
+    message.extend_from_slice(&parallelism.to_le_bytes());
+    message.extend_from_slice(password);
+    message.push(0);
+    message.extend_from_slice(salt);
+    message.push(0);
+    message.extend_from_slice(verifier);
+    hmac_sha256(secret, &message)
+}
+
 fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
     if left.len() != right.len() {
         return false;
@@ -608,57 +813,62 @@ fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
 #[cfg(windows)]
 mod windows {
     use super::{
-        AuthenticatedCoreSession, AuthenticatedCoreStatus, BootstrapMaterial, ChallengeWire,
-        CoreStatusRequestWire, CoreStatusResponseWire, EmptyPayloadWire, HANDSHAKE_NONCE_BYTES,
-        HelloWire, IPC_PROTOCOL_MAJOR, LocalIpcError, LocalIpcState,
-        MAX_IPC_FRAME_BYTES, BOOTSTRAP_DATABASE_DEK_BYTES, MAX_LOCAL_BACKUP_SLOT_BYTES,
-        SecureStorageOperation, LocalBackupDekProtectionRequest,
-        LocalBackupDekProtectionRequestWire, LocalBackupDekResponseWire,
-        LocalBackupDekUnprotectionRequest, LocalBackupDekUnprotectionRequestWire,
-        SecureStorageProtectionRequest, SecureStorageHandleOperationRequest,
-        SecureStorageHandleOperationRequestWire,
-        SecureStorageProtectionRequestWire, SecureStorageProtectionResponseWire,
-        SecureStorageResponseAckWire, SessionPasswordDerivationRequest,
-        SessionPasswordDerivationRequestWire, SessionPasswordVerifier,
-        SessionPasswordVerifierResponseWire, MAX_SESSION_PASSWORD_BYTES,
-        WelcomeWire, encode_frame,
+        encode_frame, AuthenticatedCoreSession, AuthenticatedCoreStatus, BootstrapMaterial,
+        ChallengeWire, CoreStatusRequestWire, CoreStatusResponseWire, EmptyPayloadWire, HelloWire,
+        LocalBackupDekProtectionRequest, LocalBackupDekProtectionRequestWire,
+        LocalBackupDekResponseWire, LocalBackupDekUnprotectionRequest,
+        LocalBackupDekUnprotectionRequestWire, LocalIpcError, LocalIpcState,
+        ProviderSetupCompletePayloadWire, ProviderSetupCompleteRequestWire,
+        ProviderSetupStartPayloadWire, ProviderSetupStartRequest, ProviderSetupStartRequestWire,
+        ProviderSetupStartResponse, ProviderSetupStartResponseWire,
+        ProviderSetupStatusRecord, ProviderSetupStatusRequestWire,
+        ProviderSetupStatusResponseWire,
+        SecureStorageHandleOperationRequest, SecureStorageHandleOperationRequestWire,
+        SecureStorageOperation, SecureStorageProtectionRequest, SecureStorageProtectionRequestWire,
+        SecureStorageProtectionResponseWire, SecureStorageResponseAckWire,
+        SessionPasswordDerivationRequest, SessionPasswordDerivationRequestWire,
+        SessionPasswordVerificationRequest, SessionPasswordVerificationRequestWire,
+        SessionPasswordVerificationResponseWire, SessionPasswordVerifier,
+        SessionPasswordVerifierResponseWire, WelcomeWire, BOOTSTRAP_DATABASE_DEK_BYTES,
+        HANDSHAKE_NONCE_BYTES, IPC_PROTOCOL_MAJOR, MAX_IPC_FRAME_BYTES,
+        MAX_LOCAL_BACKUP_SLOT_BYTES, MAX_SESSION_PASSWORD_BYTES,
     };
     use serde::{Deserialize, Serialize};
     use std::ffi::c_void;
-    use std::mem::{MaybeUninit, size_of};
+    use std::mem::{size_of, MaybeUninit};
     use std::os::windows::ffi::OsStrExt;
     use std::ptr::null_mut;
-    use std::sync::mpsc::{RecvTimeoutError, channel};
+    use std::sync::mpsc::{channel, RecvTimeoutError};
     use std::thread::sleep;
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use windows_sys::Win32::Foundation::{
-        CloseHandle, ERROR_PIPE_CONNECTED, GetLastError, HANDLE, HANDLE_FLAG_INHERIT,
-        INVALID_HANDLE_VALUE, LocalFree, SetHandleInformation,
+        CloseHandle, GetLastError, LocalFree, SetHandleInformation, ERROR_PIPE_CONNECTED, HANDLE,
+        HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE,
     };
     use windows_sys::Win32::Security::Authorization::{
         ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
     };
     use windows_sys::Win32::Security::Cryptography::{
-        BCRYPT_USE_SYSTEM_PREFERRED_RNG, BCryptGenRandom,
+        BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
     };
     use windows_sys::Win32::Security::{
-        GetTokenInformation, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER, TokenUser,
+        GetTokenInformation, TokenUser, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER,
     };
     use windows_sys::Win32::Storage::FileSystem::{
-        FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, ReadFile, WriteFile,
+        ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX,
     };
-    use windows_sys::Win32::System::IO::CancelSynchronousIo;
     use windows_sys::Win32::System::Pipes::{
         ConnectNamedPipe, CreateNamedPipeW, CreatePipe, DisconnectNamedPipe,
-        GetNamedPipeClientSessionId, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS,
-        PIPE_TYPE_BYTE, PIPE_WAIT, PeekNamedPipe,
+        GetNamedPipeClientSessionId, PeekNamedPipe, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS,
+        PIPE_TYPE_BYTE, PIPE_WAIT,
     };
     use windows_sys::Win32::System::RemoteDesktop::ProcessIdToSessionId;
     use windows_sys::Win32::System::Threading::{
         GetCurrentProcess, GetCurrentProcessId, GetCurrentThreadId, OpenProcessToken, OpenThread,
         THREAD_TERMINATE,
     };
+    use windows_sys::Win32::System::IO::CancelSynchronousIo;
 
     const PIPE_BUFFER_BYTES: u32 = 64 * 1024;
     // Explicit named-pipe exchange rights. This is the union of the
@@ -669,7 +879,7 @@ mod windows {
     const PIPE_EXCHANGE_ACCESS_MASK: u32 = 0x0012_019F;
     const SECURITY_DESCRIPTOR_REVISION: u32 = 1;
     const RANDOM_NAME_BYTES: usize = 16;
-const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
+    const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 
     #[derive(Debug)]
     struct OwnedHandle(HANDLE);
@@ -1108,7 +1318,12 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
         let mut bytes = random_bytes::<16>()?;
         let milliseconds = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|_| plain_error(LocalIpcState::RandomnessFailed, "system clock is before Unix epoch"))?
+            .map_err(|_| {
+                plain_error(
+                    LocalIpcState::RandomnessFailed,
+                    "system clock is before Unix epoch",
+                )
+            })?
             .as_millis() as u64;
         let timestamp = milliseconds.to_be_bytes();
         bytes[..6].copy_from_slice(&timestamp[2..]);
@@ -1355,8 +1570,7 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
             &self,
             session: &AuthenticatedCoreSession,
         ) -> Result<AuthenticatedCoreStatus, LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR
-                || session.session_id != self.session_id
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
             {
                 return Err(plain_error(
                     LocalIpcState::AuthenticationFailed,
@@ -1378,20 +1592,22 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
             .map_err(|error| {
                 plain_error(
                     LocalIpcState::ControlPlaneRequestFailed,
-                    format!("Core status request could not be written: {:?}", error.state),
+                    format!(
+                        "Core status request could not be written: {:?}",
+                        error.state
+                    ),
                 )
             })?;
 
-            let response: CoreStatusResponseWire = read_json_frame(
-                self.handle.raw(),
-                Instant::now() + HANDSHAKE_TIMEOUT,
-            )
-            .map_err(|error| {
-                plain_error(
-                    LocalIpcState::ControlPlaneRequestFailed,
-                    format!("Core status response could not be read: {:?}", error.state),
-                )
-            })?;
+            let response: CoreStatusResponseWire =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT).map_err(
+                    |error| {
+                        plain_error(
+                            LocalIpcState::ControlPlaneRequestFailed,
+                            format!("Core status response could not be read: {:?}", error.state),
+                        )
+                    },
+                )?;
             if !response.ok {
                 if let Some(error) = response.error.as_ref() {
                     let valid_error = !error.code.is_empty()
@@ -1441,20 +1657,172 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
             })
         }
 
+        /// Request an authenticated provider setup start from Core. Only
+        /// provider identity crosses this boundary; executable paths, helper
+        /// arguments, and shell text remain host-owned and unrepresentable.
+        pub fn request_provider_setup_start(
+            &self,
+            session: &AuthenticatedCoreSession,
+            request: ProviderSetupStartRequest,
+        ) -> Result<ProviderSetupStartResponse, LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "provider setup request requires the current authenticated session",
+                ));
+            }
+            for (value, label) in [
+                (&request.provider_id, "provider identity"),
+                (&request.distribution_id, "distribution identity"),
+                (&request.adapter_version, "adapter version"),
+            ] {
+                if value.is_empty() || value.len() > 256 || value.contains('\0') {
+                    return Err(plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        format!("provider setup {label} is invalid"),
+                    ));
+                }
+            }
+            if !is_uuid_v7(&request.request_id) {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "provider setup request identity is invalid",
+                ));
+            }
+            let correlation_id = random_uuid_v7()?;
+            write_json_frame(
+                self.handle.raw(),
+                &ProviderSetupStartRequestWire {
+                    protocol_version: IPC_PROTOCOL_MAJOR,
+                    kind: "request",
+                    id: Some(request.request_id.clone()),
+                    name: "start_provider_setup",
+                    correlation_id,
+                    payload: ProviderSetupStartPayloadWire {
+                        request_id: request.request_id.clone(),
+                        provider_id: request.provider_id,
+                        distribution_id: request.distribution_id,
+                        adapter_version: request.adapter_version,
+                        action: "AUTHENTICATED_USER_START",
+                    },
+                },
+            )?;
+            let response: ProviderSetupStartResponseWire =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if !response.ok || response.error.is_some() {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "Core rejected the provider setup start request",
+                ));
+            }
+            let result = response.result.ok_or_else(|| {
+                plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core provider setup response omitted its result",
+                )
+            })?;
+            if result.request_id != request.request_id || result.state != "SETUP_IN_PROGRESS" {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core provider setup response was not an in-progress transition",
+                ));
+            }
+            Ok(ProviderSetupStartResponse {
+                request_id: result.request_id,
+                state: "SETUP_IN_PROGRESS",
+            })
+        }
+
+        pub fn request_provider_setup_probe_passed(
+            &self,
+            session: &AuthenticatedCoreSession,
+            request_id: String,
+            provider_id: String,
+        ) -> Result<ProviderSetupStartResponse, LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+                return Err(plain_error(LocalIpcState::AuthenticationFailed, "provider setup completion requires the current authenticated session"));
+            }
+            if !is_uuid_v7(&request_id) || provider_id.is_empty() || provider_id.len() > 256 || provider_id.contains('\0') {
+                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "provider setup completion identity is invalid"));
+            }
+            let correlation_id = random_uuid_v7()?;
+            write_json_frame(self.handle.raw(), &ProviderSetupCompleteRequestWire {
+                protocol_version: IPC_PROTOCOL_MAJOR,
+                kind: "request",
+                id: request_id.clone(),
+                name: "complete_provider_setup",
+                correlation_id,
+                payload: ProviderSetupCompletePayloadWire { request_id: request_id.clone(), provider_id, action: "SETUP_PROBE_PASSED" },
+            })?;
+            let response: ProviderSetupStartResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if !response.ok || response.error.is_some() { return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the provider setup completion")); }
+            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup completion omitted its result"))?;
+            if result.request_id != request_id || result.state != "SETUP_READY" { return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup completion was not ready")); }
+            Ok(ProviderSetupStartResponse { request_id: result.request_id, state: "SETUP_READY" })
+        }
+
+        pub fn request_provider_setup_probe_failed(
+            &self,
+            session: &AuthenticatedCoreSession,
+            request_id: String,
+            provider_id: String,
+        ) -> Result<ProviderSetupStartResponse, LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id { return Err(plain_error(LocalIpcState::AuthenticationFailed, "provider setup failure requires the current authenticated session")); }
+            if !is_uuid_v7(&request_id) || provider_id.is_empty() || provider_id.len() > 256 || provider_id.contains('\0') { return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "provider setup failure identity is invalid")); }
+            let correlation_id = random_uuid_v7()?;
+            write_json_frame(self.handle.raw(), &ProviderSetupCompleteRequestWire { protocol_version: IPC_PROTOCOL_MAJOR, kind: "request", id: request_id.clone(), name: "complete_provider_setup", correlation_id, payload: ProviderSetupCompletePayloadWire { request_id: request_id.clone(), provider_id, action: "SETUP_PROBE_FAILED" } })?;
+            let response: ProviderSetupStartResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if !response.ok || response.error.is_some() { return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the provider setup failure")); }
+            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup failure omitted its result"))?;
+            if result.request_id != request_id || result.state != "SETUP_FAILED" { return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup failure was not persisted")); }
+            Ok(ProviderSetupStartResponse { request_id: result.request_id, state: "SETUP_FAILED" })
+        }
+
+        pub fn request_provider_setup_status(
+            &self,
+            session: &AuthenticatedCoreSession,
+        ) -> Result<Vec<ProviderSetupStatusRecord>, LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+                return Err(plain_error(LocalIpcState::AuthenticationFailed, "provider setup status requires the current authenticated session"));
+            }
+            let request_id = random_uuid_v7()?;
+            let correlation_id = random_uuid_v7()?;
+            write_json_frame(self.handle.raw(), &ProviderSetupStatusRequestWire {
+                protocol_version: IPC_PROTOCOL_MAJOR,
+                kind: "request",
+                id: request_id,
+                name: "get_provider_setup_status",
+                correlation_id,
+                payload: serde_json::json!({}),
+            })?;
+            let response: ProviderSetupStatusResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if !response.ok || response.error.is_some() {
+                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the provider setup status request"));
+            }
+            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup status omitted its result"))?;
+            Ok(result.providers.into_iter().map(|record| ProviderSetupStatusRecord {
+                provider_id: record.provider_id,
+                distribution_id: record.distribution_id,
+                adapter_version: record.adapter_version,
+                state: record.state,
+                sanitized_failure_reason: record.sanitized_failure_reason,
+            }).collect())
+        }
+
         pub fn receive_secure_storage_operation(
             &self,
             session: &AuthenticatedCoreSession,
         ) -> Result<SecureStorageOperation, LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
                 return Err(plain_error(
                     LocalIpcState::AuthenticationFailed,
                     "secure-storage request requires the current authenticated session",
                 ));
             }
-            let value: serde_json::Value = read_json_frame(
-                self.handle.raw(),
-                Instant::now() + HANDSHAKE_TIMEOUT,
-            )?;
+            let value: serde_json::Value =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
             let operation = value
                 .get("operation")
                 .and_then(serde_json::Value::as_str)
@@ -1467,8 +1835,8 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                 })?;
             match operation.as_str() {
                 "protect_new_database_dek" => {
-                    let request: SecureStorageProtectionRequestWire =
-                        serde_json::from_value(value).map_err(|_| {
+                    let request: SecureStorageProtectionRequestWire = serde_json::from_value(value)
+                        .map_err(|_| {
                             plain_error(
                                 LocalIpcState::ControlPlaneRequestFailed,
                                 "secure-storage protection request shape is invalid",
@@ -1484,16 +1852,14 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                             "secure-storage operation identity is invalid",
                         ));
                     }
-                    let database_dek = super::hex_decode(
-                        &request.database_dek,
-                        BOOTSTRAP_DATABASE_DEK_BYTES,
-                    )
-                    .ok_or_else(|| {
-                        plain_error(
-                            LocalIpcState::ControlPlaneRequestFailed,
-                            "secure-storage DB_DEK encoding is invalid",
-                        )
-                    })?;
+                    let database_dek =
+                        super::hex_decode(&request.database_dek, BOOTSTRAP_DATABASE_DEK_BYTES)
+                            .ok_or_else(|| {
+                                plain_error(
+                                    LocalIpcState::ControlPlaneRequestFailed,
+                                    "secure-storage DB_DEK encoding is invalid",
+                                )
+                            })?;
                     let database_dek: [u8; BOOTSTRAP_DATABASE_DEK_BYTES] =
                         database_dek.try_into().map_err(|_| {
                             plain_error(
@@ -1543,16 +1909,14 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                             "local backup-dek operation identity is invalid",
                         ));
                     }
-                    let backup_dek = super::hex_decode(
-                        &request.backup_dek,
-                        BOOTSTRAP_DATABASE_DEK_BYTES,
-                    )
-                    .ok_or_else(|| {
-                        plain_error(
-                            LocalIpcState::ControlPlaneRequestFailed,
-                            "local backup-dek encoding is invalid",
-                        )
-                    })?;
+                    let backup_dek =
+                        super::hex_decode(&request.backup_dek, BOOTSTRAP_DATABASE_DEK_BYTES)
+                            .ok_or_else(|| {
+                                plain_error(
+                                    LocalIpcState::ControlPlaneRequestFailed,
+                                    "local backup-dek encoding is invalid",
+                                )
+                            })?;
                     let backup_dek: [u8; BOOTSTRAP_DATABASE_DEK_BYTES] =
                         backup_dek.try_into().map_err(|_| {
                             plain_error(
@@ -1567,12 +1931,13 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                                 "local backup-dek descriptor binding is invalid",
                             )
                         })?;
-                    let descriptor_digest: [u8; 32] = descriptor_digest.try_into().map_err(|_| {
-                        plain_error(
-                            LocalIpcState::ControlPlaneRequestFailed,
-                            "local backup-dek descriptor binding length is invalid",
-                        )
-                    })?;
+                    let descriptor_digest: [u8; 32] =
+                        descriptor_digest.try_into().map_err(|_| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "local backup-dek descriptor binding length is invalid",
+                            )
+                        })?;
                     let received = super::hex_decode(&request.proof, 32).ok_or_else(|| {
                         plain_error(
                             LocalIpcState::AuthenticationFailed,
@@ -1622,9 +1987,7 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                         &request.protected_backup_dek,
                         request.protected_backup_dek.len() / 2,
                     )
-                    .filter(|value| {
-                        !value.is_empty() && value.len() <= MAX_LOCAL_BACKUP_SLOT_BYTES
-                    })
+                    .filter(|value| !value.is_empty() && value.len() <= MAX_LOCAL_BACKUP_SLOT_BYTES)
                     .ok_or_else(|| {
                         plain_error(
                             LocalIpcState::ControlPlaneRequestFailed,
@@ -1638,12 +2001,13 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                                 "local backup-dek descriptor binding is invalid",
                             )
                         })?;
-                    let descriptor_digest: [u8; 32] = descriptor_digest.try_into().map_err(|_| {
-                        plain_error(
-                            LocalIpcState::ControlPlaneRequestFailed,
-                            "local backup-dek descriptor binding length is invalid",
-                        )
-                    })?;
+                    let descriptor_digest: [u8; 32] =
+                        descriptor_digest.try_into().map_err(|_| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "local backup-dek descriptor binding length is invalid",
+                            )
+                        })?;
                     let received = super::hex_decode(&request.proof, 32).ok_or_else(|| {
                         plain_error(
                             LocalIpcState::AuthenticationFailed,
@@ -1738,7 +2102,9 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                         ));
                     }
                     let password = super::hex_decode(&request.password, request.password.len() / 2)
-                        .filter(|password| !password.is_empty() && password.len() <= MAX_SESSION_PASSWORD_BYTES)
+                        .filter(|password| {
+                            !password.is_empty() && password.len() <= MAX_SESSION_PASSWORD_BYTES
+                        })
                         .ok_or_else(|| {
                             plain_error(
                                 LocalIpcState::ControlPlaneRequestFailed,
@@ -1769,6 +2135,91 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                         },
                     ))
                 }
+                "verify_session_password" => {
+                    let request: SessionPasswordVerificationRequestWire =
+                        serde_json::from_value(value).map_err(|_| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "session-password verification request shape is invalid",
+                            )
+                        })?;
+                    if request.protocol_version != IPC_PROTOCOL_MAJOR
+                        || request.kind != "request"
+                        || request.operation != operation
+                        || !is_uuid_v7(&request.correlation_id)
+                        || request.profile_id != "session-password-v1"
+                        || request.version != 0x13
+                        || request.parallelism != 4
+                    {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneRequestFailed,
+                            "session-password verification identity is invalid",
+                        ));
+                    }
+                    let password = super::hex_decode(&request.password, request.password.len() / 2)
+                        .filter(|value| {
+                            !value.is_empty() && value.len() <= MAX_SESSION_PASSWORD_BYTES
+                        })
+                        .ok_or_else(|| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "session-password encoding or size is invalid",
+                            )
+                        })?;
+                    let salt = super::hex_decode(&request.salt, request.salt.len() / 2)
+                        .filter(|value| (16..=1024).contains(&value.len()))
+                        .ok_or_else(|| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "session-password salt encoding or size is invalid",
+                            )
+                        })?;
+                    let verifier = super::hex_decode(&request.verifier, request.verifier.len() / 2)
+                        .filter(|value| (32..=1024).contains(&value.len()))
+                        .ok_or_else(|| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneRequestFailed,
+                                "session-password verifier encoding or size is invalid",
+                            )
+                        })?;
+                    let received = super::hex_decode(&request.proof, 32).ok_or_else(|| {
+                        plain_error(
+                            LocalIpcState::AuthenticationFailed,
+                            "session-password proof encoding is invalid",
+                        )
+                    })?;
+                    let expected = super::session_password_verification_proof(
+                        self.bootstrap_material.secure_storage_secret(),
+                        &request.correlation_id,
+                        &password,
+                        &request.profile_id,
+                        request.version,
+                        request.memory_kib,
+                        request.iterations,
+                        request.parallelism,
+                        &salt,
+                        &verifier,
+                    );
+                    if !super::constant_time_equal(&received, &expected) {
+                        return Err(plain_error(
+                            LocalIpcState::AuthenticationFailed,
+                            "session-password operation authentication failed",
+                        ));
+                    }
+                    Ok(SecureStorageOperation::VerifySessionPassword(
+                        SessionPasswordVerificationRequest {
+                            correlation_id: request.correlation_id,
+                            password,
+                            profile_id: request.profile_id,
+                            version: request.version,
+                            memory_kib: request.memory_kib,
+                            iterations: request.iterations,
+                            parallelism: request.parallelism,
+                            salt,
+                            verifier,
+                        },
+                    ))
+                }
                 _ => Err(plain_error(
                     LocalIpcState::ControlPlaneRequestFailed,
                     "secure-storage operation is unsupported",
@@ -1782,7 +2233,8 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
             correlation_id: String,
             handle: Result<String, &'static str>,
         ) -> Result<(), LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
                 return Err(plain_error(
                     LocalIpcState::AuthenticationFailed,
                     "secure-storage response requires the current authenticated session",
@@ -1821,21 +2273,24 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
             operation: &'static str,
             mut value: Result<Vec<u8>, &'static str>,
         ) -> Result<(), LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
                 return Err(plain_error(
                     LocalIpcState::AuthenticationFailed,
                     "local backup-dek response requires the current authenticated session",
                 ));
             }
             let response = match &value {
-                Ok(value) if operation == "protect_local_backup_dek" => LocalBackupDekResponseWire {
-                    ok: true,
-                    correlation_id: correlation_id.clone(),
-                    operation,
-                    protected_backup_dek: Some(super::hex_encode(value)),
-                    backup_dek: None,
-                    error_code: None,
-                },
+                Ok(value) if operation == "protect_local_backup_dek" => {
+                    LocalBackupDekResponseWire {
+                        ok: true,
+                        correlation_id: correlation_id.clone(),
+                        operation,
+                        protected_backup_dek: Some(super::hex_encode(value)),
+                        backup_dek: None,
+                        error_code: None,
+                    }
+                }
                 Ok(value) => LocalBackupDekResponseWire {
                     ok: true,
                     correlation_id: correlation_id.clone(),
@@ -1876,7 +2331,8 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
             correlation_id: String,
             verifier: Result<SessionPasswordVerifier, &'static str>,
         ) -> Result<(), LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
                 return Err(plain_error(
                     LocalIpcState::AuthenticationFailed,
                     "session-password response requires the current authenticated session",
@@ -1919,6 +2375,47 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                 return Err(plain_error(
                     LocalIpcState::ControlPlaneResponseInvalid,
                     "session-password response acknowledgement was invalid",
+                ));
+            }
+            Ok(())
+        }
+
+        pub fn respond_session_password_verification(
+            &self,
+            session: &AuthenticatedCoreSession,
+            correlation_id: String,
+            result: Result<bool, &'static str>,
+        ) -> Result<(), LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "session-password verification response requires the current authenticated session",
+                ));
+            }
+            let response = match result {
+                Ok(verified) => SessionPasswordVerificationResponseWire {
+                    ok: true,
+                    correlation_id: correlation_id.clone(),
+                    verified,
+                    error_code: None,
+                },
+                Err(error_code) => SessionPasswordVerificationResponseWire {
+                    ok: false,
+                    correlation_id: correlation_id.clone(),
+                    verified: false,
+                    error_code: Some(error_code),
+                },
+            };
+            write_json_frame(self.handle.raw(), &response)?;
+            let acknowledgement: SecureStorageResponseAckWire =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if acknowledgement.kind != "response_ack"
+                || acknowledgement.correlation_id != correlation_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "session-password verification acknowledgement was invalid",
                 ));
             }
             Ok(())
@@ -2046,7 +2543,7 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
     mod tests {
         use super::*;
         use crate::local_ipc::{
-            BOOTSTRAP_SECRET_BYTES, constant_time_equal, handshake_proof, hex_decode, hex_encode,
+            constant_time_equal, handshake_proof, hex_decode, hex_encode, BOOTSTRAP_SECRET_BYTES,
         };
         use std::io::Write;
         use std::path::{Path, PathBuf};
@@ -2055,8 +2552,8 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
         use std::thread::{self, sleep};
         use windows_sys::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
         use windows_sys::Win32::Security::{
-            CreateRestrictedToken, ImpersonateLoggedOnUser, RevertToSelf, SID_AND_ATTRIBUTES,
-            TOKEN_DUPLICATE, DISABLE_MAX_PRIVILEGE,
+            CreateRestrictedToken, ImpersonateLoggedOnUser, RevertToSelf, DISABLE_MAX_PRIVILEGE,
+            SID_AND_ATTRIBUTES, TOKEN_DUPLICATE,
         };
         use windows_sys::Win32::Storage::FileSystem::{
             CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_NONE, OPEN_EXISTING,
@@ -2109,11 +2606,9 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
             assert_ne!(first.endpoint_name(), second.endpoint_name());
             assert!(first.endpoint_name().starts_with(r"\\.\pipe\jarvis-core-"));
             assert!(!first.endpoint_name().contains("http"));
-            assert!(
-                first
-                    .security_descriptor_sddl()
-                    .starts_with("D:P(A;;0x0012019F;;;S-1-")
-            );
+            assert!(first
+                .security_descriptor_sddl()
+                .starts_with("D:P(A;;0x0012019F;;;S-1-"));
             assert!(!first.security_descriptor_sddl().contains("GA"));
             assert!(!first.security_descriptor_sddl().contains("WD"));
             assert!(!first.security_descriptor_sddl().contains("AN"));
@@ -2153,9 +2648,10 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
         #[test]
         fn remote_named_pipe_path_is_rejected() {
             let server = NamedPipeServer::bind().expect("named pipe must bind");
-            let remote_endpoint = server
-                .endpoint_name()
-                .replacen(r"\\.\pipe\", r"\\127.0.0.1\pipe\", 1);
+            let remote_endpoint =
+                server
+                    .endpoint_name()
+                    .replacen(r"\\.\pipe\", r"\\127.0.0.1\pipe\", 1);
             let endpoint = wide(&remote_endpoint);
             // SAFETY: the endpoint is derived from the server-generated name;
             // this deliberately uses the Windows remote-client path so the
@@ -2272,8 +2768,15 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
             let denied = OwnedHandle::new(handle).is_none();
             // SAFETY: the test thread currently impersonates a valid token;
             // RevertToSelf has no output pointer and restores the thread.
-            assert_ne!(unsafe { RevertToSelf() }, 0, "the test thread must revert identity");
-            assert!(denied, "a restricted principal must not pass the SID-only DACL");
+            assert_ne!(
+                unsafe { RevertToSelf() },
+                0,
+                "the test thread must revert identity"
+            );
+            assert!(
+                denied,
+                "a restricted principal must not pass the SID-only DACL"
+            );
             server.disconnect_client();
         }
 
@@ -2285,7 +2788,9 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
             std::io::stdout()
                 .flush()
                 .expect("qualification endpoint must be visible");
-            println!("Keep this test running while the separate account attempts only to open the endpoint.");
+            println!(
+                "Keep this test running while the separate account attempts only to open the endpoint."
+            );
             std::io::stdout()
                 .flush()
                 .expect("qualification instructions must be visible");
@@ -2436,8 +2941,8 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                 return;
             }
             let database_path = temporary_database_path("packaged-node");
-            let server = NamedPipeServer::bind_with_database_dek([0; 32])
-                .expect("named pipe must bind");
+            let server =
+                NamedPipeServer::bind_with_database_dek([0; 32]).expect("named pipe must bind");
             let mut child = Command::new(node)
                 .arg(&entrypoint)
                 .current_dir(&root)
@@ -2504,8 +3009,8 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
                 .expect("packaged Core runtime must be qualified");
             let manifest_path = root.join("runtime-manifest.json");
             let database_path = temporary_database_path("supervised-core");
-            let server = NamedPipeServer::bind_with_database_dek([0; 32])
-                .expect("named pipe must bind");
+            let server =
+                NamedPipeServer::bind_with_database_dek([0; 32]).expect("named pipe must bind");
             let mut bootstrap_channel = server
                 .create_bootstrap_channel()
                 .expect("bootstrap channel must be created");

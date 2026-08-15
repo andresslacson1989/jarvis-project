@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { verifyTufMetadataProfile } from "./verify-tuf-metadata-profile.mjs";
 
 export const V1_NODE_VERSION = "24.18.0";
 const DEFAULT_STARTUP_TIMEOUT_MS = 2_000;
@@ -20,7 +21,7 @@ const HANDSHAKE_DOMAIN = Buffer.from("JARVIS-CORE-IPC-BOOTSTRAP-V1\0", "utf8");
 const execFileAsync = promisify(execFile);
 
 function usage() {
-  return "Usage: node tools/release/qualify-core-runtime.mjs --release-root <absolute-release-root> [--startup-timeout-ms <milliseconds>] [--stop-timeout-ms <milliseconds>]";
+  return "Usage: node tools/release/qualify-core-runtime.mjs --release-root <absolute-release-root> [--production-tuf-profile] [--startup-timeout-ms <milliseconds>] [--stop-timeout-ms <milliseconds>]";
 }
 
 function parsePositiveTimeout(value, label) {
@@ -34,12 +35,22 @@ function parsePositiveTimeout(value, label) {
 
 export function parseArguments(argv) {
   const values = new Map();
-  const allowed = new Set(["--release-root", "--startup-timeout-ms", "--stop-timeout-ms"]);
+  const allowed = new Set([
+    "--release-root",
+    "--production-tuf-profile",
+    "--startup-timeout-ms",
+    "--stop-timeout-ms",
+  ]);
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (!argument.startsWith("--")) throw new Error(`unexpected argument: ${argument}`);
     const [key, inlineValue] = argument.split("=", 2);
     if (!allowed.has(key)) throw new Error(`unknown argument: ${key}`);
+    if (key === "--production-tuf-profile") {
+      if (inlineValue !== undefined || values.has(key)) throw new Error(`duplicate argument: ${key}`);
+      values.set(key, true);
+      continue;
+    }
     const value = inlineValue ?? argv[++index];
     if (!value || value.startsWith("--")) throw new Error(`missing value for ${key}`);
     if (values.has(key)) throw new Error(`duplicate argument: ${key}`);
@@ -52,6 +63,7 @@ export function parseArguments(argv) {
   }
   return {
     releaseRoot: resolve(releaseRoot),
+    requireProductionTufProfile: values.get("--production-tuf-profile") === true,
     startupTimeoutMs: parsePositiveTimeout(
       values.get("--startup-timeout-ms") ?? String(DEFAULT_STARTUP_TIMEOUT_MS),
       "--startup-timeout-ms",
@@ -206,6 +218,7 @@ async function stopChild(child, timeoutMs) {
 
 export async function qualifyPackagedCore({
   releaseRoot: releaseRootInput,
+  requireProductionTufProfile = false,
   startupTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS,
   stopTimeoutMs = DEFAULT_STOP_TIMEOUT_MS,
 }) {
@@ -230,6 +243,9 @@ export async function qualifyPackagedCore({
   if (!isCanonicalChild(await realpath(releaseRoot), metadataDirectory)) {
     throw new Error("release-owned TUF metadata must remain inside the release root");
   }
+  const productionTufProfile = requireProductionTufProfile
+    ? await verifyTufMetadataProfile({ metadataDirectory })
+    : undefined;
 
   const manifestPath = await requireReleaseFile(
     releaseRoot,
@@ -318,6 +334,13 @@ export async function qualifyPackagedCore({
       authenticatedCoreTransport: true,
       protocolMajor: IPC_PROTOCOL_MAJOR,
       controlledStop: true,
+      productionTufProfile: productionTufProfile
+        ? {
+            profile: productionTufProfile.profile,
+            shape: productionTufProfile.productionProfileShape,
+            keyCustodyEvidence: productionTufProfile.keyCustodyEvidence,
+          }
+        : "NOT_REQUESTED",
       stdout: stdout.trim(),
       stderr: stderr.trim(),
     };

@@ -79,6 +79,33 @@ impl Argon2idProfile {
         }
     }
 
+    pub fn persisted_session_password(
+        profile_id: &str,
+        memory_kib: u32,
+        iterations: u32,
+        parallelism: u32,
+        salt_bytes: usize,
+        output_bytes: usize,
+    ) -> Result<Self, KdfError> {
+        let profile = Self {
+            profile_id: profile_id.to_owned(),
+            purpose: KdfPurpose::SessionPassword,
+            version: ARGON2ID_VERSION,
+            memory_kib,
+            iterations,
+            parallelism,
+            salt_bytes,
+            output_bytes,
+        };
+        if profile.profile_id != "session-password-v1" {
+            return Err(KdfError::InvalidProfile(
+                "session-password profile identity is unsupported",
+            ));
+        }
+        profile.validate()?;
+        Ok(profile)
+    }
+
     pub fn validate(&self) -> Result<(), KdfError> {
         if self.profile_id.is_empty()
             || self.profile_id.len() > MAX_PROFILE_ID_BYTES
@@ -183,6 +210,17 @@ pub fn derive_argon2id(
     Ok(output)
 }
 
+pub fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
+    let mut difference = (left.len() ^ right.len()) as u8;
+    let max = left.len().max(right.len());
+    for index in 0..max {
+        let left_byte = left.get(index).copied().unwrap_or(0);
+        let right_byte = right.get(index).copied().unwrap_or(0);
+        difference |= left_byte ^ right_byte;
+    }
+    difference == 0
+}
+
 #[cfg(windows)]
 fn fill_random(bytes: &mut [u8]) -> Result<(), KdfError> {
     use windows_sys::Win32::Security::Cryptography::{
@@ -275,5 +313,37 @@ mod tests {
         let second = generate_salt(&profile).expect("Windows CSPRNG must be available");
         assert_eq!(first.len(), 16);
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn persisted_session_profile_is_revalidated_before_derivation() {
+        let profile = Argon2idProfile::persisted_session_password(
+            "session-password-v1",
+            65_536,
+            3,
+            4,
+            16,
+            32,
+        )
+        .expect("qualified persisted profile must be accepted");
+        let derived = derive_argon2id(&profile, b"test-only-secret", &[0x42; 16])
+            .expect("qualified persisted profile must derive");
+        assert!(constant_time_equal(&derived, &derived));
+        assert!(!constant_time_equal(&derived, &[0; 32]));
+        assert!(
+            Argon2idProfile::persisted_session_password("other-profile", 65_536, 3, 4, 16, 32)
+                .is_err()
+        );
+        assert!(
+            Argon2idProfile::persisted_session_password(
+                "session-password-v1",
+                65_535,
+                3,
+                4,
+                16,
+                32
+            )
+            .is_err()
+        );
     }
 }

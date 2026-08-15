@@ -1,0 +1,38 @@
+{
+  "descriptor": {
+    "actionClass": "EXTERNAL_WRITE",
+    "arguments": {
+      "body": "ready",
+      "count": 2
+    },
+    "authorityEnvelopeId": "envelope-1",
+    "descriptorVersion": 1,
+    "domain": "jarvis.approval.action.v1",
+    "executionScope": {
+      "kind": "INTEGRATION",
+      "bindings": [
+        {
+          "accountId": "account-1",
+          "capabilityIds": ["write"],
+          "integrationId": "github"
+        }
+      ],
+      "environmentId": "prod",
+      "projectId": "project-1"
+    },
+    "policySnapshotVersion": 1,
+    "sideEffectClass": "EXTERNAL_WRITE",
+    "targets": [
+      {
+        "ref": "refs/heads/main",
+        "repositoryId": "repo-1",
+        "system": "github"
+      }
+    ],
+    "toolId": "github.update-ref",
+    "toolVersion": 1
+  },
+  "canonicalUtf8": "{\"actionClass\":\"EXTERNAL_WRITE\",\"arguments\":{\"body\":\"ready\",\"count\":2},\"authorityEnvelopeId\":\"envelope-1\",\"descriptorVersion\":1,\"domain\":\"jarvis.approval.action.v1\",\"executionScope\":{\"bindings\":[{\"accountId\":\"account-1\",\"capabilityIds\":[\"write\"],\"integrationId\":\"github\"}],\"environmentId\":\"prod\",\"kind\":\"INTEGRATION\",\"projectId\":\"project-1\"},\"policySnapshotVersion\":1,\"sideEffectClass\":\"EXTERNAL_WRITE\",\"targets\":[{\"ref\":\"refs/heads/main\",\"repositoryId\":\"repo-1\",\"system\":\"github\"}],\"toolId\":\"github.update-ref\",\"toolVersion\":1}",
+  "sha256Hex": "b6b3e2c1a3c745bbddea6ddc19a467e0cff263839d5f65de9ac760363c1716b5",
+  "base64url": "trPiwaPHRbvd6m3cGaRn4M_yY4OdX2XemsdgNjwXFrU"
+}

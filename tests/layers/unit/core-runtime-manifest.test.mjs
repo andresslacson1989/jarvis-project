@@ -52,6 +52,15 @@ test("runtime manifest generation is deterministic and hashes explicit release f
     assert.equal(parsed.sourceCommitSha, releaseIdentity.sourceCommitSha);
     assert.equal(parsed.releaseSequence, releaseIdentity.releaseSequence);
     assert.equal(parsed.securityEpoch, releaseIdentity.securityEpoch);
+    assert.equal(parsed.releaseDistributionScope, "PRIVATE_INTERNAL");
+    assert.equal(parsed.publicDistributionSupported, false);
+    assert.deepEqual(parsed.windowsSigning, {
+      trustMode: "PRIVATE_INTERNAL_AUTHENTICODE",
+      certificateThumbprint: "23DA4DA3E340B66EC4240B4CC845E4387E5BBDD3",
+      authorizedTargetScope: "CURRENT_USER_ONLY",
+      trustEnrollment: "CURRENT_USER_TRUSTEDPUBLISHER_AND_ROOT",
+      timestampEvidence: "ABSENT_PUBLIC_TIMESTAMP_PRIVATE_INTERNAL",
+    });
     assert.equal(parsed.tufSpecVersion, "1.0.35");
     assert.equal(parsed.coreSupportFiles.length, 11);
     assert.equal(parsed.coreSupportFiles[0].path, "core/package.json");

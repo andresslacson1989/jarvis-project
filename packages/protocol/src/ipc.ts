@@ -1,5 +1,5 @@
-import type { UUIDv7 } from "./common";
-import type { JarvisError } from "./errors";
+import type { UUIDv7 } from "./common.js";
+import type { JarvisError } from "./errors.js";
 
 export type IpcKind = "request" | "response" | "event";
 

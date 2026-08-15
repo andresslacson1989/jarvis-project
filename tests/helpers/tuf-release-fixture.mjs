@@ -65,10 +65,25 @@ function metaFile(metadata) {
   });
 }
 
-export async function writeTufReleaseMetadata({ metadataDirectory, targetBytes, custom }) {
+class FixtureDelegations {
+  constructor({ keys, roles }) {
+    this.keys = keys;
+    this.roles = roles;
+  }
+
+  toJSON() {
+    return {
+      keys: Object.fromEntries(Object.entries(this.keys).map(([keyID, key]) => [keyID, key.toJSON()])),
+      roles: Object.entries(this.roles).map(([name, role]) => ({ name, ...role })),
+    };
+  }
+}
+
+export async function writeTufReleaseMetadata({ metadataDirectory, targetBytes, custom, productionProfile = false }) {
   await mkdir(metadataDirectory, { recursive: true });
   const rootKeys = [makeKeyPair(), makeKeyPair(), makeKeyPair()];
   const targetKeys = [makeKeyPair(), makeKeyPair(), makeKeyPair()];
+  const moduleKeys = productionProfile ? [makeKeyPair(), makeKeyPair(), makeKeyPair()] : [];
   const snapshotKey = makeKeyPair();
   const timestampKey = makeKeyPair();
   const root = new Metadata(
@@ -98,7 +113,26 @@ export async function writeTufReleaseMetadata({ metadataDirectory, targetBytes, 
     unrecognizedFields: { custom: { ...custom, artifactSha256: digest(targetBytes) } },
   });
   const targets = new Metadata(
-    new Targets({ version: 1, specVersion: "1.0.35", expires: expiration(89) }),
+    new Targets({
+      version: 1,
+      specVersion: "1.0.35",
+      expires: expiration(89),
+      ...(productionProfile
+        ? {
+            delegations: new FixtureDelegations({
+              keys: Object.fromEntries(moduleKeys.map(({ key }) => [key.keyID, key])),
+              roles: {
+                modules: {
+                  keyids: moduleKeys.map(({ key }) => key.keyID),
+                  threshold: 2,
+                  terminating: true,
+                  paths: ["modules/*"],
+                },
+              },
+            }),
+          }
+        : {}),
+    }),
   );
   targets.signed.addTarget(target);
   signWith(targets, targetKeys.slice(0, 2));

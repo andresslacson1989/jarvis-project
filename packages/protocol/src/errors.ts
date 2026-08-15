@@ -1,4 +1,4 @@
-import type { UUIDv7 } from "./common";
+import type { UUIDv7 } from "./common.js";
 
 export type ErrorCategory =
   | "VALIDATION"

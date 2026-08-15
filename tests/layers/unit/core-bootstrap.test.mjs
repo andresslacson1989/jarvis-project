@@ -15,6 +15,7 @@ import {
   validateCoreEnvironment,
 } from "../../../services/core/src/main.ts";
 import { CoreIpcFrameReader } from "../../../services/core/src/ipc-bootstrap.ts";
+import { CoreSchemaError } from "../../../services/core/src/schema.ts";
 
 function encodeFrame(value) {
   const payload = Buffer.from(JSON.stringify(value), "utf8");
@@ -91,6 +92,15 @@ test("Core bootstrap accepts only explicit release paths and exposes truthful st
       releaseSequence: 1,
       securityEpoch: 1,
       sourceCommitSha: "a".repeat(40),
+      releaseDistributionScope: "PRIVATE_INTERNAL",
+      publicDistributionSupported: false,
+      windowsSigning: {
+        trustMode: "PRIVATE_INTERNAL_AUTHENTICODE",
+        certificateThumbprint: "23DA4DA3E340B66EC4240B4CC845E4387E5BBDD3",
+        authorizedTargetScope: "CURRENT_USER_ONLY",
+        trustEnrollment: "CURRENT_USER_TRUSTEDPUBLISHER_AND_ROOT",
+        timestampEvidence: "ABSENT_PUBLIC_TIMESTAMP_PRIVATE_INTERNAL",
+      },
     };
     const manifestBytes = Buffer.from(`${JSON.stringify(manifest)}\n`, "utf8");
     await writeFile(join(root, "runtime-manifest.json"), manifestBytes);
@@ -134,6 +144,50 @@ test("Core bootstrap accepts only explicit release paths and exposes truthful st
     })).state, "RECOVERY");
     assert.equal(recoveryBootstrap.getRuntimeEnvironment().recoveryMode, true);
     assert.equal(recoveryBootstrap.stop().state, "STOPPED");
+
+    const invalidManifest = { ...manifest, releaseDistributionScope: "PUBLIC" };
+    const invalidManifestBytes = Buffer.from(`${JSON.stringify(invalidManifest)}\n`, "utf8");
+    await writeFile(join(root, "runtime-manifest.json"), invalidManifestBytes);
+    await writeTufReleaseMetadata({
+      metadataDirectory: join(root, "tuf", "metadata"),
+      targetBytes: invalidManifestBytes,
+      custom: {
+        tufSpecVersion: "1.0.35",
+        releaseId: manifest.jarvisReleaseVersion,
+        jarvisVersion: manifest.jarvisReleaseVersion,
+        releaseSequence: manifest.releaseSequence,
+        securityEpoch: manifest.securityEpoch,
+        sourceCommitSha: manifest.sourceCommitSha,
+        platform: "WINDOWS",
+        runtimeRole: "FULL_HOST",
+        architecture: "x64",
+      },
+    });
+    await assert.rejects(
+      validateCoreEnvironment({
+        JARVIS_CORE_ROOT: root,
+        JARVIS_CORE_ENTRYPOINT: entrypoint,
+        JARVIS_TUF_METADATA_DIR: join(root, "tuf", "metadata"),
+      }),
+      (error) => error instanceof CoreBootstrapError && error.code === "CORE_RUNTIME_INTEGRITY_FAILED",
+    );
+
+    await writeFile(join(root, "runtime-manifest.json"), manifestBytes);
+    await writeTufReleaseMetadata({
+      metadataDirectory: join(root, "tuf", "metadata"),
+      targetBytes: manifestBytes,
+      custom: {
+        tufSpecVersion: "1.0.35",
+        releaseId: manifest.jarvisReleaseVersion,
+        jarvisVersion: manifest.jarvisReleaseVersion,
+        releaseSequence: manifest.releaseSequence,
+        securityEpoch: manifest.securityEpoch,
+        sourceCommitSha: manifest.sourceCommitSha,
+        platform: "WINDOWS",
+        runtimeRole: "FULL_HOST",
+        architecture: "x64",
+      },
+    });
 
     await assert.rejects(
       validateCoreEnvironment({
@@ -281,6 +335,64 @@ test("authenticated Core control plane returns only the deterministic locked sta
   });
   assert.equal(rejected.ok, false);
   if (!rejected.ok) assert.equal(rejected.error.code, "CORE_IPC_REQUEST_INVALID");
+});
+
+test("authenticated Core validates setup identity and never fabricates readiness", async () => {
+  const request = {
+    protocolVersion: 1,
+    kind: "request",
+    id: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    name: "start_provider_setup",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ac",
+    payload: {
+      requestId: "018f3b8e-6c68-7abc-8def-0123456789ad",
+      providerId: "codex-cli",
+      distributionId: "codex-cli-standalone-windows-x64-0.147.0",
+      adapterVersion: "1.0.0",
+      action: "AUTHENTICATED_USER_START",
+    },
+  };
+  const unavailable = await new AuthenticatedCoreServiceShell().handle(request);
+  assert.equal(unavailable.ok, false);
+  if (!unavailable.ok) assert.equal(unavailable.error.code, "CORE_PROVIDER_SETUP_NOT_READY");
+
+  const started = await new AuthenticatedCoreServiceShell(async (received) => ({
+    ok: true,
+    result: { requestId: received.payload.requestId, state: "SETUP_IN_PROGRESS" },
+  })).handle(request);
+  assert.deepEqual(started, { ok: true, result: { requestId: request.payload.requestId, state: "SETUP_IN_PROGRESS" } });
+
+  const conflict = await new AuthenticatedCoreServiceShell(async () => {
+    throw new CoreSchemaError("PERSISTENCE_CONFLICT", "stale");
+  }).handle(request);
+  assert.equal(conflict.ok, false);
+  if (!conflict.ok) {
+    assert.equal(conflict.error.code, "PERSISTENCE_CONFLICT");
+    assert.equal(conflict.error.category, "CONFLICT");
+    assert.equal(conflict.error.retryable, true);
+  }
+});
+
+test("authenticated Core returns sanitized provider setup status only through the typed request", async () => {
+  const request = {
+    protocolVersion: 1,
+    kind: "request",
+    id: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    name: "get_provider_setup_status",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ac",
+    payload: {},
+  };
+  const shell = new AuthenticatedCoreServiceShell(undefined, undefined, async () => ({
+    ok: true,
+    result: { providers: [{ providerId: "codex-cli", distributionId: "codex-cli-standalone-windows-x64-0.147.0", adapterVersion: "1.0.0", state: "SETUP_REQUIRED" }] },
+  }));
+  assert.deepEqual(await shell.handle(request), {
+    ok: true,
+    result: { providers: [{ providerId: "codex-cli", distributionId: "codex-cli-standalone-windows-x64-0.147.0", adapterVersion: "1.0.0", state: "SETUP_REQUIRED" }] },
+  });
+  const invalid = await shell.handle({ ...request, payload: { executablePath: "C:\\\\unsafe.exe" } });
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) assert.equal(invalid.error.code, "CORE_IPC_REQUEST_INVALID");
 });
 
 test("authenticated Core transport serves the bounded locked-status round-trip", async () => {

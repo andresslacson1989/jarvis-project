@@ -138,6 +138,17 @@ export interface VerifiedAuthenticatedBackupPackageV1 {
   readonly descriptorDigest: Buffer;
   readonly snapshotDbKey: Buffer;
   readonly objects: readonly { readonly path: string; readonly data: Buffer }[];
+  /** Non-secret proof metadata emitted only after a generated recovery slot authenticated. */
+  readonly recoveryEvidence?: VerifiedRecoveryFactorEvidenceV1;
+}
+
+export interface VerifiedRecoveryFactorEvidenceV1 {
+  readonly type: "GENERATED_RECOVERY_V1";
+  readonly evidenceId: string;
+  readonly backupId: string;
+  readonly slotId: string;
+  readonly descriptorDigestSha256: string;
+  readonly verifiedAt: string;
 }
 
 export interface RestoreVerifiedPortableBackupInputV1 extends VerifyAuthenticatedBackupPackageInputV1 {
@@ -462,8 +473,9 @@ function verifyAuthenticatedBackupPackageWithBackupDek(input: {
   readonly noncePrefix: Buffer;
   readonly descriptorDigest: Buffer;
   readonly backupDek: Buffer;
+  readonly recoveryEvidence?: VerifiedRecoveryFactorEvidenceV1;
 }): VerifiedAuthenticatedBackupPackageV1 {
-  const { descriptor, chunks, noncePrefix, descriptorDigest, backupDek } = input;
+  const { descriptor, chunks, noncePrefix, descriptorDigest, backupDek, recoveryEvidence } = input;
   const descriptorNoncePrefix = Buffer.from(descriptor.noncePrefix, "base64url");
   if (!descriptorNoncePrefix.equals(noncePrefix)) {
     return fail("BACKUP_PACKAGE_BINDING_INVALID", "descriptor and supplied nonce prefix are not bound");
@@ -503,6 +515,7 @@ function verifyAuthenticatedBackupPackageWithBackupDek(input: {
       descriptorDigest,
       snapshotDbKey: parsed.snapshotDbKey,
       objects: parsed.objects,
+      ...(recoveryEvidence ? { recoveryEvidence } : {}),
     });
   } finally {
     backupDek.fill(0);
@@ -536,6 +549,14 @@ export function verifyAuthenticatedBackupPackage(
     noncePrefix: input.noncePrefix,
     descriptorDigest,
     backupDek,
+    recoveryEvidence: {
+      type: "GENERATED_RECOVERY_V1",
+      evidenceId: randomUUID(),
+      backupId: descriptor.backupId,
+      slotId: input.generatedRecoverySlot.slotId,
+      descriptorDigestSha256: descriptorDigest.toString("base64url"),
+      verifiedAt: new Date().toISOString(),
+    },
   });
 }
 
@@ -686,7 +707,15 @@ async function restoreVerifiedBackupPackage(
     if (existsSync(destinationPath)) return fail("BACKUP_PACKAGE_BINDING_INVALID", "restore destination changed during authentication");
     await rename(databaseStagingPath, destinationPath);
     published = true;
-    await protectionLease.commit();
+    try {
+      await protectionLease.commit();
+    } catch (error) {
+      throw new BackupPackageVerificationError(
+        "BACKUP_PACKAGE_DB_DEK_PROTECTION_FAILED",
+        "the fresh DB_DEK handle could not be committed; recovery state was preserved",
+        { cause: error },
+      );
+    }
     return Object.freeze({
       databasePath: destinationPath,
       affectedIntegrationAccountIds: reconciliation.affectedIntegrationAccountIds,

@@ -259,6 +259,11 @@ test("1.13 Mission Control has four regions and truthful locked startup state", 
   assert.match(shell, /voiceState: "IDLE"/);
   assert.match(shell, /No mission, approval, provider, or project state is being inferred/);
   assert.match(shell, /No verified attention items are available while Core is locked/);
+  assert.match(shell, /ProjectPolicyDiagnostics/);
+  assert.match(shell, /Canonical path/);
+  assert.match(shell, /Content SHA-256/);
+  assert.match(shell, /Trust revision/);
+  assert.match(shell, /Source commit/);
   assert.match(shell, /REPAIR_REQUIRED/);
   assert.match(shell, /will not use a system Node or an unverified fallback/);
   assert.match(shell, /aria-current/);
@@ -267,7 +272,24 @@ test("1.13 Mission Control has four regions and truthful locked startup state", 
   assert.match(styles, /@media \(max-width: 719px\)/);
   assert.match(styles, /grid-template-columns:\s*1fr/);
   assert.match(styles, /@media \(forced-colors: active\)/);
+  assert.match(styles, /mission-control__diagnostic-details/);
   assert.doesNotMatch(`${app}\n${shell}`, /\b(invoke|fetch|WebSocket|localStorage|indexedDB)\s*\(/);
+});
+
+test("5.14 approval review presents exact context and a non-color-only confirmation path", () => {
+  const shell = read("apps/desktop/src/mission-control.tsx");
+  const styles = read("apps/desktop/src/mission-control.css");
+  assert.match(shell, /export function ApprovalReview/);
+  assert.match(shell, /Exact target/);
+  assert.match(shell, /Environment/);
+  assert.match(shell, /Expected consequence/);
+  assert.match(shell, /Rollback \/ backup/);
+  assert.match(shell, /Confirm and continue/);
+  assert.match(shell, /Reject/);
+  assert.match(shell, /Any material change requires a new approval/);
+  assert.match(shell, /aria-label="Approval actions"/);
+  assert.match(styles, /mission-control__approval-details/);
+  assert.match(styles, /overflow-wrap:\s*anywhere/);
 });
 
 test("renderer bootstrap is semantic and has no authoritative/native integration authority in 1.1", { skip: !existsSync(resolve(desktop, "src", "App.tsx")) }, () => {

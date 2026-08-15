@@ -37,7 +37,7 @@ Before implementation or architecture work, read:
 17. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
 18. relevant ADRs only when rationale/history is needed.
 
-The **v1.0.6 manifest defines the current component revision set**. ADRs do not form a second overlay.
+The **v1.0.7 manifest defines the current component revision set**. ADRs do not form a second overlay.
 
 ## Platform/runtime-role boundary
 
@@ -106,6 +106,57 @@ Do not:
 - use a lower historical release merely because its Tauri/Authenticode signature still validates when current trusted metadata or security-epoch policy rejects it.
 
 Windows production update gates are cumulative: current TUF authorization, Tauri updater signature, Windows code-signing policy, and JARVIS compatibility/rollback checks must all pass.
+
+## Codex products versus JARVIS provider setup
+
+- ChatGPT desktop and Codex CLI are separate products. JARVIS V1 targets the Codex CLI provider executable, not the ChatGPT desktop chat application.
+- Codex desktop task sandboxing is provider-managed automatically; do not assume a user-visible manual Windows setup/repair button or a required UAC action exists there.
+- A Codex CLI session or a normal chat response does not prove that the CLI provider is installed, compatible, sandbox-ready, or qualified for JARVIS.
+- Do not direct a user to run or approve `codex-windows-sandbox-setup.exe` for JARVIS based only on Codex desktop being open, a chat greeting, or a CLI session.
+- JARVIS CLI-provider qualification is separate: it requires a release-qualified CLI/helper identity, exact provider-defined invocation/payload, independent readiness/conformance verification, and an explicit user action only when JARVIS presents an exact qualified UAC prompt.
+- If the provider does not expose that stable interface, keep the matrix status truthful (`BLOCKED`/`IN PROGRESS`) and do not reuse a private Codex host bridge or claim qualification without an authorized architecture change.
+
+### TUF signing location and operating procedure
+
+The repository-side TUF profile verifier is `tools/release/verify-tuf-metadata-profile.mjs`, with focused coverage in `tests/layers/unit/tuf-metadata-profile.test.mjs`. Release-owned metadata is packaged under the candidate Core runtime at:
+
+```text
+<release-root>/tuf/metadata/
+├── root.json
+├── targets.json
+├── snapshot.json
+└── timestamp.json
+```
+
+The private/internal signing workspace is the dedicated non-login `jarvissigner` account on the already-provisioned signing CT (`jarvis-ct`, currently `192.168.99.77`):
+
+```text
+/srv/jarvis-tuf-signing/
+├── keys/
+│   ├── root/       # 3 Ed25519 keys, threshold 2
+│   ├── targets/    # 3 Ed25519 keys, threshold 2
+│   ├── modules/    # 3 Ed25519 keys, threshold 2; delegated to modules/*
+│   ├── snapshot/   # 1 Ed25519 key, threshold 1
+│   └── timestamp/  # 1 Ed25519 key, threshold 1
+├── artifacts/      # public release candidate inputs only
+├── metadata/       # generated public TUF metadata
+└── evidence/       # secret-free signing and verification evidence
+```
+
+Signing procedure:
+
+1. Build and freeze the exact Windows `FULL_HOST` candidate. Do not sign a moving tree.
+2. Copy only the public release candidate inputs, including `runtime-manifest.json`, into the CT signing workspace. Never copy private keys to the repository, Windows workstation, ordinary CI, application runtime, or metadata.
+3. Generate/sign `root.json`, `targets.json`, delegated `modules/*` metadata, `snapshot.json`, and `timestamp.json` with separated role keys and the thresholds fixed by the Supply-Chain Trust Contract. The target custom identity must match the exact artifact hash, source commit, release sequence, security epoch, Windows platform, `FULL_HOST` role, and x64 architecture.
+4. Copy only the resulting public metadata into the candidate's `tuf/metadata/` directory, then run:
+
+   ```text
+   node tools/release/verify-tuf-metadata-profile.mjs --metadata-dir <absolute-candidate>/tuf/metadata
+   ```
+
+5. Run the packaged Core qualification with `--production-tuf-profile` and record the exact source/artifact/metadata hashes in the implementation matrix. A successful metadata-shape check is not proof of private-key custody.
+
+Private-key files SHALL remain mode `600`, owned by the dedicated signer account. Do not print, log, commit, upload, or paste private key contents. The current CT setup is a controlled qualification signer, but its role keys are presently co-located on that CT; until independent offline root-key custody evidence exists, report `keyCustodyEvidence=EXTERNAL_REQUIRED` and do not claim production signing qualification or `Production Complete`.
 
 ## No ADR/history overlay
 

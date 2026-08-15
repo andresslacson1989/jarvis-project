@@ -11,16 +11,17 @@ use std::ptr::null_mut;
 
 use windows_sys::Win32::Foundation::FALSE;
 use windows_sys::Win32::System::RemoteDesktop::{
-    WTSActive, WTSConnectState, WTSFreeMemory, WTSQuerySessionInformationW, WTS_CONNECTSTATE_CLASS,
-    WTS_CURRENT_SESSION,
+    WTS_CONNECTSTATE_CLASS, WTS_CURRENT_SESSION, WTSActive, WTSConnectState, WTSFreeMemory,
+    WTSQuerySessionInformationW,
 };
 use windows_sys::Win32::System::StationsAndDesktops::{
-    CloseDesktop, GetUserObjectInformationW, OpenInputDesktop, DESKTOP_READOBJECTS, HDESK, UOI_NAME,
+    CloseDesktop, DESKTOP_READOBJECTS, GetUserObjectInformationW, HDESK, OpenInputDesktop, UOI_NAME,
 };
 use windows_sys::Win32::System::SystemInformation::{
     GetNativeSystemInfo, GetTickCount64, GlobalMemoryStatusEx, MEMORYSTATUSEX,
     PROCESSOR_ARCHITECTURE_AMD64, SYSTEM_INFO,
 };
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
 use windows_sys::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_REMOTESESSION};
 
 pub const SESSION_LOCK_OBSERVATION_CAPABILITY: &str = "session_lock_observation";
@@ -116,25 +117,44 @@ pub enum SessionConnectivity {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionLockReason {
+    OsSessionLock,
+    OsSessionEnd,
+    Idle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SessionObservation {
     pub transition: SessionTransition,
     pub stable_state: SessionTrustState,
     pub input_desktop: InputDesktop,
     pub connectivity: SessionConnectivity,
+    pub lock_reason: Option<SessionLockReason>,
 }
 
 #[derive(Debug, Default)]
 pub struct PlatformSessionObserver {
     last_state: Option<SessionTrustState>,
+    idle_timeout_millis: Option<u64>,
 }
 
 impl PlatformSessionObserver {
     pub const fn new() -> Self {
-        Self { last_state: None }
+        Self {
+            last_state: None,
+            idle_timeout_millis: None,
+        }
+    }
+
+    pub const fn with_idle_timeout_millis(idle_timeout_millis: u64) -> Self {
+        Self {
+            last_state: None,
+            idle_timeout_millis: Some(idle_timeout_millis),
+        }
     }
 
     pub fn capability_status(&self) -> CapabilityStatus {
-        match probe_session() {
+        match probe_session_with_idle_timeout(None) {
             Ok(_) => CapabilityStatus::available_qualified(SESSION_LOCK_OBSERVATION_CAPABILITY),
             Err(_) => {
                 CapabilityStatus::unavailable_unqualified(SESSION_LOCK_OBSERVATION_CAPABILITY)
@@ -148,7 +168,8 @@ impl PlatformSessionObserver {
     /// retain the last safe locked state rather than treating probe failure as
     /// an unlocked session.
     pub fn observe(&mut self) -> Result<SessionObservation, WindowsPlatformError> {
-        let (stable_state, input_desktop, connectivity) = probe_session()?;
+        let (stable_state, input_desktop, connectivity, lock_reason) =
+            probe_session_with_idle_timeout(self.idle_timeout_millis)?;
         let transition = transition_for(self.last_state, stable_state);
         self.last_state = Some(stable_state);
         Ok(SessionObservation {
@@ -156,6 +177,7 @@ impl PlatformSessionObserver {
             stable_state,
             input_desktop,
             connectivity,
+            lock_reason,
         })
     }
 }
@@ -180,8 +202,17 @@ fn transition_for(
     }
 }
 
-fn probe_session(
-) -> Result<(SessionTrustState, InputDesktop, SessionConnectivity), WindowsPlatformError> {
+fn probe_session_with_idle_timeout(
+    idle_timeout_millis: Option<u64>,
+) -> Result<
+    (
+        SessionTrustState,
+        InputDesktop,
+        SessionConnectivity,
+        Option<SessionLockReason>,
+    ),
+    WindowsPlatformError,
+> {
     let desktop_name = input_desktop_name()?;
     let connectivity = query_session_connectivity()?;
     let input_desktop = if desktop_name == "Default" {
@@ -189,14 +220,54 @@ fn probe_session(
     } else {
         InputDesktop::Protected
     };
-    let stable_state = if input_desktop == InputDesktop::Interactive
-        && connectivity == SessionConnectivity::Active
-    {
+    let idle = idle_timeout_millis
+        .map(|timeout| query_idle_duration_millis().map(|duration| duration >= timeout))
+        .transpose()?
+        .unwrap_or(false);
+    let lock_reason = classify_lock_reason(input_desktop, connectivity, idle);
+    let stable_state = if lock_reason.is_none() {
         SessionTrustState::Unlocked
     } else {
         SessionTrustState::Locked
     };
-    Ok((stable_state, input_desktop, connectivity))
+    Ok((stable_state, input_desktop, connectivity, lock_reason))
+}
+
+fn classify_lock_reason(
+    input_desktop: InputDesktop,
+    connectivity: SessionConnectivity,
+    idle: bool,
+) -> Option<SessionLockReason> {
+    if idle {
+        Some(SessionLockReason::Idle)
+    } else if connectivity == SessionConnectivity::NotActive {
+        Some(SessionLockReason::OsSessionEnd)
+    } else if input_desktop == InputDesktop::Protected {
+        Some(SessionLockReason::OsSessionLock)
+    } else {
+        None
+    }
+}
+
+fn query_idle_duration_millis() -> Result<u64, WindowsPlatformError> {
+    let mut input = LASTINPUTINFO {
+        cbSize: size_of::<LASTINPUTINFO>() as u32,
+        dwTime: 0,
+    };
+    // SAFETY: the structure is initialized with the documented size and is
+    // exclusively owned by this call; no handles or borrowed pointers cross
+    // the boundary.
+    let success = unsafe { GetLastInputInfo(&mut input) };
+    if success == 0 {
+        return Err(WindowsPlatformError {
+            code: WindowsPlatformErrorCode::SessionObserverFailed,
+            operation: "GetLastInputInfo",
+        });
+    }
+    // SAFETY: GetTickCount64 is a side-effect-free system query with no
+    // caller-owned pointers or handles.
+    let now = unsafe { GetTickCount64() } as u32;
+    Ok(now.wrapping_sub(input.dwTime) as u64)
 }
 
 struct OwnedDesktop(HDESK);
@@ -422,6 +493,34 @@ mod tests {
         assert_eq!(
             transition_for(Some(SessionTrustState::Unlocked), SessionTrustState::Locked),
             SessionTransition::Locking
+        );
+    }
+
+    #[test]
+    fn lock_reason_precedence_is_idle_then_sign_out_then_desktop_lock() {
+        assert_eq!(
+            classify_lock_reason(InputDesktop::Interactive, SessionConnectivity::Active, true),
+            Some(SessionLockReason::Idle)
+        );
+        assert_eq!(
+            classify_lock_reason(
+                InputDesktop::Interactive,
+                SessionConnectivity::NotActive,
+                false
+            ),
+            Some(SessionLockReason::OsSessionEnd)
+        );
+        assert_eq!(
+            classify_lock_reason(InputDesktop::Protected, SessionConnectivity::Active, false),
+            Some(SessionLockReason::OsSessionLock)
+        );
+        assert_eq!(
+            classify_lock_reason(
+                InputDesktop::Interactive,
+                SessionConnectivity::Active,
+                false
+            ),
+            None
         );
     }
 

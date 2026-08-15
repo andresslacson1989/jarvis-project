@@ -1,40 +1,53 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+#[cfg(test)]
+mod authority_vectors;
+#[cfg(test)]
+mod backup_vectors;
 pub mod core_runtime;
-mod lifecycle;
-mod platform;
-#[path = "../../../../platform/windows/src/process_supervisor.rs"]
-pub mod process_supervisor;
-#[path = "../../../../platform/windows/src/privilege_mediator.rs"]
-pub mod privilege_mediator;
-#[path = "../../../../platform/windows/src/native_broker.rs"]
-pub mod native_broker;
-#[path = "../../../../platform/windows/src/secure_storage.rs"]
-pub mod secure_storage;
 #[path = "../../../../platform/windows/src/kdf.rs"]
 pub mod kdf;
+mod lifecycle;
 #[path = "../../../../platform/windows/src/local_ipc.rs"]
 pub mod local_ipc;
+#[path = "../../../../platform/windows/src/native_broker.rs"]
+pub mod native_broker;
 #[path = "../../../../platform/windows/src/path_identity.rs"]
 pub mod path_identity;
+mod platform;
+#[path = "../../../../platform/windows/src/privilege_mediator.rs"]
+pub mod privilege_mediator;
+#[path = "../../../../platform/windows/src/process_supervisor.rs"]
+pub mod process_supervisor;
+#[path = "../../../../platform/windows/src/provider_qualification.rs"]
+pub mod provider_qualification;
+#[path = "../../../../platform/windows/src/secure_storage.rs"]
+pub mod secure_storage;
 #[path = "../../../../platform/windows/src/session_system.rs"]
 pub mod session_system;
+mod ui_boundary;
 #[path = "../../../../platform/windows/src/window_controller.rs"]
 pub mod window_controller;
-mod ui_boundary;
 
 #[cfg(not(debug_assertions))]
-use tauri::Manager;
-use tauri::{Url, WebviewUrl};
-#[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+#[cfg(any(not(debug_assertions), test))]
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 #[cfg(not(debug_assertions))]
 use std::time::Duration;
-#[cfg(any(not(debug_assertions), test))]
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+#[cfg(not(debug_assertions))]
+use tauri::Manager;
+use serde::{Deserialize, Serialize};
+use tauri::{Url, WebviewUrl};
 
 #[cfg(not(debug_assertions))]
 #[allow(dead_code)]
 struct HostRuntime {
     local_ipc: Mutex<local_ipc::NamedPipeServer>,
+    native_broker: Mutex<native_broker::WindowsNativeBroker>,
     _secure_storage_runtime: SecureStorageProtectionRuntime,
     process_supervisor: process_supervisor::PlatformProcessSupervisor,
     core_process: process_supervisor::SupervisedCoreProcess,
@@ -42,6 +55,112 @@ struct HostRuntime {
     core_status: local_ipc::AuthenticatedCoreStatus,
     _db_dek_handle: secure_storage::SecureStorageHandle,
     _db_dek: secure_storage::DatabaseDek,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderSetupStartCommandRequest {
+    request_id: String,
+    provider_id: String,
+    distribution_id: String,
+    adapter_version: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderSetupStartCommandResponse {
+    request_id: String,
+    state: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderSetupStatusCommandRecord {
+    provider_id: String,
+    distribution_id: String,
+    adapter_version: String,
+    state: String,
+    sanitized_failure_reason: Option<String>,
+}
+
+#[cfg(not(debug_assertions))]
+#[tauri::command]
+fn start_provider_setup(
+    state: tauri::State<'_, HostRuntime>,
+    request: ProviderSetupStartCommandRequest,
+) -> Result<ProviderSetupStartCommandResponse, String> {
+    let local_ipc = state
+        .local_ipc
+        .lock()
+        .map_err(|_| "CORE_IPC_LOCK_FAILED".to_owned())?;
+    let start_request_id = request.request_id.clone();
+    let start_provider_id = request.provider_id.clone();
+    let _start_response = local_ipc
+        .request_provider_setup_start(
+            &state.authenticated,
+            local_ipc::ProviderSetupStartRequest {
+                request_id: start_request_id.clone(),
+                provider_id: start_provider_id.clone(),
+                distribution_id: request.distribution_id,
+                adapter_version: request.adapter_version,
+            },
+        )
+        .map_err(|error| format!("{:?}", error.state))?;
+    let user_profile = std::env::var_os("USERPROFILE").ok_or_else(|| "CODEX_USER_PROFILE_MISSING".to_owned())?;
+    let working_directory = std::env::current_dir().map_err(|_| "CODEX_WORKING_DIRECTORY_MISSING".to_owned())?;
+    let (probe_spec, setup_plan) = match provider_qualification::discover_qualified_codex_setup(user_profile, working_directory) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = local_ipc.request_provider_setup_probe_failed(&state.authenticated, start_request_id, start_provider_id);
+            return Err(error.to_string());
+        }
+    };
+    let setup_result = {
+        let mut broker = state.native_broker.lock().map_err(|_| "NATIVE_BROKER_LOCK_FAILED".to_owned())?;
+        provider_qualification::run_authenticated_codex_setup(&mut broker, &probe_spec, &setup_plan)
+    };
+    if let Err(error) = setup_result {
+        let _ = local_ipc.request_provider_setup_probe_failed(&state.authenticated, start_request_id, start_provider_id);
+        return Err(error.to_string());
+    }
+    let ready = local_ipc
+        .request_provider_setup_probe_passed(&state.authenticated, start_request_id, start_provider_id)
+        .map_err(|error| format!("{:?}", error.state))?;
+    Ok(ProviderSetupStartCommandResponse {
+        request_id: ready.request_id,
+        state: ready.state,
+    })
+}
+
+#[cfg(not(debug_assertions))]
+#[tauri::command]
+fn get_provider_setup_status(
+    state: tauri::State<'_, HostRuntime>,
+) -> Result<Vec<ProviderSetupStatusCommandRecord>, String> {
+    let local_ipc = state.local_ipc.lock().map_err(|_| "CORE_IPC_LOCK_FAILED".to_owned())?;
+    local_ipc.request_provider_setup_status(&state.authenticated)
+        .map(|records| records.into_iter().map(|record| ProviderSetupStatusCommandRecord {
+            provider_id: record.provider_id,
+            distribution_id: record.distribution_id,
+            adapter_version: record.adapter_version,
+            state: record.state,
+            sanitized_failure_reason: record.sanitized_failure_reason,
+        }).collect())
+        .map_err(|error| format!("{:?}", error.state))
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn start_provider_setup(
+    _request: ProviderSetupStartCommandRequest,
+) -> Result<ProviderSetupStartCommandResponse, String> {
+    Err("CORE_IPC_NOT_READY".to_owned())
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn get_provider_setup_status() -> Result<Vec<ProviderSetupStatusCommandRecord>, String> {
+    Err("CORE_IPC_NOT_READY".to_owned())
 }
 
 #[cfg(any(not(debug_assertions), test))]
@@ -171,11 +290,36 @@ impl SecureStorageProtectionRuntime {
                             result,
                         );
                     }
+                    local_ipc::SecureStorageOperation::VerifySessionPassword(request) => {
+                        let result = (|| {
+                            let profile = kdf::Argon2idProfile::persisted_session_password(
+                                &request.profile_id,
+                                request.memory_kib,
+                                request.iterations,
+                                request.parallelism,
+                                request.salt.len(),
+                                request.verifier.len(),
+                            )
+                            .map_err(|_| "SESSION_PASSWORD_PROFILE_INVALID")?;
+                            let derived =
+                                kdf::derive_argon2id(&profile, &request.password, &request.salt)
+                                    .map_err(|_| "SESSION_PASSWORD_KDF_FAILED")?;
+                            Ok(kdf::constant_time_equal(&derived, &request.verifier))
+                        })();
+                        let _ = server.respond_session_password_verification(
+                            &session,
+                            request.correlation_id.clone(),
+                            result,
+                        );
+                    }
                 }
                 server.disconnect_client();
             }
         });
-        Self { stop, thread: Some(thread) }
+        Self {
+            stop,
+            thread: Some(thread),
+        }
     }
 }
 
@@ -196,7 +340,8 @@ fn allows_authoritative_navigation(url: &Url) -> bool {
             && url.port() == Some(1420);
     }
 
-    url.scheme() == "tauri" && url.host_str() == Some("localhost")
+    (url.scheme() == "tauri" && url.host_str() == Some("localhost"))
+        || (url.scheme() == "http" && url.host_str() == Some("tauri.localhost"))
 }
 
 #[allow(dead_code)]
@@ -261,7 +406,9 @@ fn core_authentication_failure_code_with_process_state(
             "PERSISTENCE_SCHEMA_UNSUPPORTED" => "PERSISTENCE_SCHEMA_UNSUPPORTED",
             "PERSISTENCE_SNAPSHOT_ACTIVE_TRANSACTION" => "PERSISTENCE_SNAPSHOT_ACTIVE_TRANSACTION",
             "PERSISTENCE_SNAPSHOT_DESTINATION_EXISTS" => "PERSISTENCE_SNAPSHOT_DESTINATION_EXISTS",
-            "PERSISTENCE_SNAPSHOT_DESTINATION_INVALID" => "PERSISTENCE_SNAPSHOT_DESTINATION_INVALID",
+            "PERSISTENCE_SNAPSHOT_DESTINATION_INVALID" => {
+                "PERSISTENCE_SNAPSHOT_DESTINATION_INVALID"
+            }
             "PERSISTENCE_SNAPSHOT_FAILED" => "PERSISTENCE_SNAPSHOT_FAILED",
             "PERSISTENCE_SNAPSHOT_INTEGRITY_FAILED" => "PERSISTENCE_SNAPSHOT_INTEGRITY_FAILED",
             "PERSISTENCE_SNAPSHOT_KEY_REQUIRED" => "PERSISTENCE_SNAPSHOT_KEY_REQUIRED",
@@ -285,7 +432,7 @@ fn core_authentication_failure_code_with_process_state(
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![ui_boundary::get_core_status])
+        .invoke_handler(tauri::generate_handler![ui_boundary::get_core_status, start_provider_setup, get_provider_setup_status])
         .setup(|app| {
             let path_backend = path_identity::PlatformPathsAndIdentity::new();
             let resolved_paths = path_backend
@@ -324,8 +471,8 @@ fn main() {
                 application_paths.data.join("secure-storage"),
             )
             .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
-            let secure_storage_status = native_broker
-                .capability_status(native_broker::NativeCapabilityId::SecureStorage);
+            let secure_storage_status =
+                native_broker.capability_status(native_broker::NativeCapabilityId::SecureStorage);
             let secure_storage_ready = secure_storage_status.availability
                 == native_broker::CapabilityAvailability::Available
                 && secure_storage_status.qualification
@@ -338,7 +485,9 @@ fn main() {
             let recovery_marker_state = application_paths.recovery_marker_state()?;
             let recovery_marker_invalid =
                 recovery_marker_state == lifecycle::RecoveryMarkerState::Invalid;
-            if recovery_marker_state == lifecycle::RecoveryMarkerState::Valid && secure_storage_ready {
+            if recovery_marker_state == lifecycle::RecoveryMarkerState::Valid
+                && secure_storage_ready
+            {
                 bootstrap.mark_recovery_required();
                 bootstrap_diagnostics.record_failure("RECOVERY_MODE_REQUIRED")?;
             }
@@ -408,7 +557,10 @@ fn main() {
                 let manifest_path = resource_dir
                     .join(core_runtime::RELEASE_RUNTIME_DIRECTORY)
                     .join("runtime-manifest.json");
-                let (local_ipc, secure_storage_server) = local_ipc::NamedPipeServer::bind_with_database_dek_and_secure_storage(*db_dek.as_bytes())
+                let (local_ipc, secure_storage_server) =
+                    local_ipc::NamedPipeServer::bind_with_database_dek_and_secure_storage(
+                        *db_dek.as_bytes(),
+                    )
                     .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
                 let secure_storage_runtime = SecureStorageProtectionRuntime::start(
                     secure_storage_server,
@@ -461,32 +613,37 @@ fn main() {
                     None
                 } else {
                     match local_ipc.authenticate_client() {
-                        Ok(authenticated) => match local_ipc.request_locked_status(&authenticated) {
-                            Ok(core_status) => {
-                                bootstrap.record(lifecycle::BootstrapStage::CoreAuthenticated)?;
-                                bootstrap_diagnostics.record(
-                                    lifecycle::BootstrapStage::CoreAuthenticated,
-                                    bootstrap.condition(),
-                                )?;
-                                HostRuntime {
-                                    local_ipc: Mutex::new(local_ipc),
-                                    _secure_storage_runtime: secure_storage_runtime,
-                                    process_supervisor,
-                                    core_process,
-                                    authenticated,
-                                    core_status,
-                                    _db_dek_handle: db_dek_handle,
-                                    _db_dek: db_dek,
+                        Ok(authenticated) => {
+                            match local_ipc.request_locked_status(&authenticated) {
+                                Ok(core_status) => {
+                                    bootstrap
+                                        .record(lifecycle::BootstrapStage::CoreAuthenticated)?;
+                                    bootstrap_diagnostics.record(
+                                        lifecycle::BootstrapStage::CoreAuthenticated,
+                                        bootstrap.condition(),
+                                    )?;
+                                    HostRuntime {
+                                        local_ipc: Mutex::new(local_ipc),
+                                        native_broker: Mutex::new(native_broker),
+                                        _secure_storage_runtime: secure_storage_runtime,
+                                        process_supervisor,
+                                        core_process,
+                                        authenticated,
+                                        core_status,
+                                        _db_dek_handle: db_dek_handle,
+                                        _db_dek: db_dek,
+                                    }
+                                    .into()
                                 }
-                                .into()
+                                Err(error) => {
+                                    bootstrap.mark_repair_required();
+                                    bootstrap_diagnostics
+                                        .record_failure(core_status_failure_code(error.state))?;
+                                    startup_condition = bootstrap.condition().startup_query_value();
+                                    None
+                                }
                             }
-                            Err(error) => {
-                                bootstrap.mark_repair_required();
-                                bootstrap_diagnostics.record_failure(core_status_failure_code(error.state))?;
-                                startup_condition = bootstrap.condition().startup_query_value();
-                                None
-                            }
-                        },
+                        }
                         Err(error) => {
                             bootstrap.mark_repair_required();
                             let core_exited = matches!(
@@ -530,8 +687,7 @@ fn main() {
                     .expect("development frontend URL must be valid"),
             );
             #[cfg(not(debug_assertions))]
-            let webview_url =
-                WebviewUrl::App(format!("index.html?startup={startup_condition}").into());
+            let webview_url = WebviewUrl::App("index.html".into());
 
             window_controller
                 .build_primary_window(app, webview_url, allows_authoritative_navigation)
@@ -547,7 +703,7 @@ fn main() {
 mod tests {
     use super::{
         core_authentication_failure_code, core_authentication_failure_code_with_process_state,
-        core_status_failure_code, should_start_core,
+        allows_authoritative_navigation, core_status_failure_code, should_start_core,
     };
 
     #[test]
@@ -560,11 +716,22 @@ mod tests {
     }
 
     #[test]
+    fn production_navigation_allows_only_the_tauri_app_origins() {
+        assert!(allows_authoritative_navigation(
+            &"http://tauri.localhost/index.html".parse().unwrap()
+        ));
+        assert!(allows_authoritative_navigation(
+            &"tauri://localhost/index.html".parse().unwrap()
+        ));
+        assert!(!allows_authoritative_navigation(
+            &"https://example.com/index.html".parse().unwrap()
+        ));
+    }
+
+    #[test]
     fn core_authentication_diagnostics_remain_bounded_and_non_secret() {
         assert_eq!(
-            core_authentication_failure_code(
-                super::local_ipc::LocalIpcState::AuthenticationFailed
-            ),
+            core_authentication_failure_code(super::local_ipc::LocalIpcState::AuthenticationFailed),
             "CORE_AUTHENTICATION_FAILED_PROOF"
         );
         assert_eq!(
@@ -697,9 +864,14 @@ mod tests {
         let authenticated = server
             .authenticate_client()
             .expect("supervised Core must authenticate on the primary endpoint");
-        assert_eq!(authenticated.protocol_major, super::local_ipc::IPC_PROTOCOL_MAJOR);
+        assert_eq!(
+            authenticated.protocol_major,
+            super::local_ipc::IPC_PROTOCOL_MAJOR
+        );
         assert!(matches!(
-            process.wait(std::time::Duration::ZERO).expect("Core wait must work"),
+            process
+                .wait(std::time::Duration::ZERO)
+                .expect("Core wait must work"),
             super::process_supervisor::ProcessWait::TimedOut
         ));
         let status = server
@@ -717,9 +889,9 @@ mod tests {
     #[cfg(test)]
     #[test]
     fn packaged_core_live_secure_storage_restore_lease_stages_commits_and_aborts() {
+        use super::{SecureStorageProtectionRuntime, local_ipc, native_broker};
         use std::io::Write;
         use std::process::{Command, Stdio};
-        use super::{local_ipc, native_broker, SecureStorageProtectionRuntime};
 
         let release_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../../target/x86_64-pc-windows-msvc/release/resources/core-runtime");
@@ -728,17 +900,16 @@ mod tests {
         if !node.is_file() || !ipc_module.is_file() {
             return;
         }
-        let root = std::env::temp_dir().join(format!(
-            "jarvis-live-secure-storage-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("jarvis-live-secure-storage-{}", std::process::id()));
         let storage_root = root.join("secure-storage");
         let handle_path = root.join("data/db-dek.handle");
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(handle_path.parent().expect("handle parent must exist"))
             .expect("test data directory must exist");
-        let (primary, secure_storage_server) = local_ipc::NamedPipeServer::bind_with_database_dek_and_secure_storage([0; 32])
-            .expect("paired live IPC servers must bind");
+        let (primary, secure_storage_server) =
+            local_ipc::NamedPipeServer::bind_with_database_dek_and_secure_storage([0; 32])
+                .expect("paired live IPC servers must bind");
         let storage = native_broker::WindowsSecureStorageBoundary::from_root(storage_root.clone())
             .expect("test secure storage must initialize");
         let runtime = SecureStorageProtectionRuntime::start(
@@ -793,7 +964,10 @@ mod tests {
                 .arg(mode)
                 .current_dir(&release_root)
                 .env_clear()
-                .env("SystemRoot", std::env::var_os("SystemRoot").expect("SystemRoot exists"))
+                .env(
+                    "SystemRoot",
+                    std::env::var_os("SystemRoot").expect("SystemRoot exists"),
+                )
                 .env("WINDIR", std::env::var_os("WINDIR").expect("WINDIR exists"))
                 .env("JARVIS_TEST_IPC_MODULE", &module_url)
                 .env("JARVIS_TEST_KEY", key.to_string())
@@ -830,8 +1004,8 @@ mod tests {
         };
 
         run_client("commit", 0x44);
-        let active_handle = std::fs::read_to_string(&handle_path)
-            .expect("committed active handle must exist");
+        let active_handle =
+            std::fs::read_to_string(&handle_path).expect("committed active handle must exist");
         assert!(active_handle.starts_with("dpapi-v1-"));
         assert!(!std::path::PathBuf::from(format!("{}.pending", handle_path.display())).exists());
         run_client("abort", 0x55);
@@ -847,12 +1021,12 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn packaged_core_live_clean_profile_restore_rekeys_and_reconciles() {
+        use super::{SecureStorageProtectionRuntime, local_ipc, native_broker, secure_storage};
         use std::io::Write;
         use std::process::{Command, Stdio};
-        use super::{local_ipc, native_broker, secure_storage, SecureStorageProtectionRuntime};
 
-        let exact_release_root = std::env::var_os("JARVIS_EXACT_SIGNED_RELEASE_ROOT")
-            .map(std::path::PathBuf::from);
+        let exact_release_root =
+            std::env::var_os("JARVIS_EXACT_SIGNED_RELEASE_ROOT").map(std::path::PathBuf::from);
         let release_root = exact_release_root.clone().unwrap_or_else(|| {
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("../../../target/x86_64-pc-windows-msvc/release/resources/core-runtime")
@@ -861,10 +1035,17 @@ mod tests {
             let path = std::env::var_os("JARVIS_PRESERVED_RECOVERY_SECRET_PATH")
                 .map(std::path::PathBuf::from)
                 .expect("exact signed release drill requires a preserved recovery secret path");
-            let metadata = std::fs::metadata(&path)
-                .expect("preserved recovery secret must be readable");
-            assert!(metadata.is_file(), "preserved recovery secret must be a file");
-            assert_eq!(metadata.len(), 32, "preserved recovery secret must be exactly 32 bytes");
+            let metadata =
+                std::fs::metadata(&path).expect("preserved recovery secret must be readable");
+            assert!(
+                metadata.is_file(),
+                "preserved recovery secret must be a file"
+            );
+            assert_eq!(
+                metadata.len(),
+                32,
+                "preserved recovery secret must be exactly 32 bytes"
+            );
             path
         });
         let node = release_root.join("runtime/node.exe");
@@ -874,10 +1055,8 @@ mod tests {
             return;
         }
 
-        let root = std::env::temp_dir().join(format!(
-            "jarvis-live-clean-restore-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("jarvis-live-clean-restore-{}", std::process::id()));
         let storage_root = root.join("secure-storage");
         let handle_path = root.join("data/db-dek.handle");
         let _ = std::fs::remove_dir_all(&root);
@@ -923,7 +1102,8 @@ mod tests {
             const { CoreBootstrap } = await import(process.env.JARVIS_TEST_CORE_MODULE);
             const base = new URL("./", process.env.JARVIS_TEST_CORE_MODULE);
             const { buildBackupPayloadManifest } = await import(new URL("./backup-manifest.js", base));
-            const { createAuthenticatedBackupPackage } = await import(new URL("./backup-package.js", base));
+            const { createAuthenticatedBackupPackage, createAuthenticatedLocalBackupPackage } = await import(new URL("./backup-package.js", base));
+            const { protectLocalBackupDekThroughNativeStorage, unprotectLocalBackupDekThroughNativeStorage } = await import(process.env.JARVIS_TEST_IPC_MODULE);
             const { openCoreDatabase, exportSqlcipherSnapshot } = await import(new URL("./persistence.js", base));
             const { applyCoreMigrations } = await import(new URL("./schema.js", base));
             const material = parseBootstrapFrame(Buffer.concat(chunks));
@@ -1005,6 +1185,63 @@ mod tests {
             if (!verifier.meta_value.includes("session-password-v1")) throw new Error("fresh session-password verifier profile metadata was not persisted");
             if (verifier.meta_value.includes("live-clean-profile-session-password")) throw new Error("fresh session-password plaintext was persisted");
             if ((await readFile(join(root, "recovery", "restore-required.marker"), "utf8")) !== "JARVIS_RECOVERY_REQUIRED_V1\n") throw new Error("restore recovery marker is missing");
+            const localManifest = buildBackupPayloadManifest({
+                backupId: "018f3b8e-6c68-7abc-8def-0123456789ac",
+                createdAt,
+                protectionClass: "LOCAL_RECOVERY",
+                jarvisVersion: "1.0.6",
+                protocolVersion: 1,
+                schemaVersion: 1,
+                snapshot: {
+                    logicalType: "SQLCIPHER_SNAPSHOT",
+                    path: "database/state.db",
+                    bytes: snapshotBytes.length.toString(10),
+                    sha256: createHash("sha256").update(snapshotBytes).digest("base64url"),
+                },
+                objects: [],
+                keySlotProfiles: ["WINDOWS_DPAPI_V1"],
+            });
+            const localBackup = await createAuthenticatedLocalBackupPackage({
+                backupId: "018f3b8e-6c68-7abc-8def-0123456789ac",
+                createdAt,
+                protectionClass: "LOCAL_RECOVERY",
+                manifestBytes: localManifest.canonicalBytes,
+                snapshotDbKey,
+                backupDek,
+                slotId: "windows-dpapi-live-restore",
+                objects: [{ path: "database/state.db", data: snapshotBytes }],
+                noncePrefix: Buffer.from([9, 10, 11, 12]),
+                protectBackupDek: (value, descriptorDigest) =>
+                    protectLocalBackupDekThroughNativeStorage(material, value, descriptorDigest),
+            });
+            const localDestinationPath = join(root, "local-clean-profile.db");
+            const localRestored = await bootstrap.restoreLocalBackup({
+                descriptor: localBackup.descriptorBytes,
+                chunks: localBackup.chunks,
+                localRecoverySlot: localBackup.localRecoverySlot,
+                noncePrefix: localBackup.noncePrefix,
+                destinationPath: localDestinationPath,
+                maintenanceLockPath: join(root, "local-restore.lock"),
+                recoveryMarkerPath: join(root, "recovery", "local-restore-required.marker"),
+                newDbDek,
+                newSessionPassword: Buffer.from("live-local-restore-session-password"),
+                now: "2026-08-14T02:00:00.000Z",
+            });
+            if (localRestored.affectedIntegrationAccountIds.length !== 1 || localRestored.affectedIntegrationAccountIds[0] !== "live-account") throw new Error("local restore reconciliation was not reported");
+            const localRestoredDb = openCoreDatabase(localDestinationPath, { dbDek: newDbDek });
+            const localAccount = localRestoredDb.database.prepare("SELECT credential_handle, state FROM integration_accounts WHERE integration_account_id = ?").get("live-account");
+            localRestoredDb.close();
+            if (localAccount?.credential_handle !== null || localAccount?.state !== "REAUTH_REQUIRED") throw new Error("local restored integration account was not re-authenticated");
+            if ((await readFile(join(root, "recovery", "local-restore-required.marker"), "utf8")) !== "JARVIS_RECOVERY_REQUIRED_V1\n") throw new Error("local restore recovery marker is missing");
+            const wrongLocalDescriptorDigest = Buffer.alloc(32, 0x78);
+            try {
+                await unprotectLocalBackupDekThroughNativeStorage(material, localBackup.localRecoverySlot.protectedBackupDek, wrongLocalDescriptorDigest);
+                throw new Error("local BackupDEK accepted mismatched descriptor binding during restore qualification");
+            } catch (error) {
+                if (error?.message === "local BackupDEK accepted mismatched descriptor binding during restore qualification") throw error;
+            } finally {
+                wrongLocalDescriptorDigest.fill(0);
+            }
             bootstrap.stop();
             for (const key of [recoverySecret, backupDek, snapshotDbKey, sourceDbDek, newDbDek]) key.fill(0);
             process.stdout.write("RESTORE_OK");
@@ -1019,13 +1256,19 @@ mod tests {
             .arg(script)
             .current_dir(&release_root)
             .env_clear()
-            .env("SystemRoot", std::env::var_os("SystemRoot").expect("SystemRoot exists"))
+            .env(
+                "SystemRoot",
+                std::env::var_os("SystemRoot").expect("SystemRoot exists"),
+            )
             .env("WINDIR", std::env::var_os("WINDIR").expect("WINDIR exists"))
             .env("JARVIS_TEST_CORE_MODULE", &core_module_url)
             .env("JARVIS_TEST_IPC_MODULE", &ipc_module_url)
             .env("JARVIS_TEST_RESTORE_ROOT", &root)
             .env("JARVIS_CORE_ROOT", &release_root)
-            .env("JARVIS_CORE_ENTRYPOINT", release_root.join("core/dist/main.js"))
+            .env(
+                "JARVIS_CORE_ENTRYPOINT",
+                release_root.join("core/dist/main.js"),
+            )
             .env("JARVIS_TUF_METADATA_DIR", release_root.join("tuf/metadata"));
         if let Some(path) = preserved_recovery_secret.as_ref() {
             command.env("JARVIS_TEST_RECOVERY_SECRET_PATH", path);

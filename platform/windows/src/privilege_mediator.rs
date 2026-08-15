@@ -12,12 +12,30 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
+#[cfg(all(target_os = "windows", not(test)))]
+use std::ffi::OsStr;
+#[cfg(all(target_os = "windows", not(test)))]
+use std::os::windows::ffi::OsStrExt;
+#[cfg(all(target_os = "windows", not(test)))]
+use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, WAIT_OBJECT_0, WAIT_TIMEOUT};
+#[cfg(all(target_os = "windows", not(test)))]
+use windows_sys::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject};
+#[cfg(all(target_os = "windows", not(test)))]
+use windows_sys::Win32::UI::Shell::{
+    SEE_MASK_NOCLOSEPROCESS, SEE_MASK_UNICODE, SHELLEXECUTEINFOW, ShellExecuteExW,
+};
+#[cfg(all(target_os = "windows", not(test)))]
+use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
 pub const PRIVILEGE_MEDIATION_CAPABILITY: &str = "privilege_mediation";
+pub const CODEX_CLI_PROVIDER_ID: &str = "codex-cli";
 
 const MAX_PROVIDER_ID_BYTES: usize = 64;
 const MAX_ARGUMENTS: usize = 16;
 const MAX_ARGUMENT_BYTES: usize = 512;
 const MAX_TOTAL_ARGUMENT_BYTES: usize = 2_048;
+#[cfg(all(target_os = "windows", not(test)))]
+const UAC_HELPER_TIMEOUT_MS: u32 = 300_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CapabilityAvailability {
@@ -77,24 +95,43 @@ impl TryFrom<&str> for PrivilegeOperationId {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProviderSetupArguments {
     provider_id: String,
+    distribution_id: String,
+    interface_id: String,
     arguments: Vec<String>,
 }
 
 impl ProviderSetupArguments {
     pub fn new(
         provider_id: String,
+        distribution_id: String,
+        interface_id: String,
         arguments: Vec<String>,
     ) -> Result<Self, PrivilegeMediatorError> {
-        let provider_id_bytes = provider_id.len();
-        if provider_id_bytes == 0 || provider_id_bytes > MAX_PROVIDER_ID_BYTES {
+        if provider_id.is_empty() || provider_id.len() > MAX_PROVIDER_ID_BYTES {
             return Err(PrivilegeMediatorError::invalid_arguments(
                 "provider identity length is outside the bounded limit",
             ));
         }
 
-        if provider_id.contains('\0') || arguments.iter().any(|argument| argument.contains('\0')) {
+        if distribution_id.is_empty() || distribution_id.len() > MAX_PROVIDER_ID_BYTES {
             return Err(PrivilegeMediatorError::invalid_arguments(
-                "provider setup arguments cannot contain NUL bytes",
+                "distribution identity length is outside the bounded limit",
+            ));
+        }
+
+        if interface_id.is_empty() || interface_id.len() > MAX_PROVIDER_ID_BYTES {
+            return Err(PrivilegeMediatorError::invalid_arguments(
+                "interface identity length is outside the bounded limit",
+            ));
+        }
+
+        if provider_id.contains('\0')
+            || distribution_id.contains('\0')
+            || interface_id.contains('\0')
+            || arguments.iter().any(|argument| argument.contains('\0'))
+        {
+            return Err(PrivilegeMediatorError::invalid_arguments(
+                "provider setup identity and arguments cannot contain NUL bytes",
             ));
         }
 
@@ -117,12 +154,22 @@ impl ProviderSetupArguments {
 
         Ok(Self {
             provider_id,
+            distribution_id,
+            interface_id,
             arguments,
         })
     }
 
     pub fn provider_id(&self) -> &str {
         &self.provider_id
+    }
+
+    pub fn distribution_id(&self) -> &str {
+        &self.distribution_id
+    }
+
+    pub fn interface_id(&self) -> &str {
+        &self.interface_id
     }
 
     pub fn arguments(&self) -> &[String] {
@@ -197,6 +244,10 @@ impl QualifiedHelperIdentity {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RegisteredOperation {
+    provider_id: String,
+    distribution_id: String,
+    interface_id: String,
+    qualified_arguments: Vec<String>,
     helper: QualifiedHelperIdentity,
 }
 
@@ -214,10 +265,28 @@ impl PrivilegeOperationRegistry {
 
     /// Registration is intentionally limited to the typed provider setup
     /// identity. It is not a generic executable/path registration API.
-    pub fn with_provider_setup_repair(helper: QualifiedHelperIdentity) -> Self {
-        Self {
-            provider_setup_repair: Some(RegisteredOperation { helper }),
-        }
+    pub fn with_provider_setup_repair(
+        provider_id: String,
+        distribution_id: String,
+        interface_id: String,
+        qualified_arguments: Vec<String>,
+        helper: QualifiedHelperIdentity,
+    ) -> Result<Self, PrivilegeMediatorError> {
+        let validated = ProviderSetupArguments::new(
+            provider_id.clone(),
+            distribution_id.clone(),
+            interface_id.clone(),
+            qualified_arguments,
+        )?;
+        Ok(Self {
+            provider_setup_repair: Some(RegisteredOperation {
+                provider_id,
+                distribution_id,
+                interface_id,
+                qualified_arguments: validated.arguments,
+                helper,
+            }),
+        })
     }
 
     fn get(&self, operation: PrivilegeOperationId) -> Option<&RegisteredOperation> {
@@ -234,8 +303,17 @@ pub enum PrivilegeMediatorErrorCode {
     UnknownOperation,
     OperationNotRegistered,
     InvalidArguments,
+    ProviderIdentityMismatch,
+    DistributionIdentityMismatch,
+    InterfaceIdentityMismatch,
+    ArgumentPlanMismatch,
     HelperIdentityInvalid,
     UacLifecycleUnqualified,
+    UacLaunchFailed,
+    UacConsentDenied,
+    UacWaitFailed,
+    UacTimeout,
+    UacHelperFailed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -326,13 +404,168 @@ impl WindowsPrivilegeMediator {
         }
 
         let registered = self.registry.get(operation).expect("checked above");
+        if registered.provider_id != arguments.provider_id() {
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::ProviderIdentityMismatch,
+                operation: Some(operation),
+            });
+        }
+        if registered.distribution_id != arguments.distribution_id() {
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::DistributionIdentityMismatch,
+                operation: Some(operation),
+            });
+        }
+        if registered.interface_id != arguments.interface_id() {
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::InterfaceIdentityMismatch,
+                operation: Some(operation),
+            });
+        }
+        if registered.qualified_arguments != arguments.arguments() {
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::ArgumentPlanMismatch,
+                operation: Some(operation),
+            });
+        }
         registered.helper.still_matches_installed_file()?;
-        let _ = arguments;
-        Err(PrivilegeMediatorError {
-            code: PrivilegeMediatorErrorCode::UacLifecycleUnqualified,
-            operation: Some(operation),
-        })
+
+        #[cfg(test)]
+        {
+            let _ = arguments;
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::UacLifecycleUnqualified,
+                operation: Some(operation),
+            });
+        }
+
+        #[cfg(not(test))]
+        {
+            Self::launch_qualified_uac(&registered.helper, &arguments, operation)
+        }
     }
+
+    #[cfg(all(target_os = "windows", not(test)))]
+    fn launch_qualified_uac(
+        helper: &QualifiedHelperIdentity,
+        arguments: &ProviderSetupArguments,
+        operation: PrivilegeOperationId,
+    ) -> Result<(), PrivilegeMediatorError> {
+        let helper_path = wide_null(helper.canonical_path.as_os_str());
+        let verb = wide_null(OsStr::new("runas"));
+        let parameter_string = windows_parameter_string(arguments.arguments());
+        let parameters = wide_null(OsStr::new(&parameter_string));
+
+        let mut execute_info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+        execute_info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+        execute_info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_UNICODE;
+        execute_info.lpVerb = verb.as_ptr();
+        execute_info.lpFile = helper_path.as_ptr();
+        execute_info.lpParameters = parameters.as_ptr();
+        execute_info.nShow = SW_SHOWNORMAL;
+
+        // SAFETY: all pointers refer to NUL-terminated buffers held alive for
+        // the entire synchronous ShellExecuteExW call. The helper path and
+        // argument plan were identity-checked immediately before this call.
+        let launched = unsafe { ShellExecuteExW(&mut execute_info) };
+        if launched == 0 {
+            let code = unsafe { GetLastError() };
+            return Err(PrivilegeMediatorError {
+                code: if code == windows_sys::Win32::Foundation::ERROR_CANCELLED {
+                    PrivilegeMediatorErrorCode::UacConsentDenied
+                } else {
+                    PrivilegeMediatorErrorCode::UacLaunchFailed
+                },
+                operation: Some(operation),
+            });
+        }
+
+        if execute_info.hProcess.is_null() {
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::UacLaunchFailed,
+                operation: Some(operation),
+            });
+        }
+
+        // SAFETY: ShellExecuteExW returned the process handle requested by
+        // SEE_MASK_NOCLOSEPROCESS; it remains owned here until CloseHandle.
+        let wait_result =
+            unsafe { WaitForSingleObject(execute_info.hProcess, UAC_HELPER_TIMEOUT_MS) };
+        if wait_result == WAIT_TIMEOUT {
+            // SAFETY: the handle is valid and is closed exactly once. The
+            // elevated helper is intentionally not force-terminated here;
+            // timeout is reported as failure/uncertain to the owning setup
+            // workflow, which must reconcile before retrying.
+            unsafe { CloseHandle(execute_info.hProcess) };
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::UacTimeout,
+                operation: Some(operation),
+            });
+        }
+        if wait_result != WAIT_OBJECT_0 {
+            unsafe { CloseHandle(execute_info.hProcess) };
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::UacWaitFailed,
+                operation: Some(operation),
+            });
+        }
+
+        let mut exit_code = 0_u32;
+        // SAFETY: the process handle is valid until the following close.
+        let exit_read = unsafe { GetExitCodeProcess(execute_info.hProcess, &mut exit_code) };
+        unsafe { CloseHandle(execute_info.hProcess) };
+        if exit_read == 0 {
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::UacWaitFailed,
+                operation: Some(operation),
+            });
+        }
+        if exit_code != 0 {
+            return Err(PrivilegeMediatorError {
+                code: PrivilegeMediatorErrorCode::UacHelperFailed,
+                operation: Some(operation),
+            });
+        }
+        Ok(())
+    }
+}
+
+#[cfg(all(target_os = "windows", not(test)))]
+fn wide_null(value: &OsStr) -> Vec<u16> {
+    value.encode_wide().chain(std::iter::once(0)).collect()
+}
+
+#[cfg(all(target_os = "windows", not(test)))]
+fn windows_parameter_string(arguments: &[String]) -> String {
+    arguments
+        .iter()
+        .map(|argument| {
+            let mut quoted = String::with_capacity(argument.len() + 2);
+            quoted.push('"');
+            let mut backslashes = 0_usize;
+            for character in argument.chars() {
+                if character == '\\' {
+                    backslashes += 1;
+                } else if character == '"' {
+                    quoted.push_str(&"\\".repeat(backslashes * 2 + 1));
+                    quoted.push(character);
+                    backslashes = 0;
+                } else {
+                    if backslashes != 0 {
+                        quoted.push_str(&"\\".repeat(backslashes));
+                        backslashes = 0;
+                    }
+                    quoted.push(character);
+                }
+            }
+            if backslashes != 0 {
+                quoted.push_str(&"\\".repeat(backslashes * 2));
+            }
+            quoted.push('"');
+            quoted
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 impl Default for WindowsPrivilegeMediator {
@@ -346,8 +579,13 @@ mod tests {
     use super::*;
 
     fn setup_arguments() -> ProviderSetupArguments {
-        ProviderSetupArguments::new("codex".to_owned(), vec!["--repair".to_owned()])
-            .expect("test arguments are bounded")
+        ProviderSetupArguments::new(
+            CODEX_CLI_PROVIDER_ID.to_owned(),
+            "codex-windows-private".to_owned(),
+            "codex-structured-v1".to_owned(),
+            vec!["--repair".to_owned()],
+        )
+        .expect("test arguments are bounded")
     }
 
     #[test]
@@ -386,14 +624,21 @@ mod tests {
     #[test]
     fn provider_setup_arguments_are_bounded_and_nul_free() {
         assert_eq!(
-            ProviderSetupArguments::new("codex\0".to_owned(), Vec::new())
-                .expect_err("NUL must be rejected")
-                .code,
+            ProviderSetupArguments::new(
+                format!("{CODEX_CLI_PROVIDER_ID}\0"),
+                "codex-windows-private".to_owned(),
+                "codex-structured-v1".to_owned(),
+                Vec::new(),
+            )
+            .expect_err("NUL must be rejected")
+            .code,
             PrivilegeMediatorErrorCode::InvalidArguments
         );
         assert_eq!(
             ProviderSetupArguments::new(
-                "codex".to_owned(),
+                CODEX_CLI_PROVIDER_ID.to_owned(),
+                "codex-windows-private".to_owned(),
+                "codex-structured-v1".to_owned(),
                 vec!["x".repeat(MAX_ARGUMENT_BYTES + 1)]
             )
             .expect_err("oversized arguments must be rejected")
@@ -408,7 +653,14 @@ mod tests {
             std::env::current_exe().expect("test executable path"),
         )
         .expect("test executable is installed and canonical");
-        let registry = PrivilegeOperationRegistry::with_provider_setup_repair(helper);
+        let registry = PrivilegeOperationRegistry::with_provider_setup_repair(
+            CODEX_CLI_PROVIDER_ID.to_owned(),
+            "codex-windows-private".to_owned(),
+            "codex-structured-v1".to_owned(),
+            vec!["--repair".to_owned()],
+            helper,
+        )
+        .expect("qualified setup arguments are bounded");
         let mediator = WindowsPrivilegeMediator::from_registry(&registry);
 
         assert_eq!(
@@ -435,7 +687,14 @@ mod tests {
         )
         .expect("test executable is installed and canonical");
         helper.sha256[0] ^= 0xff;
-        let registry = PrivilegeOperationRegistry::with_provider_setup_repair(helper);
+        let registry = PrivilegeOperationRegistry::with_provider_setup_repair(
+            CODEX_CLI_PROVIDER_ID.to_owned(),
+            "codex-windows-private".to_owned(),
+            "codex-structured-v1".to_owned(),
+            vec!["--repair".to_owned()],
+            helper,
+        )
+        .expect("qualified setup arguments are bounded");
         let mediator = WindowsPrivilegeMediator::from_registry(&registry);
 
         let error = mediator
@@ -444,6 +703,108 @@ mod tests {
         assert_eq!(
             error.code,
             PrivilegeMediatorErrorCode::HelperIdentityInvalid
+        );
+    }
+
+    #[test]
+    fn provider_identity_mismatch_is_rejected_before_helper_invocation() {
+        let helper = QualifiedHelperIdentity::from_installed_file(
+            std::env::current_exe().expect("test executable path"),
+        )
+        .expect("test executable is installed and canonical");
+        let registry = PrivilegeOperationRegistry::with_provider_setup_repair(
+            CODEX_CLI_PROVIDER_ID.to_owned(),
+            "codex-windows-private".to_owned(),
+            "codex-structured-v1".to_owned(),
+            vec!["--repair".to_owned()],
+            helper,
+        )
+        .expect("qualified setup arguments are bounded");
+        let mediator = WindowsPrivilegeMediator::from_registry(&registry);
+
+        let error = mediator
+            .invoke(
+                PrivilegeOperationId::ProviderSetupRepair,
+                ProviderSetupArguments::new(
+                    "other-provider".to_owned(),
+                    "codex-windows-private".to_owned(),
+                    "codex-structured-v1".to_owned(),
+                    vec![],
+                )
+                .unwrap(),
+            )
+            .expect_err("an operation must not retarget another provider");
+        assert_eq!(
+            error.code,
+            PrivilegeMediatorErrorCode::ProviderIdentityMismatch
+        );
+    }
+
+    #[test]
+    fn distribution_and_interface_identity_mismatches_fail_closed() {
+        let helper = QualifiedHelperIdentity::from_installed_file(
+            std::env::current_exe().expect("test executable path"),
+        )
+        .expect("test executable is installed and canonical");
+        let registry = PrivilegeOperationRegistry::with_provider_setup_repair(
+            CODEX_CLI_PROVIDER_ID.to_owned(),
+            "codex-windows-private".to_owned(),
+            "codex-structured-v1".to_owned(),
+            vec!["--repair".to_owned()],
+            helper,
+        )
+        .expect("qualified setup arguments are bounded");
+        let mediator = WindowsPrivilegeMediator::from_registry(&registry);
+
+        let distribution_error = mediator
+            .invoke(
+                PrivilegeOperationId::ProviderSetupRepair,
+                ProviderSetupArguments::new(
+                    CODEX_CLI_PROVIDER_ID.to_owned(),
+                    "other-distribution".to_owned(),
+                    "codex-structured-v1".to_owned(),
+                    vec![],
+                )
+                .unwrap(),
+            )
+            .expect_err("a changed distribution must not reach UAC");
+        assert_eq!(
+            distribution_error.code,
+            PrivilegeMediatorErrorCode::DistributionIdentityMismatch
+        );
+
+        let interface_error = mediator
+            .invoke(
+                PrivilegeOperationId::ProviderSetupRepair,
+                ProviderSetupArguments::new(
+                    CODEX_CLI_PROVIDER_ID.to_owned(),
+                    "codex-windows-private".to_owned(),
+                    "other-interface".to_owned(),
+                    vec![],
+                )
+                .unwrap(),
+            )
+            .expect_err("a changed interface must not reach UAC");
+        assert_eq!(
+            interface_error.code,
+            PrivilegeMediatorErrorCode::InterfaceIdentityMismatch
+        );
+
+        let argument_error = mediator
+            .invoke(
+                PrivilegeOperationId::ProviderSetupRepair,
+                ProviderSetupArguments::new(
+                    CODEX_CLI_PROVIDER_ID.to_owned(),
+                    "codex-windows-private".to_owned(),
+                    "codex-structured-v1".to_owned(),
+                    vec!["--unexpected".to_owned()],
+                )
+                .unwrap(),
+            )
+            .expect_err("an unqualified argument plan must not reach UAC");
+        assert_eq!(
+            argument_error.code,
+            PrivilegeMediatorErrorCode::ArgumentPlanMismatch
         );
     }
 }

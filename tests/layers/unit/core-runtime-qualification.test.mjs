@@ -20,6 +20,15 @@ test("packaged-Core qualification requires an absolute release root and bounded 
     () => parseArguments(["--release-root", "C:\\release", "--unknown", "value"]),
     /unknown argument/,
   );
+  assert.equal(
+    parseArguments(["--release-root", "C:\\release", "--production-tuf-profile"])
+      .requireProductionTufProfile,
+    true,
+  );
+  assert.throws(
+    () => parseArguments(["--release-root", "C:\\release", "--production-tuf-profile", "true"]),
+    /unexpected argument: true/,
+  );
   assert.equal(V1_NODE_VERSION, "24.18.0");
 });
 test("packaged-Core qualification fails closed for a missing release root", async () => {

@@ -20,6 +20,13 @@ const CORE_SUPPORT_RELATIVE_PATHS = [
   "core/dist/backup-payload.js",
 ];
 const DEFAULT_OUTPUT = "runtime-manifest.json";
+const DEFAULT_WINDOWS_SIGNING = Object.freeze({
+  trustMode: "PRIVATE_INTERNAL_AUTHENTICODE",
+  certificateThumbprint: "23DA4DA3E340B66EC4240B4CC845E4387E5BBDD3",
+  authorizedTargetScope: "CURRENT_USER_ONLY",
+  trustEnrollment: "CURRENT_USER_TRUSTEDPUBLISHER_AND_ROOT",
+  timestampEvidence: "ABSENT_PUBLIC_TIMESTAMP_PRIVATE_INTERNAL",
+});
 const DEFAULT_PERSISTENCE_QUALIFICATION = Object.freeze({
   binding: "better-sqlite3-multiple-ciphers",
   bindingVersion: "12.11.1",
@@ -241,6 +248,9 @@ export async function generateRuntimeManifest({
     sourceCommitSha: sourceCommitSha.toLowerCase(),
     releaseSequence,
     securityEpoch,
+    releaseDistributionScope: "PRIVATE_INTERNAL",
+    publicDistributionSupported: false,
+    windowsSigning: DEFAULT_WINDOWS_SIGNING,
     tufSpecVersion: "1.0.35",
     target,
     protocolVersion,

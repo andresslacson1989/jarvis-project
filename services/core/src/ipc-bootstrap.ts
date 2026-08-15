@@ -10,6 +10,7 @@ const HANDSHAKE_NONCE_BYTES = 32;
 const HANDSHAKE_DOMAIN = Buffer.from("JARVIS-CORE-IPC-BOOTSTRAP-V1\0", "utf8");
 const SECURE_STORAGE_DOMAIN = Buffer.from("JARVIS-CORE-SECURE-STORAGE-V1\0", "utf8");
 const SESSION_PASSWORD_KDF_DOMAIN = Buffer.from("JARVIS-CORE-SESSION-PASSWORD-KDF-V1\0", "utf8");
+const SESSION_PASSWORD_VERIFY_DOMAIN = Buffer.from("JARVIS-CORE-SESSION-PASSWORD-VERIFY-V1\0", "utf8");
 const SESSION_PASSWORD_MAX_BYTES = 4096;
 const LOCAL_BACKUP_SLOT_MAX_BYTES = 64 * 1024;
 const HANDSHAKE_TIMEOUT_MS = 5_000;
@@ -420,6 +421,34 @@ function sessionPasswordKdfProof(secret: Buffer, correlationId: string, password
     .digest();
 }
 
+function sessionPasswordVerificationProof(
+  secret: Buffer,
+  correlationId: string,
+  password: Buffer,
+  verifier: SessionPasswordVerifier,
+): Buffer {
+  const metadata = Buffer.alloc(16);
+  metadata.writeUInt32LE(verifier.version, 0);
+  metadata.writeUInt32LE(verifier.memoryKiB, 4);
+  metadata.writeUInt32LE(verifier.iterations, 8);
+  metadata.writeUInt32LE(verifier.parallelism, 12);
+  return createHmac("sha256", secret)
+    .update(Buffer.concat([
+      SESSION_PASSWORD_VERIFY_DOMAIN,
+      Buffer.from(correlationId, "utf8"),
+      Buffer.from([0]),
+      Buffer.from(verifier.profileId, "utf8"),
+      Buffer.from([0]),
+      metadata,
+      password,
+      Buffer.from([0]),
+      verifier.salt,
+      Buffer.from([0]),
+      verifier.verifier,
+    ]))
+    .digest();
+}
+
 function randomUuidV7(): string {
   const bytes = randomBytes(16);
   const timestamp = BigInt(Date.now());
@@ -740,6 +769,60 @@ export async function deriveNewSessionPasswordThroughNativeStorage(
         salt,
         verifier,
       };
+    } finally {
+      await closeCoreTransport(socket);
+      canonicalPassword.fill(0);
+    }
+  } finally {
+    canonicalPassword?.fill(0);
+    passwordBytes.fill(0);
+  }
+}
+
+export async function verifySessionPasswordThroughNativeStorage(
+  material: Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret">,
+  password: Buffer,
+  verifier: SessionPasswordVerifier,
+): Promise<boolean> {
+  const passwordBytes = Buffer.from(password);
+  let canonicalPassword: Buffer | undefined;
+  try {
+    const passwordText = passwordBytes.toString("utf8");
+    if (passwordText.length === 0 || !Buffer.from(passwordText, "utf8").equals(passwordBytes)) {
+      throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "session password must be valid non-empty UTF-8");
+    }
+    canonicalPassword = Buffer.from(passwordText.normalize("NFC"), "utf8");
+    if (canonicalPassword.length === 0 || canonicalPassword.length > SESSION_PASSWORD_MAX_BYTES) {
+      throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "session password exceeds its bounded size");
+    }
+    if (verifier.profileId !== "session-password-v1" || verifier.algorithm !== "ARGON2ID" || verifier.version !== 0x13 || verifier.parallelism !== 4 || verifier.salt.length < 16 || verifier.salt.length > 1024 || verifier.verifier.length < 32 || verifier.verifier.length > 1024 || verifier.memoryKiB < 65_536 || verifier.memoryKiB > 4_194_304 || verifier.iterations < 3 || verifier.iterations > 100) {
+      throw new CoreIpcBootstrapError("IPC_FRAME_MALFORMED", "session password verifier profile is unsupported");
+    }
+    const correlationId = randomUuidV7();
+    const socket = await connectAuthenticatedSecureStorage(material);
+    try {
+      socket.write(encodeCoreIpcJsonFrame({
+        protocolVersion: CORE_IPC_PROTOCOL_MAJOR,
+        kind: "request",
+        operation: "verify_session_password",
+        correlationId,
+        password: canonicalPassword.toString("hex"),
+        profileId: verifier.profileId,
+        version: verifier.version,
+        memoryKiB: verifier.memoryKiB,
+        iterations: verifier.iterations,
+        parallelism: verifier.parallelism,
+        salt: verifier.salt.toString("hex"),
+        verifier: verifier.verifier.toString("hex"),
+        proof: sessionPasswordVerificationProof(material.secureStorageSecret, correlationId, canonicalPassword, verifier).toString("hex"),
+      }));
+      const reader = new CoreIpcFrameReader(socket);
+      const response = parseJson<unknown>(await reader.read(CORE_IPC_FRAME_CEILING, HANDSHAKE_TIMEOUT_MS), "native session-password verification response");
+      if (!isRecord(response) || !exactKeys(response, ["correlationId", "errorCode", "ok", "verified"]) || response.correlationId !== correlationId || response.ok !== true || response.errorCode !== null || typeof response.verified !== "boolean") {
+        throw new CoreIpcBootstrapError("IPC_AUTHENTICATION_FAILED", "native session-password verification was rejected");
+      }
+      socket.write(encodeCoreIpcJsonFrame({ kind: "response_ack", correlationId }));
+      return response.verified;
     } finally {
       await closeCoreTransport(socket);
       canonicalPassword.fill(0);

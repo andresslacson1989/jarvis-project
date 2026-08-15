@@ -6,12 +6,22 @@ This inventory is generated from the exact locked dependency graph used by JARVI
 
 | Ecosystem | Name | Version | License | Role | Packaged |
 |---|---|---|---|---|---|
+| cargo | aead | 0.5.2 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
 | cargo | argon2 | 0.5.3 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | aes | 0.8.4 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
+| cargo | aes-gcm | 0.10.3 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
 | cargo | base64ct | 1.8.3 | Apache-2.0 OR MIT | DESKTOP_WINDOWS_RUNTIME | yes |
 | cargo | blake2 | 0.10.6 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | ctr | 0.9.2 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
+| cargo | ghash | 0.5.1 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
+| cargo | hmac | 0.12.1 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
+| cargo | inout | 0.1.4 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
+| cargo | opaque-debug | 0.3.1 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
 | cargo | password-hash | 0.5.0 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | polyval | 0.6.2 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
 | cargo | rand_core | 0.6.4 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |
 | cargo | subtle | 2.6.1 | BSD-3-Clause | DESKTOP_WINDOWS_RUNTIME | yes |
+| cargo | universal-hash | 0.5.1 | MIT OR Apache-2.0 | DESKTOP_WINDOWS_TEST_ONLY | no |
 | npm | base64-js | 1.5.1 | MIT | CORE_BUILD_OR_TYPECHECK | no |
 | npm | better-sqlite3-multiple-ciphers | 12.11.1 | MIT | CORE_RUNTIME | yes |
 | npm | bindings | 1.5.0 | MIT | CORE_RUNTIME | yes |

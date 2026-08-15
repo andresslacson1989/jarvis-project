@@ -73,6 +73,7 @@ mod windows {
         JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
         QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
     };
+    use windows_sys::Win32::System::Pipes::CreatePipe;
     use windows_sys::Win32::System::Threading::{
         CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
         DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetExitCodeProcess,
@@ -80,7 +81,6 @@ mod windows {
         ResumeThread, STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW, TerminateProcess,
         UpdateProcThreadAttribute, WaitForSingleObject,
     };
-    use windows_sys::Win32::System::Pipes::CreatePipe;
 
     const NO_INHERITED_HANDLES: i32 = 0;
     const RESUME_FAILURE: u32 = u32::MAX;
@@ -539,10 +539,8 @@ mod windows {
                 database_path.as_os_str().to_os_string(),
             );
             if recovery_mode {
-                spec.environment.insert(
-                    OsString::from("JARVIS_RECOVERY_MODE"),
-                    OsString::from("1"),
-                );
+                spec.environment
+                    .insert(OsString::from("JARVIS_RECOVERY_MODE"), OsString::from("1"));
             }
             spec.bootstrap_reader = Some(bootstrap_reader);
             self.spawn_spec(spec)
@@ -906,7 +904,8 @@ mod windows {
         })
     }
 
-    fn create_stderr_capture() -> Result<(Option<OwnedHandle>, OwnedHandle), ProcessSupervisorError> {
+    fn create_stderr_capture() -> Result<(Option<OwnedHandle>, OwnedHandle), ProcessSupervisorError>
+    {
         let attributes = SECURITY_ATTRIBUTES {
             nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
             lpSecurityDescriptor: std::ptr::null_mut(),
@@ -1106,6 +1105,9 @@ mod windows {
                 source_commit_sha: "0".repeat(40),
                 release_sequence: 1,
                 security_epoch: 1,
+                release_distribution_scope: "PRIVATE_INTERNAL".to_owned(),
+                public_distribution_supported: false,
+                windows_signing: crate::core_runtime::RuntimeWindowsSigningEvidence::default(),
                 persistence_qualification: Some(
                     crate::core_runtime::RuntimePersistenceQualification::default(),
                 ),
@@ -1251,7 +1253,10 @@ mod windows {
                             OsString::from("SystemRoot"),
                             std::env::var_os("SystemRoot").unwrap(),
                         ),
-                        (OsString::from("WINDIR"), std::env::var_os("WINDIR").unwrap()),
+                        (
+                            OsString::from("WINDIR"),
+                            std::env::var_os("WINDIR").unwrap(),
+                        ),
                     ]),
                     bootstrap_reader: Some(reader),
                 })
@@ -1263,7 +1268,9 @@ mod windows {
                 CloseHandle(writer);
             }
             assert!(matches!(
-                process.wait(Duration::from_secs(5)).expect("process wait must succeed"),
+                process
+                    .wait(Duration::from_secs(5))
+                    .expect("process wait must succeed"),
                 ProcessWait::Exited { .. }
             ));
             assert_eq!(

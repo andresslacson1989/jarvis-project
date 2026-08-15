@@ -1,5 +1,5 @@
 import { toInertText } from "./security/inertContent";
-import { Panel, SkipLink, StatusChip } from "./design-system/components";
+import { Button, Panel, SkipLink, StatusChip } from "./design-system/components";
 
 const destinations = [
   "Mission Control",
@@ -20,6 +20,44 @@ export interface MissionControlSnapshot {
   readonly voiceState: "IDLE";
   readonly activeMissionCount: 0;
   readonly attentionCount: 0;
+  readonly approval?: ApprovalReviewModel;
+  readonly projectPolicy?: ProjectPolicyDiagnosticModel;
+  readonly providerSetup?: ProviderSetupModel;
+}
+
+export type ProviderSetupState = "NOT_REQUIRED" | "SETUP_REQUIRED" | "SETUP_IN_PROGRESS" | "SETUP_READY" | "REPAIR_REQUIRED" | "SETUP_FAILED";
+
+export interface ProviderSetupModel {
+  readonly providerId: string;
+  readonly distributionId: string;
+  readonly adapterVersion: string;
+  readonly state: ProviderSetupState;
+  readonly failureMessage?: string;
+  readonly onStart?: () => void;
+}
+
+export type ProjectPolicyDiagnosticStatus = "NO_POLICY_CANDIDATE" | "POLICY_DECISION_REQUIRED" | "TRUSTED_POLICY" | "POLICY_CHANGED_REVIEW_REQUIRED" | "POLICY_DISABLED" | "POLICY_REVOKED" | "POLICY_PATH_VALIDATION_ERROR";
+
+export interface ProjectPolicyDiagnosticModel {
+  readonly status: ProjectPolicyDiagnosticStatus;
+  readonly canonicalPath?: string;
+  readonly canonicalScopeRoot?: string;
+  readonly contentSha256?: string;
+  readonly revision?: number;
+  readonly gitBlobOid?: string;
+  readonly sourceCommit?: string;
+}
+
+export interface ApprovalReviewModel {
+  readonly approvalId: string;
+  readonly status: "PENDING" | "APPROVED" | "REJECTED" | "EXPIRED" | "CANCELLED";
+  readonly kind: "HIGH_RISK" | "DESTRUCTIVE_FINAL_CONFIRMATION";
+  readonly actionSummary: string;
+  readonly targetSummary: string;
+  readonly environmentSummary?: string;
+  readonly consequenceSummary: string;
+  readonly rollbackSummary?: string;
+  readonly expiresAt: string;
 }
 
 export const LOCKED_STARTUP_SNAPSHOT: MissionControlSnapshot = {
@@ -41,6 +79,87 @@ export function resolveStartupSnapshot(): MissionControlSnapshot {
 
 function destinationId(destination: string) {
   return destination.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
+}
+
+export function ApprovalReview({ approval, onConfirm, onReject }: { approval: ApprovalReviewModel; onConfirm?: () => void; onReject?: () => void }) {
+  const destructive = approval.kind === "DESTRUCTIVE_FINAL_CONFIRMATION";
+  const statusState = approval.status === "APPROVED" ? "success" : approval.status === "REJECTED" || approval.status === "EXPIRED" || approval.status === "CANCELLED" ? "error" : "warning";
+  const pending = approval.status === "PENDING";
+  return (
+    <Panel className="mission-control__approval" heading="Approval review">
+      <div aria-live="polite" className="mission-control__approval-heading">
+        <StatusChip state={statusState}>{approval.status}</StatusChip>
+        <span>{destructive ? "Destructive final confirmation required" : "Approval required before execution"}</span>
+      </div>
+      <dl className="mission-control__approval-details">
+        <div><dt>Action</dt><dd>{toInertText(approval.actionSummary)}</dd></div>
+        <div><dt>Exact target</dt><dd>{toInertText(approval.targetSummary)}</dd></div>
+        {approval.environmentSummary ? <div><dt>Environment</dt><dd>{toInertText(approval.environmentSummary)}</dd></div> : null}
+        <div><dt>Expected consequence</dt><dd>{toInertText(approval.consequenceSummary)}</dd></div>
+        {approval.rollbackSummary ? <div><dt>Rollback / backup</dt><dd>{toInertText(approval.rollbackSummary)}</dd></div> : null}
+        <div><dt>Expires</dt><dd>{toInertText(approval.expiresAt)}</dd></div>
+      </dl>
+      <p className="mission-control__approval-note">The displayed action, target, environment, and consequence are bound to this approval. Any material change requires a new approval.</p>
+      {pending ? (
+        <div aria-label="Approval actions" className="mission-control__approval-actions" role="group">
+          <Button disabled={!onConfirm} onClick={onConfirm} variant={destructive ? "danger" : "primary"}>{destructive ? "Confirm and continue" : "Approve action"}</Button>
+          <Button disabled={!onReject} onClick={onReject} variant="secondary">Reject</Button>
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
+function projectPolicyStatusState(status: ProjectPolicyDiagnosticStatus): "info" | "success" | "warning" | "error" | "waiting" | "neutral" {
+  if (status === "TRUSTED_POLICY") return "success";
+  if (status === "POLICY_PATH_VALIDATION_ERROR") return "error";
+  if (status === "POLICY_DECISION_REQUIRED" || status === "POLICY_CHANGED_REVIEW_REQUIRED") return "warning";
+  return "neutral";
+}
+
+export function ProjectPolicyDiagnostics({ model }: { model: ProjectPolicyDiagnosticModel }) {
+  return (
+    <Panel heading="Project policy" className="mission-control__policy-diagnostics">
+      <div aria-live="polite" className="mission-control__policy-status">
+        <StatusChip state={projectPolicyStatusState(model.status)}>{model.status}</StatusChip>
+      </div>
+      <dl className="mission-control__diagnostic-details">
+        {model.canonicalPath ? <div><dt>Canonical path</dt><dd>{toInertText(model.canonicalPath)}</dd></div> : null}
+        {model.canonicalScopeRoot ? <div><dt>Scope root</dt><dd>{toInertText(model.canonicalScopeRoot)}</dd></div> : null}
+        {model.contentSha256 ? <div><dt>Content SHA-256</dt><dd>{toInertText(model.contentSha256)}</dd></div> : null}
+        {model.revision !== undefined ? <div><dt>Trust revision</dt><dd>{model.revision}</dd></div> : null}
+        {model.gitBlobOid ? <div><dt>Git blob</dt><dd>{toInertText(model.gitBlobOid)}</dd></div> : null}
+        {model.sourceCommit ? <div><dt>Source commit</dt><dd>{toInertText(model.sourceCommit)}</dd></div> : null}
+      </dl>
+    </Panel>
+  );
+}
+
+function providerSetupStatusState(state: ProviderSetupState): "info" | "success" | "warning" | "error" | "waiting" | "neutral" {
+  if (state === "SETUP_READY" || state === "NOT_REQUIRED") return "success";
+  if (state === "SETUP_FAILED" || state === "REPAIR_REQUIRED") return "error";
+  if (state === "SETUP_REQUIRED") return "warning";
+  if (state === "SETUP_IN_PROGRESS") return "waiting";
+  return "neutral";
+}
+
+export function ProviderSetupPanel({ model }: { model: ProviderSetupModel }) {
+  const actionRequired = model.state === "SETUP_REQUIRED" || model.state === "REPAIR_REQUIRED" || model.state === "SETUP_FAILED";
+  return (
+    <Panel heading="Codex provider setup" className="mission-control__provider-setup">
+      <div aria-live="polite" className="mission-control__provider-setup-status">
+        <StatusChip state={providerSetupStatusState(model.state)}>{model.state}</StatusChip>
+      </div>
+      <dl className="mission-control__diagnostic-details">
+        <div><dt>Provider</dt><dd>{toInertText(model.providerId)}</dd></div>
+        <div><dt>Distribution</dt><dd>{toInertText(model.distributionId)}</dd></div>
+        <div><dt>Adapter version</dt><dd>{toInertText(model.adapterVersion)}</dd></div>
+      </dl>
+      {model.failureMessage ? <p className="mission-control__provider-setup-error">{toInertText(model.failureMessage)}</p> : null}
+      <p className="mission-control__muted">Setup uses only the qualified provider helper. Normal workers remain non-elevated, and readiness is reported only after the independent probe passes.</p>
+      {actionRequired ? <Button disabled={!model.onStart} onClick={model.onStart} variant="primary">{model.state === "REPAIR_REQUIRED" ? "Repair Codex setup" : "Start Codex setup"}</Button> : null}
+    </Panel>
+  );
 }
 
 export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnapshot }) {
@@ -101,9 +220,9 @@ export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnap
           </main>
 
           <aside aria-label="Context and attention" className="mission-control__context">
-            <Panel heading="Context">
-              <p className="mission-control__muted">No selected mission, task, project, or artifact.</p>
-            </Panel>
+            {snapshot.approval ? <ApprovalReview approval={snapshot.approval} /> : null}
+            {snapshot.providerSetup ? <ProviderSetupPanel model={snapshot.providerSetup} /> : null}
+            {snapshot.projectPolicy ? <ProjectPolicyDiagnostics model={snapshot.projectPolicy} /> : <Panel heading="Context"><p className="mission-control__muted">No selected mission, task, project, or artifact.</p></Panel>}
             <Panel heading="Attention">
               <p className="mission-control__muted">No verified attention items are available while Core is locked.</p>
             </Panel>

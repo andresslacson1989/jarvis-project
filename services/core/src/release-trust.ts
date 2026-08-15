@@ -6,6 +6,20 @@ import { Updater } from "tuf-js";
 
 export const TUF_PROFILE_VERSION = "1.0.35" as const;
 export const RELEASE_TARGET_PATH = "runtime-manifest.json" as const;
+export const PRIVATE_INTERNAL_DISTRIBUTION_SCOPE = "PRIVATE_INTERNAL" as const;
+export const PRIVATE_INTERNAL_WINDOWS_TRUST_MODE = "PRIVATE_INTERNAL_AUTHENTICODE" as const;
+export const PRIVATE_INTERNAL_WINDOWS_CERTIFICATE_THUMBPRINT =
+  "23DA4DA3E340B66EC4240B4CC845E4387E5BBDD3" as const;
+
+const PRIVATE_INTERNAL_WINDOWS_SIGNING = Object.freeze({
+  trustMode: PRIVATE_INTERNAL_WINDOWS_TRUST_MODE,
+  certificateThumbprint: PRIVATE_INTERNAL_WINDOWS_CERTIFICATE_THUMBPRINT,
+  authorizedTargetScope: "CURRENT_USER_ONLY",
+  trustEnrollment: "CURRENT_USER_TRUSTEDPUBLISHER_AND_ROOT",
+  timestampEvidence: "ABSENT_PUBLIC_TIMESTAMP_PRIVATE_INTERNAL",
+} as const);
+
+export type PrivateInternalWindowsSigning = typeof PRIVATE_INTERNAL_WINDOWS_SIGNING;
 
 export interface ReleaseTrustAdmission {
   readonly tufProfileVersion: typeof TUF_PROFILE_VERSION;
@@ -17,6 +31,9 @@ export interface ReleaseTrustAdmission {
   readonly releaseSequence: number;
   readonly securityEpoch: number;
   readonly sourceCommitSha: string;
+  readonly releaseDistributionScope: typeof PRIVATE_INTERNAL_DISTRIBUTION_SCOPE;
+  readonly publicDistributionSupported: false;
+  readonly windowsSigning: PrivateInternalWindowsSigning;
 }
 
 export class ReleaseTrustError extends Error {
@@ -97,6 +114,31 @@ function requireSourceCommitSha(value: unknown): string {
     throw new ReleaseTrustError("TUF target custom sourceCommitSha is invalid");
   }
   return sourceCommitSha;
+}
+
+function requirePrivateInternalRelease(manifest: Record<string, unknown>): PrivateInternalWindowsSigning {
+  if (manifest.releaseDistributionScope !== PRIVATE_INTERNAL_DISTRIBUTION_SCOPE) {
+    throw new ReleaseTrustError("runtime manifest distribution scope is not the qualified private/internal profile");
+  }
+  if (manifest.publicDistributionSupported !== false) {
+    throw new ReleaseTrustError("runtime manifest cannot claim public distribution support");
+  }
+  const signing = manifest.windowsSigning;
+  if (!signing || typeof signing !== "object" || Array.isArray(signing)) {
+    throw new ReleaseTrustError("runtime manifest Windows signing evidence is missing");
+  }
+  const signingRecord = signing as Record<string, unknown>;
+  const expectedKeys = Object.keys(PRIVATE_INTERNAL_WINDOWS_SIGNING);
+  const actualKeys = Object.keys(signingRecord).sort();
+  if (actualKeys.length !== expectedKeys.length || actualKeys.some((key) => !expectedKeys.includes(key))) {
+    throw new ReleaseTrustError("runtime manifest Windows signing evidence fields are invalid");
+  }
+  for (const [key, expectedValue] of Object.entries(PRIVATE_INTERNAL_WINDOWS_SIGNING)) {
+    if (signingRecord[key] !== expectedValue) {
+      throw new ReleaseTrustError(`runtime manifest Windows signing evidence ${key} is invalid`);
+    }
+  }
+  return PRIVATE_INTERNAL_WINDOWS_SIGNING;
 }
 
 /**
@@ -190,6 +232,7 @@ export async function admitReleaseRuntime(
   );
   const securityEpoch = requirePositiveSafeInteger(manifestRecord.securityEpoch, "securityEpoch");
   const sourceCommitSha = requireSourceCommitSha(manifestRecord.sourceCommitSha);
+  const windowsSigning = requirePrivateInternalRelease(manifestRecord);
 
   if (requireString(custom.releaseId, "releaseId") !== jarvisVersion) {
     throw new ReleaseTrustError("TUF releaseId does not match the runtime manifest");
@@ -220,5 +263,8 @@ export async function admitReleaseRuntime(
     releaseSequence,
     securityEpoch,
     sourceCommitSha,
+    releaseDistributionScope: PRIVATE_INTERNAL_DISTRIBUTION_SCOPE,
+    publicDistributionSupported: false,
+    windowsSigning,
   };
 }

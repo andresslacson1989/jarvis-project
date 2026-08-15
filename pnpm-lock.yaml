@@ -54,6 +54,8 @@ importers:
 
   apps/desktop/src-tauri/resources/core-runtime/core: {}
 
+  packages/protocol: {}
+
   services/core:
     dependencies:
       better-sqlite3-multiple-ciphers:

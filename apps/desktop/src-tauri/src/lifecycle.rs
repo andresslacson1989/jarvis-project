@@ -274,7 +274,9 @@ impl ApplicationPaths {
         match std::fs::read(path) {
             Ok(contents) if contents == RECOVERY_REQUIRED_MARKER => Ok(RecoveryMarkerState::Valid),
             Ok(_) => Ok(RecoveryMarkerState::Invalid),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(RecoveryMarkerState::Missing),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                Ok(RecoveryMarkerState::Missing)
+            }
             Err(error) => Err(error),
         }
     }
@@ -414,14 +416,31 @@ mod tests {
     #[test]
     fn recovery_marker_is_exact_and_fail_closed() {
         let paths = test_paths();
-        paths.ensure_layout().expect("test layout must be creatable");
-        assert_eq!(paths.recovery_marker_state().unwrap(), RecoveryMarkerState::Missing);
-        std::fs::write(paths.recovery.join("restore-required.marker"), RECOVERY_REQUIRED_MARKER)
-            .expect("valid marker must be writable");
-        assert_eq!(paths.recovery_marker_state().unwrap(), RecoveryMarkerState::Valid);
-        std::fs::write(paths.recovery.join("restore-required.marker"), b"RECOVERY_REQUIRED")
-            .expect("invalid marker must be writable");
-        assert_eq!(paths.recovery_marker_state().unwrap(), RecoveryMarkerState::Invalid);
+        paths
+            .ensure_layout()
+            .expect("test layout must be creatable");
+        assert_eq!(
+            paths.recovery_marker_state().unwrap(),
+            RecoveryMarkerState::Missing
+        );
+        std::fs::write(
+            paths.recovery.join("restore-required.marker"),
+            RECOVERY_REQUIRED_MARKER,
+        )
+        .expect("valid marker must be writable");
+        assert_eq!(
+            paths.recovery_marker_state().unwrap(),
+            RecoveryMarkerState::Valid
+        );
+        std::fs::write(
+            paths.recovery.join("restore-required.marker"),
+            b"RECOVERY_REQUIRED",
+        )
+        .expect("invalid marker must be writable");
+        assert_eq!(
+            paths.recovery_marker_state().unwrap(),
+            RecoveryMarkerState::Invalid
+        );
         std::fs::remove_dir_all(paths.root.parent().expect("test root has parent"))
             .expect("test directory must be removable");
     }
@@ -444,7 +463,10 @@ mod tests {
             .expect("qualified secure storage must be recorded");
         ledger.mark_recovery_required();
         assert_eq!(ledger.condition(), BootstrapCondition::RecoveryRequired);
-        assert_eq!(ledger.condition().startup_query_value(), "RECOVERY_REQUIRED");
+        assert_eq!(
+            ledger.condition().startup_query_value(),
+            "RECOVERY_REQUIRED"
+        );
     }
 
     #[test]

@@ -1,4 +1,4 @@
-import type { IpcEnvelope, IpcResponse } from "./ipc";
+import type { IpcEnvelope, IpcResponse } from "./ipc.js";
 
 export type CoreServiceState = "LOCKED";
 export type CoreTransportState = "NOT_CONNECTED";

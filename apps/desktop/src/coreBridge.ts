@@ -9,6 +9,42 @@ export interface CoreBridgeRequest {
   readonly correlationId: UUIDv7;
 }
 
+export interface ProviderSetupStartRequest {
+  readonly requestId: UUIDv7;
+  readonly providerId: string;
+  readonly distributionId: string;
+  readonly adapterVersion: string;
+}
+
+export interface ProviderSetupStartResponse {
+  readonly requestId: UUIDv7;
+  readonly state: "SETUP_IN_PROGRESS";
+}
+
+export interface ProviderSetupStatusRecord {
+  readonly providerId: string;
+  readonly distributionId: string;
+  readonly adapterVersion: string;
+  readonly state: "NOT_REQUIRED" | "SETUP_REQUIRED" | "SETUP_IN_PROGRESS" | "SETUP_READY" | "REPAIR_REQUIRED" | "SETUP_FAILED";
+  readonly sanitizedFailureReason?: string;
+}
+
+export async function requestProviderSetupStart(request: ProviderSetupStartRequest): Promise<ProviderSetupStartResponse> {
+  const response: unknown = await invoke("start_provider_setup", { request });
+  if (!isProviderSetupStartResponse(response)) {
+    throw new Error("native provider setup response failed runtime validation");
+  }
+  return response;
+}
+
+export async function requestProviderSetupStatus(): Promise<readonly ProviderSetupStatusRecord[]> {
+  const response: unknown = await invoke("get_provider_setup_status");
+  if (!Array.isArray(response) || !response.every(isProviderSetupStatusRecord)) {
+    throw new Error("native provider setup status failed runtime validation");
+  }
+  return response;
+}
+
 /**
  * Typed UI → Rust boundary stub. The renderer never opens Core IPC directly;
  * Rust owns the native hop and currently returns the truthful locked state.
@@ -32,6 +68,14 @@ function isCoreStatusResponse(value: unknown): value is CoreStatusResponse {
     value.ok === true &&
     isCoreServiceStatus(value.result)
   );
+}
+
+function isProviderSetupStartResponse(value: unknown): value is ProviderSetupStartResponse {
+  return isRecord(value) && Object.keys(value).sort().join(",") === "requestId,state" && isUuidV7(value.requestId) && value.state === "SETUP_IN_PROGRESS";
+}
+
+function isProviderSetupStatusRecord(value: unknown): value is ProviderSetupStatusRecord {
+  return isRecord(value) && typeof value.providerId === "string" && typeof value.distributionId === "string" && typeof value.adapterVersion === "string" && ["NOT_REQUIRED", "SETUP_REQUIRED", "SETUP_IN_PROGRESS", "SETUP_READY", "REPAIR_REQUIRED", "SETUP_FAILED"].includes(value.state as string) && (value.sanitizedFailureReason === undefined || typeof value.sanitizedFailureReason === "string");
 }
 
 function isCoreServiceStatus(value: unknown): boolean {

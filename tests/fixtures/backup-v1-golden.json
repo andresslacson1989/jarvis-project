@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "descriptor": {
+    "domain": "jarvis.backup.package.v1",
+    "formatId": "JARVIS_BACKUP_V1",
+    "formatVersion": 1,
+    "backupId": "018f3b8e-6c68-7abc-8def-0123456789ab",
+    "createdAt": "2026-08-14T00:00:00.000Z",
+    "protectionClass": "PORTABLE_STATE",
+    "outerAead": "AES_256_GCM",
+    "chunkSizeBytes": 4194304,
+    "chunkCount": "3",
+    "plaintextBytes": "8388609",
+    "noncePrefix": "obLD1A",
+    "payloadManifestSha256": "QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI",
+    "keySlotCount": 1
+  },
+  "descriptorCanonicalUtf8": "{\"backupId\":\"018f3b8e-6c68-7abc-8def-0123456789ab\",\"chunkCount\":\"3\",\"chunkSizeBytes\":4194304,\"createdAt\":\"2026-08-14T00:00:00.000Z\",\"domain\":\"jarvis.backup.package.v1\",\"formatId\":\"JARVIS_BACKUP_V1\",\"formatVersion\":1,\"keySlotCount\":1,\"noncePrefix\":\"obLD1A\",\"outerAead\":\"AES_256_GCM\",\"payloadManifestSha256\":\"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkI\",\"plaintextBytes\":\"8388609\",\"protectionClass\":\"PORTABLE_STATE\"}",
+  "descriptorSha256Hex": "3fefd351b7ee30cdfd15ccd25e0778d6c3ffed59c2b4fdac08becd3e10762012",
+  "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "noncePrefixHex": "a1b2c3d4",
+  "plaintextPattern": "byte = index mod 251",
+  "recoverySecretHex": "5555555555555555555555555555555555555555555555555555555555555555",
+  "recoverySlot": {
+    "slotId": "golden-slot",
+    "nonceHex": "000102030405060708090a0b",
+    "wrappedBackupDekHex": "b01ce3b0a7e0f44a5de2a6de549d9f302fc02935be5dc014ceeb853adba1d08a",
+    "tagHex": "5691f2990d809e091240774b2ee094fe"
+  },
+  "chunks": [
+    {
+      "index": "0",
+      "plaintextLength": 4194304,
+      "aadCanonicalUtf8": "{\"backupId\":\"018f3b8e-6c68-7abc-8def-0123456789ab\",\"chunkCount\":\"3\",\"chunkIndex\":\"0\",\"descriptorSha256\":\"P-_TUbfuMM39FczSXgd41sP_7VnCtP2sCL7NPhB2IBI\",\"domain\":\"jarvis.backup.chunk.v1\",\"plaintextLength\":4194304}",
+      "nonceHex": "a1b2c3d40000000000000000",
+      "ciphertextSha256Hex": "f2e8c75d5cc740aa7666e019c103edb605262584a2d3cec483e92c8cabe03a81"
+    },
+    {
+      "index": "1",
+      "plaintextLength": 4194304,
+      "aadCanonicalUtf8": "{\"backupId\":\"018f3b8e-6c68-7abc-8def-0123456789ab\",\"chunkCount\":\"3\",\"chunkIndex\":\"1\",\"descriptorSha256\":\"P-_TUbfuMM39FczSXgd41sP_7VnCtP2sCL7NPhB2IBI\",\"domain\":\"jarvis.backup.chunk.v1\",\"plaintextLength\":4194304}",
+      "nonceHex": "a1b2c3d40000000000000001",
+      "ciphertextSha256Hex": "ced3836a9966f559bf968bacd3aa28c83f4509a9ecd6f4acb6bd0846e6ca9faf"
+    },
+    {
+      "index": "2",
+      "plaintextLength": 1,
+      "aadCanonicalUtf8": "{\"backupId\":\"018f3b8e-6c68-7abc-8def-0123456789ab\",\"chunkCount\":\"3\",\"chunkIndex\":\"2\",\"descriptorSha256\":\"P-_TUbfuMM39FczSXgd41sP_7VnCtP2sCL7NPhB2IBI\",\"domain\":\"jarvis.backup.chunk.v1\",\"plaintextLength\":1}",
+      "nonceHex": "a1b2c3d40000000000000002",
+      "ciphertextSha256Hex": "fbc290c387f1a9bd24faab49df1280547e7a7de7818a67afa462b98b22a1f61a"
+    }
+  ]
+}

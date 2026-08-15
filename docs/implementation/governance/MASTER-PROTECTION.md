@@ -1,6 +1,6 @@
 # Authoritative `master` Repository Governance
 
-**Contract suite:** JARVIS v1.0.6  
+**Contract suite:** JARVIS v1.0.7
 **Decision:** ADR-074  
 **Authoritative branch:** `master`  
 **Mandatory CI context:** `static-ci`

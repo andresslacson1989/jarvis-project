@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::fs::{remove_file, rename, File, OpenOptions};
+use std::fs::{File, OpenOptions, remove_file, rename};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

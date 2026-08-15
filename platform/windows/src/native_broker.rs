@@ -7,10 +7,13 @@
 
 use crate::privilege_mediator::{
     CapabilityAvailability as PrivilegeAvailability,
-    CapabilityQualification as PrivilegeQualification, WindowsPrivilegeMediator,
+    CapabilityQualification as PrivilegeQualification, PrivilegeMediatorError,
+    PrivilegeOperationId, PrivilegeOperationRegistry, ProviderSetupArguments,
+    WindowsPrivilegeMediator,
 };
 use crate::secure_storage::{
-    BackupDek, DatabaseDek, SecureStorageHandle, WindowsSecureStorage, WindowsSecureStorageError,
+    BackupDek, CredentialContext, CredentialSecret, DatabaseDek, SecureStorageHandle,
+    WindowsSecureStorage, WindowsSecureStorageError,
 };
 use crate::session_system::{
     CapabilityAvailability as SessionAvailability, CapabilityQualification as SessionQualification,
@@ -207,6 +210,58 @@ impl WindowsSecureStorageBoundary {
             .unprotect_backup_dek(protected, additional_entropy)
     }
 
+    pub fn put_secret(
+        &self,
+        context: &CredentialContext,
+        value: &[u8],
+    ) -> Result<SecureStorageHandle, WindowsSecureStorageError> {
+        self.backend
+            .as_ref()
+            .ok_or(WindowsSecureStorageError::InvalidRoot(
+                "secure storage is not registered",
+            ))?
+            .put_secret(context, value)
+    }
+
+    pub fn get_secret(
+        &self,
+        handle: &SecureStorageHandle,
+        context: &CredentialContext,
+    ) -> Result<CredentialSecret, WindowsSecureStorageError> {
+        self.backend
+            .as_ref()
+            .ok_or(WindowsSecureStorageError::InvalidRoot(
+                "secure storage is not registered",
+            ))?
+            .get_secret(handle, context)
+    }
+
+    pub fn rotate_secret(
+        &self,
+        previous: &SecureStorageHandle,
+        context: &CredentialContext,
+        replacement: &[u8],
+    ) -> Result<SecureStorageHandle, WindowsSecureStorageError> {
+        self.backend
+            .as_ref()
+            .ok_or(WindowsSecureStorageError::InvalidRoot(
+                "secure storage is not registered",
+            ))?
+            .rotate_secret(previous, context, replacement)
+    }
+
+    pub fn delete_secret(
+        &self,
+        handle: &SecureStorageHandle,
+    ) -> Result<(), WindowsSecureStorageError> {
+        self.backend
+            .as_ref()
+            .ok_or(WindowsSecureStorageError::InvalidRoot(
+                "secure storage is not registered",
+            ))?
+            .delete_secret(handle)
+    }
+
     pub fn rotate_db_dek(
         &self,
         previous: &SecureStorageHandle,
@@ -260,6 +315,40 @@ impl WindowsNativeBroker {
             session_observer: PlatformSessionObserver::new(),
             privilege_mediator: WindowsPrivilegeMediator::new(),
         })
+    }
+
+    pub const fn with_idle_timeout_millis(idle_timeout_millis: u64) -> Self {
+        Self {
+            secure_storage: WindowsSecureStorageBoundary::new(),
+            session_observer: PlatformSessionObserver::with_idle_timeout_millis(
+                idle_timeout_millis,
+            ),
+            privilege_mediator: WindowsPrivilegeMediator::new(),
+        }
+    }
+
+    /// Compose a provider-qualified setup registry into the broker without
+    /// exposing executable paths or a generic elevated command surface.
+    /// Callers must obtain the registry from the provider qualification flow;
+    /// the default constructors remain fail-closed and unqualified.
+    pub fn with_privilege_registry(mut self, registry: &PrivilegeOperationRegistry) -> Self {
+        self.privilege_mediator = WindowsPrivilegeMediator::from_registry(registry);
+        self
+    }
+
+    pub fn configure_privilege_registry(&mut self, registry: &PrivilegeOperationRegistry) {
+        self.privilege_mediator = WindowsPrivilegeMediator::from_registry(registry);
+    }
+
+    /// The only elevated operation exposed by this broker is the typed
+    /// provider setup/repair request. No executable path, shell text, or
+    /// arbitrary operation can cross the native boundary.
+    pub fn invoke_provider_setup_repair(
+        &self,
+        arguments: ProviderSetupArguments,
+    ) -> Result<(), PrivilegeMediatorError> {
+        self.privilege_mediator
+            .invoke(PrivilegeOperationId::ProviderSetupRepair, arguments)
     }
 
     /// Discover a semantic capability fact. A capability fact never grants
@@ -371,6 +460,26 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn qualified_privilege_registry_is_composed_without_becoming_qualified_uac() {
+        let helper = crate::privilege_mediator::QualifiedHelperIdentity::from_installed_file(
+            std::env::current_exe().expect("test executable path"),
+        )
+        .expect("test executable is installed and canonical");
+        let registry = PrivilegeOperationRegistry::with_provider_setup_repair(
+            crate::privilege_mediator::CODEX_CLI_PROVIDER_ID.to_owned(),
+            "codex-windows-private".to_owned(),
+            "codex-structured-v1".to_owned(),
+            vec!["--repair".to_owned()],
+            helper,
+        )
+        .expect("qualified setup registration must be bounded");
+        let mut broker = WindowsNativeBroker::new().with_privilege_registry(&registry);
+        let status = broker.capability_status(NativeCapabilityId::PrivilegeMediation);
+        assert_eq!(status.availability, CapabilityAvailability::Available);
+        assert_eq!(status.qualification, CapabilityQualification::Unqualified);
     }
 
     #[test]

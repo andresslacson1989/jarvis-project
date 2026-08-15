@@ -1,7 +1,7 @@
 # JARVIS Verification, Qualification & Release Contract
 
 **Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`  
-**Version:** 1.0.5  
+**Version:** 1.0.6
 **Date:** August 12, 2026
 
 ---
@@ -14,7 +14,7 @@ Code existence, model self-report, documentation completion, one happy-path demo
 
 Production is verified behavior under normal success, ambiguity, interruption, crash, stale state, provider setup/repair, provider outage, adversarial input, target race, recovery, update, resource pressure, accessibility modes, adaptive layouts, platform-capability failure, and real release packaging.
 
-V1 production qualification is for a **Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the active v1.0.6 contract suite.
+V1 qualification is for a **private/internal Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the active v1.0.7 contract suite.
 
 ---
 
@@ -25,12 +25,17 @@ DEVELOPMENT
 INTERNAL ALPHA
 BETA
 RELEASE CANDIDATE
-PRODUCTION
+PRIVATE_INTERNAL
+PRODUCTION_PUBLIC (future profile only)
 ```
 
-Only a release satisfying every mandatory v1.0.6 gate for the active Release Profile may be labeled `PRODUCTION`/`Production Complete`.
+Only a release satisfying every mandatory v1.0.7 gate for the active Release Profile may be labeled `PRIVATE_INTERNAL`. A public `PRODUCTION_PUBLIC` label requires a future Release Profile that explicitly enables public distribution and public-trust signing.
+
+`Production Complete` remains the final qualification declaration for the active profile; under the current profile it means a fully qualified `PRIVATE_INTERNAL` release and does not imply public distribution or public trust.
 
 Qualification SHALL bind to one source commit, contract manifest, Release Profile, PlatformFamily/RuntimeRole/backend profile, exact protocol/schema versions, and exact signed installer/update artifacts.
+
+For `PRIVATE_INTERNAL`, qualification SHALL additionally bind the exact Authenticode certificate identity, trust-enrollment evidence for every tested Windows profile, authorized target scope, and an explicit statement that the artifact is not publicly trusted.
 
 ---
 
@@ -465,6 +470,8 @@ Tests prove:
 
 At least one full Windows disaster-restore drill uses the exact Release Candidate artifacts.
 
+For the active `PRIVATE_INTERNAL` profile, the Release Candidate artifacts may use the enrolled self-signed/private-CA Authenticode identity defined by the Release Profile. The drill SHALL use that exact signed artifact and SHALL verify the target trust enrollment before launch.
+
 Cross-platform Windows↔Linux restore is not claimed or required by V1.
 
 ---
@@ -732,4 +739,4 @@ The production question is:
 
 ---
 
-**END — JARVIS VERIFICATION, QUALIFICATION & RELEASE CONTRACT v1.0.5**
+**END — JARVIS VERIFICATION, QUALIFICATION & RELEASE CONTRACT v1.0.6**

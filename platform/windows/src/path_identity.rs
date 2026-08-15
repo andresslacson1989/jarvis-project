@@ -6,7 +6,7 @@
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::fs::{canonicalize, symlink_metadata, Metadata};
+use std::fs::{Metadata, canonicalize, symlink_metadata};
 use std::path::{Component, Path, PathBuf, Prefix};
 
 pub const APPLICATION_DIRECTORY: &str = "JARVIS";
@@ -29,6 +29,10 @@ pub struct WindowsPathIdentity {
 impl WindowsPathIdentity {
     pub fn existing(path: &Path) -> Result<Self, WindowsPathError> {
         validate_path_text(path, false)?;
+        // Inspect the caller-supplied spelling before canonicalization so a
+        // junction/symlink that escapes the requested project root cannot be
+        // hidden by resolving directly to its target.
+        reject_reparse(path)?;
         let canonical_path =
             canonicalize(path).map_err(|error| WindowsPathError::io("canonicalize", error))?;
         reject_reparse(&canonical_path)?;
@@ -134,6 +138,33 @@ impl PlatformPathsAndIdentity {
         }
         Ok(ApplicationPathResolution { root, identity })
     }
+
+    /// Resolve a registered project root using Windows-only filesystem
+    /// identity rules. Project roots are existing non-root directories on a
+    /// local drive; UNC, device, and other alternate roots remain explicit
+    /// unsupported states rather than being treated as ordinary paths.
+    pub fn resolve_project_root(
+        &self,
+        path: &Path,
+    ) -> Result<WindowsPathIdentity, WindowsPathError> {
+        let identity = WindowsPathIdentity::existing(path)?;
+        if identity.root != WindowsPathRoot::Drive {
+            return Err(WindowsPathError::UnsupportedRoot(identity.root));
+        }
+        if is_drive_root(&identity.canonical_path) {
+            return Err(WindowsPathError::Invalid(
+                "project root cannot be a drive root".to_owned(),
+            ));
+        }
+        let metadata = symlink_metadata(&identity.canonical_path)
+            .map_err(|error| WindowsPathError::io("inspect project root", error))?;
+        if !metadata.is_dir() {
+            return Err(WindowsPathError::Invalid(
+                "project root must be a directory".to_owned(),
+            ));
+        }
+        Ok(identity)
+    }
 }
 
 fn ordinary_drive_path(path: &Path) -> Result<PathBuf, WindowsPathError> {
@@ -189,6 +220,13 @@ fn classify_root(path: &Path) -> WindowsPathRoot {
         Prefix::VerbatimUNC(_, _) => WindowsPathRoot::Unc,
         Prefix::Verbatim(_) | Prefix::DeviceNS(_) => WindowsPathRoot::Verbatim,
     }
+}
+
+fn is_drive_root(path: &Path) -> bool {
+    let components: Vec<_> = path.components().collect();
+    components.len() == 2
+        && matches!(components[0], Component::Prefix(_))
+        && matches!(components[1], Component::RootDir)
 }
 
 fn reject_reparse(path: &Path) -> Result<(), WindowsPathError> {
@@ -254,6 +292,27 @@ mod tests {
                 .to_string_lossy()
                 .to_ascii_lowercase()
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn project_root_rejects_drive_root_and_preserves_case_insensitive_identity() {
+        let backend = PlatformPathsAndIdentity::new();
+        let local_app_data = std::env::var_os("LOCALAPPDATA").expect("LOCALAPPDATA must exist");
+        let identity = backend
+            .resolve_project_root(Path::new(&local_app_data))
+            .expect("existing local app-data directory must be a valid project-root candidate");
+        assert_eq!(
+            identity.case_insensitive_key,
+            identity
+                .canonical_path
+                .to_string_lossy()
+                .to_ascii_lowercase()
+        );
+        assert!(matches!(
+            backend.resolve_project_root(Path::new(r"C:\")),
+            Err(WindowsPathError::Invalid(_))
+        ));
     }
 
     #[cfg(windows)]

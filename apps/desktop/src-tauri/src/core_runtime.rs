@@ -7,7 +7,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fmt::{Display, Formatter};
-use std::fs::{canonicalize, read, symlink_metadata, File, Metadata};
+use std::fs::{File, Metadata, canonicalize, read, symlink_metadata};
 use std::io::{self, BufReader, Read};
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -96,6 +96,9 @@ pub struct RuntimeIntegrityManifest {
     pub source_commit_sha: String,
     pub release_sequence: u64,
     pub security_epoch: u64,
+    pub release_distribution_scope: String,
+    pub public_distribution_supported: bool,
+    pub windows_signing: RuntimeWindowsSigningEvidence,
     #[serde(default)]
     pub persistence_qualification: Option<RuntimePersistenceQualification>,
     pub tuf_spec_version: String,
@@ -115,6 +118,28 @@ pub struct RuntimeIntegrityManifest {
     pub core_sha256: String,
     #[serde(default)]
     pub core_support_files: Vec<RuntimeSupportFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RuntimeWindowsSigningEvidence {
+    pub trust_mode: String,
+    pub certificate_thumbprint: String,
+    pub authorized_target_scope: String,
+    pub trust_enrollment: String,
+    pub timestamp_evidence: String,
+}
+
+impl Default for RuntimeWindowsSigningEvidence {
+    fn default() -> Self {
+        Self {
+            trust_mode: "PRIVATE_INTERNAL_AUTHENTICODE".to_owned(),
+            certificate_thumbprint: "23DA4DA3E340B66EC4240B4CC845E4387E5BBDD3".to_owned(),
+            authorized_target_scope: "CURRENT_USER_ONLY".to_owned(),
+            trust_enrollment: "CURRENT_USER_TRUSTEDPUBLISHER_AND_ROOT".to_owned(),
+            timestamp_evidence: "ABSENT_PUBLIC_TIMESTAMP_PRIVATE_INTERNAL".to_owned(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -212,11 +237,7 @@ impl CoreRuntimeLayout {
             ));
         }
         let root_metadata = symlink_metadata(&self.release_root).map_err(|error| {
-            Self::io_error(
-                CoreRuntimeState::CoreRuntimeMissing,
-                "release root",
-                error,
-            )
+            Self::io_error(CoreRuntimeState::CoreRuntimeMissing, "release root", error)
         })?;
         let node_metadata = symlink_metadata(&self.node_executable).map_err(|error| {
             Self::io_error(
@@ -314,6 +335,9 @@ impl CoreRuntimeLayout {
             || !is_sha256_or_commit_sha(&manifest.source_commit_sha, 40)
             || manifest.release_sequence == 0
             || manifest.security_epoch == 0
+            || manifest.release_distribution_scope != "PRIVATE_INTERNAL"
+            || manifest.public_distribution_supported
+            || manifest.windows_signing != RuntimeWindowsSigningEvidence::default()
             || manifest.tuf_spec_version != "1.0.35"
             || manifest.target != V1_RELEASE_TARGET
             || manifest.protocol_version != 1
@@ -385,7 +409,8 @@ impl CoreRuntimeLayout {
                     "runtime support file paths must be unique",
                 ));
             }
-            let support_path = self.resolve_manifest_child(&root, &support_file.path, "support path")?;
+            let support_path =
+                self.resolve_manifest_child(&root, &support_file.path, "support path")?;
             let support = canonicalize(&support_path).map_err(|error| {
                 Self::io_error(
                     CoreRuntimeState::CoreRuntimeIntegrityFailed,
@@ -443,14 +468,21 @@ impl CoreRuntimeLayout {
             ),
             (
                 OsString::from("JARVIS_TUF_METADATA_DIR"),
-                release_root.join("tuf").join("metadata").as_os_str().to_os_string(),
+                release_root
+                    .join("tuf")
+                    .join("metadata")
+                    .as_os_str()
+                    .to_os_string(),
             ),
         ]))
     }
 
     /// Build the only production launch shape accepted by the Windows process
     /// supervisor. Integrity validation happens before this spec is returned.
-    pub(crate) fn launch_spec(&self, manifest_path: &Path) -> Result<CoreLaunchSpec, CoreRuntimeError> {
+    pub(crate) fn launch_spec(
+        &self,
+        manifest_path: &Path,
+    ) -> Result<CoreLaunchSpec, CoreRuntimeError> {
         self.validate_integrity(manifest_path)?;
         Ok(CoreLaunchSpec {
             program: launch_path(&self.node_executable),
@@ -684,6 +716,9 @@ mod tests {
             source_commit_sha: "0".repeat(40),
             release_sequence: 1,
             security_epoch: 1,
+            release_distribution_scope: "PRIVATE_INTERNAL".to_owned(),
+            public_distribution_supported: false,
+            windows_signing: RuntimeWindowsSigningEvidence::default(),
             persistence_qualification: Some(RuntimePersistenceQualification::default()),
             tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
@@ -751,6 +786,9 @@ mod tests {
             source_commit_sha: "0".repeat(40),
             release_sequence: 1,
             security_epoch: 1,
+            release_distribution_scope: "PRIVATE_INTERNAL".to_owned(),
+            public_distribution_supported: false,
+            windows_signing: RuntimeWindowsSigningEvidence::default(),
             persistence_qualification: Some(RuntimePersistenceQualification::default()),
             tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
@@ -793,8 +831,7 @@ mod tests {
     fn integrity_manifest_must_be_a_regular_file() {
         let (root, layout) = test_layout();
         create_dir_all(root.join("runtime")).expect("runtime directory must be creatable");
-        create_dir_all(root.join("core").join("dist"))
-            .expect("core directory must be creatable");
+        create_dir_all(root.join("core").join("dist")).expect("core directory must be creatable");
         write(root.join("runtime").join("node.exe"), b"synthetic node")
             .expect("synthetic runtime must be writable");
         write(
@@ -854,6 +891,9 @@ mod tests {
             source_commit_sha: "0".repeat(40),
             release_sequence: 1,
             security_epoch: 1,
+            release_distribution_scope: "PRIVATE_INTERNAL".to_owned(),
+            public_distribution_supported: false,
+            windows_signing: RuntimeWindowsSigningEvidence::default(),
             persistence_qualification: Some(RuntimePersistenceQualification::default()),
             tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),
@@ -885,13 +925,17 @@ mod tests {
             .controlled_command(&manifest_path)
             .expect("complete release structure must build a controlled command");
         assert_eq!(command.get_program(), root.join("runtime").join("node.exe"));
-        assert!(command
-            .get_args()
-            .any(|argument| argument == root.join("core").join("dist").join("main.js")));
+        assert!(
+            command
+                .get_args()
+                .any(|argument| argument == root.join("core").join("dist").join("main.js"))
+        );
         let environment: Vec<_> = command.get_envs().collect();
-        assert!(environment
-            .iter()
-            .any(|(key, _)| *key == OsStr::new("JARVIS_CORE_ROOT")));
+        assert!(
+            environment
+                .iter()
+                .any(|(key, _)| *key == OsStr::new("JARVIS_CORE_ROOT"))
+        );
         assert!(!environment.iter().any(|(key, _)| {
             *key == OsStr::new("NODE_OPTIONS") || *key == OsStr::new("NODE_PATH")
         }));
@@ -920,6 +964,9 @@ mod tests {
             source_commit_sha: "0".repeat(40),
             release_sequence: 1,
             security_epoch: 1,
+            release_distribution_scope: "PRIVATE_INTERNAL".to_owned(),
+            public_distribution_supported: false,
+            windows_signing: RuntimeWindowsSigningEvidence::default(),
             persistence_qualification: Some(RuntimePersistenceQualification::default()),
             tuf_spec_version: "1.0.35".to_owned(),
             target: V1_RELEASE_TARGET.to_owned(),

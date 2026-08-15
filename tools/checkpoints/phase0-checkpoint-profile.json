@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "checkpointId": "0.CP",
   "checkpointName": "Repository Governance + Platform Boundary + Contract-Drift Protection Ready",
-  "contractSuiteVersion": "1.0.6",
+  "contractSuiteVersion": "1.0.7",
   "requiredNativeWindowsGate": {
     "jobId": "windows-desktop",
     "jobName": "windows-desktop",

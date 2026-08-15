@@ -7,13 +7,15 @@ import type {
   CoreServiceStatus,
   CoreStatusResponse,
 } from "../../../packages/protocol/src/core.js";
+import { validateProviderSetupStartRequest } from "../../../packages/protocol/src/provider-runtime.mjs";
+import type { ProviderSetupRecord } from "../../../packages/protocol/src/provider.ts";
 import { admitReleaseRuntime, type ReleaseTrustAdmission } from "./release-trust.js";
 import {
   CorePersistenceError,
   openCoreDatabase,
   type CoreDatabaseConnection,
 } from "./persistence.js";
-import { applyCoreMigrations, CoreSchemaError } from "./schema.js";
+import { applyCoreMigrations, CoreSchemaError, CoreStateRepository } from "./schema.js";
 import {
   restoreVerifiedLocalBackup,
   restoreVerifiedPortableBackup,
@@ -37,6 +39,9 @@ import {
 } from "./ipc-bootstrap.js";
 
 export const CORE_PROTOCOL_MAJOR = 1 as const;
+const QUALIFIED_CODEX_PROVIDER_ID = "codex-cli";
+const QUALIFIED_CODEX_DISTRIBUTION_ID = "codex-cli-standalone-windows-x64-0.147.0";
+const QUALIFIED_CODEX_ADAPTER_VERSION = "1.0.0";
 export const CORE_PLATFORM = "WINDOWS" as const;
 export const CORE_RUNTIME_ROLE = "FULL_HOST" as const;
 export const CORE_ARCHITECTURE = "x64" as const;
@@ -211,8 +216,15 @@ export interface CoreIpcBoundaryStub {
 }
 
 export interface CoreServiceShellBoundary {
-  handle(request: IpcEnvelope<unknown>): Promise<CoreStatusResponse>;
+  handle(request: IpcEnvelope<unknown>): Promise<IpcResponse<unknown>>;
 }
+
+type ProviderSetupStartResponse = IpcResponse<{
+  readonly requestId: string;
+  readonly state: "SETUP_IN_PROGRESS";
+}>;
+type ProviderSetupCompleteResponse = IpcResponse<{ readonly requestId: string; readonly state: "SETUP_READY" | "SETUP_FAILED" }>;
+type ProviderSetupStatusResponse = IpcResponse<{ readonly providers: readonly ProviderSetupRecord[] }>;
 
 /**
  * Shared service-shell stub for the first UI/Core boundary slice. It exposes
@@ -220,7 +232,7 @@ export interface CoreServiceShellBoundary {
  * native transport is established; it never fabricates a ready response.
  */
 export class CoreServiceShell implements CoreServiceShellBoundary {
-  async handle(request: IpcEnvelope<unknown>): Promise<CoreStatusResponse> {
+  async handle(request: IpcEnvelope<unknown>): Promise<IpcResponse<unknown>> {
     if (!isCoreStatusRequest(request)) {
       return invalidCoreStatusResponse(request);
     }
@@ -249,10 +261,47 @@ export class CoreServiceShell implements CoreServiceShellBoundary {
  * and exposes no tools or provider operations.
  */
 export class AuthenticatedCoreServiceShell implements CoreServiceShellBoundary {
-  async handle(request: IpcEnvelope<unknown>): Promise<CoreStatusResponse> {
+  private readonly startProviderSetup: ((request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>) | undefined;
+  private readonly completeProviderSetup: ((request: IpcEnvelope<unknown>) => ProviderSetupCompleteResponse | Promise<ProviderSetupCompleteResponse>) | undefined;
+  private readonly providerSetupStatus: ((request: IpcEnvelope<unknown>) => ProviderSetupStatusResponse | Promise<ProviderSetupStatusResponse>) | undefined;
+
+  constructor(startProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>, completeProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupCompleteResponse | Promise<ProviderSetupCompleteResponse>, providerSetupStatus?: (request: IpcEnvelope<unknown>) => ProviderSetupStatusResponse | Promise<ProviderSetupStatusResponse>) {
+    this.startProviderSetup = startProviderSetup;
+    this.completeProviderSetup = completeProviderSetup;
+    this.providerSetupStatus = providerSetupStatus;
+  }
+
+  async handle(request: IpcEnvelope<unknown>): Promise<IpcResponse<unknown>> {
+    if (isProviderSetupStartRequest(request)) {
+      try {
+        return this.startProviderSetup ? await this.startProviderSetup(request) : providerSetupNotReadyResponse(request);
+      } catch (error) {
+        return providerSetupFailureResponse(request, error);
+      }
+    }
+    if (isProviderSetupCompleteRequest(request)) {
+      try {
+        return this.completeProviderSetup ? await this.completeProviderSetup(request) : providerSetupNotReadyResponse(request) as ProviderSetupCompleteResponse;
+      } catch (error) {
+        return providerSetupFailureResponse(request, error) as ProviderSetupCompleteResponse;
+      }
+    }
+    if (isProviderSetupStatusRequest(request)) {
+      try { return this.providerSetupStatus ? await this.providerSetupStatus(request) : providerSetupStatusNotReadyResponse(request); }
+      catch (error) { return providerSetupStatusFailureResponse(request, error); }
+    }
     if (!isCoreStatusRequest(request)) return invalidCoreStatusResponse(request);
     return { ok: true, result: LOCKED_CORE_SERVICE_STATUS };
   }
+}
+
+function providerSetupStatusNotReadyResponse(request: IpcEnvelope<unknown>): ProviderSetupStatusResponse {
+  return { ok: false, error: { code: "CORE_PROVIDER_SETUP_NOT_READY", category: "UNSUPPORTED", message: "Provider setup status is not available until the authenticated Core setup workflow is attached", retryable: true, correlationId: request.correlationId } };
+}
+
+function providerSetupStatusFailureResponse(request: IpcEnvelope<unknown>, error: unknown): ProviderSetupStatusResponse {
+  const code = error instanceof CoreSchemaError || error instanceof CorePersistenceError ? error.code : "CORE_PROVIDER_SETUP_STATUS_FAILED";
+  return { ok: false, error: { code, category: "INTERNAL", message: "Provider setup status could not be read", retryable: true, correlationId: request.correlationId } };
 }
 
 const FALLBACK_CORRELATION_ID = "018f3b8e-6c68-7abc-8def-0123456789ab";
@@ -266,6 +315,41 @@ function invalidCoreStatusResponse(request: unknown): CoreStatusResponse {
       message: "Core status requests must use protocol 1, get_core_status, a UUIDv7 correlation ID, and an empty payload",
       retryable: false,
       correlationId: correlationIdFor(request),
+    },
+  };
+}
+
+function providerSetupNotReadyResponse(request: IpcEnvelope<unknown>): ProviderSetupStartResponse {
+  const setup = validateProviderSetupStartRequest(request.payload);
+  return {
+    ok: false,
+    error: {
+      code: "CORE_PROVIDER_SETUP_NOT_READY",
+      category: "UNSUPPORTED",
+      message: "Provider setup is not available until the authenticated Core setup workflow is attached",
+      retryable: true,
+      correlationId: request.correlationId,
+      details: {
+        requestId: setup.requestId,
+        providerId: setup.providerId,
+        distributionId: setup.distributionId,
+        adapterVersion: setup.adapterVersion,
+      },
+    },
+  };
+}
+
+function providerSetupFailureResponse(request: IpcEnvelope<unknown>, error: unknown): ProviderSetupStartResponse {
+  const code = error instanceof CoreSchemaError || error instanceof CorePersistenceError ? error.code : "CORE_PROVIDER_SETUP_FAILED";
+  const conflict = code === "PERSISTENCE_CONFLICT";
+  return {
+    ok: false,
+    error: {
+      code,
+      category: conflict ? "CONFLICT" : "INTERNAL",
+      message: conflict ? "Provider setup state changed or is not eligible; refresh provider state before retrying" : "Provider setup could not be started",
+      retryable: conflict,
+      correlationId: request.correlationId,
     },
   };
 }
@@ -289,6 +373,28 @@ function isCoreStatusRequest(value: unknown): value is IpcEnvelope<Record<string
     isRecord(value.payload) &&
     Object.keys(value.payload).length === 0
   );
+}
+
+function isProviderSetupStartRequest(value: unknown): value is IpcEnvelope<Record<string, unknown>> {
+  if (!isRecord(value)) return false;
+  if (value.protocolVersion !== 1 || value.kind !== "request" || value.name !== "start_provider_setup") return false;
+  if (!isUuidV7(value.id) || !isUuidV7(value.correlationId) || !isRecord(value.payload)) return false;
+  try {
+    validateProviderSetupStartRequest(value.payload);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isProviderSetupCompleteRequest(value: unknown): value is IpcEnvelope<{ requestId: string; providerId: string; action: "SETUP_PROBE_PASSED" | "SETUP_PROBE_FAILED" }> {
+  if (!isRecord(value) || value.protocolVersion !== 1 || value.kind !== "request" || value.name !== "complete_provider_setup" || !isUuidV7(value.id) || !isUuidV7(value.correlationId) || !isRecord(value.payload)) return false;
+  return isUuidV7(value.payload.requestId) && typeof value.payload.providerId === "string" && value.payload.providerId.length > 0 && value.payload.providerId.length <= 256 && (value.payload.action === "SETUP_PROBE_PASSED" || value.payload.action === "SETUP_PROBE_FAILED");
+}
+
+function isProviderSetupStatusRequest(value: unknown): value is IpcEnvelope<Record<string, never>> {
+  if (!isRecord(value) || value.protocolVersion !== 1 || value.kind !== "request" || value.name !== "get_provider_setup_status" || !isUuidV7(value.id) || !isUuidV7(value.correlationId) || !isRecord(value.payload)) return false;
+  return Object.keys(value.payload).length === 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -349,6 +455,7 @@ export class CoreBootstrap {
       try {
         this.database = openCoreDatabase(this.environment.databasePath, { dbDek: databaseDek });
         applyCoreMigrations(this.database);
+        this.ensureQualifiedCodexProvider();
       } catch (error) {
         this.database?.close();
         this.database = undefined;
@@ -357,6 +464,34 @@ export class CoreBootstrap {
     }
     this.state = this.environment.recoveryMode ? "RECOVERY" : "READY";
     return this.status();
+  }
+
+  private ensureQualifiedCodexProvider(): void {
+    if (!this.database) return;
+    const repository = new CoreStateRepository(this.database);
+    const now = new Date().toISOString();
+    repository.putProviderProfile({
+      providerId: QUALIFIED_CODEX_PROVIDER_ID,
+      adapterType: "CODEX_CLI",
+      adapterVersion: QUALIFIED_CODEX_ADAPTER_VERSION,
+      providerVersion: "0.147.0",
+      platform: { platform: "WINDOWS", runtimeRole: "FULL_HOST", architecture: "x64", backendProfileId: "windows-v1" },
+      setup: "SETUP_REQUIRED",
+      compatibility: "COMPATIBLE",
+      capabilities: { coding: true, structuredOutput: true, toolUse: true, locality: "LOCAL" },
+      costClass: "FREE",
+      latencyClass: "LOW",
+      health: "READY",
+    }, {
+      providerId: QUALIFIED_CODEX_PROVIDER_ID,
+      adapterVersion: QUALIFIED_CODEX_ADAPTER_VERSION,
+      platformCompatibility: [{ platform: "WINDOWS", runtimeRoles: ["FULL_HOST"], architecture: ["x64"] }],
+      acceptedVersions: [{ kind: "EXACT", version: "0.147.0" }],
+      requiredCapabilities: ["coding"],
+      conformanceProfileId: "codex-cli-windows-v1",
+      distributionPolicy: { distributionIds: [QUALIFIED_CODEX_DISTRIBUTION_ID], interfaceIds: ["codex-structured-v1"], executableFileNames: ["codex.exe"], setupHelperFileNames: ["codex-windows-sandbox-setup.exe"] },
+    }, now);
+    repository.ensureProviderSetupState({ providerId: QUALIFIED_CODEX_PROVIDER_ID, distributionId: QUALIFIED_CODEX_DISTRIBUTION_ID, adapterVersion: QUALIFIED_CODEX_ADAPTER_VERSION, providerVersion: "0.147.0", state: "SETUP_REQUIRED" }, now);
   }
 
   stop(): CoreStatus {
@@ -384,6 +519,32 @@ export class CoreBootstrap {
       throw new CoreBootstrapError("CORE_START_FAILED", "Core has not completed bootstrap");
     }
     return this.environment;
+  }
+
+  startProviderSetup(request: IpcEnvelope<unknown>): ProviderSetupStartResponse {
+    if (!isProviderSetupStartRequest(request)) return providerSetupNotReadyResponse(request);
+    if (!this.database) return providerSetupNotReadyResponse(request);
+    const setup = validateProviderSetupStartRequest(request.payload);
+    const repository = new CoreStateRepository(this.database);
+    repository.beginProviderSetup(setup.providerId, setup.distributionId, setup.adapterVersion, new Date().toISOString());
+    return { ok: true, result: { requestId: setup.requestId, state: "SETUP_IN_PROGRESS" } };
+  }
+
+  completeProviderSetup(request: IpcEnvelope<unknown>): ProviderSetupCompleteResponse {
+    if (!isProviderSetupCompleteRequest(request) || !this.database) return providerSetupNotReadyResponse(request) as ProviderSetupCompleteResponse;
+    const repository = new CoreStateRepository(this.database);
+    const now = new Date().toISOString();
+    if (request.payload.action === "SETUP_PROBE_FAILED") {
+      repository.failProviderSetup(request.payload.providerId, now);
+      return { ok: true, result: { requestId: request.payload.requestId, state: "SETUP_FAILED" } };
+    }
+    repository.completeProviderSetup(request.payload.providerId, now);
+    return { ok: true, result: { requestId: request.payload.requestId, state: "SETUP_READY" } };
+  }
+
+  providerSetupStatus(request: IpcEnvelope<unknown>): ProviderSetupStatusResponse {
+    if (!isProviderSetupStatusRequest(request) || !this.database) return providerSetupStatusNotReadyResponse(request);
+    return { ok: true, result: { providers: new CoreStateRepository(this.database).listProviderSetupStates() } };
   }
 
   async restorePortableBackup(
@@ -480,9 +641,12 @@ async function writeCoreFrame(transport: AuthenticatedTransport, value: unknown)
 export async function serveAuthenticatedCoreTransport(
   transport: AuthenticatedTransport,
   isStopping: () => boolean = () => false,
+  startProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>,
+  completeProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupCompleteResponse | Promise<ProviderSetupCompleteResponse>,
+  providerSetupStatus?: (request: IpcEnvelope<unknown>) => ProviderSetupStatusResponse | Promise<ProviderSetupStatusResponse>,
 ): Promise<void> {
   const reader = transport.reader;
-  const shell = new AuthenticatedCoreServiceShell();
+  const shell = new AuthenticatedCoreServiceShell(startProviderSetup, completeProviderSetup, providerSetupStatus);
   while (!isStopping()) {
     let payload: Buffer;
     try {
@@ -545,7 +709,7 @@ async function runEntrypoint(): Promise<void> {
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
-  await serveAuthenticatedCoreTransport(authenticatedTransport, () => stopping);
+  await serveAuthenticatedCoreTransport(authenticatedTransport, () => stopping, (request) => bootstrap.startProviderSetup(request), (request) => bootstrap.completeProviderSetup(request), (request) => bootstrap.providerSetupStatus(request));
   process.off("SIGINT", shutdown);
   process.off("SIGTERM", shutdown);
   authenticatedTransport.socket.destroy();

@@ -1,9 +1,9 @@
 # JARVIS V1 Production Release Profile
 
-**Profile Version:** 1.0.5  
+**Profile Version:** 1.0.6
 **Status:** Canonical production-support target  
 **Date:** August 12, 2026  
-**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md`
+**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`
 
 ---
 
@@ -13,7 +13,7 @@ The architecture describes what JARVIS may support over time. This Release Profi
 
 A capability that exists only in an ADR, experimental code, historical contract, or unqualified module/platform is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after full qualification.
 
-V1 is intentionally **Windows-only as a production FULL_HOST release**. The v1.0.5 architecture preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden.
+V1 is intentionally a **private/internal Windows-only FULL_HOST release**. The v1.0.7 architecture preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden. This profile does not claim Microsoft Store, public Internet, or publicly trusted Windows distribution.
 
 ---
 
@@ -46,6 +46,21 @@ A Linux build, Tauri launch, Node launch, or provider executable presence SHALL 
 
 V1 implementation SHALL preserve the Platform Portability Contract's architecture/import boundaries even though Linux runtime tests are not part of V1 Production Complete.
 
+## 2.1 PRIVATE/INTERNAL DISTRIBUTION SCOPE
+
+The active release scope is:
+
+```text
+DistributionScope: PRIVATE_INTERNAL
+PublicDistribution: NOT_SUPPORTED
+WindowsTrustMode: PRIVATE_INTERNAL_AUTHENTICODE
+AuthorizedTargets: explicitly enrolled Windows profiles/devices only
+```
+
+The NSIS installer and every shipped Windows PE executable SHALL still be Authenticode-signed. In this private/internal mode the signing certificate MAY be self-signed or issued by a private CA. The exact certificate identity/fingerprint, trust-enrollment procedure, authorized target scope, and timestamp metadata SHALL be recorded in the qualification evidence. A self-signed/private-CA artifact SHALL NOT be represented as publicly trusted, and the application SHALL NOT silently install an arbitrary trust root.
+
+TUF metadata authorization, Tauri updater signing, offline role-key custody, threshold rules, revocation, anti-rollback, and release-manifest checks remain mandatory. Private/internal Windows certificate trust does not waive those controls.
+
 ---
 
 # 3. DESKTOP, UI, RUNTIME, AND PLATFORM BACKEND BASELINE
@@ -74,7 +89,7 @@ Required runtime properties:
 - Windows local Core transport uses restrictive explicit DACL, local-only behavior, unpredictable endpoint, and bootstrap authentication;
 - no privileged localhost/LAN HTTP control plane;
 - Windows Job Object containment is mandatory for managed executable child trees except narrowly qualified exceptions;
-- signed installer/update artifacts;
+- privately enrolled and signed installer/update artifacts;
 - protocol major `1` using the current manifest's protocol/domain schemas.
 
 The implementation SHALL expose native responsibilities through explicit semantic platform-capability/composition boundaries equivalent to:
@@ -417,7 +432,7 @@ These are Windows V1 qualification requirements. Future Linux voice support must
 
 Wake word may remain disabled/unqualified and is not required for V1.
 
-Before broad feature implementation proceeds beyond the early platform/persistence foundation, the v1.0.5 Implementation Plan SHALL run an early real-hardware feasibility spike for candidate STT/VAD/TTS/AEC/barge-in/device/resource/licensing behavior. Passing that spike is evidence of stack feasibility, not final Voice Production Complete.
+Before broad feature implementation proceeds beyond the early platform/persistence foundation, the v1.0.7 Implementation Plan SHALL run an early real-hardware feasibility spike for candidate STT/VAD/TTS/AEC/barge-in/device/resource/licensing behavior. Passing that spike is evidence of stack feasibility, not final Voice Production Complete.
 
 ---
 
@@ -588,6 +603,8 @@ Phase 0 SHALL also create machine-readable canonical profile/capability definiti
 
 For this profile, Production Complete requires the same source commit and signed **Windows FULL_HOST** release artifacts to pass:
 
+For `PRIVATE_INTERNAL`, the exact artifacts are qualified with the enrolled private/internal Authenticode identity rather than a public CA identity. The qualification report SHALL state that the release is private/internal and list the target trust-enrollment evidence; it SHALL NOT claim public distribution or public-trust reputation.
+
 - all required functionality and every current mandatory active-contract rule;
 - platform/clean-install qualification;
 - platform-capability/composition/import-boundary architecture checks;
@@ -629,4 +646,4 @@ Documentation completion alone never satisfies this gate.
 
 ---
 
-**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.5**
+**END — JARVIS V1 PRIVATE/INTERNAL RELEASE PROFILE v1.0.6**

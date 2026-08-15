@@ -14,7 +14,7 @@ Before Phase 0 implementation is considered complete, repository governance must
 
 ## Current implementation source of truth
 
-**There is one current contract suite: JARVIS v1.0.6.**
+**There is one current contract suite: JARVIS v1.0.7.**
 
 Start with [`docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`](docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md). It is the authoritative index of the current suite and records each component revision.
 
@@ -33,7 +33,7 @@ Read the active suite in this order:
 11. [`docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`](docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md) — normative coding/package/platform-boundary/validation/testing/CI rules.
 12. [`docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`](docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md) — queue/dashboard truth, recovery visibility, notification/focus behavior, module/integration UX, voice responsiveness, diagnostics, and governance.
 13. [`docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`](docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md) — canonical brand, dark-theme Mission Control, adaptive/reflow behavior, accessibility, and UI qualification.
-14. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — central Definition of Done and Windows V1 release qualification; all specialized mandatory verification rules in the active v1.0.6 contracts are cumulative.
+14. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — central Definition of Done and private/internal Windows V1 release qualification; all specialized mandatory verification rules in the active v1.0.7 contracts are cumulative.
 15. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria, including hosting-capability-aware repository governance and the early voice feasibility spike. It does not authorize implementation to begin by itself.
 
 Canonical vector brand assets live under [`assets/brand/`](assets/brand/).
@@ -66,6 +66,10 @@ v1.0.5 does not redesign the architecture or reduce V1 scope. It closes the rema
 - Phase 0 adds machine-readable repeated contract values and CI drift checks where practical;
 - SQLite qualification is tied to the exact embedded build and fix evidence, not numerical version comparison alone.
 
+## v1.0.7 private/internal release closure
+
+The active V1 release is private/internal: Windows FULL_HOST remains the target, but Microsoft Store/public distribution is outside scope. NSIS and PE artifacts remain Authenticode-signed, with an explicitly enrolled self-signed/private-CA identity permitted for controlled targets. TUF, updater, recovery, rollback, and artifact-integrity gates remain mandatory.
+
 ## v1.0.6 repository-governance closure
 
 v1.0.6 does not change the V1 platform, runtime, provider, integration, voice, backup, UI, or product capability scope. It makes repository governance truthful to the hosting capability:
@@ -78,7 +82,7 @@ v1.0.6 does not change the V1 platform, runtime, provider, integration, voice, b
 
 ## No overlay interpretation
 
-Accepted ADRs preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.6 suite.
+Accepted ADRs preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.7 suite.
 
 If an ADR/history file and the active suite appear to conflict, the current manifest and normative documents govern; a suspected missing still-valid requirement is treated as a contract defect and corrected in the current suite rather than silently inferred from history.
 
@@ -100,4 +104,4 @@ If an ADR/history file and the active suite appear to conflict, the current mani
 
 > **A valid historical signature is not perpetual authorization to activate.**
 
-`Implementation-locked` means the active contract defines architecture tightly enough that implementation does not invent product/security/platform boundaries. `Production Complete` still requires an implemented, signed Windows V1 release that passes every mandatory active release gate.
+`Implementation-locked` means the active contract defines architecture tightly enough that implementation does not invent product/security/platform boundaries. `Production Complete` still requires an implemented, privately enrolled and signed Windows V1 release that passes every mandatory active release gate; it does not claim public distribution.
