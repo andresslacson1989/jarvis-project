@@ -6,6 +6,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { generateRuntimeManifest } from "./generate-core-runtime-manifest.mjs";
 import { validateReleaseSource } from "./validate-source-commit.mjs";
 
+const REPOSITORY_ROOT = resolve(fileURLToPath(new URL("../../", import.meta.url)));
+
 const V1_NODE_VERSION = "24.18.0";
 const CORE_SUPPORT_FILES = [
   "release-trust.js",
@@ -190,6 +192,26 @@ async function copyReleaseUnit({ node, core, coreSupports, coreNodeModules, outp
     await copyFile(support.source, join(coreDirectory, support.name), constants.COPYFILE_EXCL);
   }
   await copyCoreDependencies(coreNodeModules, join(output, "core", "node_modules"));
+  await copyCoreWorkspaceRuntimeModules(output);
+}
+
+async function copyCoreWorkspaceRuntimeModules(output) {
+  const workspacePackages = resolve(REPOSITORY_ROOT, "packages");
+  const bundledPackages = join(output, "core", "packages");
+  for (const packageName of ["protocol", "policy"]) {
+    const source = join(workspacePackages, packageName, "src");
+    const destination = join(bundledPackages, packageName, "src");
+    await requireRegularDirectory(source, `Core workspace package ${packageName}`);
+    await cp(source, destination, { recursive: true, dereference: true, force: false });
+  }
+  const distDirectory = join(output, "core", "dist");
+  for (const entry of await readdir(distDirectory, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith(".js")) continue;
+    const path = join(distDirectory, entry.name);
+    const source = await readFile(path, "utf8");
+    const rewritten = source.replaceAll("../../../packages/", "../packages/");
+    if (rewritten !== source) await writeFile(path, rewritten, { flag: "w" });
+  }
 }
 
 async function resolvePackageRoot(packageName, packageBase) {
