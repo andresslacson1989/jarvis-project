@@ -199,6 +199,31 @@ installed desktop host opened visibly but Core reported
 without an explicit recovery/reset decision; preserve it and use the approved
 migration or clean-profile qualification path.
 
+### Mandatory important-artifact recording
+
+After creating, receiving, moving, mounting, or materially changing any
+important document, key, certificate, metadata set, release artifact, database,
+backup, recovery item, installer, test fixture, or external signing input, the
+agent SHALL update an agent-facing record in `AGENTS.md` or the relevant current
+implementation evidence before ending the task. The record SHALL state, in
+plain language:
+
+1. what the artifact is and why it exists;
+2. the exact absolute path, drive, host, or service where it is saved;
+3. whether it is repository-tracked, ignored/generated, external, or removable;
+4. who or what is allowed to use it and for which workflow;
+5. its custody, retention, expiration, or cleanup state; and
+6. the verification evidence or known limitation.
+
+This record must never contain private-key contents, passwords, recovery
+secrets, tokens, raw credentials, derived key material, or other secret values.
+Record secret-free identifiers such as filenames, role names, certificate
+thumbprints, hashes, public key IDs, versions, and purpose instead. If the
+artifact is intentionally temporary, record its cleanup result; if cleanup is
+not performed, record the exact remaining location and reason. A task is not
+complete when an important artifact is left undocumented or its location is
+left for the next agent to infer.
+
 ## No ADR/history overlay
 
 Historical contracts/ADRs may explain why a rule exists but SHALL NOT be required to determine current behavior.
