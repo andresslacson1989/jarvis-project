@@ -141,7 +141,7 @@ jobs:
           fi
           llvm_bin_dir="$(dirname "$llvm_rc_path")"
           echo "$llvm_bin_dir" >> "$GITHUB_PATH"
-          "$llvm_rc_path" --version
+          "$llvm_rc_path" --help >/dev/null
 
       - name: Rust formatting
         run: cargo fmt --all -- --check
