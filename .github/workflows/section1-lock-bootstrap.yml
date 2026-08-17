@@ -1,0 +1,105 @@
+name: Section 1 Lock Bootstrap
+
+on:
+  push:
+    branches:
+      - 'impl/section1-1.1-tauri-react'
+
+permissions:
+  contents: read
+
+jobs:
+  locks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install pinned pnpm and Node
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.21.0
+          runtime: node@24.18.0
+          install: false
+          cache: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.97.1
+          rustup default 1.97.1
+
+      - name: Stage intended manifests
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'apps/desktop/package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          pkg.scripts = {
+            'dev:web': 'vite --host 127.0.0.1 --port 5173 --strictPort',
+            'build:web': 'tsc -p tsconfig.json --noEmit && vite build',
+            'tauri': 'tauri'
+          };
+          pkg.dependencies = {
+            '@tauri-apps/api': '2.11.1',
+            'react': '19.2.8',
+            'react-dom': '19.2.8'
+          };
+          pkg.devDependencies = {
+            '@tauri-apps/cli': '2.11.4',
+            '@types/react': '19.2.17',
+            '@types/react-dom': '19.2.3',
+            '@vitejs/plugin-react': '6.0.3',
+            'vite': '8.1.5'
+          };
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+
+          cat > Cargo.toml <<'EOF'
+          [workspace]
+          resolver = "3"
+          members = ["tools/toolchain/rust-smoke", "apps/desktop/src-tauri"]
+          default-members = ["tools/toolchain/rust-smoke", "apps/desktop/src-tauri"]
+
+          [workspace.package]
+          version = "0.0.0"
+          edition = "2024"
+          rust-version = "1.97.1"
+          EOF
+
+          mkdir -p apps/desktop/src-tauri
+          cat > apps/desktop/src-tauri/Cargo.toml <<'EOF'
+          [package]
+          name = "jarvis-desktop"
+          version.workspace = true
+          edition.workspace = true
+          rust-version.workspace = true
+
+          [build-dependencies]
+          tauri-build = "=2.6.3"
+
+          [dependencies]
+          tauri = "=2.11.5"
+          EOF
+
+      - name: Generate exact locks
+        shell: bash
+        run: |
+          pnpm install --lockfile-only --ignore-scripts
+          cargo generate-lockfile
+
+      - name: Emit compressed locks
+        shell: bash
+        run: |
+          echo 'PNPM_LOCK_GZIP_BASE64_BEGIN'
+          gzip -c pnpm-lock.yaml | base64 -w 120
+          echo 'PNPM_LOCK_GZIP_BASE64_END'
+          echo 'CARGO_LOCK_GZIP_BASE64_BEGIN'
+          gzip -c Cargo.lock | base64 -w 120
+          echo 'CARGO_LOCK_GZIP_BASE64_END'
