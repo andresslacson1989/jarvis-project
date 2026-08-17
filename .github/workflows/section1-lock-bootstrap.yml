@@ -6,7 +6,7 @@ on:
       - 'impl/section1-1.1-tauri-react'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   locks:
@@ -102,13 +102,22 @@ jobs:
       - name: Generate provenance metadata
         run: node .github/scripts/section1-bootstrap-provenance.mjs
 
-      - name: Emit compressed locks and provenance
+      - name: Revalidate master and capture generated files
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          for item in PNPM_LOCK:pnpm-lock.yaml CARGO_LOCK:Cargo.lock NPM_PROVENANCE:/tmp/npm-provenance.json CARGO_PROVENANCE:/tmp/cargo-provenance.json; do
-            name="${item%%:*}"
-            path="${item#*:}"
-            echo "${name}_GZIP_BASE64_BEGIN"
-            gzip -c "$path" | base64 -w 120
-            echo "${name}_GZIP_BASE64_END"
-          done
+          git fetch --no-tags --depth=1 origin master
+          test "$(git rev-parse FETCH_HEAD)" = "db6731650d472aa2faa002cf4f0402cc59370768"
+          mkdir -p .bootstrap
+          cp /tmp/npm-provenance.json .bootstrap/npm-provenance.json
+          cp /tmp/cargo-provenance.json .bootstrap/cargo-provenance.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml Cargo.lock .bootstrap/npm-provenance.json .bootstrap/cargo-provenance.json
+          if git diff --cached --quiet; then
+            echo "generated dependency state already captured"
+            exit 0
+          fi
+          git commit -m "build(1.1): capture generated lockfiles and provenance"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF_NAME}
