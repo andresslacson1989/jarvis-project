@@ -4,14 +4,10 @@ import { resolve } from "node:path";
 import { isMain, printViolations, violation } from "./lib.mjs";
 
 const EXPECTED_QUALIFICATION = "DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED";
-const TAURI_HOST_DEPENDENCIES = Object.freeze([
+const LINUX_TAURI_HOST_MARKERS = Object.freeze([
+  "Install Tauri host-check system dependencies",
   "libwebkit2gtk-4.1-dev",
-  "build-essential",
-  "curl",
-  "wget",
-  "file",
   "libxdo-dev",
-  "libssl-dev",
   "libayatana-appindicator3-dev",
   "librsvg2-dev",
 ]);
@@ -60,16 +56,18 @@ function parseJson(text) {
 
 export async function loadDesktopFoundationSnapshot(rootDir) {
   const read = (relativePath) => readOptional(resolve(rootDir, relativePath));
-  const [rootCargo, desktopPackageText, tauriCargo, tauriConfigText, indexHtml, stylesCss, mainRs, toolchainText, workflow, windowsResourceIcon] = await Promise.all([
+  const [rootCargo, desktopPackageText, tauriCargo, tauriBuildRs, tauriConfigText, indexHtml, stylesCss, mainRs, toolchainText, workflow, sourceAttributes, windowsResourceIcon] = await Promise.all([
     read("Cargo.toml"),
     read("apps/desktop/package.json"),
     read("apps/desktop/src-tauri/Cargo.toml"),
+    read("apps/desktop/src-tauri/build.rs"),
     read("apps/desktop/src-tauri/tauri.conf.json"),
     read("apps/desktop/index.html"),
     read("apps/desktop/src/styles.css"),
     read("apps/desktop/src-tauri/src/main.rs"),
     read("tools/toolchain/toolchain-baseline.json"),
     read(".github/workflows/static-ci.yml"),
+    read(".gitattributes"),
     readBinaryOptional(resolve(rootDir, "apps/desktop/src-tauri/icons/icon.ico")),
   ]);
   return {
@@ -77,6 +75,7 @@ export async function loadDesktopFoundationSnapshot(rootDir) {
     desktopPackage: parseJson(desktopPackageText),
     desktopPackageText,
     tauriCargo,
+    tauriBuildRs,
     tauriConfig: parseJson(tauriConfigText),
     tauriConfigText,
     indexHtml,
@@ -85,6 +84,7 @@ export async function loadDesktopFoundationSnapshot(rootDir) {
     toolchain: parseJson(toolchainText),
     toolchainText,
     workflow,
+    sourceAttributes,
     windowsResourceIcon,
   };
 }
@@ -98,14 +98,19 @@ function workflowStepBlock(workflow, name) {
   return normalized.slice(start, next < 0 ? normalized.length : next);
 }
 
+function workflowJobBlock(workflow, name) {
+  if (typeof workflow !== "string") return null;
+  const normalized = workflow.replace(/\r\n/g, "\n");
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = normalized.match(
+    new RegExp(`(?:^|\\n)  ${escaped}:\\n[\\s\\S]*?(?=\\n  [A-Za-z0-9_-]+:\\n|$)`),
+  );
+  return match?.[0] ?? null;
+}
+
 function hasWorkflowStep(workflow, name, run) {
   const block = workflowStepBlock(workflow, name);
   return block !== null && block.includes(`\n        run: ${run}`) && !/\n {8}if:/.test(block);
-}
-
-function hasWorkflowStepFragments(workflow, name, fragments) {
-  const block = workflowStepBlock(workflow, name);
-  return block !== null && fragments.every((fragment) => block.includes(fragment)) && !/\n {8}if:/.test(block);
 }
 
 function add(violations, condition, code, path, detail) {
@@ -121,9 +126,12 @@ export function evaluateDesktopFoundation(snapshot) {
   const build = baseline?.tauri?.build;
   const api = baseline?.tauri?.javascriptApi;
   const cli = baseline?.tauri?.cli;
+  const workflowText = typeof snapshot.workflow === "string" ? snapshot.workflow : "";
+  const staticCiJob = workflowJobBlock(snapshot.workflow, "static-ci");
 
   add(violations, snapshot.rootCargo !== null, "DESKTOP_ROOT_CARGO_MISSING", "Cargo.toml", "root Cargo workspace is required");
   add(violations, snapshot.tauriCargo !== null, "DESKTOP_TAURI_MANIFEST_MISSING", "apps/desktop/src-tauri/Cargo.toml", "real Tauri crate manifest is required");
+  add(violations, snapshot.tauriBuildRs !== null, "DESKTOP_TAURI_BUILD_SCRIPT_MISSING", "apps/desktop/src-tauri/build.rs", "Tauri build script is required");
   add(violations, snapshot.tauriConfigText !== null, "DESKTOP_TAURI_CONFIG_MISSING", "apps/desktop/src-tauri/tauri.conf.json", "Tauri configuration is required");
   add(violations, snapshot.desktopPackageText !== null, "DESKTOP_PACKAGE_MISSING", "apps/desktop/package.json", "desktop package manifest is required");
   add(violations, snapshot.indexHtml !== null, "DESKTOP_INDEX_MISSING", "apps/desktop/index.html", "bundled renderer entry point is required");
@@ -173,6 +181,16 @@ export function evaluateDesktopFoundation(snapshot) {
   if (typeof snapshot.mainRs === "string") {
     add(violations, !snapshot.mainRs.includes("invoke_handler") && !/#\s*\[\s*tauri::command/.test(snapshot.mainRs), "DESKTOP_CUSTOM_COMMAND_SURFACE", "apps/desktop/src-tauri/src/main.rs", "Section 1.1 must not add a consequential custom Tauri command surface");
     add(violations, snapshot.mainRs.includes('#[cfg(not(target_os = "windows"))]') && snapshot.mainRs.includes("only qualified for Windows"), "DESKTOP_NON_WINDOWS_STUB_MISSING", "apps/desktop/src-tauri/src/main.rs", "non-Windows builds must remain an explicit unsupported stub rather than a Tauri runtime");
+    add(
+      violations,
+      snapshot.mainRs.includes("tauri::generate_context!()") &&
+        !snapshot.mainRs.includes("tauri::tauri_build_context!()") &&
+        typeof snapshot.tauriBuildRs === "string" &&
+        snapshot.tauriBuildRs.includes("tauri_build::build();"),
+      "DESKTOP_TAURI_CONTEXT_PAIRING_INVALID",
+      "apps/desktop/src-tauri/src/main.rs",
+      "Section 1.1 must use tauri::generate_context!() with the standard tauri_build::build() hook; build-context include codegen is not configured",
+    );
   }
   if (baseline && typeof baseline === "object") {
     add(violations, baseline.tauri?.qualification === EXPECTED_QUALIFICATION, "DESKTOP_TAURI_QUALIFICATION_MISMATCH", "tools/toolchain/toolchain-baseline.json", `Tauri qualification must be ${EXPECTED_QUALIFICATION}`);
@@ -182,14 +200,34 @@ export function evaluateDesktopFoundation(snapshot) {
   add(violations, hasWorkflowStep(snapshot.workflow, "Desktop Tauri Windows build", "cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc"), "DESKTOP_WINDOWS_BUILD_CI_GATE_MISSING", ".github/workflows/static-ci.yml", "explicit Windows Tauri build gate must be mandatory and unconditional");
   add(
     violations,
-    hasWorkflowStepFragments(snapshot.workflow, "Install Tauri host-check system dependencies", [
-      "sudo apt-get update",
-      "sudo apt-get install --no-install-recommends -y",
-      ...TAURI_HOST_DEPENDENCIES,
-    ]),
-    "DESKTOP_TAURI_HOST_DEPS_CI_GATE_MISSING",
+    staticCiJob !== null && /\n\s+runs-on:\s*windows-2025\s*\n/.test(`${staticCiJob}\n`),
+    "DESKTOP_STATIC_CI_WINDOWS_RUNNER_REQUIRED",
     ".github/workflows/static-ci.yml",
-    "Ubuntu host clippy/build must install the reviewed Tauri development prerequisites without weakening Rust gates",
+    "mandatory Section 1.1 static CI must run on the Windows V1 FULL_HOST qualification platform",
+  );
+  add(
+    violations,
+    !LINUX_TAURI_HOST_MARKERS.some((marker) => workflowText.includes(marker)),
+    "DESKTOP_LINUX_TAURI_HOST_QUALIFICATION_FORBIDDEN",
+    ".github/workflows/static-ci.yml",
+    "Linux WebKit/GTK host prerequisites are not a Windows V1 Section 1.1 qualification requirement",
+  );
+  add(
+    violations,
+    !workflowText.includes("Normalize Rust source newlines") &&
+      !/git ls-files ['"]\*\.rs['"][\s\S]{0,500}Replace\(/.test(workflowText),
+    "DESKTOP_SOURCE_REWRITE_CI_FORBIDDEN",
+    ".github/workflows/static-ci.yml",
+    "CI must validate a clean checkout instead of rewriting tracked Rust source line endings",
+  );
+  add(
+    violations,
+    typeof snapshot.sourceAttributes === "string" &&
+      /^\*\s+text=auto\s+eol=lf\s*$/m.test(snapshot.sourceAttributes) &&
+      /^\*\.ico\s+binary\s*$/m.test(snapshot.sourceAttributes),
+    "DESKTOP_LINE_ENDING_POLICY_MISSING",
+    ".gitattributes",
+    "repository-owned LF text checkout and binary ICO attributes are required for reproducible native Windows CI",
   );
 
   return violations;

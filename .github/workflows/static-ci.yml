@@ -37,16 +37,6 @@ jobs:
             throw "Expected exact candidate SHA $env:EXPECTED_SHA but checked out $actualSha"
           }
 
-      - name: Normalize Rust source newlines
-        shell: pwsh
-        run: |
-          $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-          foreach ($path in (git ls-files '*.rs')) {
-            $absolutePath = Join-Path $PWD $path
-            $text = [System.IO.File]::ReadAllText($absolutePath)
-            [System.IO.File]::WriteAllText($absolutePath, $text.Replace("`r`n", "`n"), $utf8NoBom)
-          }
-
       - name: Install pinned pnpm and Node
         uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
         with:
@@ -86,7 +76,7 @@ jobs:
     name: static-ci
     needs: windows-tauri-build
     if: ${{ always() }}
-    runs-on: ubuntu-24.04
+    runs-on: windows-2025
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -97,25 +87,23 @@ jobs:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Verify exact checkout
-        shell: bash
+        shell: pwsh
         env:
           EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
-          actual_sha="$(git rev-parse HEAD)"
-          if [[ "$actual_sha" != "$EXPECTED_SHA" ]]; then
-            echo "Expected exact candidate SHA $EXPECTED_SHA but checked out $actual_sha" >&2
-            exit 1
-          fi
+          $actualSha = (git rev-parse HEAD).Trim()
+          if ($actualSha -ne $env:EXPECTED_SHA) {
+            throw "Expected exact candidate SHA $env:EXPECTED_SHA but checked out $actualSha"
+          }
 
       - name: Verify native Windows Tauri prerequisite
-        shell: bash
+        shell: pwsh
         env:
           WINDOWS_TAURI_RESULT: ${{ needs.windows-tauri-build.result }}
         run: |
-          if [[ "$WINDOWS_TAURI_RESULT" != "success" ]]; then
-            echo "Native Windows Tauri prerequisite was $WINDOWS_TAURI_RESULT" >&2
-            exit 1
-          fi
+          if ($env:WINDOWS_TAURI_RESULT -ne "success") {
+            throw "Native Windows Tauri prerequisite was $env:WINDOWS_TAURI_RESULT"
+          }
 
       - name: Install pinned pnpm and Node
         uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
@@ -126,7 +114,7 @@ jobs:
           cache: false
 
       - name: Install pinned Rust toolchain
-        shell: bash
+        shell: pwsh
         run: |
           rustup set profile minimal
           rustup toolchain install 1.97.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc
@@ -188,21 +176,6 @@ jobs:
 
       - name: Node dependency vulnerability gate
         run: pnpm audit --audit-level high
-
-      - name: Install Tauri host-check system dependencies
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
 
       - name: Rust formatting
         run: cargo fmt --all -- --check
