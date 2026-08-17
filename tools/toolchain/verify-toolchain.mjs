@@ -82,7 +82,8 @@ assert(baseline.tauri?.qualification === "DESKTOP_FOUNDATION_IMPLEMENTED_NOT_REL
 assert(desktopPackage.dependencies?.["@tauri-apps/api"] === baseline.tauri.javascriptApi, "desktop Tauri JavaScript API must match the selected release fact");
 assert(desktopPackage.devDependencies?.["@tauri-apps/cli"] === baseline.tauri.cli, "desktop Tauri CLI must match the selected release fact");
 assert(desktopCargo.includes(`tauri-build = "=${baseline.tauri.build}"`), "desktop tauri-build must match the selected release fact");
-assert(desktopCargo.includes(`tauri = "=${baseline.tauri.runtime}"`), "desktop Tauri runtime must match the selected release fact");
+assert(desktopCargo.includes(`[dependencies]\ntauri = { version = "=${baseline.tauri.runtime}", default-features = false }`), "desktop host-visible Tauri pairing must match the selected release fact with default features disabled");
+assert(desktopCargo.includes(`[target.'cfg(target_os = "windows")'.dependencies]\ntauri = { version = "=${baseline.tauri.runtime}", default-features = false, features = ["wry"] }`), "desktop Windows Tauri runtime must match the selected release fact with only wry enabled");
 
 const EXPECTED = Object.freeze({
   node: baseline.node.version,
