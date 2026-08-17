@@ -19,23 +19,48 @@ function desktopCodes(snapshot) {
   return evaluateDesktopFoundation(snapshot).map((item) => item.code);
 }
 
+function withProductionStep(workflow, replacement) {
+  assert.ok(workflow.includes(PRODUCTION_STEP), "fixture must contain the production Tauri step");
+  return workflow.replace(PRODUCTION_STEP, replacement);
+}
+
 test("Section 1.1 requires a real production Tauri build rather than cargo check", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
-  const productionWorkflow = snapshot.workflow.replace(OLD_CHECK_STEP, PRODUCTION_STEP);
+  const productionWorkflow = snapshot.workflow.includes(PRODUCTION_STEP)
+    ? snapshot.workflow
+    : snapshot.workflow.replace(OLD_CHECK_STEP, PRODUCTION_STEP);
   const valid = { ...snapshot, workflow: productionWorkflow };
   assert.deepEqual(evaluateDesktopFoundation(valid), []);
 
-  const cargoCheckOnly = { ...valid, workflow: productionWorkflow.replace(PRODUCTION_STEP, OLD_CHECK_STEP) };
+  const cargoCheckOnly = {
+    ...valid,
+    workflow: withProductionStep(productionWorkflow, OLD_CHECK_STEP),
+  };
   assert.ok(desktopCodes(cargoCheckOnly).includes("DESKTOP_TAURI_PRODUCTION_BUILD_CI_GATE_MISSING"));
 
-  for (const [label, workflow] of [
-    ["no-bundle", productionWorkflow.replace(" --no-bundle", "")],
-    ["target", productionWorkflow.replace(" --target x86_64-pc-windows-msvc", "")],
-    ["ci", productionWorkflow.replace(" --ci", "")],
-    ["working directory", productionWorkflow.replace("        working-directory: apps/desktop\n", "")],
-    ["conditional", productionWorkflow.replace("        working-directory: apps/desktop\n", "        if: always()\n        working-directory: apps/desktop\n")],
-    ["continue-on-error", productionWorkflow.replace("        working-directory: apps/desktop\n", "        continue-on-error: true\n        working-directory: apps/desktop\n")],
-  ]) {
+  const invalidSteps = [
+    ["no-bundle", PRODUCTION_STEP.replace(" --no-bundle", "")],
+    ["target", PRODUCTION_STEP.replace(" --target x86_64-pc-windows-msvc", "")],
+    ["ci", PRODUCTION_STEP.replace(" --ci", "")],
+    ["working directory", PRODUCTION_STEP.replace("        working-directory: apps/desktop\n", "")],
+    [
+      "conditional",
+      PRODUCTION_STEP.replace(
+        "        working-directory: apps/desktop\n",
+        "        if: always()\n        working-directory: apps/desktop\n",
+      ),
+    ],
+    [
+      "continue-on-error",
+      PRODUCTION_STEP.replace(
+        "        working-directory: apps/desktop\n",
+        "        continue-on-error: true\n        working-directory: apps/desktop\n",
+      ),
+    ],
+  ];
+
+  for (const [label, invalidStep] of invalidSteps) {
+    const workflow = withProductionStep(productionWorkflow, invalidStep);
     assert.ok(
       desktopCodes({ ...snapshot, workflow }).includes("DESKTOP_TAURI_PRODUCTION_BUILD_CI_GATE_MISSING"),
       label,
