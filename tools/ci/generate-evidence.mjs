@@ -34,16 +34,36 @@ function requireValue(value, name) {
   return value;
 }
 
+function resolveCandidateSha(env) {
+  const hasExplicitCandidate = Object.prototype.hasOwnProperty.call(
+    env,
+    "JARVIS_CANDIDATE_SHA",
+  );
+  if (env.GITHUB_EVENT_NAME === "pull_request" || hasExplicitCandidate) {
+    const candidateSha = requireValue(
+      env.JARVIS_CANDIDATE_SHA,
+      "JARVIS_CANDIDATE_SHA",
+    );
+    if (!/^[0-9a-f]{40}$/.test(candidateSha)) {
+      throw new Error("JARVIS_CANDIDATE_SHA must be a 40-hex commit SHA");
+    }
+    return candidateSha;
+  }
+
+  const githubSha = requireValue(env.GITHUB_SHA, "GITHUB_SHA");
+  if (!/^[0-9a-f]{40}$/.test(githubSha)) {
+    throw new Error("GITHUB_SHA must be a 40-hex commit SHA");
+  }
+  return githubSha;
+}
+
 export function buildCiEvidence({
   env,
   versions,
   contractSuiteVersion,
   governanceMode,
 }) {
-  const commitSha = requireValue(env.GITHUB_SHA, "GITHUB_SHA");
-  if (!/^[0-9a-f]{40}$/.test(commitSha)) {
-    throw new Error("GITHUB_SHA must be a 40-hex commit SHA");
-  }
+  const commitSha = resolveCandidateSha(env);
   if (env.JARVIS_STATIC_CI_GATES_PASSED !== "1") {
     throw new Error(
       "JARVIS_STATIC_CI_GATES_PASSED=1 is required for PASS evidence",

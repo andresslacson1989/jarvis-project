@@ -191,6 +191,7 @@ jobs:
 
       - name: Static CI evidence
         env:
+          JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           JARVIS_STATIC_CI_GATES_PASSED: '1'
           JARVIS_PHASE0_CHECKPOINT_PASSED: '1'
           JARVIS_WINDOWS_TAURI_GATES_PASSED: '1'
