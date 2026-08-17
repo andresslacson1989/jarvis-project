@@ -17,7 +17,7 @@ function assert(condition, message) {
 }
 
 function read(relativePath) {
-  return readFileSync(resolve(root, relativePath), "utf8");
+  return readFileSync(resolve(root, relativePath), "utf8").replace(/\r\n/g, "\n");
 }
 
 function readJson(relativePath) {
