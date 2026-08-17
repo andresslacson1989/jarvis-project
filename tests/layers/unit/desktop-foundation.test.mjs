@@ -70,6 +70,14 @@ test("JavaScript API and CLI pin drift fail closed", async () => {
   assert.ok(codes(cli).includes("DESKTOP_TAURI_CLI_PIN_MISMATCH"));
 });
 
+test("Tauri production command cannot be redirected through a package-script substitute", async () => {
+  const snapshot = await loadDesktopFoundationSnapshot(root);
+  const substituted = mutate(snapshot, (copy) => {
+    copy.desktopPackage.scripts.tauri = 'node -e "process.exit(0)"';
+  });
+  assert.ok(codes(substituted).includes("DESKTOP_TAURI_CLI_SCRIPT_DRIFT"));
+});
+
 test("remote production renderer target fails closed", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
   const remote = mutate(snapshot, (copy) => { copy.tauriConfig.build.frontendDist = "https://example.invalid/app"; });
