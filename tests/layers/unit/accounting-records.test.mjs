@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   validateMoneyAmount,
   validateProviderQuotaSnapshot,
+  validateUsageRecord,
 } from "../../../packages/protocol/src/accounting-runtime.mts";
 import { applyCoreMigrations, CoreSchemaError, CoreStateRepository } from "../../../services/core/src/schema.ts";
 import { openCoreDatabase } from "../../../services/core/src/persistence.ts";
@@ -23,6 +24,20 @@ test("accounting validators preserve exact money and provenance enums", () => {
   assert.deepEqual(validateMoneyAmount({ currency: "USD", nanoUnits: "1000" }), { currency: "USD", nanoUnits: "1000" });
   assert.throws(() => validateMoneyAmount({ currency: "USD", nanoUnits: "1.0" }));
   assert.deepEqual(validateProviderQuotaSnapshot({ snapshotId: "quota-1", providerId: "provider-1", quotaType: "TOKENS", unit: "tokens", observedAt: "2026-08-15T00:00:00.000Z", source: "PROVIDER_REPORTED", remaining: "100" }).source, "PROVIDER_REPORTED");
+});
+
+test("unknown quota and usage facts stay unknown instead of becoming zero or provider-reported", () => {
+  const unknownQuota = validateProviderQuotaSnapshot({ snapshotId: "quota-unknown", providerId: "provider-1", quotaType: "TOKENS", unit: "tokens", observedAt: "2026-08-15T00:00:00.000Z", source: "UNKNOWN" });
+  assert.equal(unknownQuota.source, "UNKNOWN");
+  assert.equal("remaining" in unknownQuota, false);
+
+  const calculatedQuota = validateProviderQuotaSnapshot({ snapshotId: "quota-calculated", providerId: "provider-1", quotaType: "TOKENS", unit: "tokens", observedAt: "2026-08-15T00:00:00.000Z", source: "JARVIS_CALCULATED", remaining: "0" });
+  assert.equal(calculatedQuota.source, "JARVIS_CALCULATED");
+  assert.equal(calculatedQuota.remaining, "0");
+
+  const unknownUsage = validateUsageRecord({ usageId: "usage-unknown", providerId: "provider-1", costConfidence: "UNKNOWN", occurredAt: "2026-08-15T00:00:00.000Z" });
+  assert.equal(unknownUsage.costConfidence, "UNKNOWN");
+  assert.equal("actualCost" in unknownUsage, false);
 });
 
 test("provider facts append and hard budget reservations serialize against exact amounts", async () => {

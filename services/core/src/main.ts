@@ -3,12 +3,20 @@ import { fileURLToPath } from "node:url";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { IpcEnvelope, IpcResponse } from "../../../packages/protocol/src/ipc.js";
 import type { JarvisError } from "../../../packages/protocol/src/errors.js";
+import { validateToolRequest } from "../../../packages/protocol/src/tool-runtime.mjs";
+import type { ToolResult } from "../../../packages/protocol/src/tool.ts";
+import type { ProjectStatusSnapshot, ProjectPolicyStatus } from "../../../packages/protocol/src/tool-status.mjs";
+import { createCoreToolRuntime, createFailClosedCoreToolRuntime, CoreToolRuntime } from "./tool-runtime.mjs";
+import { createNativeToolPlatformBoundaries, CoreNativeCapabilityClient } from "./native-capability.mjs";
+import type { ToolCriterionResult } from "../../../packages/protocol/src/tool.ts";
 import type {
   CoreServiceStatus,
   CoreStatusResponse,
 } from "../../../packages/protocol/src/core.js";
 import { validateProviderSetupStartRequest } from "../../../packages/protocol/src/provider-runtime.mjs";
-import type { ProviderSetupRecord } from "../../../packages/protocol/src/provider.ts";
+import type { ProviderSetupStatusView } from "./schema.js";
+import { runQualifiedCodexConversation } from "../../../providers/ai/src/codex-cli-adapter.mjs";
+import { ConversationService, ConversationServiceError, type ConversationPipelineResult } from "./conversation.mjs";
 import { admitReleaseRuntime, type ReleaseTrustAdmission } from "./release-trust.js";
 import {
   CorePersistenceError,
@@ -17,6 +25,10 @@ import {
 } from "./persistence.js";
 import { applyCoreMigrations, CoreSchemaError, CoreStateRepository } from "./schema.js";
 import type { SessionSecurityState } from "../../../packages/protocol/src/session.js";
+import { validateAuthenticatedTextConversationInput } from "../../../packages/protocol/src/conversation-runtime.mjs";
+import type { AuthenticatedTextConversationInputV1 } from "../../../packages/protocol/src/conversation.js";
+import { admitPersistedProviderWorkspaceEngineeringRequest, routePersistedProviderForRoleWithAdmission, type ProviderRoutingAdmission, type ProviderWorkspaceEngineeringAdmission } from "./provider-routing.js";
+import type { ProviderRoutingRequestV1, ProviderRoutingResultV1 } from "../../../packages/protocol/src/provider.js";
 import {
   restoreVerifiedLocalBackup,
   restoreVerifiedPortableBackup,
@@ -51,6 +63,37 @@ const CORE_STATUS_REQUEST = "get_core_status" as const;
 const SESSION_STATUS_REQUEST = "get_session_status" as const;
 const SESSION_INITIALIZE_REQUEST = "initialize_session" as const;
 const SESSION_AUTHENTICATE_REQUEST = "authenticate_session" as const;
+const CONVERSATION_REQUEST = "process_authenticated_text" as const;
+const TOOL_EXECUTION_REQUEST = "execute_tool" as const;
+
+export function evaluateOpenTargetPostcondition(
+  request: { readonly arguments: unknown },
+  output: Readonly<Record<string, unknown>>,
+  verifiedAt = new Date().toISOString(),
+): ToolCriterionResult {
+  const requestArguments = typeof request.arguments === "object" && request.arguments !== null && !Array.isArray(request.arguments)
+    ? request.arguments as Record<string, unknown>
+    : undefined;
+  const targetKind = requestArguments?.targetKind;
+  const outputTargetKind = output.targetKind;
+  const targetIdentity = output.targetIdentity;
+  const state = output.state;
+  const passed = (targetKind === "PROJECT" || targetKind === "FILE")
+    && outputTargetKind === targetKind
+    && typeof targetIdentity === "string"
+    && targetIdentity.length > 0
+    && state === "OPEN_REQUESTED";
+  return {
+    criterionId: "target-open-requested",
+    verdict: passed ? "PASS" : "UNKNOWN",
+    evidence: [],
+    summary: passed
+      ? "Windows returned the exact qualified open target and OPEN_REQUESTED state"
+      : "Windows did not return matching qualified open-target postcondition evidence",
+    verifiedAt,
+    verifierType: "LIVE_STATE",
+  };
+}
 
 export type CoreBootstrapState = "STARTING" | "RECOVERY" | "READY" | "STOPPING" | "STOPPED";
 export type CoreBootstrapFailureCode =
@@ -229,10 +272,11 @@ type ProviderSetupStartResponse = IpcResponse<{
   readonly state: "SETUP_IN_PROGRESS";
 }>;
 type ProviderSetupCompleteResponse = IpcResponse<{ readonly requestId: string; readonly state: "SETUP_READY" | "SETUP_FAILED" }>;
-type ProviderSetupStatusResponse = IpcResponse<{ readonly providers: readonly ProviderSetupRecord[] }>;
+type ProviderSetupStatusResponse = IpcResponse<{ readonly providers: readonly ProviderSetupStatusView[] }>;
 type SessionStatusResponse = IpcResponse<{ readonly initialized: boolean; readonly state: SessionSecurityState | null }>;
 type SessionInitializeResponse = IpcResponse<{ readonly initialized: true; readonly state: SessionSecurityState }>;
 type SessionAuthenticateResponse = IpcResponse<{ readonly status: "UNLOCKED" | "DENIED" | "COOLDOWN"; readonly retryAfterMs: number; readonly state: SessionSecurityState }>;
+type ConversationResponse = IpcResponse<ConversationPipelineResult>;
 
 /**
  * Shared service-shell stub for the first UI/Core boundary slice. It exposes
@@ -266,7 +310,8 @@ export class CoreServiceShell implements CoreServiceShellBoundary {
 /**
  * The authenticated native transport is the first point at which Core may
  * return a real status result. This shell still owns no mutable mission state
- * and exposes no tools or provider operations.
+ * and exposes no provider operations. Tool execution is accepted only through
+ * the explicit Core-owned handler supplied by the native composition root.
  */
 export class AuthenticatedCoreServiceShell implements CoreServiceShellBoundary {
   private readonly startProviderSetup: ((request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>) | undefined;
@@ -275,14 +320,18 @@ export class AuthenticatedCoreServiceShell implements CoreServiceShellBoundary {
   private readonly sessionStatus: ((request: IpcEnvelope<unknown>) => SessionStatusResponse | Promise<SessionStatusResponse>) | undefined;
   private readonly initializeSession: ((request: IpcEnvelope<unknown>) => SessionInitializeResponse | Promise<SessionInitializeResponse>) | undefined;
   private readonly authenticateSession: ((request: IpcEnvelope<unknown>) => SessionAuthenticateResponse | Promise<SessionAuthenticateResponse>) | undefined;
+  private readonly processConversation: ((request: IpcEnvelope<unknown>) => ConversationResponse | Promise<ConversationResponse>) | undefined;
+  private readonly executeTool: ((request: IpcEnvelope<unknown>) => ToolResult | Promise<ToolResult>) | undefined;
 
-  constructor(startProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>, completeProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupCompleteResponse | Promise<ProviderSetupCompleteResponse>, providerSetupStatus?: (request: IpcEnvelope<unknown>) => ProviderSetupStatusResponse | Promise<ProviderSetupStatusResponse>, sessionStatus?: (request: IpcEnvelope<unknown>) => SessionStatusResponse | Promise<SessionStatusResponse>, initializeSession?: (request: IpcEnvelope<unknown>) => SessionInitializeResponse | Promise<SessionInitializeResponse>, authenticateSession?: (request: IpcEnvelope<unknown>) => SessionAuthenticateResponse | Promise<SessionAuthenticateResponse>) {
+  constructor(startProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupStartResponse | Promise<ProviderSetupStartResponse>, completeProviderSetup?: (request: IpcEnvelope<unknown>) => ProviderSetupCompleteResponse | Promise<ProviderSetupCompleteResponse>, providerSetupStatus?: (request: IpcEnvelope<unknown>) => ProviderSetupStatusResponse | Promise<ProviderSetupStatusResponse>, sessionStatus?: (request: IpcEnvelope<unknown>) => SessionStatusResponse | Promise<SessionStatusResponse>, initializeSession?: (request: IpcEnvelope<unknown>) => SessionInitializeResponse | Promise<SessionInitializeResponse>, authenticateSession?: (request: IpcEnvelope<unknown>) => SessionAuthenticateResponse | Promise<SessionAuthenticateResponse>, processConversation?: (request: IpcEnvelope<unknown>) => ConversationResponse | Promise<ConversationResponse>, executeTool?: (request: IpcEnvelope<unknown>) => ToolResult | Promise<ToolResult>) {
     this.startProviderSetup = startProviderSetup;
     this.completeProviderSetup = completeProviderSetup;
     this.providerSetupStatus = providerSetupStatus;
     this.sessionStatus = sessionStatus;
     this.initializeSession = initializeSession;
     this.authenticateSession = authenticateSession;
+    this.processConversation = processConversation;
+    this.executeTool = executeTool;
   }
 
   async handle(request: IpcEnvelope<unknown>): Promise<IpcResponse<unknown>> {
@@ -316,9 +365,76 @@ export class AuthenticatedCoreServiceShell implements CoreServiceShellBoundary {
       try { return this.authenticateSession ? await this.authenticateSession(request) : sessionAuthenticateNotReadyResponse(request); }
       catch (error) { return sessionMutationFailureResponse(request, error); }
     }
+    if (isConversationRequest(request)) {
+      try { return this.processConversation ? await this.processConversation(request) : conversationNotReadyResponse(request); }
+      catch (error) { return conversationFailureResponse(request, error); }
+    }
+    if (isToolExecutionRequest(request)) {
+      try {
+        return this.executeTool
+          ? { ok: true, result: await this.executeTool(request) }
+          : toolExecutionNotReadyResponse(request);
+      } catch {
+        return toolExecutionFailureResponse(request);
+      }
+    }
+    if (isToolExecutionEnvelope(request)) return invalidToolExecutionResponse(request);
     if (!isCoreStatusRequest(request)) return invalidCoreStatusResponse(request);
     return { ok: true, result: LOCKED_CORE_SERVICE_STATUS };
   }
+}
+
+type ToolExecutionResponse = IpcResponse<ToolResult>;
+
+function toolExecutionNotReadyResponse(request: IpcEnvelope<unknown>): ToolExecutionResponse {
+  const toolRequest = validateToolRequest(request.payload);
+  return {
+    ok: false,
+    error: {
+      code: "CORE_TOOL_RUNTIME_NOT_READY",
+      category: "UNSUPPORTED",
+      message: "Core tool execution is not available until typed platform boundaries are attached",
+      retryable: true,
+      correlationId: request.correlationId,
+      details: { toolExecutionId: toolRequest.toolExecutionId },
+    },
+  };
+}
+
+function toolExecutionFailureResponse(request: IpcEnvelope<unknown>): ToolExecutionResponse {
+  return {
+    ok: false,
+    error: {
+      code: "CORE_TOOL_EXECUTION_FAILED",
+      category: "INTERNAL",
+      message: "Core tool execution could not be completed",
+      retryable: true,
+      correlationId: request.correlationId,
+    },
+  };
+}
+
+function invalidToolExecutionResponse(request: IpcEnvelope<unknown>): ToolExecutionResponse {
+  return {
+    ok: false,
+    error: {
+      code: "CORE_TOOL_REQUEST_INVALID",
+      category: "VALIDATION",
+      message: "Tool execution requests must contain a valid ToolRequest whose execution ID matches the IPC request ID",
+      retryable: false,
+      correlationId: correlationIdFor(request),
+    },
+  };
+}
+
+function conversationNotReadyResponse(request: IpcEnvelope<unknown>): ConversationResponse {
+  return { ok: false, error: { code: "CORE_CONVERSATION_NOT_READY", category: "UNSUPPORTED", message: "Authenticated conversation is not available until the Core conversation boundary is attached", retryable: true, correlationId: request.correlationId } };
+}
+
+function conversationFailureResponse(request: IpcEnvelope<unknown>, error: unknown): ConversationResponse {
+  const code = error instanceof ConversationServiceError ? error.code : "CORE_CONVERSATION_FAILED";
+  const category = code === "AUTHENTICATION_REQUIRED" ? "AUTHENTICATION" : code === "PROVIDER_ERROR" ? "PROVIDER_FAILED" : code === "PERSISTENCE_FAILED" ? "INTERNAL" : "VALIDATION";
+  return { ok: false, error: { code, category, message: error instanceof ConversationServiceError ? error.message : "Authenticated conversation could not be completed", retryable: code === "PROVIDER_ERROR", correlationId: request.correlationId } };
 }
 
 function sessionStatusNotReadyResponse(request: IpcEnvelope<unknown>): SessionStatusResponse {
@@ -460,6 +576,30 @@ function isSessionAuthenticateRequest(value: unknown): value is IpcEnvelope<{ re
   return Object.keys(value.payload).sort().join(",") === "password,userId" && boundedSecretText(value.payload.password) && boundedUserId(value.payload.userId);
 }
 
+function isConversationRequest(value: unknown): value is IpcEnvelope<AuthenticatedTextConversationInputV1> {
+  if (!isRecord(value) || value.protocolVersion !== 1 || value.kind !== "request" || value.name !== CONVERSATION_REQUEST || !isUuidV7(value.id) || !isUuidV7(value.correlationId) || !isRecord(value.payload)) return false;
+  try {
+    const input = validateAuthenticatedTextConversationInput(value.payload);
+    return input.instruction.id === value.id;
+  } catch {
+    return false;
+  }
+}
+
+function isToolExecutionEnvelope(value: unknown): value is IpcEnvelope<unknown> {
+  return isRecord(value) && value.protocolVersion === 1 && value.kind === "request" && value.name === TOOL_EXECUTION_REQUEST;
+}
+
+function isToolExecutionRequest(value: unknown): value is IpcEnvelope<Record<string, unknown>> {
+  if (!isToolExecutionEnvelope(value) || !isUuidV7(value.id) || !isUuidV7(value.correlationId) || !isRecord(value.payload)) return false;
+  try {
+    const request = validateToolRequest(value.payload);
+    return request.toolExecutionId === value.id;
+  } catch {
+    return false;
+  }
+}
+
 function boundedSecretText(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 4096 && !value.includes("\0");
 }
@@ -500,6 +640,7 @@ export class CoreBootstrap {
   private state: CoreBootstrapState = "STARTING";
   private environment: CoreRuntimeEnvironment | undefined;
   private database: CoreDatabaseConnection | undefined;
+  private toolRuntime: CoreToolRuntime | undefined;
   private secureStorageMaterial:
     Pick<BootstrapMaterial, "secureStorageEndpoint" | "secureStorageSecret"> | undefined;
 
@@ -527,6 +668,7 @@ export class CoreBootstrap {
         this.database = openCoreDatabase(this.environment.databasePath, { dbDek: databaseDek });
         applyCoreMigrations(this.database);
         this.ensureQualifiedCodexProvider();
+        this.toolRuntime = createFailClosedCoreToolRuntime(new CoreStateRepository(this.database));
       } catch (error) {
         this.database?.close();
         this.database = undefined;
@@ -535,6 +677,175 @@ export class CoreBootstrap {
     }
     this.state = this.environment.recoveryMode ? "RECOVERY" : "READY";
     return this.status();
+  }
+
+  async executeTool(request: IpcEnvelope<unknown>): Promise<ToolResult> {
+    if (!isToolExecutionRequest(request) || this.toolRuntime === undefined) {
+      throw new CoreBootstrapError("CORE_START_FAILED", "Core tool runtime is not composed");
+    }
+    return this.toolRuntime.execute(request.payload);
+  }
+
+  getProjectWorkspace(projectId: string, workspaceId: string): { readonly projectId: string; readonly workspaceId: string; readonly canonicalRoot: { readonly platform: string; readonly value: string } } | undefined {
+    if (this.database === undefined) return undefined;
+    const workspace = new CoreStateRepository(this.database).getProjectWorkspace(workspaceId);
+    if (workspace === undefined || workspace.projectId !== projectId) return undefined;
+    return workspace;
+  }
+
+  getProjectStatus(projectId: string, workspaceId: string): ProjectStatusSnapshot | undefined {
+    if (this.database === undefined) return undefined;
+    const repository = new CoreStateRepository(this.database);
+    const project = repository.getProject(projectId);
+    const workspace = repository.getProjectWorkspace(workspaceId);
+    if (project === undefined || workspace === undefined || workspace.projectId !== projectId) return undefined;
+    const states = repository.getProjectPolicyTrustRecords(projectId).map((record) => record.state);
+    const policyStatus: ProjectPolicyStatus = states.length === 0
+      ? "NO_POLICY_CANDIDATE"
+      : states.includes("CHANGED_REVIEW_REQUIRED")
+        ? "POLICY_CHANGED_REVIEW_REQUIRED"
+        : states.includes("UNTRUSTED_CANDIDATE")
+          ? "POLICY_DECISION_REQUIRED"
+          : states.includes("REVOKED")
+            ? "POLICY_REVOKED"
+            : states.includes("TRUSTED")
+              ? "TRUSTED_POLICY"
+              : "POLICY_DISABLED";
+    return { project, workspace, policyStatus };
+  }
+
+  attachNativeCapabilityClient(client: CoreNativeCapabilityClient): void {
+    if (this.database === undefined) throw new CoreBootstrapError("CORE_START_FAILED", "Core persistence must be ready before native capabilities attach");
+    const repository = new CoreStateRepository(this.database);
+    const releaseTrustReady = this.environment?.releaseTrust !== undefined;
+    const nativeBoundaries = createNativeToolPlatformBoundaries(client);
+    const criterion = (criterionId: string, verdict: ToolCriterionResult["verdict"], summary: string): ToolCriterionResult => ({
+      criterionId,
+      verdict,
+      evidence: [],
+      summary,
+      verifiedAt: new Date().toISOString(),
+      verifierType: "LIVE_STATE",
+    });
+    this.toolRuntime = createCoreToolRuntime(repository, nativeBoundaries, {
+      readPermissionDecision: async (request) => repository.getPermissionDecisionForToolExecution(request.toolExecutionId) ?? (() => { throw new Error("CORE_TOOL_PERMISSION_DECISION_MISSING"); })(),
+      readPreAllowGateFacts: async (request, manifest) => {
+        const supportedPlatformCapabilities = new Set([
+          "core.status.read",
+          "project.status.read",
+          "project.open",
+          "file.open",
+          "filesystem.workspace.read",
+          "filesystem.workspace.write",
+          "process.supervision",
+          "workspace.engineering.test",
+          "workspace.engineering.build",
+          "git.workspace.read",
+        ]);
+        const requestArguments = typeof request.arguments === "object" && request.arguments !== null && !Array.isArray(request.arguments)
+          ? request.arguments as Record<string, unknown>
+          : undefined;
+        const applicationOpenRequested = manifest.toolId === "jarvis.open.application-project-file" && requestArguments?.targetKind === "APPLICATION";
+        const platformReady = !applicationOpenRequested && manifest.requiredPlatformCapabilities.every((capability) => supportedPlatformCapabilities.has(capability));
+        const workspaceScope = request.executionScope.kind === "PROJECT_WORKSPACE";
+        const projectStatus = workspaceScope
+          ? this.getProjectStatus(request.executionScope.projectId, request.executionScope.workspaceId)
+          : undefined;
+        const statusRead = manifest.toolId === "jarvis.status.project-system";
+        const projectPolicyFact = !workspaceScope || statusRead
+          ? { state: "NOT_APPLICABLE" as const, reasonCode: "PROJECT_POLICY_NOT_CONSUMED" }
+          : projectStatus === undefined
+            ? { state: "UNKNOWN" as const, reasonCode: "PROJECT_POLICY_FACT_NOT_FOUND" }
+            : projectStatus.policyStatus === "TRUSTED_POLICY"
+              ? { state: "PASS" as const, reasonCode: "TRUSTED_PROJECT_POLICY" }
+              : { state: "FAIL" as const, reasonCode: "PROJECT_POLICY_NOT_TRUSTED" };
+        const workspaceTargetTool = manifest.toolId.startsWith("jarvis.project.")
+          || manifest.toolId.startsWith("jarvis.git.")
+          || manifest.toolId.startsWith("jarvis.filesystem.")
+          || (manifest.toolId === "jarvis.open.application-project-file" && (requestArguments?.targetKind === "PROJECT" || requestArguments?.targetKind === "FILE"));
+        const targetReadyFact = manifest.preconditions.length === 0
+          ? { state: "NOT_APPLICABLE" as const, reasonCode: "NO_TOOL_PRECONDITION" }
+          : workspaceScope
+            && projectStatus !== undefined
+            && workspaceTargetTool
+              ? { state: "PASS" as const, reasonCode: "CORE_WORKSPACE_TARGET_PRESENT" }
+              : applicationOpenRequested
+                ? { state: "FAIL" as const, reasonCode: "APPLICATION_OPEN_UNQUALIFIED" }
+                : { state: "UNKNOWN" as const, reasonCode: "TOOL_PRECONDITION_NOT_COMPOSED" };
+        return {
+          PLATFORM_CAPABILITY: { state: platformReady ? "PASS" : "UNKNOWN", reasonCode: platformReady ? "NATIVE_CAPABILITY_COMPOSED" : "NATIVE_CAPABILITY_UNQUALIFIED" },
+          PROVIDER_SETUP: { state: "NOT_APPLICABLE", reasonCode: "LOCAL_TOOL_NO_PROVIDER_GATE" },
+          INTEGRITY: { state: releaseTrustReady ? "PASS" : "UNKNOWN", reasonCode: releaseTrustReady ? "RELEASE_TUF_ADMITTED" : "RELEASE_TUF_UNKNOWN" },
+          PROJECT_POLICY_TRUST: projectPolicyFact,
+          SUPPLY_CHAIN_TRUST: { state: releaseTrustReady ? "PASS" : "UNKNOWN", reasonCode: releaseTrustReady ? "RELEASE_SUPPLY_CHAIN_ADMITTED" : "RELEASE_SUPPLY_CHAIN_UNKNOWN" },
+          LOCALITY: { state: "PASS", reasonCode: "WINDOWS_LOCAL_HOST" },
+          BUDGET: { state: "NOT_APPLICABLE", reasonCode: "LOCAL_TOOL_NO_MONETARY_BUDGET" },
+          RESOURCE: { state: "PASS", reasonCode: "BOUNDED_TOOL_RESOURCE_INPUT" },
+          PRECONDITION: targetReadyFact,
+        };
+      },
+      evaluatePreconditions: async (request, manifest, input, signal) => {
+        const projectId = input.projectId as string | undefined;
+        const workspaceId = input.workspaceId as string | undefined;
+        if (manifest.toolId === "jarvis.open.application-project-file") {
+          if (input.targetKind === "APPLICATION") return [criterion("target-resolved", "UNKNOWN", "application opening is not qualified without a contract-defined application allowlist")];
+          if (projectId === undefined || workspaceId === undefined) return [];
+          try {
+            const snapshot = await nativeBoundaries.status.readProjectStatus(projectId, workspaceId, signal);
+            return [criterion("target-resolved", snapshot.workspace.projectId === projectId && snapshot.workspace.workspaceId === workspaceId ? "PASS" : "FAIL", "Core and Windows returned the exact registered workspace for the open target")];
+          } catch {
+            return [criterion("target-resolved", "UNKNOWN", "the registered open target could not be verified")];
+          }
+        }
+        if (projectId === undefined || workspaceId === undefined) return [];
+        if (manifest.toolId.startsWith("jarvis.project.")) {
+          try {
+            const snapshot = await nativeBoundaries.status.readProjectStatus(projectId, workspaceId, signal);
+            return [criterion("engineering-target-ready", snapshot.workspace.projectId === projectId && snapshot.workspace.workspaceId === workspaceId ? "PASS" : "FAIL", "Core and Windows returned the exact registered engineering workspace")];
+          } catch {
+            return [criterion("engineering-target-ready", "UNKNOWN", "the registered engineering workspace could not be verified")];
+          }
+        }
+        if (manifest.toolId.startsWith("jarvis.git.")) {
+          try {
+            const result = await nativeBoundaries.git.readStatus({ operation: "STATUS", projectId, workspaceId, maxEntries: 1 }, signal);
+            return [criterion("git-workspace-resolved", result.workspaceIdentity.length > 0 && result.repositoryIdentity.length > 0 ? "PASS" : "FAIL", "Windows returned bounded Git identity evidence for the registered workspace")];
+          } catch {
+            return [criterion("git-workspace-resolved", "UNKNOWN", "the registered Git workspace could not be verified")];
+          }
+        }
+        if (manifest.toolId === "jarvis.filesystem.write-text") {
+          try {
+            const result = await nativeBoundaries.filesystem.readText({ operation: "READ_TEXT", projectId, workspaceId, relativePath: input.relativePath as string, maxBytes: 1_048_576 }, signal);
+            return [criterion("write-target-version", result.versionToken.length > 0 ? "PASS" : "FAIL", "Windows returned the current expected-state token for the write target")];
+          } catch {
+            return [criterion("write-target-version", "UNKNOWN", "the filesystem write target version could not be verified")];
+          }
+        }
+        if (manifest.toolId === "jarvis.filesystem.read-text") {
+          try {
+            const result = await nativeBoundaries.filesystem.readText({ operation: "READ_TEXT", projectId, workspaceId, relativePath: input.relativePath as string, maxBytes: 1_048_576 }, signal);
+            return [criterion("read-target-resolved", result.targetIdentity.length > 0 ? "PASS" : "FAIL", "Windows returned bounded identity evidence for the read target")];
+          } catch {
+            return [criterion("read-target-resolved", "UNKNOWN", "the filesystem read target could not be verified")];
+          }
+        }
+        return [];
+      },
+      evaluatePostconditions: async (request, manifest, output) => {
+        if (manifest.toolId === "jarvis.open.application-project-file") {
+          return [evaluateOpenTargetPostcondition(request, output)];
+        }
+        if (manifest.toolId === "jarvis.project.test" || manifest.toolId === "jarvis.project.build") {
+          const semanticState = output.semanticState;
+          return [criterion("engineering-result-verified", semanticState === "UNCERTAIN" ? "UNKNOWN" : "PASS", `Windows supervised engineering returned semantic state ${String(semanticState)}`)];
+        }
+        if (manifest.toolId === "jarvis.filesystem.write-text") {
+          return [criterion("write-target-verified", typeof output.targetIdentity === "string" && typeof output.versionToken === "string" && output.state === "WRITTEN" ? "PASS" : "UNKNOWN", "Windows returned the post-write target identity and version token")];
+        }
+        return [];
+      },
+    });
   }
 
   private ensureQualifiedCodexProvider(): void {
@@ -549,7 +860,7 @@ export class CoreBootstrap {
       platform: { platform: "WINDOWS", runtimeRole: "FULL_HOST", architecture: "x64", backendProfileId: "windows-v1" },
       setup: "SETUP_REQUIRED",
       compatibility: "COMPATIBLE",
-      capabilities: { coding: true, structuredOutput: true, toolUse: true, locality: "LOCAL" },
+      capabilities: { naturalLanguage: true, coding: true, structuredOutput: true, toolUse: true, locality: "LOCAL" },
       costClass: "FREE",
       latencyClass: "LOW",
       health: "READY",
@@ -563,6 +874,7 @@ export class CoreBootstrap {
       distributionPolicy: { distributionIds: [QUALIFIED_CODEX_DISTRIBUTION_ID], interfaceIds: ["codex-structured-v1"], executableFileNames: ["codex.exe"], setupHelperFileNames: ["codex-windows-sandbox-setup.exe"] },
     }, now);
     repository.ensureProviderSetupState({ providerId: QUALIFIED_CODEX_PROVIDER_ID, distributionId: QUALIFIED_CODEX_DISTRIBUTION_ID, adapterVersion: QUALIFIED_CODEX_ADAPTER_VERSION, providerVersion: "0.147.0", state: "SETUP_REQUIRED" }, now);
+    repository.ensureProviderQualificationState({ providerId: QUALIFIED_CODEX_PROVIDER_ID, distributionId: QUALIFIED_CODEX_DISTRIBUTION_ID, providerVersion: "0.147.0", state: "UNQUALIFIED" }, now);
   }
 
   stop(): CoreStatus {
@@ -592,6 +904,16 @@ export class CoreBootstrap {
     return this.environment;
   }
 
+  routeProviderForRole(request: ProviderRoutingRequestV1, admission: ProviderRoutingAdmission): ProviderRoutingResultV1 {
+    if (!this.database) throw new CoreBootstrapError("CORE_START_FAILED", "Core persistence is not available for provider routing");
+    return routePersistedProviderForRoleWithAdmission(new CoreStateRepository(this.database), request, admission);
+  }
+
+  admitWorkspaceEngineeringRequest(value: unknown): ProviderWorkspaceEngineeringAdmission {
+    if (!this.database) throw new CoreBootstrapError("CORE_START_FAILED", "Core persistence is not available for workspace engineering admission");
+    return admitPersistedProviderWorkspaceEngineeringRequest(new CoreStateRepository(this.database), value);
+  }
+
   startProviderSetup(request: IpcEnvelope<unknown>): ProviderSetupStartResponse {
     if (!isProviderSetupStartRequest(request)) return providerSetupNotReadyResponse(request);
     if (!this.database) return providerSetupNotReadyResponse(request);
@@ -615,7 +937,32 @@ export class CoreBootstrap {
 
   providerSetupStatus(request: IpcEnvelope<unknown>): ProviderSetupStatusResponse {
     if (!isProviderSetupStatusRequest(request) || !this.database) return providerSetupStatusNotReadyResponse(request);
-    return { ok: true, result: { providers: new CoreStateRepository(this.database).listProviderSetupStates() } };
+    return { ok: true, result: { providers: new CoreStateRepository(this.database).listProviderSetupStatusViews() } };
+  }
+
+  async processAuthenticatedText(request: IpcEnvelope<unknown>): Promise<ConversationResponse> {
+    if (!isConversationRequest(request) || !this.database) return conversationNotReadyResponse(request);
+    const repository = new CoreStateRepository(this.database);
+    const provider = repository.listProviderSetupStates().find((record) => record.providerId === QUALIFIED_CODEX_PROVIDER_ID);
+    if (!provider || provider.state !== "SETUP_READY") {
+      return {
+        ok: false,
+        error: {
+          code: "CORE_PROVIDER_SETUP_REQUIRED",
+          category: "PRECONDITION",
+          message: "Codex provider setup must be independently verified before conversation use",
+          retryable: true,
+          correlationId: request.correlationId,
+        },
+      };
+    }
+    const service = new ConversationService({
+      providerId: QUALIFIED_CODEX_PROVIDER_ID,
+      repository,
+      createMessageId: () => `${request.id as string}:assistant`,
+      orchestrator: ({ input, context, repairAttempt }) => runQualifiedCodexConversation({ input, context, repairAttempt, workingDirectory: this.getRuntimeEnvironment().releaseRoot }),
+    });
+    return { ok: true, result: await service.processAuthenticatedText(request.payload) };
   }
 
   sessionStatus(request: IpcEnvelope<unknown>): SessionStatusResponse {
@@ -759,9 +1106,12 @@ export async function serveAuthenticatedCoreTransport(
   sessionStatus?: (request: IpcEnvelope<unknown>) => SessionStatusResponse | Promise<SessionStatusResponse>,
   initializeSession?: (request: IpcEnvelope<unknown>) => SessionInitializeResponse | Promise<SessionInitializeResponse>,
   authenticateSession?: (request: IpcEnvelope<unknown>) => SessionAuthenticateResponse | Promise<SessionAuthenticateResponse>,
+  processConversation?: (request: IpcEnvelope<unknown>) => ConversationResponse | Promise<ConversationResponse>,
+  executeTool?: (request: IpcEnvelope<unknown>) => ToolResult | Promise<ToolResult>,
+  nativeCapabilityClient?: CoreNativeCapabilityClient,
 ): Promise<void> {
   const reader = transport.reader;
-  const shell = new AuthenticatedCoreServiceShell(startProviderSetup, completeProviderSetup, providerSetupStatus, sessionStatus, initializeSession, authenticateSession);
+  const shell = new AuthenticatedCoreServiceShell(startProviderSetup, completeProviderSetup, providerSetupStatus, sessionStatus, initializeSession, authenticateSession, processConversation, executeTool);
   while (!isStopping()) {
     let payload: Buffer;
     try {
@@ -783,6 +1133,7 @@ export async function serveAuthenticatedCoreTransport(
     } catch {
       request = undefined;
     }
+    if (nativeCapabilityClient?.handleResponse(request)) continue;
     const response = await shell.handle(request as IpcEnvelope<unknown>);
     try {
       await writeCoreFrame(transport, response);
@@ -817,6 +1168,18 @@ async function runEntrypoint(): Promise<void> {
     process.exitCode = 1;
     return;
   }
+  const nativeCapabilityClient = new CoreNativeCapabilityClient({
+    write: async (frame) => writeCoreFrame(authenticatedTransport, frame),
+  }, async (projectId, workspaceId) => {
+    const workspace = bootstrap.getProjectWorkspace(projectId, workspaceId);
+    if (workspace === undefined || workspace.canonicalRoot.platform !== CORE_PLATFORM) return undefined;
+    return {
+      projectId: workspace.projectId,
+      workspaceId: workspace.workspaceId,
+      workspaceRoot: workspace.canonicalRoot.value,
+    };
+  }, async (projectId, workspaceId) => bootstrap.getProjectStatus(projectId, workspaceId));
+  bootstrap.attachNativeCapabilityClient(nativeCapabilityClient);
   let stopping = false;
   const shutdown = () => {
     stopping = true;
@@ -824,7 +1187,8 @@ async function runEntrypoint(): Promise<void> {
   };
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
-  await serveAuthenticatedCoreTransport(authenticatedTransport, () => stopping, (request) => bootstrap.startProviderSetup(request), (request) => bootstrap.completeProviderSetup(request), (request) => bootstrap.providerSetupStatus(request), (request) => bootstrap.sessionStatus(request), (request) => bootstrap.initializeSession(request), (request) => bootstrap.authenticateSession(request));
+  await serveAuthenticatedCoreTransport(authenticatedTransport, () => stopping, (request) => bootstrap.startProviderSetup(request), (request) => bootstrap.completeProviderSetup(request), (request) => bootstrap.providerSetupStatus(request), (request) => bootstrap.sessionStatus(request), (request) => bootstrap.initializeSession(request), (request) => bootstrap.authenticateSession(request), (request) => bootstrap.processAuthenticatedText(request), (request) => bootstrap.executeTool(request), nativeCapabilityClient);
+  nativeCapabilityClient.close();
   process.off("SIGINT", shutdown);
   process.off("SIGTERM", shutdown);
   authenticatedTransport.socket.destroy();

@@ -1,7 +1,7 @@
 # JARVIS
 ## Implementation, Security, Operations & Production Contract
 
-**Contract Suite Version:** 1.0.7
+**Contract Suite Version:** 1.0.8
 **Status:** Canonical Implementation-Locked Baseline  
 **Date:** August 12, 2026  
 **V1 Production Platform:** Microsoft Windows 11  
@@ -319,10 +319,10 @@ Shell-capable software engineering workers operate under the V1 `WORKSPACE_ENGIN
 - JARVIS assigns the exact project/worktree;
 - writes are limited to the assigned writable workspace by the qualified provider/OS sandbox where supported;
 - provider/native read access outside the workspace is **not** claimed to be impossible unless conformance proves it;
-- delegated network access is denied by default and may be enabled only by an explicit qualified policy;
+- delegated Codex CLI worker network access is enabled by default; the typed Codex workspace request SHALL use `networkMode: ENABLED`;
 - unrelated secrets/credentials are not placed in the worker environment/context;
 - external consequential actions such as GitHub push, deploy, Proxmox change, email/send, or cloud mutation are not delegated merely because a shell/client binary exists;
-- those operations return through registered JARVIS tools/integrations and PermissionEngine.
+- those operations return through registered JARVIS tools/integrations and PermissionEngine. Network availability does not authorize them.
 
 Windows V1 uses Job Objects for lifecycle/resource containment. Job Objects are not filesystem/network security isolation and are not the universal shared abstraction; the shared concept is managed process-tree supervision.
 
@@ -780,4 +780,4 @@ The absence of Linux/companion delivery from V1 SHALL NOT be used to justify vio
 
 ---
 
-**END — JARVIS IMPLEMENTATION, SECURITY, OPERATIONS & PRODUCTION CONTRACT SUITE v1.0.7**
+**END — JARVIS IMPLEMENTATION, SECURITY, OPERATIONS & PRODUCTION CONTRACT SUITE v1.0.8**

@@ -1,5 +1,6 @@
 import type { PlatformCompatibility, PlatformPathRef, PlatformRuntimeIdentity } from "./platform.js";
 import type { StructuredAiOutputV1 } from "./content-authority.js";
+import type { DataPolicy } from "./data.js";
 import type { ProviderSetupQualificationPlan } from "./provider-setup-plan.js";
 
 export type ProviderSetupState = "NOT_REQUIRED" | "SETUP_REQUIRED" | "SETUP_IN_PROGRESS" | "SETUP_READY" | "REPAIR_REQUIRED" | "SETUP_FAILED";
@@ -64,6 +65,68 @@ export interface ProviderProfile {
   readonly latencyClass: "LOW" | "MEDIUM" | "HIGH" | "UNKNOWN";
   readonly health: ProviderHealth;
   readonly resources?: ProviderResourceProfile;
+}
+
+export type ProviderWorkRole = "GENERALIST" | "SOFTWARE_ENGINEER" | "VERIFIER" | "SYNTHESIZER";
+export type ProviderCapabilityName = "naturalLanguage" | "structuredOutput" | "toolUse" | "coding" | "research" | "vision" | "streaming" | "resumableSession";
+
+export interface ProviderRoleProfileV1 {
+  readonly domain: "jarvis.provider-role-profile.v1";
+  readonly schemaVersion: 1;
+  readonly role: ProviderWorkRole;
+  readonly requiredCapabilities: readonly ProviderCapabilityName[];
+  readonly preferredExecutionModes: readonly ProviderExecutionMode[];
+  readonly maxIterations: number;
+}
+
+export interface ProviderRoutingRequestV1 {
+  readonly domain: "jarvis.provider-routing-request.v1";
+  readonly schemaVersion: 1;
+  readonly requestId: string;
+  readonly role: ProviderWorkRole;
+  readonly platform: PlatformRuntimeIdentity;
+  readonly dataPolicy: DataPolicy;
+  readonly requiredCapabilities?: readonly ProviderCapabilityName[];
+  readonly executionMode?: ProviderExecutionMode;
+  readonly allowedProviderIds?: readonly string[];
+}
+
+export interface ProviderRoutingCandidateV1 {
+  readonly profile: ProviderProfile;
+  readonly adapter: ProviderAdapterContract;
+  readonly setup: ProviderSetupRecord;
+  readonly qualification: ProviderQualificationRecord;
+}
+
+export type ProviderRoutingRejectionCode =
+  | "PROVIDER_NOT_ALLOWED"
+  | "IDENTITY_MISMATCH"
+  | "SETUP_NOT_READY"
+  | "SETUP_EVIDENCE_MISSING"
+  | "COMPATIBILITY_NOT_READY"
+  | "HEALTH_NOT_READY"
+  | "QUALIFICATION_NOT_READY"
+  | "QUALIFICATION_EVIDENCE_MISSING"
+  | "CAPABILITY_MISSING"
+  | "EXECUTION_MODE_UNSUPPORTED"
+  | "LOCALITY_NOT_ALLOWED"
+  | "PLATFORM_NOT_SUPPORTED";
+
+export interface ProviderRoutingCandidateResultV1 {
+  readonly providerId: string;
+  readonly eligible: boolean;
+  readonly rejectionCodes: readonly ProviderRoutingRejectionCode[];
+}
+
+export interface ProviderRoutingResultV1 {
+  readonly domain: "jarvis.provider-routing-result.v1";
+  readonly schemaVersion: 1;
+  readonly requestId: string;
+  readonly role: ProviderWorkRole;
+  readonly outcome: "SELECTED" | "NO_MATCH";
+  readonly selectedProviderId?: string;
+  readonly selectedExecutionMode?: ProviderExecutionMode;
+  readonly candidates: readonly ProviderRoutingCandidateResultV1[];
 }
 
 export interface ProviderCompatibilityPolicy {

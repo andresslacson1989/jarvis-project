@@ -97,7 +97,7 @@ const canonicalValues = {
 };
 
 const matrix =
-  `| Contract suite | JARVIS v1.0.7 |\n` +
+  `| Contract suite | JARVIS v1.0.8 |\n` +
   childIds
     .map((id) => `| ↳ **${id}** x | **VERIFIED** |`)
     .join("\n") +
@@ -211,7 +211,7 @@ test("unverified child subsection fails checkpoint", () => {
 
 test("verified Section 0 summary permits completed child rows to be compacted later", () => {
   const compactMatrix =
-    "| Contract suite | JARVIS v1.0.7 |\n" +
+    "| Contract suite | JARVIS v1.0.8 |\n" +
     "| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFIED** | — |\n";
   assert.deepEqual(codes({ matrix: compactMatrix }), []);
 });
@@ -219,7 +219,7 @@ test("verified Section 0 summary permits completed child rows to be compacted la
 test("live matrix suite drift fails checkpoint", () => {
   assert.ok(
     codes({
-      matrix: matrix.replace("JARVIS v1.0.7", "JARVIS v1.0.5"),
+      matrix: matrix.replace("JARVIS v1.0.8", "JARVIS v1.0.5"),
     }).includes("PHASE0_MATRIX_SUITE_DRIFT"),
   );
 });

@@ -85,3 +85,12 @@ test("2.3 renderer cannot open the privileged Core channel directly", () => {
   assert.match(bridge, /isCoreStatusResponse/);
   assert.match(bridge, /native Core status response failed runtime validation/);
 });
+
+test("2.3 renderer tool requests remain behind the typed native bridge", () => {
+  const bridge = read("apps/desktop/src/coreBridge.ts");
+  assert.match(bridge, /invoke\("execute_tool"/);
+  assert.match(bridge, /toolRequest: input/);
+  assert.match(bridge, /response\.toolExecutionId !== input\.toolExecutionId/);
+  assert.match(bridge, /native tool result failed runtime validation/);
+  assert.match(bridge, /isToolResult/);
+});

@@ -4,32 +4,82 @@ import { MissionControlShell, resolveStartupSnapshot, type ProviderSetupModel, t
 
 export function App() {
   const [providerSetup, setProviderSetup] = useState<ProviderSetupModel | undefined>();
+  const [providerSetupStatusMessage, setProviderSetupStatusMessage] = useState<string | undefined>();
   const [sessionControl, setSessionControl] = useState<SessionControlModel | undefined>();
   const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     let active = true;
     void requestSessionStatus().then((status) => {
       if (active) setSessionControl(buildSessionControl(status, setSessionControl, setRefresh));
-    }).catch((error) => { if (active) setSessionControl({ initialized: false, state: "LOCKED", errorMessage: error instanceof Error ? error.message : "Session status is unavailable." }); });
+    }).catch((error) => {
+      if (!active) return;
+      setSessionControl({
+        initialized: false,
+        state: "LOCKED",
+        errorMessage: error instanceof Error ? error.message : "Session status is unavailable.",
+        onInitialize: async (password: string) => {
+          const result = await initializeSession(password);
+          setSessionControl(buildSessionControl(result, setSessionControl, setRefresh));
+        },
+      });
+    });
     return () => { active = false; };
   }, [refresh]);
   useEffect(() => {
     let active = true;
     if (sessionControl?.state !== "UNLOCKED") {
       setProviderSetup(undefined);
+      setProviderSetupStatusMessage(undefined);
       return () => { active = false; };
     }
     void requestProviderSetupStatus().then((records) => {
-      if (!active || records.length === 0) return;
+      if (!active) return;
+      if (records.length === 0) {
+        setProviderSetup(undefined);
+        setProviderSetupStatusMessage("Core returned no registered provider setup record.");
+        return;
+      }
       const record = records.at(0);
       if (!record) return;
-      setProviderSetup({ providerId: record.providerId, distributionId: record.distributionId, adapterVersion: record.adapterVersion, state: record.state, ...(record.sanitizedFailureReason ? { failureMessage: record.sanitizedFailureReason } : {}), onStart: () => {
-        void requestProviderSetupStart({ requestId: uuidV7(), providerId: record.providerId, distributionId: record.distributionId, adapterVersion: record.adapterVersion }).then(() => setRefresh((value) => value + 1));
-      } });
-    }).catch(() => { if (active) setProviderSetup(undefined); });
+      setProviderSetupStatusMessage(undefined);
+      setProviderSetup({
+        providerId: record.providerId,
+        distributionId: record.distributionId,
+        adapterVersion: record.adapterVersion,
+        state: record.state,
+        ...(record.providerVersion ? { providerVersion: record.providerVersion } : {}),
+        ...(record.setupPolicyId ? { setupPolicyId: record.setupPolicyId } : {}),
+        ...(record.lastVerifiedAt ? { lastVerifiedAt: record.lastVerifiedAt } : {}),
+        ...(record.conformanceEvidenceRef ? { conformanceEvidenceRef: record.conformanceEvidenceRef } : {}),
+        ...(record.compatibility ? { compatibility: record.compatibility } : {}),
+        ...(record.health ? { health: record.health } : {}),
+        ...(record.qualificationState ? { qualificationState: record.qualificationState } : {}),
+        ...(record.qualificationEvidenceRef ? { qualificationEvidenceRef: record.qualificationEvidenceRef } : {}),
+        ...(record.locality ? { locality: record.locality } : {}),
+        capabilities: record.capabilities ?? [],
+        supportState: record.supportState ?? "UNSUPPORTED",
+        ...(record.sanitizedFailureReason ? { failureMessage: record.sanitizedFailureReason } : {}),
+        onStart: () => {
+        setProviderSetupStatusMessage("Codex setup is running. Wait for the qualified helper and readiness probe to finish.");
+        void requestProviderSetupStart({ requestId: uuidV7(), providerId: record.providerId, distributionId: record.distributionId, adapterVersion: record.adapterVersion }).then(() => {
+          setProviderSetupStatusMessage(undefined);
+          setRefresh((value) => value + 1);
+        }).catch((error) => {
+          const detail = error instanceof Error ? error.message : typeof error === "string" ? error : "the native setup operation failed";
+          setProviderSetup((current) => current ? { ...current, state: "SETUP_FAILED", failureMessage: detail } : current);
+          setProviderSetupStatusMessage(`Codex setup did not complete: ${detail}`);
+        });
+        },
+      });
+    }).catch((error) => {
+      if (!active) return;
+      setProviderSetup(undefined);
+      const detail = error instanceof Error ? error.message : typeof error === "string" ? error : undefined;
+      setProviderSetupStatusMessage(detail ? `Provider setup status is unavailable: ${detail}` : "Provider setup status is unavailable.");
+    });
     return () => { active = false; };
   }, [refresh, sessionControl?.state]);
-  return <MissionControlShell snapshot={{ ...resolveStartupSnapshot(), ...(providerSetup ? { providerSetup } : {}), ...(sessionControl ? { sessionControl } : {}) }} />;
+  return <MissionControlShell snapshot={{ ...resolveStartupSnapshot(), ...(providerSetup ? { providerSetup } : {}), ...(providerSetupStatusMessage ? { providerSetupStatusMessage } : {}), ...(sessionControl ? { sessionControl } : {}) }} />;
 }
 
 function buildSessionControl(status: SessionStatusResponse, setSessionControl: (value: SessionControlModel) => void, setRefresh: (value: (current: number) => number) => void): SessionControlModel {
@@ -40,14 +90,12 @@ function buildSessionControl(status: SessionStatusResponse, setSessionControl: (
     ...(status.initialized ? {} : { onInitialize: async (password: string) => {
       const result = await initializeSession(password);
       setSessionControl(buildSessionControl(result, setSessionControl, setRefresh));
-      setRefresh((value) => value + 1);
     } }),
     ...(status.initialized && state !== "UNLOCKED" ? { onUnlock: async (password: string) => {
       const result = await authenticateSession(password);
       const next = buildSessionControl({ initialized: true, state: result.state }, setSessionControl, setRefresh);
       setSessionControl({ ...next, retryAfterMs: result.retryAfterMs, ...(result.status === "UNLOCKED" ? {} : { errorMessage: result.status === "COOLDOWN" ? "The session is cooling down after failed attempts." : "The session password was not accepted." }) });
       if (result.status === "DENIED" || result.status === "COOLDOWN") throw new Error(result.status === "COOLDOWN" ? "The session is cooling down after failed attempts." : "The session password was not accepted.");
-      setRefresh((value) => value + 1);
     } } : {}),
   };
 }

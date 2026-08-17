@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { validateArtifact, validateLease } from "../../../packages/protocol/src/worker-runtime.mts";
+import { fallbackToFreshWorkerSession, planWorkerRecovery } from "../../../packages/protocol/src/worker-recovery-runtime.mts";
 import { applyCoreMigrations, CoreSchemaError, CoreStateRepository } from "../../../services/core/src/schema.ts";
 import { openCoreDatabase } from "../../../services/core/src/persistence.ts";
 
@@ -72,9 +73,43 @@ test("worker checkpoints persist artifacts and enforce monotonic attempt progres
     assert.deepEqual(repository.appendWorkerCheckpoint("worker-1", checkpoint(1)), { checkpointId: "checkpoint-1", sequence: 1 });
     assert.deepEqual(repository.appendWorkerCheckpoint("worker-1", checkpoint(2)), { checkpointId: "checkpoint-2", sequence: 2 });
     assert.equal(connection.database.prepare("SELECT json_extract(checkpoint_json, '$.providerResume.handle') AS handle FROM worker_checkpoints WHERE checkpoint_id = ?").get("checkpoint-2").handle, "opaque-resume-handle");
+    assert.equal(repository.getLatestWorkerCheckpoint("worker-1", "task-1", "attempt-1").checkpointId, "checkpoint-2");
+    assert.throws(() => repository.getLatestWorkerCheckpoint("worker-1", "task-1", "attempt-missing"), (error) => error instanceof CoreSchemaError && error.code === "PERSISTENCE_SCHEMA_INVALID");
     assert.throws(() => repository.appendWorkerCheckpoint("worker-1", checkpoint(2)), (error) => error instanceof CoreSchemaError && error.code === "PERSISTENCE_CONFLICT");
     assert.throws(() => repository.putArtifact({ ...artifact, storageRef: "artifact://changed" }), (error) => error instanceof CoreSchemaError && error.code === "PERSISTENCE_CONFLICT");
   });
+});
+
+test("worker recovery prefers qualified provider resume but reconstructs a fresh session from JARVIS state on failure", () => {
+  const resumable = planWorkerRecovery(checkpoint(2), {
+    providerSupportsResume: true,
+    providerIdentityMatches: true,
+    authenticationVerified: true,
+    privacyAuthorized: true,
+    authorityVerified: true,
+    setupReady: true,
+  });
+  assert.equal(resumable.strategy, "PROVIDER_RESUME");
+  assert.equal(resumable.providerResume.handle, "opaque-resume-handle");
+  assert.equal("providerResume" in resumable.context, false);
+
+  const fresh = fallbackToFreshWorkerSession(resumable);
+  assert.equal(fresh.strategy, "FRESH_SESSION");
+  assert.equal(fresh.reason, "PROVIDER_RESUME_FAILED");
+  assert.equal(fresh.context.checkpointId, "checkpoint-2");
+  assert.equal("providerResume" in fresh, false);
+
+  const noReference = planWorkerRecovery(checkpoint(1), {
+    providerSupportsResume: true,
+    providerIdentityMatches: true,
+    authenticationVerified: true,
+    privacyAuthorized: true,
+    authorityVerified: true,
+    setupReady: true,
+  });
+  assert.equal(noReference.strategy, "FRESH_SESSION");
+  assert.equal(noReference.reason, "NO_RESUME_REFERENCE");
+  assert.deepEqual(noReference.context.completedWork, []);
 });
 
 test("workspace and resource leases are exclusive and retain owner metadata", async () => {

@@ -1,8 +1,8 @@
 # JARVIS Verification, Qualification & Release Contract
 
 **Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`  
-**Version:** 1.0.6
-**Date:** August 12, 2026
+**Version:** 1.0.7
+**Date:** August 17, 2026
 
 ---
 
@@ -14,7 +14,7 @@ Code existence, model self-report, documentation completion, one happy-path demo
 
 Production is verified behavior under normal success, ambiguity, interruption, crash, stale state, provider setup/repair, provider outage, adversarial input, target race, recovery, update, resource pressure, accessibility modes, adaptive layouts, platform-capability failure, and real release packaging.
 
-V1 qualification is for a **private/internal Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the active v1.0.7 contract suite.
+V1 qualification is for a **private/internal Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the active v1.0.8 contract suite.
 
 ---
 
@@ -29,7 +29,7 @@ PRIVATE_INTERNAL
 PRODUCTION_PUBLIC (future profile only)
 ```
 
-Only a release satisfying every mandatory v1.0.7 gate for the active Release Profile may be labeled `PRIVATE_INTERNAL`. A public `PRODUCTION_PUBLIC` label requires a future Release Profile that explicitly enables public distribution and public-trust signing.
+Only a release satisfying every mandatory v1.0.8 gate for the active Release Profile may be labeled `PRIVATE_INTERNAL`. A public `PRODUCTION_PUBLIC` label requires a future Release Profile that explicitly enables public distribution and public-trust signing.
 
 `Production Complete` remains the final qualification declaration for the active profile; under the current profile it means a fully qualified `PRIVATE_INTERNAL` release and does not imply public distribution or public trust.
 
@@ -392,7 +392,8 @@ Codex V1 additionally proves on the supported Windows target:
 - no silent downgrade to unqualified sandbox after setup failure;
 - working directory/worktree binding;
 - actual sandbox write restriction behavior;
-- actual default/selected network restriction behavior;
+- actual delegated Codex network availability for the default `ENABLED` mode;
+- failure is reported when the worker cannot complete the bounded network probe;
 - honest read-access reporting—workspace-only read isolation is not claimed unless proven;
 - no unrelated secrets in worker environment;
 - provider process/descendants remain contained;

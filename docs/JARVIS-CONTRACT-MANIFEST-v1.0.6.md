@@ -1,6 +1,6 @@
-# JARVIS Contract Manifest v1.0.7
+# JARVIS Contract Manifest v1.0.8
 
-**Suite Version:** 1.0.7
+**Suite Version:** 1.0.8
 **Status:** Canonical current contract manifest  
 **Date:** August 12, 2026
 
@@ -22,35 +22,40 @@ Component revisions are explicit; a suite-version change does not require rewrit
 
 | # | Document | Current component revision | Role |
 |---|---|---:|---|
-| 1 | `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md` | 1.0.7 | top-level product/architecture/security/production contract |
+| 1 | `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md` | 1.0.8 | top-level product/architecture/security/production contract |
 | 2 | `docs/JARVIS-V1-RELEASE-PROFILE.md` | 1.0.6 | exact private/internal Windows V1 release support target |
 | 3 | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | 1.0.4 | Windows/Linux full-host portability and future companion boundary |
-| 4 | `docs/implementation/JARVIS-RUNTIME-CONTRACT.md` | 1.0.3 | Windows V1 runtime specialization and process behavior |
+| 4 | `docs/implementation/JARVIS-RUNTIME-CONTRACT.md` | 1.0.4 | Windows V1 runtime specialization and process behavior |
 | 5 | `docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md` | 1.0.4 | canonical V1 protocol/domain/platform schemas |
 | 6 | `docs/implementation/JARVIS-DATA-STATE-CONTRACT.md` | 1.0.3 | Windows V1 persistence/state/recovery specialization |
-| 7 | `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md` | 1.0.3 | Windows V1 security specialization and global security invariants |
+| 7 | `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md` | 1.0.4 | Windows V1 security specialization and global security invariants |
 | 8 | `docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md` | 1.0.5 | exact backup format, AEAD/chunk/key-slot/recovery-factor semantics |
 | 9 | `docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md` | 1.0.5 | deterministic project-policy candidate/enrollment/change trust boundary |
 | 10 | `docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md` | 1.0.6 | TUF-based update/module trust-root lifecycle, revocation and anti-rollback |
 | 11 | `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md` | 1.0.4 | coding/package/platform-boundary standards |
 | 12 | `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md` | 1.0.3 | operational/user-visible/governance semantics |
 | 13 | `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md` | 1.0.3 | unified Mission Control identity/adaptive design system |
-| 14 | `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md` | 1.0.6 | central release evidence plus all cumulative active-contract gates |
-| 15 | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` | 1.0.7 | implementation sequencing including hosting-capability-aware repository governance and private/internal release scope |
+| 14 | `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md` | 1.0.7 | central release evidence plus all cumulative active-contract gates |
+| 15 | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` | 1.0.8 | implementation sequencing including hosting-capability-aware repository governance, private/internal release scope, and Codex worker network availability |
 
 `README.md` and `AGENTS.md` are contributor/governance entry points and SHALL point to this same suite.
 
 ## 2.1 Inherited component headers
 
-Several unchanged component revisions retain historical header text naming their earlier parent suite. Their inclusion in the current suite is governed exclusively by this manifest and the v1.0.7 top-level contract. Those historical header references do not make superseded top-level contracts current and do not create an overlay.
+Several unchanged component revisions retain historical header text naming their earlier parent suite. Their inclusion in the current suite is governed exclusively by this manifest and the v1.0.8 top-level contract. Those historical header references do not make superseded top-level contracts current and do not create an overlay.
 
-The specialized security contracts remain cumulative specializations of compatible broad rules in the inherited Data/Security/Operations components. The v1.0.5 security closure remains fully active. The v1.0.6 Verification and Supply-Chain revisions plus the v1.0.7 Implementation Plan revision carry forward the repository-governance capability closure required by ADR-074 and the private/internal release scope required by ADR-075. These current component rules are part of one suite, not ADR overrides.
+The specialized security contracts remain cumulative specializations of compatible broad rules in the inherited Data/Security/Operations components. The v1.0.5 security closure remains fully active. The v1.0.6 Verification and Supply-Chain revisions plus the v1.0.7 Implementation Plan revision carry forward the repository-governance capability closure required by ADR-074 and the private/internal release scope required by ADR-075. The v1.0.8 revisions incorporate ADR-076's Codex worker network-availability decision. These current component rules are part of one suite, not ADR overrides.
 
 ---
 
 # 3. CURRENT DECISION BOUNDARY
 
-The suite incorporates the accepted current effects of ADRs through **ADR-075**.
+The suite incorporates the accepted current effects of ADRs through **ADR-076**.
+
+ADR-076 changes delegated Codex CLI `WORKSPACE_ENGINEERING` workers from a
+network-denied default to a required typed `ENABLED` network mode. The worker
+still receives no unrelated secrets, elevation, workspace authority outside
+its assigned worktree, or authorization for consequential external actions.
 
 ADR-073 closes the backup cryptographic format/recovery-factor strength, project-policy trust admission, update/module trust-root lifecycle, early voice-feasibility sequencing, post-V1 integration release coupling, and repeated-contract-value drift risks.
 
@@ -106,7 +111,7 @@ SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding post-V1 prod
 
 Phase 0 SHALL establish machine-readable canonical repeated security/profile/capability values and CI drift checks where practical.
 
-Repository server-side protection SHALL be activated when available, but an unavailable paid/host-gated protection feature is not itself a JARVIS production prerequisite when the v1.0.7 compensating-governance qualification passes.
+Repository server-side protection SHALL be activated when available, but an unavailable paid/host-gated protection feature is not itself a JARVIS production prerequisite when the v1.0.8 compensating-governance qualification passes.
 
 ---
 
@@ -168,4 +173,4 @@ Generated platform assets derive from these sources.
 
 ---
 
-**END — JARVIS CONTRACT MANIFEST v1.0.7**
+**END — JARVIS CONTRACT MANIFEST v1.0.8**

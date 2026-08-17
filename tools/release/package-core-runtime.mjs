@@ -21,6 +21,15 @@ const CORE_SUPPORT_FILES = [
   "backup-recovery.js",
   "backup-package.js",
   "backup-payload.js",
+  "conversation.js",
+  "conversation.mjs",
+  "provider-routing.js",
+  "tool-runtime.mjs",
+  "native-capability.mjs",
+  "native-capability.mts",
+  "codex-cli-adapter.mjs",
+  "provider-execution.mjs",
+  "provider-execution.mts",
 ];
 const CORE_RUNTIME_INSTALL_ONLY_DEPENDENCIES = new Set(["prebuild-install"]);
 const CORE_PACKAGE_JSON = '{"type":"module"}\n';
@@ -207,10 +216,12 @@ async function copyCoreWorkspaceRuntimeModules(output) {
   }
   const distDirectory = join(output, "core", "dist");
   for (const entry of await readdir(distDirectory, { withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.endsWith(".js")) continue;
+    if (!entry.isFile() || !(entry.name.endsWith(".js") || entry.name.endsWith(".mjs") || entry.name.endsWith(".mts"))) continue;
     const path = join(distDirectory, entry.name);
     const source = await readFile(path, "utf8");
-    const rewritten = source.replaceAll("../../../packages/", "../packages/");
+    const rewritten = source
+      .replaceAll("../../../packages/", "../packages/")
+      .replaceAll("../../../providers/ai/src/codex-cli-adapter.mjs", "./codex-cli-adapter.mjs");
     if (rewritten !== source) await writeFile(path, rewritten, { flag: "w" });
   }
 }

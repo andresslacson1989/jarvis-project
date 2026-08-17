@@ -51,6 +51,8 @@ import type {
 } from "../../../packages/protocol/src/accounting.js";
 import { validateArtifact, validateLease, validateWorkerCheckpoint } from "../../../packages/protocol/src/worker-runtime.mjs";
 import type { ArtifactRecord, LeaseRecord, WorkerCheckpoint } from "../../../packages/protocol/src/worker.js";
+import { buildContextPackage } from "../../../packages/protocol/src/content-authority-runtime.mjs";
+import type { ContextItemV1 } from "../../../packages/protocol/src/content-authority.js";
 import {
   validateIntegrationAccount,
   validateModuleManifest,
@@ -67,13 +69,39 @@ import type {
   ModuleManifest,
   ProxmoxConnection,
   ProviderCompatibilityPolicy,
+  ProviderCompatibilityState,
+  ProviderCapabilityName,
+  ProviderCapabilities,
+  ProviderHealth,
   ProviderProfile,
   ProviderQualificationRecord,
   ProviderSetupRecord,
   ProviderSetupWorkflowAction,
 } from "../../../packages/protocol/src/provider.js";
+
+export interface StoredProviderProfileRecord {
+  readonly profile: ProviderProfile;
+  readonly compatibilityPolicy: ProviderCompatibilityPolicy;
+}
+
+export interface ProviderCapabilityStatus {
+  readonly capabilityId: ProviderCapabilityName;
+  readonly supported: boolean;
+}
+
+export type ProviderSupportState = "SUPPORTED" | "SETUP_REQUIRED" | "QUALIFICATION_REQUIRED" | "HEALTH_UNAVAILABLE" | "UNSUPPORTED";
+
+export interface ProviderSetupStatusView extends ProviderSetupRecord {
+  readonly compatibility?: ProviderCompatibilityState;
+  readonly health?: ProviderHealth;
+  readonly qualificationState?: ProviderQualificationRecord["state"];
+  readonly qualificationEvidenceRef?: string;
+  readonly locality?: ProviderCapabilities["locality"];
+  readonly capabilities: readonly ProviderCapabilityStatus[];
+  readonly supportState: ProviderSupportState;
+}
 import { evaluateProjectPolicyMutationGate, resolveApplicableTrustedProjectPolicies, validateProjectPolicyDecisionRequest, validateProjectPolicySnapshot, validateProjectPolicySnapshotRevalidationRequest, validateProjectPolicyTrustRecord } from "../../../packages/protocol/src/project-policy-runtime.mjs";
-import type { ProjectPolicyDecisionRequest, ProjectPolicyMutationGateResult, ProjectPolicySnapshotRecord, ProjectPolicySnapshotRevalidationRequest, ProjectPolicyTrustRecord } from "../../../packages/protocol/src/project-policy.js";
+import type { ProjectPolicyDecisionRequest, ProjectPolicyMutationGateResult, ProjectPolicySnapshotContent, ProjectPolicySnapshotRecord, ProjectPolicySnapshotRevalidationRequest, ProjectPolicyTrustRecord } from "../../../packages/protocol/src/project-policy.js";
 import { evaluateProjectPolicyMutation, validateProjectPolicyMutationAdmission } from "../../../packages/policy/src/project-policy-mutation.mjs";
 import {
   validateProjectAliasRecord,
@@ -112,6 +140,8 @@ import { isSessionCooldownActive, progressiveCooldownMs, validateSessionSecurity
 import type { SessionSecurityState } from "../../../packages/protocol/src/session.js";
 import { validateSecurityAuditEvent } from "../../../packages/protocol/src/security-audit-runtime.mjs";
 import type { SecurityAuditEvent } from "../../../packages/protocol/src/security-audit.mjs";
+import { validateToolManifest } from "../../../packages/protocol/src/tool-runtime.mjs";
+import type { ToolManifest, ToolOutcome, ToolResult } from "../../../packages/protocol/src/tool.ts";
 import {
   CoreDatabaseConnection,
   CorePersistenceError,
@@ -2732,6 +2762,61 @@ export class CoreStateRepository {
       );
   }
 
+  /**
+   * Persist only secret-free execution facts. Tool output and criterion
+   * evidence are deliberately excluded from this audit row; they remain
+   * behind the typed result/artifact boundaries owned by the execution path.
+   */
+  recordToolExecutionAudit(resultValue: unknown, manifestValue: unknown): void {
+    const manifest = validateToolManifest(manifestValue);
+    if (typeof resultValue !== "object" || resultValue === null || Array.isArray(resultValue)) {
+      throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "tool execution audit result must be an object");
+    }
+    const result = resultValue as Partial<ToolResult>;
+    const outcomes: readonly ToolOutcome[] = ["SUCCEEDED", "FAILED", "DENIED", "CANCELLED", "UNCERTAIN"];
+    if (typeof result.toolExecutionId !== "string" || !/^[0-9a-f-]{36}$/iu.test(result.toolExecutionId) || !outcomes.includes(result.outcome as ToolOutcome)) {
+      throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "tool execution audit identity or outcome is invalid");
+    }
+    if (typeof result.startedAt !== "string" || Number.isNaN(Date.parse(result.startedAt)) || typeof result.endedAt !== "string" || Number.isNaN(Date.parse(result.endedAt))) {
+      throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "tool execution audit timestamps are invalid");
+    }
+    if (Date.parse(result.endedAt) < Date.parse(result.startedAt)) {
+      throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "tool execution audit ended before it started");
+    }
+    const error = result.error;
+    if (error !== undefined && (typeof error !== "object" || error === null || typeof error.code !== "string" || typeof error.category !== "string")) {
+      throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "tool execution audit error is invalid");
+    }
+    const criterionCounts = (criteria: readonly { readonly verdict: string }[] | undefined): Readonly<Record<string, number>> => {
+      const counts: Record<string, number> = {};
+      for (const criterion of criteria ?? []) counts[criterion.verdict] = (counts[criterion.verdict] ?? 0) + 1;
+      return counts;
+    };
+    const reasonCode = ({
+      SUCCEEDED: "TOOL_EXECUTION_SUCCEEDED",
+      FAILED: "TOOL_EXECUTION_FAILED",
+      DENIED: "TOOL_EXECUTION_DENIED",
+      CANCELLED: "TOOL_EXECUTION_CANCELLED",
+      UNCERTAIN: "TOOL_EXECUTION_UNCERTAIN",
+    } as const)[result.outcome as ToolOutcome];
+    this.appendSecurityAudit({
+      auditEventId: `tool-execution:${result.toolExecutionId}`,
+      eventType: "TOOL_EXECUTION",
+      subjectType: "TOOL_EXECUTION",
+      subjectId: result.toolExecutionId,
+      reasonCode,
+      occurredAt: result.endedAt,
+      details: {
+        toolId: manifest.toolId,
+        toolVersion: manifest.version,
+        outcome: result.outcome,
+        ...(error === undefined ? {} : { errorCode: error.code, errorCategory: error.category }),
+        preconditionVerdicts: criterionCounts(result.preconditions),
+        postconditionVerdicts: criterionCounts(result.postconditions),
+      },
+    });
+  }
+
   putPermissionDecision(decisionValue: unknown): PermissionDecisionWriteResult {
     const decision = validatePermissionForStorage(decisionValue);
     const insert = this.connection.database.transaction(() => {
@@ -2755,6 +2840,21 @@ export class CoreStateRepository {
       if (error instanceof CoreSchemaError || error instanceof CorePersistenceError) throw error;
       throw new CorePersistenceError("PERSISTENCE_INIT_FAILED", "permission decision persistence failed", { cause: error });
     }
+  }
+
+  getPermissionDecisionForToolExecution(toolExecutionId: string): PermissionDecision | undefined {
+    if (typeof toolExecutionId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(toolExecutionId)) {
+      throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "tool execution identity is invalid");
+    }
+    const rows = this.connection.database
+      .prepare("SELECT decision_json FROM permission_decisions ORDER BY created_at DESC, decision_id DESC")
+      .all() as readonly { decision_json?: string }[];
+    for (const row of rows) {
+      if (typeof row.decision_json !== "string") throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "stored permission decision is missing");
+      const decision = validatePermissionForStorage(JSON.parse(row.decision_json));
+      if (decision.toolExecutionId === toolExecutionId) return decision;
+    }
+    return undefined;
   }
 
   putApprovalRequest(request: ApprovalRequestWriteRequest): ApprovalRequestWriteResult {
@@ -3135,6 +3235,21 @@ export class CoreStateRepository {
     try { return apply(); } catch (error) { if (error instanceof CoreSchemaError || error instanceof CorePersistenceError) throw error; throw new CorePersistenceError("PERSISTENCE_INIT_FAILED", "worker checkpoint persistence failed", { cause: error }); }
   }
 
+  getLatestWorkerCheckpoint(workerIdValue: unknown, taskIdValue: unknown, attemptIdValue: unknown): WorkerCheckpoint | undefined {
+    const workerId = validatePlatformIdentifierForStorage(workerIdValue);
+    const taskId = validatePlatformIdentifierForStorage(taskIdValue);
+    const attemptId = validatePlatformIdentifierForStorage(attemptIdValue);
+    const row = this.connection.database
+      .prepare("SELECT checkpoint_json FROM worker_checkpoints WHERE worker_id = ? AND task_id = ? ORDER BY version DESC LIMIT 1")
+      .get(workerId, taskId) as { checkpoint_json?: string } | undefined;
+    if (!row?.checkpoint_json) return undefined;
+    const checkpoint = validateCheckpointForStorage(assertStoredState(row.checkpoint_json, "worker checkpoint"));
+    if (checkpoint.taskId !== taskId || checkpoint.attemptId !== attemptId) {
+      throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "latest worker checkpoint is outside the requested attempt");
+    }
+    return checkpoint;
+  }
+
   putArtifact(value: unknown): { readonly artifactId: string } {
     const artifact = validateArtifactForStorage(value);
     const now = new Date().toISOString();
@@ -3226,22 +3341,25 @@ export class CoreStateRepository {
     if (policy.providerId !== profile.providerId || policy.adapterVersion !== profile.adapterVersion) throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "provider profile and compatibility policy identity disagree");
     assertPlatformStateTimestamp(now);
     const profileId = `${profile.providerId}:${profile.modelId ?? "default"}`;
+    const profilePayload = JSON.stringify({ profile, compatibilityPolicy: policy });
     const apply = this.connection.database.transaction(() => {
-      const existing = this.connection.database.prepare("SELECT version FROM provider_profiles WHERE profile_id = ?").get(profileId) as { version?: number } | undefined;
+      const existing = this.connection.database.prepare("SELECT version, profile_json FROM provider_profiles WHERE profile_id = ?").get(profileId) as { version?: number; profile_json?: string } | undefined;
       const version = (existing?.version ?? 0) + 1;
       const providerJson = JSON.stringify({ providerId: profile.providerId, adapterType: profile.adapterType, adapterVersion: profile.adapterVersion });
       if (!this.connection.database.prepare("SELECT 1 AS present FROM providers WHERE provider_id = ?").get(profile.providerId)) {
         this.connection.database.prepare("INSERT INTO providers (provider_id, provider_json, version, created_at, updated_at) VALUES (?, ?, 1, ?, ?)").run(profile.providerId, providerJson, now, now);
       }
-      const payload = JSON.stringify({ profile, compatibilityPolicy: policy });
-      if (existing) this.connection.database.prepare("UPDATE provider_profiles SET profile_json = ?, version = ?, updated_at = ? WHERE profile_id = ? AND version = ?").run(payload, version, now, profileId, existing.version);
-      else this.connection.database.prepare("INSERT INTO provider_profiles (profile_id, provider_id, profile_json, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").run(profileId, profile.providerId, payload, version, now, now);
+      if (existing) this.connection.database.prepare("UPDATE provider_profiles SET profile_json = ?, version = ?, updated_at = ? WHERE profile_id = ? AND version = ?").run(profilePayload, version, now, profileId, existing.version);
+      else this.connection.database.prepare("INSERT INTO provider_profiles (profile_id, provider_id, profile_json, version, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").run(profileId, profile.providerId, profilePayload, version, now, now);
+      const providerQualificationChanged = existing?.profile_json !== profilePayload;
       const setupRow = this.connection.database.prepare("SELECT version, setup_json FROM provider_setup_state WHERE provider_id = ?").get(profile.providerId) as { version?: number; setup_json?: string } | undefined;
       if (setupRow?.setup_json) {
         const priorSetup = validateProviderSetupForStorage(JSON.parse(setupRow.setup_json));
-        const providerVersionChanged = priorSetup.providerVersion !== profile.providerVersion;
-        const adapterVersionChanged = priorSetup.adapterVersion !== profile.adapterVersion;
-        if (providerVersionChanged || adapterVersionChanged) {
+        // Setup/conformance evidence is bound to the complete persisted
+        // profile/policy identity. Any changed discovery or compatibility
+        // record invalidates readiness conservatively; a later independent
+        // setup/conformance probe must establish readiness again.
+        if (providerQualificationChanged) {
           const { lastAttemptAt: _lastAttemptAt, sanitizedFailureReason: _sanitizedFailureReason, lastVerifiedAt: _lastVerifiedAt, conformanceEvidenceRef: _conformanceEvidenceRef, ...stableSetup } = priorSetup;
           const invalidatedSetup = {
             ...stableSetup,
@@ -3254,9 +3372,37 @@ export class CoreStateRepository {
           this.connection.database.prepare("UPDATE provider_setup_state SET state = ?, setup_json = ?, version = ?, updated_at = ? WHERE provider_id = ? AND version = ?").run(invalidatedSetup.state, JSON.stringify(invalidatedSetup), setupVersion, now, profile.providerId, setupRow.version);
         }
       }
+      if (providerQualificationChanged) {
+        const qualificationRow = this.connection.database.prepare("SELECT version, qualification_json FROM provider_qualification_state WHERE provider_id = ?").get(profile.providerId) as { version?: number; qualification_json?: string } | undefined;
+        if (qualificationRow?.qualification_json) {
+          const priorQualification = validateProviderQualificationForStorage(JSON.parse(qualificationRow.qualification_json));
+          const invalidatedQualification: ProviderQualificationRecord = {
+            providerId: priorQualification.providerId,
+            distributionId: priorQualification.distributionId,
+            ...(profile.providerVersion === undefined ? {} : { providerVersion: profile.providerVersion }),
+            state: "UNQUALIFIED",
+          };
+          const qualificationVersion = (qualificationRow.version ?? 0) + 1;
+          this.connection.database.prepare("UPDATE provider_qualification_state SET state = ?, qualification_json = ?, version = ?, updated_at = ? WHERE provider_id = ? AND version = ?").run(invalidatedQualification.state, JSON.stringify(invalidatedQualification), qualificationVersion, now, profile.providerId, qualificationRow.version);
+        }
+      }
       return { id: profileId, version };
     });
     try { return apply(); } catch (error) { if (error instanceof CoreSchemaError || error instanceof CorePersistenceError) throw error; throw new CorePersistenceError("PERSISTENCE_INIT_FAILED", "provider profile persistence failed", { cause: error }); }
+  }
+
+  listProviderProfiles(): readonly StoredProviderProfileRecord[] {
+    const rows = this.connection.database
+      .prepare("SELECT profile_json FROM provider_profiles ORDER BY profile_id ASC")
+      .all() as readonly { profile_json?: string }[];
+    return rows.map((row) => {
+      if (typeof row.profile_json !== "string") throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "provider profile payload is missing");
+      const payload = JSON.parse(row.profile_json) as Record<string, unknown>;
+      return Object.freeze({
+        profile: validateProviderProfileForStorage(payload.profile),
+        compatibilityPolicy: validateProviderPolicyForStorage(payload.compatibilityPolicy),
+      });
+    });
   }
 
   putProviderSetupState(value: unknown, now: string): ProviderStateWriteResult {
@@ -3357,6 +3503,36 @@ export class CoreStateRepository {
     });
   }
 
+  listProviderSetupStatusViews(): readonly ProviderSetupStatusView[] {
+    const profiles = new Map(this.listProviderProfiles().map((entry) => [entry.profile.providerId, entry.profile]));
+    const qualifications = new Map(this.listProviderQualificationStates().map((entry) => [entry.providerId, entry]));
+    const capabilityIds: readonly ProviderCapabilityName[] = ["naturalLanguage", "structuredOutput", "toolUse", "coding", "research", "vision", "streaming", "resumableSession"];
+    return this.listProviderSetupStates().map((setup) => {
+      const profile = profiles.get(setup.providerId);
+      const qualification = qualifications.get(setup.providerId);
+      const capabilities = capabilityIds.map((capabilityId) => ({ capabilityId, supported: profile?.capabilities[capabilityId] === true }));
+      const supportState: ProviderSupportState = setup.state !== "SETUP_READY" && setup.state !== "NOT_REQUIRED"
+        ? "SETUP_REQUIRED"
+        : qualification?.state !== "QUALIFIED"
+          ? "QUALIFICATION_REQUIRED"
+          : profile === undefined
+            ? "UNSUPPORTED"
+            : profile.health !== "READY"
+              ? "HEALTH_UNAVAILABLE"
+              : profile.compatibility !== "COMPATIBLE"
+                ? "UNSUPPORTED"
+                : "SUPPORTED";
+      return Object.freeze({
+        ...setup,
+        ...(profile === undefined ? {} : { compatibility: profile.compatibility, health: profile.health, locality: profile.capabilities.locality }),
+        ...(qualification?.state === undefined ? {} : { qualificationState: qualification.state }),
+        ...(qualification?.evidenceRef === undefined ? {} : { qualificationEvidenceRef: qualification.evidenceRef }),
+        capabilities: Object.freeze(capabilities),
+        supportState,
+      });
+    });
+  }
+
   putProviderQualificationState(value: unknown, now: string): ProviderStateWriteResult {
     const qualification = validateProviderQualificationForStorage(value);
     assertPlatformStateTimestamp(now);
@@ -3370,6 +3546,33 @@ export class CoreStateRepository {
       return { id: qualification.providerId, version };
     });
     try { return apply(); } catch (error) { if (error instanceof CoreSchemaError || error instanceof CorePersistenceError) throw error; throw new CorePersistenceError("PERSISTENCE_INIT_FAILED", "provider qualification persistence failed", { cause: error }); }
+  }
+
+  ensureProviderQualificationState(value: unknown, now: string): ProviderStateWriteResult | undefined {
+    const qualification = validateProviderQualificationForStorage(value);
+    assertPlatformStateTimestamp(now);
+    const existing = this.connection.database
+      .prepare("SELECT version FROM provider_qualification_state WHERE provider_id = ?")
+      .get(qualification.providerId) as { version?: number } | undefined;
+    if (existing) return undefined;
+    const provider = this.connection.database
+      .prepare("SELECT 1 AS present FROM providers WHERE provider_id = ?")
+      .get(qualification.providerId) as { present?: number } | undefined;
+    if (provider?.present !== 1) throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "provider qualification references an unknown provider");
+    this.connection.database
+      .prepare("INSERT INTO provider_qualification_state (provider_id, state, qualification_json, version, updated_at) VALUES (?, ?, ?, 1, ?)")
+      .run(qualification.providerId, qualification.state, JSON.stringify(qualification), now);
+    return { id: qualification.providerId, version: 1 };
+  }
+
+  listProviderQualificationStates(): readonly ProviderQualificationRecord[] {
+    const rows = this.connection.database
+      .prepare("SELECT qualification_json FROM provider_qualification_state ORDER BY provider_id ASC")
+      .all() as readonly { qualification_json?: string }[];
+    return rows.map((row) => {
+      if (typeof row.qualification_json !== "string") throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "provider qualification payload is missing");
+      return validateProviderQualificationForStorage(JSON.parse(row.qualification_json));
+    });
   }
 
   putModuleManifest(value: unknown, now: string): ProviderStateWriteResult {
@@ -3455,6 +3658,41 @@ export class CoreStateRepository {
       return { id: project.projectId, version };
     });
     try { return apply(); } catch (error) { if (error instanceof CoreSchemaError || error instanceof CorePersistenceError) throw error; throw new CorePersistenceError("PERSISTENCE_INIT_FAILED", "project persistence failed", { cause: error }); }
+  }
+
+  getProject(projectIdValue: unknown): ProjectRecord | undefined {
+    const projectId = validatePlatformIdentifierForStorage(projectIdValue);
+    const row = this.connection.database
+      .prepare("SELECT project_json FROM projects WHERE project_id = ?")
+      .get(projectId) as { project_json?: string } | undefined;
+    if (row === undefined) return undefined;
+    if (row.project_json === undefined) throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "stored project is missing");
+    return validateProjectForStorage(JSON.parse(row.project_json));
+  }
+
+  getProjectWorkspace(workspaceId: string): ProjectWorkspaceRecord | undefined {
+    if (typeof workspaceId !== "string" || workspaceId.length < 1 || workspaceId.length > 256) {
+      throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "workspace identity is invalid");
+    }
+    const row = this.connection.database
+      .prepare("SELECT workspace_json FROM project_workspaces WHERE workspace_id = ?")
+      .get(workspaceId) as { workspace_json?: string } | undefined;
+    if (row === undefined) return undefined;
+    if (row.workspace_json === undefined) throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "stored project workspace is missing");
+    return validateProjectWorkspaceForStorage(JSON.parse(row.workspace_json));
+  }
+
+  getProjectPolicyTrustRecords(projectIdValue: unknown): readonly ProjectPolicyTrustRecord[] {
+    const projectId = validatePlatformIdentifierForStorage(projectIdValue);
+    const project = this.connection.database.prepare("SELECT 1 AS present FROM projects WHERE project_id = ?").get(projectId) as { present?: number } | undefined;
+    if (project?.present !== 1) return [];
+    const rows = this.connection.database
+      .prepare("SELECT policy_json FROM project_policy_trust_records WHERE project_id = ? ORDER BY policy_trust_id")
+      .all(projectId) as Array<{ policy_json?: string }>;
+    return rows.map((row) => {
+      if (row.policy_json === undefined) throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "stored project policy trust record is missing");
+      return validatePolicyTrustForStorage(JSON.parse(row.policy_json));
+    });
   }
 
   putProjectAlias(value: unknown, now: string): ProviderStateWriteResult {
@@ -3689,6 +3927,45 @@ export class CoreStateRepository {
       return { snapshotId: snapshot.snapshotId, attemptId: snapshot.attemptId };
     });
     try { return apply(); } catch (error) { if (error instanceof CoreSchemaError || error instanceof CorePersistenceError) throw error; throw new CorePersistenceError("PERSISTENCE_INIT_FAILED", "project policy snapshot persistence failed", { cause: error }); }
+  }
+
+  getProjectPolicySnapshot(snapshotIdValue: unknown, projectIdValue: unknown, attemptIdValue: unknown): ProjectPolicySnapshotRecord {
+    const snapshotId = validatePlatformIdentifierForStorage(snapshotIdValue);
+    const projectId = validatePlatformIdentifierForStorage(projectIdValue);
+    const attemptId = validatePlatformIdentifierForStorage(attemptIdValue);
+    const row = this.connection.database.prepare("SELECT snapshot_json FROM project_policy_snapshots WHERE snapshot_id = ? AND project_id = ? AND attempt_id = ?").get(snapshotId, projectId, attemptId) as { snapshot_json?: string } | undefined;
+    if (!row?.snapshot_json) throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "project policy snapshot does not exist for the requested attempt");
+    return validatePolicySnapshotForStorage(JSON.parse(row.snapshot_json));
+  }
+
+  buildProjectPolicyContextItems(snapshotIdValue: unknown, projectIdValue: unknown, attemptIdValue: unknown, contentValues: readonly unknown[]): readonly ContextItemV1[] {
+    const snapshot = this.getProjectPolicySnapshot(snapshotIdValue, projectIdValue, attemptIdValue);
+    if (!Array.isArray(contentValues)) throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "project policy snapshot content must be an array");
+    const contentByTrustId = new Map<string, ProjectPolicySnapshotContent>();
+    for (const value of contentValues) {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "project policy snapshot content entry is invalid");
+      const item = value as Record<string, unknown>;
+      if (Object.keys(item).some((key) => !["policyTrustId", "revision", "content"].includes(key)) || !["policyTrustId", "revision", "content"].every((key) => key in item) || typeof item.policyTrustId !== "string" || typeof item.content !== "string" || !Number.isSafeInteger(item.revision) || (item.revision as number) < 1 || item.content.length < 1 || item.content.length > 32768 || item.content.includes("\0")) {
+        throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "project policy snapshot content entry is invalid");
+      }
+      if (contentByTrustId.has(item.policyTrustId)) throw new CoreSchemaError("PERSISTENCE_CONFLICT", "project policy snapshot content contains duplicate trust records");
+      contentByTrustId.set(item.policyTrustId, Object.freeze({ policyTrustId: item.policyTrustId, revision: item.revision as number, content: item.content }));
+    }
+    if (contentByTrustId.size !== snapshot.policies.length) throw new CoreSchemaError("PERSISTENCE_CONFLICT", "project policy snapshot content does not exactly match the immutable policy snapshot");
+    try {
+      const items = snapshot.policies.map((policy) => {
+        const supplied = contentByTrustId.get(policy.policyTrustId);
+        if (!supplied || supplied.revision !== policy.revision || createHash("sha256").update(supplied.content, "utf8").digest("hex") !== policy.contentSha256) throw new CoreSchemaError("PERSISTENCE_CONFLICT", "project policy snapshot content does not match the immutable policy revision and hash");
+        const packageValue = buildContextPackage({ domain: "jarvis.context-package.v1", schemaVersion: 1, contextId: `project-policy-item:${snapshot.snapshotId}:${policy.policyTrustId}`, projectId: snapshot.projectId, items: [{ itemId: `project-policy:${snapshot.snapshotId}:${policy.policyTrustId}:${policy.revision}`, sourceLabel: { domain: "jarvis.content-authority.label.v1", schemaVersion: 1, sourceType: "PROJECT_POLICY", sourceId: policy.policyTrustId, authorityClass: "SCOPED_INSTRUCTION", resolutionId: `project-policy-snapshot:${snapshot.snapshotId}:${policy.policyTrustId}:${policy.revision}` }, policyRevision: policy.revision, content: supplied.content }] });
+        const item = packageValue.items[0];
+        if (item === undefined) throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "trusted project-policy context item could not be built");
+        return item;
+      });
+      return Object.freeze(items);
+    } catch (error) {
+      if (error instanceof CoreSchemaError) throw error;
+      throw new CoreSchemaError("PERSISTENCE_SCHEMA_INVALID", "trusted project-policy context item is invalid", { cause: error });
+    }
   }
 
   revalidateProjectPolicySnapshot(value: unknown): ProjectPolicySnapshotRevalidationRequest {

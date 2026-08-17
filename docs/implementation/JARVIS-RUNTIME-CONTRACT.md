@@ -1,8 +1,8 @@
 # JARVIS Runtime Contract
 
 **Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
-**Version:** 1.0.3  
-**Date:** August 12, 2026
+**Version:** 1.0.4  
+**Date:** August 17, 2026
 
 ---
 
@@ -315,13 +315,13 @@ V1 `WORKSPACE_ENGINEERING` defaults:
 workspace writes:    allowed only inside assigned writable worktree under qualified sandbox
 workspace reads:     required
 other-user-file read isolation: not claimed unless provider/OS conformance proves it
-network:             denied by default
+network:             enabled by default for delegated Codex CLI workers
 integration secrets: none by default
 external side effects: not delegated
 admin/elevation:     prohibited by default
 ```
 
-The provider may run local development commands required to inspect/edit/build/test the assigned project according to the qualified sandbox profile.
+The provider may run local development commands required to inspect/edit/build/test the assigned project according to the qualified sandbox profile. Codex CLI workspace requests SHALL use the typed `ENABLED` network mode; Core rejects a Codex workspace request that selects a denial or policy-only mode.
 
 The existence of Git/GitHub/SSH/cloud/Proxmox client binaries inside the worker process does not authorize external writes. Push, publish, deploy, email/send, infrastructure mutation, credential administration, and similar consequential remote operations SHALL cross a registered JARVIS tool/integration/PermissionEngine boundary.
 

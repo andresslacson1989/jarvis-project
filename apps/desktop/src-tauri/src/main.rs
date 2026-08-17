@@ -19,6 +19,10 @@ mod platform;
 pub mod privilege_mediator;
 #[path = "../../../../platform/windows/src/process_supervisor.rs"]
 pub mod process_supervisor;
+#[path = "../../../../platform/windows/src/git_read.rs"]
+mod git_read;
+#[path = "../../../../platform/windows/src/open_target.rs"]
+mod open_target;
 #[path = "../../../../platform/windows/src/provider_qualification.rs"]
 pub mod provider_qualification;
 #[path = "../../../../platform/windows/src/secure_storage.rs"]
@@ -31,6 +35,8 @@ pub mod window_controller;
 
 #[cfg(not(debug_assertions))]
 use std::sync::Mutex;
+#[cfg(not(debug_assertions))]
+use std::collections::HashMap;
 #[cfg(any(not(debug_assertions), test))]
 use std::sync::{
     Arc,
@@ -40,6 +46,8 @@ use std::sync::{
 use std::time::Duration;
 #[cfg(not(debug_assertions))]
 use tauri::Manager;
+#[cfg(not(debug_assertions))]
+use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
 use tauri::{Url, WebviewUrl};
 
@@ -53,8 +61,253 @@ struct HostRuntime {
     core_process: process_supervisor::SupervisedCoreProcess,
     authenticated: local_ipc::AuthenticatedCoreSession,
     core_status: local_ipc::AuthenticatedCoreStatus,
+    native_workspaces: Arc<NativeWorkspaceRegistry>,
     _db_dek_handle: secure_storage::SecureStorageHandle,
     _db_dek: secure_storage::DatabaseDek,
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeWorkspaceBindArguments {
+    project_id: String,
+    workspace_id: String,
+    workspace_root: String,
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeFilesystemReadArguments {
+    operation: String,
+    project_id: String,
+    workspace_id: String,
+    relative_path: String,
+    max_bytes: usize,
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeFilesystemWriteArguments {
+    operation: String,
+    project_id: String,
+    workspace_id: String,
+    relative_path: String,
+    content: String,
+    expected_version_token: String,
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeProjectStatusArguments {
+    project_id: String,
+    workspace_id: String,
+    snapshot: serde_json::Value,
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeEngineeringArguments {
+    operation: String,
+    project_id: String,
+    workspace_id: String,
+    profile_id: String,
+    timeout_ms: u64,
+}
+
+#[cfg(not(debug_assertions))]
+#[derive(Debug)]
+struct NativeWorkspaceRegistry {
+    backend: path_identity::PlatformPathsAndIdentity,
+    workspaces: Mutex<HashMap<(String, String), path_identity::RegisteredWorkspace>>,
+}
+
+#[cfg(not(debug_assertions))]
+impl NativeWorkspaceRegistry {
+    fn new(backend: path_identity::PlatformPathsAndIdentity) -> Self {
+        Self { backend, workspaces: Mutex::new(HashMap::new()) }
+    }
+
+    fn bind(&self, arguments: serde_json::Value) -> Result<serde_json::Value, local_ipc::NativeCapabilityDispatchError> {
+        let input: NativeWorkspaceBindArguments = serde_json::from_value(arguments).map_err(|_| native_capability_error("NATIVE_WORKSPACE_BINDING_INVALID", "workspace binding arguments are invalid", false))?;
+        let registration = self.backend.register_workspace(&input.project_id, &input.workspace_id, std::path::Path::new(&input.workspace_root)).map_err(|_| native_capability_error("NATIVE_WORKSPACE_BIND_FAILED", "Core workspace binding could not be registered on Windows", false))?;
+        let key = (input.project_id, input.workspace_id);
+        let mut workspaces = self.workspaces.lock().map_err(|_| native_capability_error("NATIVE_WORKSPACE_REGISTRY_UNAVAILABLE", "native workspace registry is unavailable", true))?;
+        if let Some(existing) = workspaces.get(&key) {
+            if existing.root_identity().case_insensitive_key != registration.root_identity().case_insensitive_key {
+                return Err(native_capability_error("NATIVE_WORKSPACE_IDENTITY_CHANGED", "registered workspace identity cannot move during an active host session", false));
+            }
+        } else {
+            workspaces.insert(key, registration);
+        }
+        Ok(serde_json::json!({ "state": "BOUND" }))
+    }
+
+    fn read_text(&self, arguments: serde_json::Value) -> Result<serde_json::Value, local_ipc::NativeCapabilityDispatchError> {
+        let input: NativeFilesystemReadArguments = serde_json::from_value(arguments).map_err(|_| native_capability_error("NATIVE_FILESYSTEM_ARGUMENTS_INVALID", "filesystem read arguments are invalid", false))?;
+        if input.operation != "READ_TEXT" || input.max_bytes == 0 || input.max_bytes > 1_048_576 {
+            return Err(native_capability_error("NATIVE_FILESYSTEM_ARGUMENTS_INVALID", "filesystem read arguments are invalid", false));
+        }
+        let registration = self.registration(&input.project_id, &input.workspace_id)?;
+        let result = self.backend.read_registered_workspace_text(&registration, &input.project_id, &input.workspace_id, &input.relative_path, input.max_bytes).map_err(|_| native_capability_error("NATIVE_FILESYSTEM_READ_FAILED", "native filesystem read failed", false))?;
+        Ok(serde_json::json!({ "operation": "READ_TEXT", "targetIdentity": result.target_identity, "versionToken": result.version_token, "content": result.content, "bytes": result.bytes }))
+    }
+
+    fn write_text(&self, arguments: serde_json::Value) -> Result<serde_json::Value, local_ipc::NativeCapabilityDispatchError> {
+        let input: NativeFilesystemWriteArguments = serde_json::from_value(arguments).map_err(|_| native_capability_error("NATIVE_FILESYSTEM_ARGUMENTS_INVALID", "filesystem write arguments are invalid", false))?;
+        if input.operation != "WRITE_TEXT" || input.content.len() > 1_048_576 {
+            return Err(native_capability_error("NATIVE_FILESYSTEM_ARGUMENTS_INVALID", "filesystem write arguments are invalid", false));
+        }
+        let registration = self.registration(&input.project_id, &input.workspace_id)?;
+        let result = self.backend.write_registered_workspace_text(&registration, &input.project_id, &input.workspace_id, &input.relative_path, &input.content, &input.expected_version_token).map_err(|_| native_capability_error("NATIVE_FILESYSTEM_WRITE_FAILED", "native filesystem write failed", false))?;
+        Ok(serde_json::json!({ "operation": "WRITE_TEXT", "targetIdentity": result.target_identity, "versionToken": result.version_token, "state": result.state }))
+    }
+
+    fn project_status(&self, arguments: serde_json::Value) -> Result<serde_json::Value, local_ipc::NativeCapabilityDispatchError> {
+        let input: NativeProjectStatusArguments = serde_json::from_value(arguments).map_err(|_| native_capability_error("NATIVE_PROJECT_STATUS_ARGUMENTS_INVALID", "project status arguments are invalid", false))?;
+        let snapshot = input.snapshot.as_object().ok_or_else(|| native_capability_error("NATIVE_PROJECT_STATUS_ARGUMENTS_INVALID", "project status snapshot is invalid", false))?;
+        let project = snapshot.get("project").and_then(serde_json::Value::as_object).ok_or_else(|| native_capability_error("NATIVE_PROJECT_STATUS_ARGUMENTS_INVALID", "project status project record is invalid", false))?;
+        let workspace = snapshot.get("workspace").and_then(serde_json::Value::as_object).ok_or_else(|| native_capability_error("NATIVE_PROJECT_STATUS_ARGUMENTS_INVALID", "project status workspace record is invalid", false))?;
+        if project.get("projectId").and_then(serde_json::Value::as_str) != Some(input.project_id.as_str())
+            || workspace.get("projectId").and_then(serde_json::Value::as_str) != Some(input.project_id.as_str())
+            || workspace.get("workspaceId").and_then(serde_json::Value::as_str) != Some(input.workspace_id.as_str()) {
+            return Err(native_capability_error("NATIVE_PROJECT_STATUS_ARGUMENTS_INVALID", "project status identity does not match the bound request", false));
+        }
+        let _ = self.registration(&input.project_id, &input.workspace_id)?;
+        Ok(input.snapshot)
+    }
+
+    fn execute_engineering(&self, arguments: serde_json::Value) -> Result<serde_json::Value, local_ipc::NativeCapabilityDispatchError> {
+        let input: NativeEngineeringArguments = serde_json::from_value(arguments).map_err(|_| native_capability_error("NATIVE_ENGINEERING_ARGUMENTS_INVALID", "engineering arguments are invalid", false))?;
+        if !(1_000..=3_600_000).contains(&input.timeout_ms)
+            || !matches!((input.operation.as_str(), input.profile_id.as_str()), ("TEST", "npm.test") | ("BUILD", "npm.build"))
+        {
+            return Err(native_capability_error("NATIVE_ENGINEERING_ARGUMENTS_INVALID", "engineering operation, profile, or timeout is not allowed", false));
+        }
+        let registration = self.registration(&input.project_id, &input.workspace_id)?;
+        let workspace_identity = format!("workspace-{:x}", Sha256::digest(registration.root_identity().case_insensitive_key.as_bytes()));
+        let supervisor = process_supervisor::PlatformProcessSupervisor::new()
+            .map_err(map_engineering_error)?;
+        let process = supervisor
+            .launch_engineering(
+                &registration.root_identity().canonical_path,
+                &input.operation,
+                &input.profile_id,
+            )
+            .map_err(map_engineering_error)?;
+        let timeout = Duration::from_millis(input.timeout_ms);
+        let started = std::time::Instant::now();
+        loop {
+            match process.wait(Duration::from_millis(50)).map_err(map_engineering_error)? {
+                process_supervisor::ProcessWait::Exited { code } => {
+                    return Ok(serde_json::json!({
+                        "operation": input.operation,
+                        "projectId": input.project_id,
+                        "workspaceId": input.workspace_id,
+                        "profileId": input.profile_id,
+                        "workspaceIdentity": workspace_identity,
+                        "supervision": "WINDOWS_JOB_OBJECT",
+                        "privilege": "STANDARD_USER",
+                        "semanticState": if code == 0 { "PASSED" } else { "FAILED" },
+                        "exitCode": code,
+                    }));
+                }
+                process_supervisor::ProcessWait::TimedOut if started.elapsed() >= timeout => {
+                    process
+                        .shutdown_after_cooperative_request(
+                            Duration::ZERO,
+                            0x4A52_5649,
+                            Duration::from_secs(5),
+                            process_supervisor::ProcessShutdownReason::Timeout,
+                        )
+                        .map_err(map_engineering_error)?;
+                    return Ok(serde_json::json!({
+                        "operation": input.operation,
+                        "projectId": input.project_id,
+                        "workspaceId": input.workspace_id,
+                        "profileId": input.profile_id,
+                        "workspaceIdentity": workspace_identity,
+                        "supervision": "WINDOWS_JOB_OBJECT",
+                        "privilege": "STANDARD_USER",
+                        "semanticState": "TIMED_OUT",
+                    }));
+                }
+                process_supervisor::ProcessWait::TimedOut => {}
+            }
+        }
+    }
+
+    fn git_read(&self, arguments: serde_json::Value) -> Result<serde_json::Value, local_ipc::NativeCapabilityDispatchError> {
+        let input: serde_json::Value = arguments.clone();
+        let object = input.as_object().ok_or_else(|| native_capability_error("NATIVE_GIT_ARGUMENTS_INVALID", "Git arguments are invalid", false))?;
+        let project_id = object.get("projectId").and_then(serde_json::Value::as_str).ok_or_else(|| native_capability_error("NATIVE_GIT_ARGUMENTS_INVALID", "Git arguments are invalid", false))?;
+        let workspace_id = object.get("workspaceId").and_then(serde_json::Value::as_str).ok_or_else(|| native_capability_error("NATIVE_GIT_ARGUMENTS_INVALID", "Git arguments are invalid", false))?;
+        let registration = self.registration(project_id, workspace_id)?;
+        git_read::read_git(&self.backend, &registration, input).map_err(|error| {
+            let (code, retryable) = match error {
+                git_read::GitReadError::Invalid(_) => ("NATIVE_GIT_ARGUMENTS_INVALID", false),
+                git_read::GitReadError::Unavailable(_) => ("NATIVE_GIT_UNAVAILABLE", true),
+                git_read::GitReadError::TimedOut => ("NATIVE_GIT_TIMEOUT", true),
+                git_read::GitReadError::Failed(_) => ("NATIVE_GIT_READ_FAILED", false),
+            };
+            native_capability_error(code, "native Git inspection failed", retryable)
+        })
+    }
+
+    fn open_project(&self, arguments: serde_json::Value) -> Result<serde_json::Value, local_ipc::NativeCapabilityDispatchError> {
+        let object = arguments.as_object().ok_or_else(|| native_capability_error("NATIVE_OPEN_ARGUMENTS_INVALID", "open project arguments are invalid", false))?;
+        let project_id = object.get("projectId").and_then(serde_json::Value::as_str).ok_or_else(|| native_capability_error("NATIVE_OPEN_ARGUMENTS_INVALID", "open project arguments are invalid", false))?;
+        let workspace_id = object.get("workspaceId").and_then(serde_json::Value::as_str).ok_or_else(|| native_capability_error("NATIVE_OPEN_ARGUMENTS_INVALID", "open project arguments are invalid", false))?;
+        let registration = self.registration(project_id, workspace_id)?;
+        open_target::open_project(&registration, arguments).map_err(|error| map_open_error(error, "project"))
+    }
+
+    fn open_file(&self, arguments: serde_json::Value) -> Result<serde_json::Value, local_ipc::NativeCapabilityDispatchError> {
+        let object = arguments.as_object().ok_or_else(|| native_capability_error("NATIVE_OPEN_ARGUMENTS_INVALID", "open file arguments are invalid", false))?;
+        let project_id = object.get("projectId").and_then(serde_json::Value::as_str).ok_or_else(|| native_capability_error("NATIVE_OPEN_ARGUMENTS_INVALID", "open file arguments are invalid", false))?;
+        let workspace_id = object.get("workspaceId").and_then(serde_json::Value::as_str).ok_or_else(|| native_capability_error("NATIVE_OPEN_ARGUMENTS_INVALID", "open file arguments are invalid", false))?;
+        let registration = self.registration(project_id, workspace_id)?;
+        open_target::open_file(&self.backend, &registration, arguments).map_err(|error| map_open_error(error, "file"))
+    }
+
+    fn registration(&self, project_id: &str, workspace_id: &str) -> Result<path_identity::RegisteredWorkspace, local_ipc::NativeCapabilityDispatchError> {
+        self.workspaces.lock().map_err(|_| native_capability_error("NATIVE_WORKSPACE_REGISTRY_UNAVAILABLE", "native workspace registry is unavailable", true))?.get(&(project_id.to_owned(), workspace_id.to_owned())).cloned().ok_or_else(|| native_capability_error("NATIVE_WORKSPACE_NOT_BOUND", "Core workspace is not bound to the Windows host", false))
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn native_capability_error(code: &str, message: &str, retryable: bool) -> local_ipc::NativeCapabilityDispatchError {
+    local_ipc::NativeCapabilityDispatchError { code: code.to_owned(), message: message.to_owned(), retryable }
+}
+
+#[cfg(not(debug_assertions))]
+fn map_open_error(error: open_target::OpenTargetError, target: &str) -> local_ipc::NativeCapabilityDispatchError {
+    match error {
+        open_target::OpenTargetError::Invalid => native_capability_error("NATIVE_OPEN_ARGUMENTS_INVALID", "open arguments are invalid", false),
+        open_target::OpenTargetError::TargetUnavailable => native_capability_error("NATIVE_OPEN_TARGET_UNAVAILABLE", "open target is unavailable or unsafe", false),
+        open_target::OpenTargetError::LaunchFailed => native_capability_error("NATIVE_OPEN_LAUNCH_FAILED", &format!("{target} open request could not be started"), true),
+    }
+}
+
+#[cfg(not(debug_assertions))]
+fn map_engineering_error(error: process_supervisor::ProcessSupervisorError) -> local_ipc::NativeCapabilityDispatchError {
+    let (code, retryable) = match error.state {
+        process_supervisor::ProcessSupervisorState::UnsupportedPlatform => ("NATIVE_ENGINEERING_UNSUPPORTED_PLATFORM", false),
+        process_supervisor::ProcessSupervisorState::InvalidLaunchSpec => ("NATIVE_ENGINEERING_ARGUMENTS_INVALID", false),
+        process_supervisor::ProcessSupervisorState::JobCreationFailed
+        | process_supervisor::ProcessSupervisorState::JobConfigurationFailed
+        | process_supervisor::ProcessSupervisorState::ProcessCreationFailed
+        | process_supervisor::ProcessSupervisorState::ContainmentFailed
+        | process_supervisor::ProcessSupervisorState::ResumeFailed => ("NATIVE_ENGINEERING_START_FAILED", true),
+        process_supervisor::ProcessSupervisorState::WaitFailed
+        | process_supervisor::ProcessSupervisorState::ExitCodeFailed => ("NATIVE_ENGINEERING_RESULT_UNCERTAIN", true),
+        process_supervisor::ProcessSupervisorState::TerminationFailed
+        | process_supervisor::ProcessSupervisorState::TerminationVerificationFailed => ("NATIVE_ENGINEERING_TERMINATION_FAILED", true),
+    };
+    native_capability_error(code, "supervised engineering execution did not complete", retryable)
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -79,8 +332,33 @@ struct ProviderSetupStatusCommandRecord {
     provider_id: String,
     distribution_id: String,
     adapter_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provider_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    setup_policy_id: Option<String>,
     state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_attempt_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_attempt_outcome: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     sanitized_failure_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_verified_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    conformance_evidence_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compatibility: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    health: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    qualification_state: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    qualification_evidence_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    locality: Option<String>,
+    capabilities: Vec<local_ipc::ProviderCapabilityStatus>,
+    support_state: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -114,6 +392,22 @@ struct SessionAuthenticationCommandResponse {
     status: String,
     retry_after_ms: u64,
     state: SessionSecurityStateCommandRecord,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthenticatedTextConversationCommandRequest {
+    request_id: String,
+    instruction: serde_json::Value,
+    context: serde_json::Value,
+    data_policy: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[allow(dead_code)]
+struct ToolExecutionCommandRequest {
+    tool_request: serde_json::Value,
 }
 
 #[cfg(not(debug_assertions))]
@@ -176,8 +470,21 @@ fn get_provider_setup_status(
             provider_id: record.provider_id,
             distribution_id: record.distribution_id,
             adapter_version: record.adapter_version,
+            provider_version: record.provider_version,
+            setup_policy_id: record.setup_policy_id,
             state: record.state,
+            last_attempt_at: record.last_attempt_at,
+            last_attempt_outcome: record.last_attempt_outcome,
             sanitized_failure_reason: record.sanitized_failure_reason,
+            last_verified_at: record.last_verified_at,
+            conformance_evidence_ref: record.conformance_evidence_ref,
+            compatibility: record.compatibility,
+            health: record.health,
+            qualification_state: record.qualification_state,
+            qualification_evidence_ref: record.qualification_evidence_ref,
+            locality: record.locality,
+            capabilities: record.capabilities,
+            support_state: record.support_state,
         }).collect())
         .map_err(|error| format!("{:?}", error.state))
 }
@@ -263,6 +570,88 @@ fn authenticate_session(
     result
 }
 
+#[cfg(not(debug_assertions))]
+#[tauri::command]
+fn process_authenticated_text(
+    state: tauri::State<'_, HostRuntime>,
+    request: AuthenticatedTextConversationCommandRequest,
+) -> Result<serde_json::Value, String> {
+    let local_ipc = state.local_ipc.lock().map_err(|_| "CORE_IPC_LOCK_FAILED".to_owned())?;
+    local_ipc
+        .request_authenticated_text_conversation(
+            &state.authenticated,
+            local_ipc::AuthenticatedTextConversationRequest {
+                request_id: request.request_id,
+                instruction: request.instruction,
+                context: request.context,
+                data_policy: request.data_policy,
+            },
+        )
+        .map(|response| response.result)
+        .map_err(|error| format!("{:?}", error.state))
+}
+
+#[cfg(not(debug_assertions))]
+#[tauri::command]
+fn execute_tool(
+    state: tauri::State<'_, HostRuntime>,
+    request: ToolExecutionCommandRequest,
+) -> Result<serde_json::Value, String> {
+    let core_status = state.core_status.clone();
+    let native_workspaces = Arc::clone(&state.native_workspaces);
+    let local_ipc = state.local_ipc.lock().map_err(|_| "CORE_IPC_LOCK_FAILED".to_owned())?;
+    local_ipc
+        .request_tool_execution_with_native_handler(
+            &state.authenticated,
+            local_ipc::ToolExecutionRequest { tool_request: request.tool_request },
+            move |capability, arguments| {
+                dispatch_native_capability(&core_status, &native_workspaces, capability, arguments)
+            },
+        )
+        .map_err(|error| format!("{:?}:{}", error.state, error.detail))
+}
+
+#[cfg(not(debug_assertions))]
+fn dispatch_native_capability(
+    core_status: &local_ipc::AuthenticatedCoreStatus,
+    native_workspaces: &Arc<NativeWorkspaceRegistry>,
+    capability: &str,
+    arguments: serde_json::Value,
+) -> Result<serde_json::Value, local_ipc::NativeCapabilityDispatchError> {
+    match capability {
+        "status.system" => {
+            if !arguments.as_object().is_some_and(|value| value.is_empty()) {
+                return Err(native_capability_error("NATIVE_CAPABILITY_ARGUMENTS_INVALID", "status.system does not accept arguments", false));
+            }
+            Ok(serde_json::json!({
+                "core": {
+                    "protocolMajor": core_status.protocol_major,
+                    "platform": core_status.platform,
+                    "runtimeRole": core_status.runtime_role,
+                    "architecture": core_status.architecture,
+                    "serviceState": core_status.service_state,
+                    "transportState": core_status.transport_state,
+                },
+                "platform": {
+                    "platform": "WINDOWS",
+                    "runtimeRole": "FULL_HOST",
+                    "architecture": "x64",
+                    "backendProfileId": platform::WINDOWS_V1_BACKEND_PROFILE_ID,
+                },
+            }))
+        }
+        "workspace.bind" => native_workspaces.bind(arguments),
+        "status.project" => native_workspaces.project_status(arguments),
+        "filesystem.read_text" => native_workspaces.read_text(arguments),
+        "filesystem.write_text" => native_workspaces.write_text(arguments),
+        "open.project" => native_workspaces.open_project(arguments),
+        "open.file" => native_workspaces.open_file(arguments),
+        "git.status" | "git.branch" | "git.diff" | "git.log" => native_workspaces.git_read(arguments),
+        "engineering.execute" => native_workspaces.execute_engineering(arguments),
+        _ => Err(native_capability_error("NATIVE_CAPABILITY_UNQUALIFIED", "this native capability is not yet qualified on the Windows host", false)),
+    }
+}
+
 #[cfg(debug_assertions)]
 #[tauri::command]
 fn start_provider_setup(
@@ -292,6 +681,18 @@ fn initialize_session(_request: SessionPasswordCommandRequest) -> Result<Session
 #[cfg(debug_assertions)]
 #[tauri::command]
 fn authenticate_session(_request: SessionPasswordCommandRequest) -> Result<SessionAuthenticationCommandResponse, String> {
+    Err("CORE_IPC_NOT_READY".to_owned())
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn process_authenticated_text(_request: AuthenticatedTextConversationCommandRequest) -> Result<serde_json::Value, String> {
+    Err("CORE_IPC_NOT_READY".to_owned())
+}
+
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn execute_tool(_request: ToolExecutionCommandRequest) -> Result<serde_json::Value, String> {
     Err("CORE_IPC_NOT_READY".to_owned())
 }
 
@@ -564,7 +965,7 @@ fn core_authentication_failure_code_with_process_state(
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![ui_boundary::get_core_status, start_provider_setup, get_provider_setup_status, get_session_status, initialize_session, authenticate_session])
+        .invoke_handler(tauri::generate_handler![ui_boundary::get_core_status, start_provider_setup, get_provider_setup_status, get_session_status, initialize_session, authenticate_session, process_authenticated_text, execute_tool])
         .setup(|app| {
             let path_backend = path_identity::PlatformPathsAndIdentity::new();
             let resolved_paths = path_backend
@@ -684,6 +1085,9 @@ fn main() {
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
 
             #[cfg(not(debug_assertions))]
+            let native_workspaces = Arc::new(NativeWorkspaceRegistry::new(path_backend));
+
+            #[cfg(not(debug_assertions))]
             let host_runtime = if should_start_core(startup_condition) {
                 let layout = _core_runtime_policy.load_verified_layout(resource_dir.clone())?;
                 let manifest_path = resource_dir
@@ -740,7 +1144,14 @@ fn main() {
                 );
                 if core_exited {
                     bootstrap.mark_repair_required();
-                    bootstrap_diagnostics.record_failure("CORE_EXITED_BEFORE_AUTHENTICATION")?;
+                    let startup_failure_code = core_process.startup_failure_code();
+                    bootstrap_diagnostics.record_failure(
+                        core_authentication_failure_code_with_process_state(
+                            local_ipc::LocalIpcState::HandshakeTimeout,
+                            true,
+                            startup_failure_code.as_deref(),
+                        ),
+                    )?;
                     startup_condition = bootstrap.condition().startup_query_value();
                     None
                 } else {
@@ -762,6 +1173,7 @@ fn main() {
                                         core_process,
                                         authenticated,
                                         core_status,
+                                        native_workspaces: Arc::clone(&native_workspaces),
                                         _db_dek_handle: db_dek_handle,
                                         _db_dek: db_dek,
                                     }
@@ -838,6 +1250,28 @@ mod tests {
         allows_authoritative_navigation, core_status_failure_code, should_start_core,
     };
 
+    fn packaged_release_root() -> std::path::PathBuf {
+        if let Some(path) = std::env::var_os("JARVIS_EXACT_SIGNED_RELEASE_ROOT") {
+            return std::path::PathBuf::from(path);
+        }
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let candidates = [
+            manifest_dir.join("../../../target/release/resources/core-runtime"),
+            manifest_dir.join(
+                "../../../target/x86_64-pc-windows-msvc/release/resources/core-runtime",
+            ),
+        ];
+        candidates
+            .iter()
+            .find(|root| {
+                root.join("runtime/node.exe").is_file()
+                    && root.join("core/dist/main.js").is_file()
+                    && root.join("tuf/metadata/targets.json").is_file()
+            })
+            .cloned()
+            .unwrap_or_else(|| candidates[0].clone())
+    }
+
     #[test]
     fn only_locked_startup_condition_can_start_core() {
         assert!(should_start_core("LOCKED"));
@@ -848,7 +1282,22 @@ mod tests {
     }
 
     #[test]
-    fn production_navigation_allows_only_the_tauri_app_origins() {
+    fn authoritative_navigation_allows_only_the_expected_app_origins() {
+        #[cfg(debug_assertions)]
+        {
+            assert!(allows_authoritative_navigation(
+                &"http://127.0.0.1:1420/index.html".parse().unwrap()
+            ));
+            assert!(!allows_authoritative_navigation(
+                &"http://tauri.localhost/index.html".parse().unwrap()
+            ));
+            assert!(!allows_authoritative_navigation(
+                &"tauri://localhost/index.html".parse().unwrap()
+            ));
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
         assert!(allows_authoritative_navigation(
             &"http://tauri.localhost/index.html".parse().unwrap()
         ));
@@ -858,6 +1307,7 @@ mod tests {
         assert!(!allows_authoritative_navigation(
             &"https://example.com/index.html".parse().unwrap()
         ));
+        }
     }
 
     #[test]
@@ -928,19 +1378,85 @@ mod tests {
         );
     }
 
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn release_native_workspace_dispatch_round_trips_real_windows_boundary() {
+        let root = std::env::temp_dir().join(format!(
+            "jarvis-native-dispatch-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("system clock must be after epoch")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).expect("native dispatch fixture root must be creatable");
+        let target = root.join("src").join("main.txt");
+        std::fs::create_dir_all(target.parent().expect("fixture parent must exist"))
+            .expect("native dispatch fixture parent must be creatable");
+        std::fs::write(&target, "before").expect("native dispatch fixture must be writable");
+
+        let registry = super::NativeWorkspaceRegistry::new(
+            super::path_identity::PlatformPathsAndIdentity::new(),
+        );
+        let project_id = "0199a000-0000-7000-8000-000000000001";
+        let workspace_id = "0199a000-0000-7000-8000-000000000002";
+        registry
+            .bind(serde_json::json!({
+                "projectId": project_id,
+                "workspaceId": workspace_id,
+                "workspaceRoot": root,
+            }))
+            .expect("Core-owned workspace binding must be accepted");
+
+        let read = registry
+            .read_text(serde_json::json!({
+                "operation": "READ_TEXT",
+                "projectId": project_id,
+                "workspaceId": workspace_id,
+                "relativePath": "src/main.txt",
+                "maxBytes": 1024,
+            }))
+            .expect("typed native read must succeed");
+        assert_eq!(read.get("content").and_then(serde_json::Value::as_str), Some("before"));
+        let version = read
+            .get("versionToken")
+            .and_then(serde_json::Value::as_str)
+            .expect("native read must return a version token");
+
+        let write = registry
+            .write_text(serde_json::json!({
+                "operation": "WRITE_TEXT",
+                "projectId": project_id,
+                "workspaceId": workspace_id,
+                "relativePath": "src/main.txt",
+                "content": "after",
+                "expectedVersionToken": version,
+            }))
+            .expect("conditional native write must succeed");
+        assert_eq!(
+            write.get("state").and_then(serde_json::Value::as_str),
+            Some("WRITE_REQUESTED")
+        );
+        assert_eq!(std::fs::read_to_string(&target).expect("written target must be readable"), "after");
+
+        let other_root = root.join("other");
+        std::fs::create_dir_all(&other_root).expect("retarget fixture root must be creatable");
+        let retarget = registry.bind(serde_json::json!({
+            "projectId": project_id,
+            "workspaceId": workspace_id,
+            "workspaceRoot": other_root,
+        }));
+        assert_eq!(retarget.expect_err("workspace identity movement must fail").code, "NATIVE_WORKSPACE_IDENTITY_CHANGED");
+        std::fs::remove_dir_all(root).expect("native dispatch fixture must be removable");
+    }
+
     #[test]
     fn supervised_packaged_core_authenticates_with_host_secure_storage_runtime() {
-        let release_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../target/x86_64-pc-windows-msvc/release");
-        let resource_dir = if release_dir
-            .join("resources")
-            .join(super::core_runtime::RELEASE_RUNTIME_DIRECTORY)
-            .is_dir()
-        {
-            release_dir.join("resources")
-        } else {
-            release_dir
-        };
+        let packaged_root = packaged_release_root();
+        let resource_dir = packaged_root
+            .parent()
+            .expect("packaged Core runtime must have a resource parent")
+            .to_path_buf();
         let resource_dir = std::fs::canonicalize(resource_dir)
             .expect("release resource directory must canonicalize");
         let root = resource_dir.join("core-runtime");
@@ -1025,8 +1541,7 @@ mod tests {
         use std::io::Write;
         use std::process::{Command, Stdio};
 
-        let release_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../target/x86_64-pc-windows-msvc/release/resources/core-runtime");
+        let release_root = packaged_release_root();
         let node = release_root.join("runtime/node.exe");
         let ipc_module = release_root.join("core/dist/ipc-bootstrap.js");
         if !node.is_file() || !ipc_module.is_file() {
@@ -1160,8 +1675,7 @@ mod tests {
         let exact_release_root =
             std::env::var_os("JARVIS_EXACT_SIGNED_RELEASE_ROOT").map(std::path::PathBuf::from);
         let release_root = exact_release_root.clone().unwrap_or_else(|| {
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../../target/x86_64-pc-windows-msvc/release/resources/core-runtime")
+            packaged_release_root()
         });
         let preserved_recovery_secret = exact_release_root.map(|_| {
             let path = std::env::var_os("JARVIS_PRESERVED_RECOVERY_SECRET_PATH")

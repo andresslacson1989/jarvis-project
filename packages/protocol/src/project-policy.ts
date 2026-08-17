@@ -57,3 +57,9 @@ export interface ProjectPolicySnapshotRecord {
     contentSha256: string;
   }>[];
 }
+
+export interface ProjectPolicySnapshotContent {
+  readonly policyTrustId: string;
+  readonly revision: number;
+  readonly content: string;
+}

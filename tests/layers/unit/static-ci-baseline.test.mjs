@@ -11,7 +11,6 @@ function readWorkflow() {
 }
 
 const requiredFiles = [
-  ".github/workflows/static-ci.yml",
   "tools/ci/lib.mjs",
   "tools/ci/check-format.mjs",
   "tools/ci/check-schemas.mjs",
@@ -24,7 +23,7 @@ const requiredFiles = [
   "tsconfig.build.json",
 ];
 
-test("0.11 static CI baseline artifacts exist", () => {
+test("0.11 local verification baseline artifacts exist", () => {
   for (const path of requiredFiles) {
     assert.ok(existsSync(resolve(root, path)), `missing required 0.11 artifact: ${path}`);
   }

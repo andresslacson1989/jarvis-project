@@ -546,6 +546,20 @@ mod windows {
             self.spawn_spec(spec)
         }
 
+        /// Launch one of the fixed, repository-owned engineering profiles.
+        /// The caller supplies only the already-registered workspace root and
+        /// the typed operation/profile identifiers; it cannot provide an
+        /// executable, arguments, or environment. The resulting process is
+        /// assigned to this supervisor's Job Object before it is resumed.
+        pub fn launch_engineering(
+            &self,
+            workspace_root: &Path,
+            operation: &str,
+            profile_id: &str,
+        ) -> Result<SupervisedCoreProcess, ProcessSupervisorError> {
+            self.spawn_spec(engineering_launch_spec(workspace_root, operation, profile_id)?)
+        }
+
         fn spawn_spec(
             &self,
             spec: ProcessLaunchSpec,
@@ -825,6 +839,64 @@ mod windows {
         Ok(())
     }
 
+    fn engineering_launch_spec(
+        workspace_root: &Path,
+        operation: &str,
+        profile_id: &str,
+    ) -> Result<ProcessLaunchSpec, ProcessSupervisorError> {
+        if !workspace_root.is_absolute() || !workspace_root.is_dir() {
+            return Err(invalid_spec(
+                "engineering workspace root must be an existing absolute directory",
+            ));
+        }
+
+        let command = match (operation, profile_id) {
+            ("TEST", "npm.test") => "test",
+            ("BUILD", "npm.build") => "build",
+            _ => {
+                return Err(invalid_spec(
+                    "engineering operation/profile is not in the fixed Windows allowlist",
+                ));
+            }
+        };
+
+        let program_files = std::env::var_os("ProgramFiles")
+            .ok_or_else(|| invalid_spec("ProgramFiles is required for the qualified Node runtime"))?;
+        let node_root = PathBuf::from(program_files).join("nodejs");
+        let node = node_root.join("node.exe");
+        let pnpm_script = node_root.join("node_modules").join("corepack").join("dist").join("pnpm.js");
+        if !node.is_file() || !pnpm_script.is_file() {
+            return Err(invalid_spec(
+                "the qualified Node/corepack runtime is not installed at the fixed Windows location",
+            ));
+        }
+
+        let system_root = std::env::var_os("SystemRoot")
+            .ok_or_else(|| invalid_spec("SystemRoot is required for the engineering worker environment"))?;
+        let system_root = PathBuf::from(system_root);
+        let git_bin = PathBuf::from(std::env::var_os("ProgramFiles").expect("ProgramFiles checked"))
+            .join("Git")
+            .join("cmd");
+        let system32 = system_root.join("System32");
+        let path = std::env::join_paths([node_root.as_path(), git_bin.as_path(), system32.as_path()])
+            .map_err(|_| invalid_spec("fixed engineering PATH could not be constructed"))?;
+        let mut environment = BTreeMap::new();
+        environment.insert(OsString::from("Path"), path);
+        environment.insert(OsString::from("SystemRoot"), system_root.clone().into_os_string());
+        for key in ["TEMP", "TMP", "USERPROFILE"] {
+            if let Some(value) = std::env::var_os(key) {
+                environment.insert(OsString::from(key), value);
+            }
+        }
+        Ok(ProcessLaunchSpec {
+            program: node,
+            arguments: vec![pnpm_script.into_os_string(), OsString::from(command)],
+            current_dir: workspace_root.to_owned(),
+            environment,
+            bootstrap_reader: None,
+        })
+    }
+
     fn build_command_line(spec: &ProcessLaunchSpec) -> Result<Vec<u16>, ProcessSupervisorError> {
         let mut command_line = quote_windows_argument(spec.program.as_os_str())?;
         for argument in &spec.arguments {
@@ -1060,6 +1132,44 @@ mod windows {
                 if entry.th32ParentProcessID == parent_id {
                     found = Some(entry.th32ProcessID);
                     break;
+                }
+                // SAFETY: same valid snapshot and writable entry as above.
+                has_entry = unsafe { Process32NextW(snapshot, &mut entry) } != 0;
+            }
+            // SAFETY: this test owns the snapshot handle.
+            unsafe {
+                CloseHandle(snapshot);
+            }
+            found
+        }
+
+        fn find_named_child_process(parent_id: u32, expected_name: &str) -> Option<u32> {
+            // SAFETY: the snapshot is a Windows-owned read-only process list;
+            // the output entry is correctly sized and writable.
+            let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+            if snapshot == INVALID_HANDLE_VALUE {
+                return None;
+            }
+            let mut entry = PROCESSENTRY32W {
+                dwSize: size_of::<PROCESSENTRY32W>() as u32,
+                ..Default::default()
+            };
+            let mut found = None;
+            // SAFETY: `entry` remains valid for each Toolhelp iteration and
+            // the snapshot handle is valid until the explicit close below.
+            let mut has_entry = unsafe { Process32FirstW(snapshot, &mut entry) } != 0;
+            while has_entry {
+                if entry.th32ParentProcessID == parent_id {
+                    let name_end = entry
+                        .szExeFile
+                        .iter()
+                        .position(|unit| *unit == 0)
+                        .unwrap_or(entry.szExeFile.len());
+                    let name = String::from_utf16_lossy(&entry.szExeFile[..name_end]);
+                    if name.eq_ignore_ascii_case(expected_name) {
+                        found = Some(entry.th32ProcessID);
+                        break;
+                    }
                 }
                 // SAFETY: same valid snapshot and writable entry as above.
                 has_entry = unsafe { Process32NextW(snapshot, &mut entry) } != 0;
@@ -1482,6 +1592,113 @@ mod windows {
         }
 
         #[test]
+        #[ignore = "requires the installed qualified Codex CLI and its Windows sandbox setup"]
+        fn live_codex_worker_inherits_supervisor_job_and_is_force_terminated() {
+            let system_root = std::env::var_os("SystemRoot").expect("Windows sets SystemRoot");
+            let system_root = PathBuf::from(system_root);
+            let node = PathBuf::from(r"C:\Program Files\nodejs\node.exe");
+            assert!(
+                node.is_file(),
+                "the pinned Node development runtime must exist"
+            );
+            let codex = std::env::var_os("JARVIS_CODEX_EXECUTABLE")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| {
+                    PathBuf::from(
+                        std::env::var_os("USERPROFILE").expect("Windows user profile must exist"),
+                    )
+                    .join(".codex")
+                    .join("packages")
+                    .join("standalone")
+                    .join("releases")
+                    .join("0.147.0-x86_64-pc-windows-msvc")
+                    .join("bin")
+                    .join("codex.exe")
+                });
+            assert!(
+                codex.is_file(),
+                "the qualified Codex CLI executable must exist"
+            );
+            let codex_parent = codex
+                .parent()
+                .and_then(Path::parent)
+                .expect("Codex release directory must have a working parent")
+                .to_path_buf();
+            let script = "const { spawn } = require('node:child_process'); const child = spawn(process.env.JARVIS_LIVE_CODEX, ['sandbox', '--', 'cmd', '/d', '/c', 'ping.exe', '-n', '60', '127.0.0.1'], { stdio: 'ignore' }); child.once('error', () => process.exit(41)); child.once('exit', code => process.exit(code ?? 42)); setTimeout(() => process.exit(43), 30000);";
+            let supervisor = PlatformProcessSupervisor::new().expect("Job Object must be created");
+            let process = supervisor
+                .launch_test_process(ProcessLaunchSpec {
+                    program: node,
+                    arguments: vec![OsString::from("-e"), OsString::from(script)],
+                    current_dir: codex_parent,
+                    environment: BTreeMap::from([
+                        (
+                            OsString::from("SystemRoot"),
+                            system_root.clone().into_os_string(),
+                        ),
+                        (OsString::from("WINDIR"), system_root.into_os_string()),
+                        (OsString::from("JARVIS_LIVE_CODEX"), codex.into_os_string()),
+                    ]),
+                    bootstrap_reader: None,
+                })
+                .expect("supervised Core-like parent must launch");
+            let codex_pid = (0..200).find_map(|_| {
+                let child = find_named_child_process(process.process_id(), "codex.exe");
+                if child.is_none() {
+                    sleep(Duration::from_millis(50));
+                }
+                child
+            });
+            let codex_pid =
+                codex_pid.expect("the actual Codex worker must be a supervised descendant");
+            // SAFETY: the PID came from the live supervised process tree;
+            // rights are limited to synchronization and liveness inspection.
+            let external_process_handle = unsafe {
+                OpenProcess(
+                    PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+                    0,
+                    codex_pid,
+                )
+            };
+            assert!(
+                !external_process_handle.is_null()
+                    && external_process_handle != INVALID_HANDLE_VALUE,
+                "the test must obtain a synchronization handle to the live Codex worker"
+            );
+            let outcome = process
+                .shutdown_after_cooperative_request(
+                    Duration::ZERO,
+                    TEST_TERMINATION_CODE,
+                    Duration::from_secs(10),
+                    ProcessShutdownReason::Timeout,
+                )
+                .expect("forced shutdown must verify the complete Codex Job Object");
+            assert!(matches!(
+                outcome,
+                ProcessShutdownOutcome::Forced {
+                    reason: ProcessShutdownReason::Timeout,
+                    ..
+                }
+            ));
+            let diagnostics = process
+                .containment_diagnostics()
+                .expect("Codex containment diagnostics must verify an empty Job Object");
+            assert!(diagnostics.process_exited);
+            assert_eq!(diagnostics.active_job_processes, 0);
+            // SAFETY: the handle was validated above and remains open until
+            // the explicit close below. Job termination must end Codex too.
+            let wait = unsafe { WaitForSingleObject(external_process_handle, 10_000) };
+            assert_eq!(
+                wait, WAIT_OBJECT_0,
+                "Job termination must end the Codex worker"
+            );
+            // SAFETY: this test owns the synchronization handle.
+            unsafe {
+                CloseHandle(external_process_handle);
+            }
+        }
+
+        #[test]
         fn relative_or_embedded_nul_launch_specs_fail_closed() {
             let supervisor = PlatformProcessSupervisor::new().expect("Job Object must be created");
             let relative = ProcessLaunchSpec {
@@ -1509,6 +1726,70 @@ mod windows {
                 .launch_test_process(embedded_nul)
                 .expect_err("embedded NUL must be rejected");
             assert_eq!(error.state, ProcessSupervisorState::InvalidLaunchSpec);
+        }
+
+        #[test]
+        fn engineering_profiles_are_fixed_and_reject_arbitrary_commands() {
+            let workspace = std::env::current_dir().expect("test workspace must resolve");
+            let test_spec = engineering_launch_spec(&workspace, "TEST", "npm.test")
+                .expect("the qualified Node/Corepack runtime must be installed for Windows tests");
+            assert_eq!(
+                test_spec.program.file_name().and_then(|value| value.to_str()),
+                Some("node.exe")
+            );
+            assert_eq!(test_spec.arguments.last().and_then(|value| value.to_str()), Some("test"));
+            assert!(test_spec
+                .environment
+                .keys()
+                .all(|key| key != &OsString::from("NODE_OPTIONS")));
+
+            let error = engineering_launch_spec(&workspace, "TEST", "cmd.arbitrary")
+                .expect_err("arbitrary profile IDs must be rejected");
+            assert_eq!(error.state, ProcessSupervisorState::InvalidLaunchSpec);
+            let error = engineering_launch_spec(&workspace, "TEST", "npm.build")
+                .expect_err("operation/profile mismatches must be rejected");
+            assert_eq!(error.state, ProcessSupervisorState::InvalidLaunchSpec);
+        }
+
+        #[test]
+        fn engineering_test_profile_runs_inside_the_owned_job() {
+            let root = std::env::temp_dir().join(format!(
+                "jarvis-engineering-profile-{}-{}",
+                std::process::id(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("system clock must be after epoch")
+                    .as_nanos()
+            ));
+            create_dir_all(&root).expect("engineering fixture directory must be creatable");
+            write(
+                root.join("package.json"),
+                br#"{"scripts":{"test":"node -e \"process.exit(0)\""}}"#,
+            )
+            .expect("engineering fixture package must be written");
+            let supervisor = PlatformProcessSupervisor::new().expect("Job Object must be created");
+            let process = supervisor
+                .launch_engineering(&root, "TEST", "npm.test")
+                .expect("fixed engineering profile must launch");
+            let result = process
+                .wait(Duration::from_secs(30))
+                .expect("engineering profile wait must succeed");
+            assert!(matches!(result, ProcessWait::Exited { code: 0 }));
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                let diagnostics = process
+                    .containment_diagnostics()
+                    .expect("engineering containment diagnostics must succeed");
+                if diagnostics.process_exited && diagnostics.active_job_processes == 0 {
+                    break;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "owned Job Object did not become empty after the process exited: {diagnostics:?}"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            remove_dir_all(root).expect("engineering fixture must be removable");
         }
     }
 }

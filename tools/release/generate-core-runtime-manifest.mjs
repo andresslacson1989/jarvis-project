@@ -19,6 +19,11 @@ const CORE_SUPPORT_RELATIVE_PATHS = [
   "core/dist/backup-recovery.js",
   "core/dist/backup-package.js",
   "core/dist/backup-payload.js",
+  "core/dist/conversation.js",
+  "core/dist/conversation.mjs",
+  "core/dist/codex-cli-adapter.mjs",
+  "core/dist/provider-execution.mjs",
+  "core/dist/provider-execution.mts",
   "core/packages/protocol/src/provider-runtime.mjs",
   "core/packages/protocol/src/authority-runtime.mjs",
   "core/packages/protocol/src/state-machine-runtime.mjs",
@@ -26,6 +31,7 @@ const CORE_SUPPORT_RELATIVE_PATHS = [
   "core/packages/protocol/src/mission-graph-runtime.mjs",
   "core/packages/protocol/src/accounting-runtime.mjs",
   "core/packages/protocol/src/worker-runtime.mjs",
+  "core/packages/protocol/src/worker-recovery-runtime.mjs",
   "core/packages/protocol/src/project-policy-runtime.mjs",
   "core/packages/protocol/src/project-runtime.mjs",
   "core/packages/protocol/src/update-trust-runtime.mjs",
@@ -36,7 +42,10 @@ const CORE_SUPPORT_RELATIVE_PATHS = [
   "core/packages/protocol/src/session-runtime.mjs",
   "core/packages/protocol/src/security-audit-runtime.mjs",
   "core/packages/protocol/src/authority-canonical-runtime.mjs",
+  "core/packages/protocol/src/conversation-runtime.mjs",
+  "core/packages/protocol/src/conversation-runtime.mts",
   "core/packages/policy/src/project-policy-mutation.mjs",
+  "core/packages/policy/src/pre-allow-gates.mjs",
 ];
 const DEFAULT_OUTPUT = "runtime-manifest.json";
 const DEFAULT_WINDOWS_SIGNING = Object.freeze({

@@ -1,4 +1,4 @@
-import { copyFile, mkdir, rm, stat } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -61,6 +61,24 @@ const generatedBackupPayloadModule = resolve(
   ".artifacts/core-build/services/core/src/backup-payload.js",
 );
 const outputBackupPayloadModule = resolve(outputDirectory, "backup-payload.js");
+const generatedConversationModule = resolve(projectRoot, ".artifacts/core-build/services/core/src/conversation.js");
+const generatedProviderRoutingModule = resolve(projectRoot, ".artifacts/core-build/services/core/src/provider-routing.js");
+const generatedToolRuntimeModule = resolve(projectRoot, ".artifacts/core-build/services/core/src/tool-runtime.js");
+const generatedCodexAdapterModule = resolve(projectRoot, ".artifacts/core-build/providers/ai/src/codex-cli-adapter.mjs");
+const sourceProviderExecutionModule = resolve(projectRoot, "providers/ai/src/provider-execution.mjs");
+const sourceProviderExecutionTypes = resolve(projectRoot, "providers/ai/src/provider-execution.mts");
+const sourceNativeCapabilityModule = resolve(projectRoot, "services/core/src/native-capability.mjs");
+const sourceNativeCapabilityTypes = resolve(projectRoot, "services/core/src/native-capability.mts");
+const outputConversationModule = resolve(outputDirectory, "conversation.js");
+const outputProviderRoutingModule = resolve(outputDirectory, "provider-routing.js");
+const outputToolRuntimeModule = resolve(outputDirectory, "tool-runtime.mjs");
+const outputNativeCapabilityModule = resolve(outputDirectory, "native-capability.mjs");
+const outputNativeCapabilityTypes = resolve(outputDirectory, "native-capability.mts");
+const sourceConversationWrapper = resolve(projectRoot, "services/core/src/conversation.mjs");
+const outputConversationWrapper = resolve(outputDirectory, "conversation.mjs");
+const outputCodexAdapterModule = resolve(outputDirectory, "codex-cli-adapter.mjs");
+const outputProviderExecutionModule = resolve(outputDirectory, "provider-execution.mjs");
+const outputProviderExecutionTypes = resolve(outputDirectory, "provider-execution.mts");
 
 async function main() {
   const information = await stat(generatedEntrypoint).catch(() => null);
@@ -81,6 +99,16 @@ async function main() {
   await copyFile(generatedBackupRecoveryModule, outputBackupRecoveryModule);
   await copyFile(generatedBackupPackageModule, outputBackupPackageModule);
   await copyFile(generatedBackupPayloadModule, outputBackupPayloadModule);
+  await copyFile(generatedConversationModule, outputConversationModule);
+  await copyFile(generatedProviderRoutingModule, outputProviderRoutingModule);
+  await copyFile(generatedToolRuntimeModule, outputToolRuntimeModule);
+  await copyFile(sourceNativeCapabilityModule, outputNativeCapabilityModule);
+  await copyFile(sourceNativeCapabilityTypes, outputNativeCapabilityTypes);
+  const conversationWrapper = await readFile(sourceConversationWrapper, "utf8");
+  await writeFile(outputConversationWrapper, conversationWrapper.replace("./conversation.ts", "./conversation.js"), { flag: "w" });
+  await copyFile(generatedCodexAdapterModule, outputCodexAdapterModule);
+  await copyFile(sourceProviderExecutionModule, outputProviderExecutionModule);
+  await copyFile(sourceProviderExecutionTypes, outputProviderExecutionTypes);
   console.log(`[core-build] wrote ${outputEntrypoint}`);
 }
 

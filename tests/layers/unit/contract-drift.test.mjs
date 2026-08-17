@@ -21,17 +21,13 @@ test("0.12 contract reproducibility artifacts exist", () => {
   }
 });
 
-test("0.12 package and CI gates are wired", () => {
+test("0.12 package and local contract gates are wired", () => {
   const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
   for (const name of ["contract:generate", "contract:check-generated", "contract:check-manifest", "contract:check-drift", "contract:check"]) {
     assert.equal(typeof pkg.scripts?.[name], "string", `missing script ${name}`);
   }
   const tsconfig = JSON.parse(readFileSync(resolve(root, "tsconfig.json"), "utf8"));
   assert.ok(tsconfig.include?.includes("generated/**/*.ts"), "generated TypeScript must be part of strict typecheck/build");
-  const workflow = readFileSync(resolve(root, ".github/workflows/static-ci.yml"), "utf8");
-  assert.match(workflow, /pnpm contract:check-generated/);
-  assert.match(workflow, /pnpm contract:check-manifest/);
-  assert.match(workflow, /pnpm contract:check-drift/);
 });
 
 import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";

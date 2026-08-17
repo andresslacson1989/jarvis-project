@@ -1,9 +1,9 @@
 # JARVIS Contract Lineage and Authority
 
-**Current contract suite:** v1.0.7
+**Current contract suite:** v1.0.8
 **Current authoritative branch:** `master`  
 **Current manifest:** `docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`  
-**Date:** 2026-08-12
+**Date:** 2026-08-17
 
 ## Purpose
 
@@ -13,7 +13,7 @@ This file removes ambiguity about which JARVIS documents and decisions are curre
 
 `master` is the only authoritative/latest repository branch.
 
-The canonical decision history includes accepted ADR-054 through ADR-068, v1.0.2 consolidation in ADR-069, UI identity/adaptive Mission Control in ADR-070, v1.0.3 production hardening in ADR-071, the Windows/Linux platform/runtime-role boundary in ADR-072, the pre-implementation security/sequence closure in ADR-073, hosting-capability-aware repository governance in ADR-074, and private/internal Windows release scope in ADR-075.
+The canonical decision history includes accepted ADR-054 through ADR-068, v1.0.2 consolidation in ADR-069, UI identity/adaptive Mission Control in ADR-070, v1.0.3 production hardening in ADR-071, the Windows/Linux platform/runtime-role boundary in ADR-072, the pre-implementation security/sequence closure in ADR-073, hosting-capability-aware repository governance in ADR-074, private/internal Windows release scope in ADR-075, and delegated Codex worker network availability in ADR-076.
 
 ADR identifiers in this lineage are unique. Duplicate ADR identifiers from deleted historical review branches are non-canonical.
 
@@ -63,7 +63,7 @@ ADR-073 and the inherited v1.0.5 security closure establish:
 - Phase-0 machine-readable repeated contract values/CI drift checks where practical;
 - exact-build/fix evidence rather than raw numeric SQLite version comparison as production qualification.
 
-These rules remain current normative behavior in v1.0.7. ADR-073 explains why and is not required as an implementation overlay.
+These rules remain current normative behavior in v1.0.8. ADR-073 explains why and is not required as an implementation overlay.
 
 ## v1.0.6 repository-governance closure
 
@@ -78,11 +78,11 @@ ADR-074 establishes:
 
 ## Current normative model
 
-`docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md` is the authoritative index and records the exact component-revision set for v1.0.7.
+`docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md` is the authoritative index and records the exact component-revision set for v1.0.8.
 
 Some unchanged earlier component revisions remain current because their normative behavior did not change. The manifest explicitly identifies them; earlier suite top-level contracts are not current merely because an inherited component's historical header names an earlier parent.
 
-The v1.0.5 specialized security contracts remain current cumulative specializations of compatible broad inherited rules. The v1.0.6 top-level, Verification, and Implementation Plan revisions add the repository-governance qualification, and the v1.0.7 top-level, Release Profile, Supply-Chain, Verification, and Implementation Plan revisions add private/internal release scope. These rules are one current suite, not an ADR overlay.
+The v1.0.5 specialized security contracts remain current cumulative specializations of compatible broad inherited rules. The v1.0.6 top-level, Verification, and Implementation Plan revisions add the repository-governance qualification, the v1.0.7 top-level, Release Profile, Supply-Chain, Verification, and Implementation Plan revisions add private/internal release scope, and the v1.0.8 revisions add the Codex worker network-availability decision. These rules are one current suite, not an ADR overlay.
 
 ADRs preserve context, alternatives, rationale, and historical decision identity. Implementers do not reconstruct current behavior by layering ADRs over stale contracts.
 

@@ -259,7 +259,13 @@ test("1.13 Mission Control has four regions and truthful locked startup state", 
   assert.match(shell, /voiceState: "IDLE"/);
   assert.match(shell, /protected Core transport is authenticated/);
   assert.match(shell, /JARVIS user session is still locked/);
+  assert.match(shell, /SESSION_UNLOCKED/);
+  assert.match(shell, /Provider setup and protected mission state remain governed by their own authenticated Core gates/);
   assert.match(shell, /SessionControlPanel/);
+  assert.match(shell, /ProviderSetupStatusNotice/);
+  assert.match(app, /Provider setup status is unavailable/);
+  assert.match(app, /Codex setup did not complete/);
+  assert.match(app, /Codex setup is running/);
   assert.match(shell, /label="Session password"/);
   assert.match(shell, /label="Confirm session password"/);
   assert.match(shell, /<TextInput/);
@@ -274,6 +280,9 @@ test("1.13 Mission Control has four regions and truthful locked startup state", 
   assert.match(shell, /REPAIR_REQUIRED/);
   assert.match(shell, /will not use a system Node or an unverified fallback/);
   assert.match(shell, /aria-current/);
+  assert.match(shell, /destinationFromHash/);
+  assert.match(shell, /setActiveDestination\(destination\)/);
+  assert.match(shell, /LOCKED · CORE_REQUIRED/);
   assert.match(styles, /grid-template-columns:\s*minmax\(12rem, 15rem\)/);
   assert.match(styles, /grid-template-columns:\s*minmax\(0, 1fr\) minmax\(16rem, 22rem\)/);
   assert.match(styles, /@media \(max-width: 719px\)/);
@@ -281,6 +290,47 @@ test("1.13 Mission Control has four regions and truthful locked startup state", 
   assert.match(styles, /@media \(forced-colors: active\)/);
   assert.match(styles, /mission-control__diagnostic-details/);
   assert.doesNotMatch(`${app}\n${shell}`, /\b(invoke|fetch|WebSocket|localStorage|indexedDB)\s*\(/);
+});
+
+test("provider setup exposes an explicit requalification action after prior readiness", () => {
+  const shell = read("apps/desktop/src/mission-control.tsx");
+  assert.match(shell, /model\.state === "SETUP_READY"/);
+  assert.match(shell, /Re-run Codex qualification/);
+});
+
+test("provider setup diagnostics keep support, health, qualification, compatibility, locality, and capabilities distinct", () => {
+  const bridge = read("apps/desktop/src/coreBridge.ts");
+  const app = read("apps/desktop/src/App.tsx");
+  const shell = read("apps/desktop/src/mission-control.tsx");
+  assert.match(bridge, /supportState/);
+  assert.match(bridge, /qualificationState/);
+  assert.match(bridge, /capabilities/);
+  assert.match(app, /supportState: record\.supportState \?\? "UNSUPPORTED"/);
+  assert.match(shell, /<dt>Support<\/dt>/);
+  assert.match(shell, /<dt>Compatibility<\/dt>/);
+  assert.match(shell, /<dt>Health<\/dt>/);
+  assert.match(shell, /<dt>Qualification<\/dt>/);
+  assert.match(shell, /<dt>Locality<\/dt>/);
+  assert.match(shell, /<dt>Capabilities<\/dt>/);
+  assert.match(shell, /capability\.supported \? "supported" : "unsupported"/);
+});
+
+test("session initialization keeps the authenticated Core response without a redundant status refresh", () => {
+  const app = read("apps/desktop/src/App.tsx");
+  const initializationCalls = [...app.matchAll(/const result = await initializeSession\(password\)/gu)];
+  assert.equal(initializationCalls.length, 2);
+  for (const match of initializationCalls) {
+    const snippet = app.slice(match.index, (match.index ?? 0) + 180);
+    assert.doesNotMatch(snippet, /setRefresh\(\(value\) => value \+ 1\)/u);
+  }
+});
+
+test("session status failure keeps session creation actionable", () => {
+  const app = read("apps/desktop/src/App.tsx");
+  const statusFailureBlock = app.match(/requestSessionStatus\(\)[\s\S]*?setSessionControl\(\{[\s\S]*?\}\);\s*\}\);/u)?.[0];
+  assert.ok(statusFailureBlock);
+  assert.match(statusFailureBlock, /onInitialize: async \(password: string\)/u);
+  assert.match(statusFailureBlock, /initializeSession\(password\)/u);
 });
 
 test("5.14 approval review presents exact context and a non-color-only confirmation path", () => {

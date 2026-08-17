@@ -1,9 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   CoreStatusResponse,
+  AuthenticatedTextConversationInputV1,
   SessionSecurityState,
   UUIDv7,
 } from "../../../packages/protocol/src/index";
+import type { ToolRequest, ToolResult } from "../../../packages/protocol/src/tool";
 
 export interface CoreBridgeRequest {
   readonly protocolVersion: 1;
@@ -19,7 +21,13 @@ export interface ProviderSetupStartRequest {
 
 export interface ProviderSetupStartResponse {
   readonly requestId: UUIDv7;
-  readonly state: "SETUP_IN_PROGRESS";
+  /**
+   * The native command performs the authenticated setup and readiness probe
+   * synchronously, so a successful response may already be SETUP_READY. Keep
+   * SETUP_IN_PROGRESS valid for a provider boundary that reports the initial
+   * transition before completion.
+   */
+  readonly state: "SETUP_IN_PROGRESS" | "SETUP_READY";
 }
 
 export interface ProviderSetupStatusRecord {
@@ -27,7 +35,20 @@ export interface ProviderSetupStatusRecord {
   readonly distributionId: string;
   readonly adapterVersion: string;
   readonly state: "NOT_REQUIRED" | "SETUP_REQUIRED" | "SETUP_IN_PROGRESS" | "SETUP_READY" | "REPAIR_REQUIRED" | "SETUP_FAILED";
+  readonly providerVersion?: string;
+  readonly setupPolicyId?: string;
+  readonly lastAttemptAt?: string;
+  readonly lastAttemptOutcome?: string;
   readonly sanitizedFailureReason?: string;
+  readonly lastVerifiedAt?: string;
+  readonly conformanceEvidenceRef?: string;
+  readonly compatibility?: "NOT_DETECTED" | "VERSION_UNKNOWN" | "VERSION_UNSUPPORTED" | "CONFORMANCE_UNQUALIFIED" | "COMPATIBLE";
+  readonly health?: "STARTING" | "READY" | "DEGRADED" | "UNAVAILABLE" | "FAILED";
+  readonly qualificationState?: "UNQUALIFIED" | "QUALIFIED" | "EXPIRED" | "REVOKED";
+  readonly qualificationEvidenceRef?: string;
+  readonly locality?: "LOCAL" | "CLOUD" | "LAN";
+  readonly capabilities?: readonly { readonly capabilityId: string; readonly supported: boolean }[];
+  readonly supportState?: "SUPPORTED" | "SETUP_REQUIRED" | "QUALIFICATION_REQUIRED" | "HEALTH_UNAVAILABLE" | "UNSUPPORTED";
 }
 
 export interface SessionStatusResponse {
@@ -39,6 +60,32 @@ export interface SessionAuthenticationResponse {
   readonly status: "UNLOCKED" | "DENIED" | "COOLDOWN";
   readonly retryAfterMs: number;
   readonly state: SessionSecurityState;
+}
+
+export async function processAuthenticatedText(input: AuthenticatedTextConversationInputV1): Promise<unknown> {
+  const response: unknown = await invoke("process_authenticated_text", {
+    request: {
+      requestId: input.instruction.id,
+      instruction: input.instruction,
+      context: input.context,
+      dataPolicy: input.dataPolicy,
+    },
+  });
+  if (!isRecord(response)) throw new Error("native conversation response failed runtime validation");
+  return response;
+}
+
+/**
+ * Renderer callers can request a tool only through the typed native bridge.
+ * Core remains the authority for validation, admission, execution, and audit;
+ * this boundary verifies that the returned result belongs to the request.
+ */
+export async function executeTool(input: ToolRequest): Promise<ToolResult> {
+  const response: unknown = await invoke("execute_tool", { request: { toolRequest: input } });
+  if (!isToolResult(response) || response.toolExecutionId !== input.toolExecutionId) {
+    throw new Error("native tool result failed runtime validation");
+  }
+  return response;
 }
 
 export async function requestProviderSetupStart(request: ProviderSetupStartRequest): Promise<ProviderSetupStartResponse> {
@@ -107,11 +154,19 @@ function isCoreStatusResponse(value: unknown): value is CoreStatusResponse {
 }
 
 function isProviderSetupStartResponse(value: unknown): value is ProviderSetupStartResponse {
-  return isRecord(value) && Object.keys(value).sort().join(",") === "requestId,state" && isUuidV7(value.requestId) && value.state === "SETUP_IN_PROGRESS";
+  return isRecord(value) && Object.keys(value).sort().join(",") === "requestId,state" && isUuidV7(value.requestId) && (value.state === "SETUP_IN_PROGRESS" || value.state === "SETUP_READY");
 }
 
 function isProviderSetupStatusRecord(value: unknown): value is ProviderSetupStatusRecord {
-  return isRecord(value) && typeof value.providerId === "string" && typeof value.distributionId === "string" && typeof value.adapterVersion === "string" && ["NOT_REQUIRED", "SETUP_REQUIRED", "SETUP_IN_PROGRESS", "SETUP_READY", "REPAIR_REQUIRED", "SETUP_FAILED"].includes(value.state as string) && (value.sanitizedFailureReason === undefined || typeof value.sanitizedFailureReason === "string");
+  if (!isRecord(value) || typeof value.providerId !== "string" || typeof value.distributionId !== "string" || typeof value.adapterVersion !== "string" || !["NOT_REQUIRED", "SETUP_REQUIRED", "SETUP_IN_PROGRESS", "SETUP_READY", "REPAIR_REQUIRED", "SETUP_FAILED"].includes(value.state as string)) return false;
+  const strings = ["providerVersion", "setupPolicyId", "lastAttemptAt", "lastAttemptOutcome", "sanitizedFailureReason", "lastVerifiedAt", "conformanceEvidenceRef", "compatibility", "health", "qualificationState", "qualificationEvidenceRef", "locality", "supportState"];
+  if (strings.some((key) => value[key] !== undefined && typeof value[key] !== "string")) return false;
+  if (value.compatibility !== undefined && !["NOT_DETECTED", "VERSION_UNKNOWN", "VERSION_UNSUPPORTED", "CONFORMANCE_UNQUALIFIED", "COMPATIBLE"].includes(value.compatibility as string)) return false;
+  if (value.health !== undefined && !["STARTING", "READY", "DEGRADED", "UNAVAILABLE", "FAILED"].includes(value.health as string)) return false;
+  if (value.qualificationState !== undefined && !["UNQUALIFIED", "QUALIFIED", "EXPIRED", "REVOKED"].includes(value.qualificationState as string)) return false;
+  if (value.locality !== undefined && !["LOCAL", "CLOUD", "LAN"].includes(value.locality as string)) return false;
+  if (value.supportState !== undefined && !["SUPPORTED", "SETUP_REQUIRED", "QUALIFICATION_REQUIRED", "HEALTH_UNAVAILABLE", "UNSUPPORTED"].includes(value.supportState as string)) return false;
+  return value.capabilities === undefined || (Array.isArray(value.capabilities) && value.capabilities.every((capability) => isRecord(capability) && typeof capability.capabilityId === "string" && typeof capability.supported === "boolean"));
 }
 
 function isSessionStatusResponse(value: unknown): value is SessionStatusResponse {
@@ -193,6 +248,20 @@ function isJarvisError(value: unknown): boolean {
     isUuidV7(value.correlationId) &&
     (value.details === undefined || isRecord(value.details))
   );
+}
+
+function isToolResult(value: unknown): value is ToolResult {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value);
+  const allowed = new Set(["toolExecutionId", "outcome", "output", "artifacts", "preconditions", "postconditions", "error", "startedAt", "endedAt"]);
+  if (keys.some((key) => !allowed.has(key))) return false;
+  if (!isUuidV7(value.toolExecutionId) || !["SUCCEEDED", "FAILED", "DENIED", "CANCELLED", "UNCERTAIN"].includes(value.outcome as string)) return false;
+  if (typeof value.startedAt !== "string" || Number.isNaN(Date.parse(value.startedAt)) || typeof value.endedAt !== "string" || Number.isNaN(Date.parse(value.endedAt))) return false;
+  if (value.output !== undefined && !isRecord(value.output)) return false;
+  if (value.artifacts !== undefined && !Array.isArray(value.artifacts)) return false;
+  if (value.preconditions !== undefined && !Array.isArray(value.preconditions)) return false;
+  if (value.postconditions !== undefined && !Array.isArray(value.postconditions)) return false;
+  return value.error === undefined || isJarvisError(value.error);
 }
 
 function isUuidV7(value: unknown): value is UUIDv7 {

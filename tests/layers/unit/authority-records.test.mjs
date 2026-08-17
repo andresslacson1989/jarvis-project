@@ -77,6 +77,7 @@ test("authority envelopes are immutable, permission decisions are persisted, and
     assert.throws(() => connection.database.prepare("DELETE FROM authority_envelopes WHERE envelope_id = 'envelope-1'").run());
     assert.deepEqual(repository.putPermissionDecision({
       decisionId: "decision-1",
+      toolExecutionId: "018f0000-0000-7000-8000-000000000201",
       outcome: "REQUIRE_APPROVAL",
       contextualRisk: "HIGH",
       reasonCodes: ["HIGH_RISK"],
@@ -86,6 +87,23 @@ test("authority envelopes are immutable, permission decisions are persisted, and
       decidedAt: "2026-08-15T00:00:01.000Z",
       policyVersion: 1,
     }), { decisionId: "decision-1" });
+    assert.deepEqual(repository.getPermissionDecisionForToolExecution("018f0000-0000-7000-8000-000000000201"), {
+      decisionId: "decision-1",
+      toolExecutionId: "018f0000-0000-7000-8000-000000000201",
+      outcome: "REQUIRE_APPROVAL",
+      contextualRisk: "HIGH",
+      reasonCodes: ["HIGH_RISK"],
+      matchedPolicyIds: ["policy-1"],
+      matchedPrecedentIds: [],
+      approvalRequestId: "approval-1",
+      decidedAt: "2026-08-15T00:00:01.000Z",
+      policyVersion: 1,
+    });
+    assert.equal(repository.getPermissionDecisionForToolExecution("018f0000-0000-7000-8000-000000000202"), undefined);
+    assert.throws(
+      () => repository.getPermissionDecisionForToolExecution("not-a-uuid"),
+      (error) => error instanceof CoreSchemaError && error.code === "PERSISTENCE_SCHEMA_INVALID",
+    );
     assert.deepEqual(repository.putApprovalRequest({
       descriptor,
       approval: {

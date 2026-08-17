@@ -352,12 +352,12 @@ export function validatePhase0Snapshot({
     );
   }
 
-  if (!String(matrix).includes("| Contract suite | JARVIS v1.0.7 |")) {
+  if (!String(matrix).includes("| Contract suite | JARVIS v1.0.8 |")) {
     violations.push(
       violation(
         "PHASE0_MATRIX_SUITE_DRIFT",
         "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md",
-        "live matrix must identify JARVIS v1.0.7",
+        "live matrix must identify JARVIS v1.0.8",
       ),
     );
   }

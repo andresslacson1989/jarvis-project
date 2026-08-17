@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { packageCoreRuntime } from "../../../tools/release/package-core-runtime.mjs";
@@ -22,6 +22,7 @@ test("Core runtime packaging creates one deterministic release-owned unit", asyn
     const node = join(root, "node.exe");
     const core = join(root, "main.js");
     const coreSupport = join(root, "release-trust.js");
+    const coreAuthoritySupport = join(root, "authority-canonical.js");
     const coreIpcSupport = join(root, "ipc-bootstrap.js");
     const corePersistenceSupport = join(root, "persistence.js");
     const coreSchemaSupport = join(root, "schema.js");
@@ -31,10 +32,20 @@ test("Core runtime packaging creates one deterministic release-owned unit", asyn
     const coreBackupRecoverySupport = join(root, "backup-recovery.js");
     const coreBackupPackageSupport = join(root, "backup-package.js");
     const coreBackupPayloadSupport = join(root, "backup-payload.js");
+    const coreConversationSupport = join(root, "conversation.js");
+    const coreConversationWrapperSupport = join(root, "conversation.mjs");
+    const coreProviderRoutingSupport = join(root, "provider-routing.js");
+    const coreToolRuntimeSupport = join(root, "tool-runtime.mjs");
+    const coreNativeCapabilitySupport = join(root, "native-capability.mjs");
+    const coreNativeCapabilityTypes = join(root, "native-capability.mts");
+    const coreCodexAdapterSupport = join(root, "codex-cli-adapter.mjs");
+    const coreProviderExecutionSupport = join(root, "provider-execution.mjs");
+    const coreProviderExecutionTypes = join(root, "provider-execution.mts");
     const output = join(root, "release");
     await writeFile(node, syntheticX64Pe());
     await writeFile(core, "export const coreProtocolMajor = 1;\n");
     await writeFile(coreSupport, "export const trustProfile = '1.0.35';\n");
+    await writeFile(coreAuthoritySupport, "export const authorityCanonicalVersion = 1;\n");
     await writeFile(coreIpcSupport, "export const ipcProtocolMajor = 1;\n");
     await writeFile(
       corePersistenceSupport,
@@ -56,6 +67,15 @@ export const SQLCIPHER_SNAPSHOT_MECHANISM = "attached-sqlcipher-schema-export-v1
     await writeFile(coreBackupRecoverySupport, "export const backupRecoveryVersion = 1;\n");
     await writeFile(coreBackupPackageSupport, "export const backupPackageVersion = 1;\n");
     await writeFile(coreBackupPayloadSupport, "export const backupPayloadVersion = 1;\n");
+    await writeFile(coreConversationSupport, "export const conversationVersion = 1;\n");
+    await writeFile(coreConversationWrapperSupport, "export * from './conversation.js';\n");
+    await writeFile(coreProviderRoutingSupport, "export const providerRoutingVersion = 1;\n");
+    await writeFile(coreToolRuntimeSupport, "export const toolRuntimeVersion = 1;\n");
+    await writeFile(coreNativeCapabilitySupport, "export const nativeCapabilityVersion = 1;\n");
+    await writeFile(coreNativeCapabilityTypes, "export interface NativeCapabilityVersion { readonly version: number; }\n");
+    await writeFile(coreCodexAdapterSupport, "export const codexAdapterVersion = 1;\n");
+    await writeFile(coreProviderExecutionSupport, "export const providerExecutionVersion = 1;\n");
+    await writeFile(coreProviderExecutionTypes, "export interface ProviderExecutionVersion { readonly version: number; }\n");
     const sourceCommitSha = "a".repeat(40);
     const preview = join(root, "preview");
     await mkdir(join(preview, "runtime"), { recursive: true });
@@ -64,6 +84,7 @@ export const SQLCIPHER_SNAPSHOT_MECHANISM = "attached-sqlcipher-schema-export-v1
     await copyFile(node, join(preview, "runtime", "node.exe"));
     await copyFile(core, join(preview, "core", "dist", "main.js"));
     await copyFile(coreSupport, join(preview, "core", "dist", "release-trust.js"));
+    await copyFile(coreAuthoritySupport, join(preview, "core", "dist", "authority-canonical.js"));
     await copyFile(coreIpcSupport, join(preview, "core", "dist", "ipc-bootstrap.js"));
     await copyFile(corePersistenceSupport, join(preview, "core", "dist", "persistence.js"));
     await copyFile(coreSchemaSupport, join(preview, "core", "dist", "schema.js"));
@@ -73,6 +94,45 @@ export const SQLCIPHER_SNAPSHOT_MECHANISM = "attached-sqlcipher-schema-export-v1
     await copyFile(coreBackupRecoverySupport, join(preview, "core", "dist", "backup-recovery.js"));
     await copyFile(coreBackupPackageSupport, join(preview, "core", "dist", "backup-package.js"));
     await copyFile(coreBackupPayloadSupport, join(preview, "core", "dist", "backup-payload.js"));
+    await copyFile(coreConversationSupport, join(preview, "core", "dist", "conversation.js"));
+    await copyFile(coreConversationWrapperSupport, join(preview, "core", "dist", "conversation.mjs"));
+    await copyFile(coreProviderRoutingSupport, join(preview, "core", "dist", "provider-routing.js"));
+    await copyFile(coreToolRuntimeSupport, join(preview, "core", "dist", "tool-runtime.mjs"));
+    await copyFile(coreNativeCapabilitySupport, join(preview, "core", "dist", "native-capability.mjs"));
+    await copyFile(coreNativeCapabilityTypes, join(preview, "core", "dist", "native-capability.mts"));
+    await copyFile(coreCodexAdapterSupport, join(preview, "core", "dist", "codex-cli-adapter.mjs"));
+    await copyFile(coreProviderExecutionSupport, join(preview, "core", "dist", "provider-execution.mjs"));
+    await copyFile(coreProviderExecutionTypes, join(preview, "core", "dist", "provider-execution.mts"));
+    for (const relativePath of [
+      "packages/protocol/src/provider-runtime.mjs",
+      "packages/protocol/src/provider-runtime.mts",
+      "packages/protocol/src/provider-routing.mjs",
+      "packages/protocol/src/authority-runtime.mjs",
+      "packages/protocol/src/state-machine-runtime.mjs",
+      "packages/protocol/src/execution-scope-runtime.mjs",
+      "packages/protocol/src/mission-graph-runtime.mjs",
+      "packages/protocol/src/accounting-runtime.mjs",
+      "packages/protocol/src/worker-runtime.mjs",
+      "packages/protocol/src/worker-recovery-runtime.mjs",
+      "packages/protocol/src/project-policy-runtime.mjs",
+      "packages/protocol/src/project-runtime.mjs",
+      "packages/protocol/src/update-trust-runtime.mjs",
+      "packages/protocol/src/domain-event-runtime.mjs",
+      "packages/protocol/src/config-runtime.mjs",
+      "packages/protocol/src/memory-runtime.mjs",
+      "packages/protocol/src/platform-runtime.mjs",
+      "packages/protocol/src/session-runtime.mjs",
+      "packages/protocol/src/security-audit-runtime.mjs",
+      "packages/protocol/src/authority-canonical-runtime.mjs",
+      "packages/protocol/src/conversation-runtime.mjs",
+      "packages/protocol/src/conversation-runtime.mts",
+      "packages/policy/src/project-policy-mutation.mjs",
+      "packages/policy/src/pre-allow-gates.mjs",
+    ]) {
+      const path = join(preview, "core", relativePath);
+      await mkdir(dirname(path), { recursive: true });
+      await copyFile(resolve(relativePath), path);
+    }
     const previewManifest = await generateRuntimeManifest({
       root: preview,
       nodeVersion: "24.18.0",
@@ -127,6 +187,12 @@ export const SQLCIPHER_SNAPSHOT_MECHANISM = "attached-sqlcipher-schema-export-v1
     assert.equal((await stat(join(output, "tuf", "metadata", "root.json"))).isFile(), true);
     assert.equal((await stat(join(output, "core", "dist", "persistence.js"))).isFile(), true);
     assert.equal((await stat(join(output, "core", "dist", "schema.js"))).isFile(), true);
+    assert.equal((await stat(join(output, "core", "dist", "provider-routing.js"))).isFile(), true);
+    assert.equal((await stat(join(output, "core", "dist", "tool-runtime.mjs"))).isFile(), true);
+    assert.equal((await stat(join(output, "core", "dist", "native-capability.mjs"))).isFile(), true);
+    assert.equal((await stat(join(output, "core", "dist", "native-capability.mts"))).isFile(), true);
+    assert.equal((await stat(join(output, "core", "dist", "provider-execution.mjs"))).isFile(), true);
+    assert.equal((await stat(join(output, "core", "dist", "provider-execution.mts"))).isFile(), true);
     assert.equal((await stat(join(output, "core", "dist", "backup-descriptor.js"))).isFile(), true);
     assert.equal((await stat(join(output, "core", "dist", "backup-manifest.js"))).isFile(), true);
     assert.equal((await stat(join(output, "core", "dist", "backup-chunks.js"))).isFile(), true);

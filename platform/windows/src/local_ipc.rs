@@ -217,8 +217,53 @@ pub struct ProviderSetupStatusRecord {
     pub provider_id: String,
     pub distribution_id: String,
     pub adapter_version: String,
+    pub provider_version: Option<String>,
+    pub setup_policy_id: Option<String>,
     pub state: String,
+    pub last_attempt_at: Option<String>,
+    pub last_attempt_outcome: Option<String>,
     pub sanitized_failure_reason: Option<String>,
+    pub last_verified_at: Option<String>,
+    pub conformance_evidence_ref: Option<String>,
+    pub compatibility: Option<String>,
+    pub health: Option<String>,
+    pub qualification_state: Option<String>,
+    pub qualification_evidence_ref: Option<String>,
+    pub locality: Option<String>,
+    pub capabilities: Vec<ProviderCapabilityStatus>,
+    pub support_state: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderCapabilityStatus {
+    pub capability_id: String,
+    pub supported: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AuthenticatedTextConversationRequest {
+    pub request_id: String,
+    pub instruction: serde_json::Value,
+    pub context: serde_json::Value,
+    pub data_policy: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AuthenticatedTextConversationResponse {
+    pub result: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolExecutionRequest {
+    pub tool_request: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeCapabilityDispatchError {
+    pub code: String,
+    pub message: String,
+    pub retryable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -511,12 +556,89 @@ struct ProviderSetupStatusResultWire {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[allow(dead_code)]
 struct ProviderSetupStatusRecordWire {
     provider_id: String,
     distribution_id: String,
     adapter_version: String,
+    provider_version: Option<String>,
+    setup_policy_id: Option<String>,
     state: String,
+    last_attempt_at: Option<String>,
+    last_attempt_outcome: Option<String>,
     sanitized_failure_reason: Option<String>,
+    last_verified_at: Option<String>,
+    conformance_evidence_ref: Option<String>,
+    compatibility: Option<String>,
+    health: Option<String>,
+    qualification_state: Option<String>,
+    qualification_evidence_ref: Option<String>,
+    locality: Option<String>,
+    capabilities: Vec<ProviderCapabilityStatusWire>,
+    support_state: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderCapabilityStatusWire {
+    capability_id: String,
+    supported: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthenticatedTextConversationRequestWire {
+    protocol_version: u32,
+    kind: &'static str,
+    id: String,
+    name: &'static str,
+    correlation_id: String,
+    payload: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AuthenticatedTextConversationResponseWire {
+    ok: bool,
+    result: Option<serde_json::Value>,
+    error: Option<CoreStatusErrorWire>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ToolExecutionRequestWire {
+    protocol_version: u32,
+    kind: &'static str,
+    id: String,
+    name: &'static str,
+    correlation_id: String,
+    payload: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ToolExecutionResponseWire {
+    ok: bool,
+    result: Option<serde_json::Value>,
+    error: Option<CoreStatusErrorWire>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeCapabilityRequestWire {
+    protocol_version: u32,
+    kind: String,
+    id: String,
+    name: String,
+    correlation_id: String,
+    payload: NativeCapabilityPayloadWire,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NativeCapabilityPayloadWire {
+    capability: String,
+    arguments: serde_json::Value,
 }
 
 #[derive(Debug, Serialize)]
@@ -943,8 +1065,12 @@ mod windows {
         ProviderSetupCompletePayloadWire, ProviderSetupCompleteRequestWire,
         ProviderSetupStartPayloadWire, ProviderSetupStartRequest, ProviderSetupStartRequestWire,
         ProviderSetupStartResponse, ProviderSetupStartResponseWire,
-        ProviderSetupStatusRecord, ProviderSetupStatusRequestWire,
+        ProviderSetupStatusRecord, ProviderSetupStatusRequestWire, ProviderCapabilityStatus,
         ProviderSetupStatusResponseWire, SessionAuthenticateRequestWire,
+        AuthenticatedTextConversationRequest, AuthenticatedTextConversationRequestWire,
+        AuthenticatedTextConversationResponse, AuthenticatedTextConversationResponseWire,
+        ToolExecutionRequest, ToolExecutionRequestWire, ToolExecutionResponseWire,
+        NativeCapabilityDispatchError, NativeCapabilityRequestWire,
         SessionAuthenticateResponseWire, SessionAuthenticationResult,
         SessionInitializeResponseWire, SessionMutationPayloadWire,
         SessionMutationRequestWire, SessionPasswordVerifierResponseWire,
@@ -1965,9 +2091,216 @@ mod windows {
                 provider_id: record.provider_id,
                 distribution_id: record.distribution_id,
                 adapter_version: record.adapter_version,
+                provider_version: record.provider_version,
+                setup_policy_id: record.setup_policy_id,
                 state: record.state,
+                last_attempt_at: record.last_attempt_at,
+                last_attempt_outcome: record.last_attempt_outcome,
                 sanitized_failure_reason: record.sanitized_failure_reason,
+                last_verified_at: record.last_verified_at,
+                conformance_evidence_ref: record.conformance_evidence_ref,
+                compatibility: record.compatibility,
+                health: record.health,
+                qualification_state: record.qualification_state,
+                qualification_evidence_ref: record.qualification_evidence_ref,
+                locality: record.locality,
+                capabilities: record.capabilities.into_iter().map(|capability| ProviderCapabilityStatus { capability_id: capability.capability_id, supported: capability.supported }).collect(),
+                support_state: record.support_state,
             }).collect())
+        }
+
+        pub fn request_authenticated_text_conversation(
+            &self,
+            session: &AuthenticatedCoreSession,
+            request: AuthenticatedTextConversationRequest,
+        ) -> Result<AuthenticatedTextConversationResponse, LocalIpcError> {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+                return Err(plain_error(LocalIpcState::AuthenticationFailed, "conversation request requires the current authenticated session"));
+            }
+            if !is_uuid_v7(&request.request_id) {
+                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "conversation request identity is invalid"));
+            }
+            let correlation_id = random_uuid_v7()?;
+            let payload = serde_json::json!({
+                "instruction": request.instruction,
+                "context": request.context,
+                "dataPolicy": request.data_policy,
+            });
+            write_json_frame(self.handle.raw(), &AuthenticatedTextConversationRequestWire {
+                protocol_version: IPC_PROTOCOL_MAJOR,
+                kind: "request",
+                id: request.request_id.clone(),
+                name: "process_authenticated_text",
+                correlation_id,
+                payload,
+            })?;
+            let response: AuthenticatedTextConversationResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if !response.ok || response.error.is_some() {
+                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the authenticated conversation request"));
+            }
+            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core conversation response omitted its result"))?;
+            if !result.is_object() {
+                return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core conversation response is not an object"));
+            }
+            Ok(AuthenticatedTextConversationResponse { result })
+        }
+
+        /// Forward one already-authenticated, bounded ToolRequest to Core.
+        /// The host validates the transport identity fields here, while Core
+        /// remains the owner of the complete manifest, permission, target,
+        /// precondition, adapter, and audit decision.
+        pub fn request_tool_execution(
+            &self,
+            session: &AuthenticatedCoreSession,
+            request: ToolExecutionRequest,
+        ) -> Result<serde_json::Value, LocalIpcError> {
+            self.request_tool_execution_with_native_handler(session, request, |_capability, _arguments| {
+                Err(NativeCapabilityDispatchError {
+                    code: "NATIVE_CAPABILITY_UNQUALIFIED".to_owned(),
+                    message: "native capability is not composed on this host".to_owned(),
+                    retryable: false,
+                })
+            })
+        }
+
+        /// Forward one ToolRequest while allowing the single authenticated
+        /// reader to service explicitly typed Core→native capability frames.
+        /// This is a narrow multiplexed protocol, not a generic command or
+        /// shell channel. An uncomposed capability receives a deterministic
+        /// failure response and never becomes an implicit fallback.
+        pub fn request_tool_execution_with_native_handler<F>(
+            &self,
+            session: &AuthenticatedCoreSession,
+            request: ToolExecutionRequest,
+            mut native_handler: F,
+        ) -> Result<serde_json::Value, LocalIpcError>
+        where
+            F: FnMut(&str, serde_json::Value) -> Result<serde_json::Value, NativeCapabilityDispatchError>,
+        {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "tool execution request requires the current authenticated session",
+                ));
+            }
+            let payload = request.tool_request;
+            let object = payload.as_object().ok_or_else(|| {
+                plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool request must be an object")
+            })?;
+            let tool_execution_id = object
+                .get("toolExecutionId")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool execution identity is missing"))?
+                .to_owned();
+            if !is_uuid_v7(&tool_execution_id) {
+                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool execution identity is invalid"));
+            }
+            let tool_id = object
+                .get("toolId")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool identity is missing"))?;
+            if tool_id.is_empty() || tool_id.len() > 256 || tool_id.contains('\0') {
+                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool identity is invalid"));
+            }
+            let tool_version = object
+                .get("toolVersion")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool version is invalid"))?;
+            if tool_version == 0 || tool_version > u32::MAX as u64 {
+                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool version is invalid"));
+            }
+            let authority_envelope_id = object.get("authorityEnvelopeId").and_then(serde_json::Value::as_str);
+            let task_id = object.get("taskId").and_then(serde_json::Value::as_str);
+            if object.get("executionScope").and_then(serde_json::Value::as_object).is_none()
+                || object.get("arguments").and_then(serde_json::Value::as_object).is_none()
+                || authority_envelope_id.is_none()
+                || !authority_envelope_id.is_some_and(is_uuid_v7)
+                || (object.contains_key("taskId") && !task_id.is_some_and(is_uuid_v7))
+                || (object.contains_key("idempotencyKey") && object.get("idempotencyKey").and_then(serde_json::Value::as_str).is_none())
+            {
+                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool request boundary fields are invalid"));
+            }
+            if serde_json::to_vec(&payload).map(|bytes| bytes.len() > MAX_IPC_FRAME_BYTES / 2).unwrap_or(true) {
+                return Err(plain_error(LocalIpcState::FrameTooLarge, "tool request exceeds the bounded IPC payload ceiling"));
+            }
+            let correlation_id = random_uuid_v7()?;
+            write_json_frame(self.handle.raw(), &ToolExecutionRequestWire {
+                protocol_version: IPC_PROTOCOL_MAJOR,
+                kind: "request",
+                id: tool_execution_id.clone(),
+                name: "execute_tool",
+                correlation_id,
+                payload,
+            })?;
+            loop {
+                let response_value: serde_json::Value = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+                if response_value.get("name").and_then(serde_json::Value::as_str) == Some("native_capability")
+                    && response_value.get("kind").and_then(serde_json::Value::as_str) == Some("request")
+                {
+                    let native_request: NativeCapabilityRequestWire = serde_json::from_value(response_value).map_err(|_| {
+                        plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core native capability request is malformed")
+                    })?;
+                    if native_request.protocol_version != IPC_PROTOCOL_MAJOR
+                        || native_request.kind != "request"
+                        || native_request.id != native_request.correlation_id
+                        || !is_uuid_v7(&native_request.id)
+                        || native_request.name != "native_capability"
+                        || native_request.payload.capability.is_empty()
+                        || native_request.payload.capability.len() > 128
+                        || native_request.payload.capability.contains('\0')
+                        || !native_request.payload.arguments.is_object()
+                        || serde_json::to_vec(&native_request.payload.arguments).map(|bytes| bytes.len() > MAX_IPC_FRAME_BYTES / 2).unwrap_or(true)
+                    {
+                        return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core native capability request failed typed boundary validation"));
+                    }
+                    let response = match native_handler(&native_request.payload.capability, native_request.payload.arguments) {
+                        Ok(result) => serde_json::json!({
+                            "ok": true,
+                            "result": result,
+                            "error": null,
+                            "correlationId": native_request.correlation_id,
+                        }),
+                        Err(error) => serde_json::json!({
+                            "ok": false,
+                            "result": null,
+                            "error": {
+                                "code": error.code,
+                                "category": "UNSUPPORTED",
+                                "message": error.message,
+                                "retryable": error.retryable,
+                                "correlationId": native_request.correlation_id,
+                            },
+                            "correlationId": native_request.correlation_id,
+                        }),
+                    };
+                    write_json_frame(self.handle.raw(), &response)?;
+                    continue;
+                }
+                let response: ToolExecutionResponseWire = serde_json::from_value(response_value).map_err(|_| {
+                    plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool response is malformed")
+                })?;
+            if response.ok {
+                if response.error.is_some() {
+                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool response contains both result and error"));
+                }
+                let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool response omitted its result"))?;
+                let result_object = result.as_object().ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool result is not an object"))?;
+                if result_object.get("toolExecutionId").and_then(serde_json::Value::as_str) != Some(tool_execution_id.as_str())
+                    || !matches!(result_object.get("outcome").and_then(serde_json::Value::as_str), Some("SUCCEEDED" | "FAILED" | "DENIED" | "CANCELLED" | "UNCERTAIN"))
+                {
+                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool result identity or outcome is invalid"));
+                }
+                return Ok(result);
+            }
+            if response.result.is_some() {
+                return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool error response contains a result"));
+            }
+            let error = response.error.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool error response omitted its error"))?;
+            if error.code.is_empty() || error.category.is_empty() || error.message.is_empty() || !is_uuid_v7(&error.correlation_id) {
+                return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool error response is invalid"));
+            }
+            return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, format!("Core tool request rejected: {}", error.code)));
+            }
         }
 
         pub fn request_session_status(
@@ -2847,6 +3180,7 @@ mod windows {
         use std::path::{Path, PathBuf};
         use std::process::{Command, Stdio};
         use std::ptr::{null, null_mut};
+        use std::sync::{Arc, Mutex};
         use std::thread::{self, sleep};
         use windows_sys::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
         use windows_sys::Win32::Security::{
@@ -3211,6 +3545,31 @@ mod windows {
                     }),
                 )
                 .expect("client must return the deterministic locked status");
+                let tool_request: serde_json::Value =
+                    read_json_frame(owned.raw(), Instant::now() + HANDSHAKE_TIMEOUT)
+                        .expect("client must receive the typed tool request");
+                assert_eq!(tool_request["protocolVersion"], 1);
+                assert_eq!(tool_request["kind"], "request");
+                assert_eq!(tool_request["name"], "execute_tool");
+                assert_eq!(tool_request["id"], tool_request["payload"]["toolExecutionId"]);
+                assert_eq!(tool_request["payload"]["toolId"], "status");
+                assert_eq!(tool_request["payload"]["toolVersion"], 1);
+                write_json_frame(
+                    owned.raw(),
+                    &serde_json::json!({
+                        "ok": false,
+                        "result": null,
+                        "error": {
+                            "code": "CORE_TOOL_RUNTIME_NOT_READY",
+                            "category": "UNSUPPORTED",
+                            "message": "typed platform boundaries are not attached",
+                            "retryable": true,
+                            "correlationId": tool_request["correlationId"],
+                            "details": null
+                        }
+                    }),
+                )
+                .expect("client must return the deterministic tool-not-ready error");
                 sleep(Duration::from_millis(100));
             });
             let authenticated = server
@@ -3226,13 +3585,180 @@ mod windows {
             assert_eq!(status.architecture, "x64");
             assert_eq!(status.service_state, "LOCKED");
             assert_eq!(status.transport_state, "NOT_CONNECTED");
+            let tool_execution_id = "018f6f0e-7b4a-7abc-8def-1234567890ab";
+            let error = server
+                .request_tool_execution(
+                    &authenticated,
+                    ToolExecutionRequest {
+                        tool_request: serde_json::json!({
+                            "toolExecutionId": tool_execution_id,
+                            "toolId": "status",
+                            "toolVersion": 1,
+                            "executionScope": { "kind": "SYSTEM" },
+                            "authorityEnvelopeId": "018f6f0e-7b4a-7abc-8def-1234567890ac",
+                            "arguments": {}
+                        }),
+                    },
+                )
+                .expect_err("Core tool runtime not-ready response must remain a typed failure");
+            assert_eq!(error.state, LocalIpcState::ControlPlaneRequestFailed);
+            assert!(error.detail.contains("CORE_TOOL_RUNTIME_NOT_READY"));
             client.join().expect("client thread must exit");
         }
 
         #[test]
+        fn typed_native_capability_round_trip_is_multiplexed_during_tool_execution() {
+            let server = NamedPipeServer::bind().expect("named pipe must bind");
+            let endpoint = server.endpoint_name().to_owned();
+            let secret = *server.bootstrap_material().secret();
+            let observed = Arc::new(Mutex::new(None::<(String, serde_json::Value)>));
+            let observed_by_handler = Arc::clone(&observed);
+            let client = thread::spawn(move || {
+                let endpoint = wide(&endpoint);
+                // SAFETY: the endpoint is generated by the server and the
+                // client requests only the named-pipe duplex access.
+                let handle = unsafe {
+                    CreateFileW(
+                        endpoint.as_ptr(),
+                        GENERIC_READ | GENERIC_WRITE,
+                        FILE_SHARE_NONE,
+                        null(),
+                        OPEN_EXISTING,
+                        FILE_ATTRIBUTE_NORMAL,
+                        null_mut(),
+                    )
+                };
+                let owned = OwnedHandle::new(handle).expect("client must connect");
+                let challenge: ChallengeWire =
+                    read_json_frame(owned.raw(), Instant::now() + HANDSHAKE_TIMEOUT)
+                        .expect("client must receive challenge");
+                let nonce = hex_decode(&challenge.nonce, HANDSHAKE_NONCE_BYTES)
+                    .expect("challenge nonce must be valid");
+                write_json_frame(
+                    owned.raw(),
+                    &HelloWire {
+                        kind: "hello".to_owned(),
+                        protocol_major: IPC_PROTOCOL_MAJOR,
+                        proof: hex_encode(&handshake_proof(&secret, IPC_PROTOCOL_MAJOR, &nonce)),
+                    },
+                )
+                .expect("client must send proof");
+                let _: WelcomeWire =
+                    read_json_frame(owned.raw(), Instant::now() + HANDSHAKE_TIMEOUT)
+                        .expect("client must receive welcome");
+                let tool_request: serde_json::Value =
+                    read_json_frame(owned.raw(), Instant::now() + HANDSHAKE_TIMEOUT)
+                        .expect("client must receive the typed tool request");
+                let native_correlation_id = "018f6f0e-7b4a-7abc-8def-1234567890ad";
+                write_json_frame(
+                    owned.raw(),
+                    &serde_json::json!({
+                        "protocolVersion": 1,
+                        "kind": "request",
+                        "id": native_correlation_id,
+                        "name": "native_capability",
+                        "correlationId": native_correlation_id,
+                        "payload": {
+                            "capability": "status.system",
+                            "arguments": { "request": "test" }
+                        }
+                    }),
+                )
+                .expect("client must request the typed native capability");
+                let native_response: serde_json::Value =
+                    read_json_frame(owned.raw(), Instant::now() + HANDSHAKE_TIMEOUT)
+                        .expect("client must receive the native response");
+                assert_eq!(native_response["ok"], true);
+                assert_eq!(native_response["correlationId"], native_correlation_id);
+                assert_eq!(native_response["result"]["serviceState"], "READY");
+                write_json_frame(
+                    owned.raw(),
+                    &serde_json::json!({
+                        "ok": true,
+                        "result": {
+                            "toolExecutionId": tool_request["payload"]["toolExecutionId"],
+                            "outcome": "SUCCEEDED"
+                        },
+                        "error": null
+                    }),
+                )
+                .expect("client must complete the tool request");
+            });
+            let authenticated = server
+                .authenticate_client()
+                .expect("native handshake must authenticate");
+            let tool_execution_id = "018f6f0e-7b4a-7abc-8def-1234567890ab";
+            let result = server
+                .request_tool_execution_with_native_handler(
+                    &authenticated,
+                    ToolExecutionRequest {
+                        tool_request: serde_json::json!({
+                            "toolExecutionId": tool_execution_id,
+                            "toolId": "status",
+                            "toolVersion": 1,
+                            "executionScope": { "kind": "SYSTEM" },
+                            "authorityEnvelopeId": "018f6f0e-7b4a-7abc-8def-1234567890ac",
+                            "arguments": {}
+                        }),
+                    },
+                    |capability, arguments| {
+                        *observed_by_handler.lock().expect("handler observation lock") =
+                            Some((capability.to_owned(), arguments));
+                        Ok(serde_json::json!({ "serviceState": "READY" }))
+                    },
+                )
+                .expect("typed native capability and tool response must complete");
+            assert_eq!(result["outcome"], "SUCCEEDED");
+            assert_eq!(
+                observed.lock().expect("handler observation lock").as_ref(),
+                Some(&("status.system".to_owned(), serde_json::json!({ "request": "test" })))
+            );
+            client.join().expect("client thread must exit");
+        }
+
+        #[test]
+        fn tool_execution_request_rejects_untyped_or_retargetable_boundary_input() {
+            let server = NamedPipeServer::bind().expect("named pipe must bind");
+            let session = AuthenticatedCoreSession {
+                protocol_major: IPC_PROTOCOL_MAJOR,
+                session_id: server.session_id(),
+            };
+            let invalid = server
+                .request_tool_execution(
+                    &session,
+                    ToolExecutionRequest {
+                        tool_request: serde_json::json!({
+                            "toolExecutionId": "018f6f0e-7b4a-7abc-8def-1234567890ab",
+                            "toolId": "status",
+                            "toolVersion": 1,
+                            "executionScope": { "kind": "SYSTEM" },
+                            "authorityEnvelopeId": "not-a-uuid",
+                            "arguments": {}
+                        }),
+                    },
+                )
+                .expect_err("invalid authority identity must fail before pipe write");
+            assert_eq!(invalid.state, LocalIpcState::ControlPlaneRequestFailed);
+
+            let missing_fields = server
+                .request_tool_execution(
+                    &session,
+                    ToolExecutionRequest {
+                        tool_request: serde_json::json!({
+                            "toolExecutionId": "018f6f0e-7b4a-7abc-8def-1234567890ab",
+                            "toolId": "status",
+                            "toolVersion": 1
+                        }),
+                    },
+                )
+                .expect_err("missing scope and authority must fail before pipe write");
+            assert_eq!(missing_fields.state, LocalIpcState::ControlPlaneRequestFailed);
+            server.disconnect_client();
+        }
+
+        #[test]
         fn packaged_node_client_can_authenticate_native_server() {
-            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../../target/x86_64-pc-windows-msvc/release/resources/core-runtime");
+            let root = packaged_release_root();
             let node = root.join("runtime/node.exe");
             let entrypoint = root.join("core/dist/main.js");
             if !node.is_file() || !entrypoint.is_file() {
@@ -3283,19 +3809,35 @@ mod windows {
             remove_database_artifacts(&database_path);
         }
 
+        fn packaged_release_root() -> PathBuf {
+            if let Some(path) = std::env::var_os("JARVIS_EXACT_SIGNED_RELEASE_ROOT") {
+                return PathBuf::from(path);
+            }
+            let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            let candidates = [
+                manifest_dir.join("../../../target/release/resources/core-runtime"),
+                manifest_dir.join(
+                    "../../../target/x86_64-pc-windows-msvc/release/resources/core-runtime",
+                ),
+            ];
+            candidates
+                .iter()
+                .find(|root| {
+                    root.join("runtime/node.exe").is_file()
+                        && root.join("core/dist/main.js").is_file()
+                        && root.join("tuf/metadata/targets.json").is_file()
+                })
+                .cloned()
+                .unwrap_or_else(|| candidates[0].clone())
+        }
+
         #[test]
         fn supervised_packaged_core_authenticates_native_server() {
-            let release_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../../target/x86_64-pc-windows-msvc/release");
-            let resource_dir = if release_dir
-                .join("resources")
-                .join(crate::core_runtime::RELEASE_RUNTIME_DIRECTORY)
-                .is_dir()
-            {
-                release_dir.join("resources")
-            } else {
-                release_dir
-            };
+            let root = packaged_release_root();
+            let resource_dir = root
+                .parent()
+                .expect("packaged Core runtime must have a resource parent")
+                .to_path_buf();
             let resource_dir = std::fs::canonicalize(resource_dir)
                 .expect("release resource directory must canonicalize");
             let root = resource_dir.join("core-runtime");
@@ -3338,17 +3880,11 @@ mod windows {
 
         #[test]
         fn supervised_packaged_core_authenticates_with_separate_secure_storage_endpoint() {
-            let release_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../../target/x86_64-pc-windows-msvc/release");
-            let resource_dir = if release_dir
-                .join("resources")
-                .join(crate::core_runtime::RELEASE_RUNTIME_DIRECTORY)
-                .is_dir()
-            {
-                release_dir.join("resources")
-            } else {
-                release_dir
-            };
+            let root = packaged_release_root();
+            let resource_dir = root
+                .parent()
+                .expect("packaged Core runtime must have a resource parent")
+                .to_path_buf();
             let resource_dir = std::fs::canonicalize(resource_dir)
                 .expect("release resource directory must canonicalize");
             let root = resource_dir.join("core-runtime");
@@ -3492,6 +4028,51 @@ mod windows {
                 .expect_err("malformed handshake frame must fail closed");
             assert_eq!(error.state, LocalIpcState::FrameMalformed);
             client.join().expect("client thread must exit");
+        }
+
+        #[test]
+        fn provider_setup_status_accepts_complete_contract_record_and_rejects_unknown_fields() {
+            let response = serde_json::json!({
+                "ok": true,
+                "result": {
+                    "providers": [{
+                        "providerId": "codex-cli",
+                        "distributionId": "codex-cli-standalone-windows-x64-0.147.0",
+                        "adapterVersion": "1.0.0",
+                        "providerVersion": "0.147.0",
+                        "setupPolicyId": "codex-cli-windows-v1",
+                        "state": "SETUP_REQUIRED",
+                        "lastAttemptAt": "2026-08-16T00:00:00.000Z",
+                        "lastAttemptOutcome": "AUTHENTICATED_USER_START",
+                        "sanitizedFailureReason": "setup did not complete successfully",
+                        "lastVerifiedAt": "2026-08-16T00:01:00.000Z",
+                        "conformanceEvidenceRef": "evidence://codex-cli-windows-v1",
+                        "capabilities": [{ "capabilityId": "coding", "supported": true }],
+                        "supportState": "SETUP_REQUIRED"
+                    }]
+                }
+            });
+            let parsed: ProviderSetupStatusResponseWire =
+                serde_json::from_value(response).expect("complete provider record must decode");
+            let record = &parsed
+                .result
+                .expect("provider status result must be present")
+                .providers[0];
+            assert_eq!(record.provider_version.as_deref(), Some("0.147.0"));
+            assert_eq!(record.setup_policy_id.as_deref(), Some("codex-cli-windows-v1"));
+            assert_eq!(record.last_attempt_outcome.as_deref(), Some("AUTHENTICATED_USER_START"));
+
+            let unknown_field = serde_json::json!({
+                "ok": true,
+                "result": { "providers": [{
+                    "providerId": "codex-cli",
+                    "distributionId": "codex-cli-standalone-windows-x64-0.147.0",
+                    "adapterVersion": "1.0.0",
+                    "state": "SETUP_REQUIRED",
+                    "unexpected": true
+                }]}
+            });
+            assert!(serde_json::from_value::<ProviderSetupStatusResponseWire>(unknown_field).is_err());
         }
 
         #[test]

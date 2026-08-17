@@ -52,11 +52,14 @@ test("project registry persists aliases, environments, workspaces, and immutable
   await withDatabase(async (connection, repository) => {
     assert.deepEqual(repository.putProject(project, now), { id: "project-1", version: 1 });
     assert.deepEqual(repository.putProject({ ...project, displayName: "JARVIS Project" }, now), { id: "project-1", version: 2 });
+    assert.equal(repository.getProject("project-1").displayName, "JARVIS Project");
+    assert.equal(repository.getProject("missing-project"), undefined);
     assert.deepEqual(repository.putProjectAlias({ alias: "jarvis", projectId: "project-1" }, now), { id: "jarvis", version: 1 });
     assert.deepEqual(repository.putProjectAlias({ alias: "jarvis", projectId: "project-1" }, now), { id: "jarvis", version: 2 });
     assert.deepEqual(repository.putProjectEnvironment({ environmentId: "env-1", projectId: "project-1", displayName: "local", kind: "LOCAL", platform: "WINDOWS" }, now), { id: "env-1", version: 1 });
     assert.deepEqual(repository.putProjectWorkspace({ workspaceId: "workspace-1", projectId: "project-1", displayName: "primary", kind: "PRIMARY", canonicalRoot: project.canonicalRoot }, now), { id: "workspace-1", version: 1 });
     assert.deepEqual(repository.putProjectWorkspace({ workspaceId: "workspace-1", projectId: "project-1", displayName: "primary", kind: "PRIMARY", canonicalRoot: project.canonicalRoot, branch: "master" }, now), { id: "workspace-1", version: 2 });
+    assert.equal(repository.getProjectWorkspace("workspace-1").branch, "master");
 
     assert.equal(connection.database.prepare("SELECT project_id FROM project_aliases WHERE alias = ?").get("jarvis").project_id, "project-1");
     assert.equal(connection.database.prepare("SELECT project_id FROM project_environments WHERE environment_id = ?").get("env-1").project_id, "project-1");

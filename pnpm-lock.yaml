@@ -52,6 +52,12 @@ importers:
         specifier: 8.1.5
         version: 8.1.5(@types/node@26.2.0)
 
+  apps/desktop/src-tauri/resources/core-runtime-previous-20260816-231605/core: {}
+
+  apps/desktop/src-tauri/resources/core-runtime-stale-20260817-01/core: {}
+
+  apps/desktop/src-tauri/resources/core-runtime-unqualified-20260816-234000/core: {}
+
   apps/desktop/src-tauri/resources/core-runtime/core: {}
 
   packages/protocol: {}

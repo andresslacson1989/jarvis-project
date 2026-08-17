@@ -24,6 +24,7 @@ export interface MissionControlSnapshot {
   readonly approval?: ApprovalReviewModel;
   readonly projectPolicy?: ProjectPolicyDiagnosticModel;
   readonly providerSetup?: ProviderSetupModel;
+  readonly providerSetupStatusMessage?: string;
   readonly sessionControl?: SessionControlModel;
 }
 
@@ -34,6 +35,17 @@ export interface ProviderSetupModel {
   readonly distributionId: string;
   readonly adapterVersion: string;
   readonly state: ProviderSetupState;
+  readonly providerVersion?: string;
+  readonly setupPolicyId?: string;
+  readonly lastVerifiedAt?: string;
+  readonly conformanceEvidenceRef?: string;
+  readonly compatibility?: "NOT_DETECTED" | "VERSION_UNKNOWN" | "VERSION_UNSUPPORTED" | "CONFORMANCE_UNQUALIFIED" | "COMPATIBLE";
+  readonly health?: "STARTING" | "READY" | "DEGRADED" | "UNAVAILABLE" | "FAILED";
+  readonly qualificationState?: "UNQUALIFIED" | "QUALIFIED" | "EXPIRED" | "REVOKED";
+  readonly qualificationEvidenceRef?: string;
+  readonly locality?: "LOCAL" | "CLOUD" | "LAN";
+  readonly capabilities: readonly { readonly capabilityId: string; readonly supported: boolean }[];
+  readonly supportState: "SUPPORTED" | "SETUP_REQUIRED" | "QUALIFICATION_REQUIRED" | "HEALTH_UNAVAILABLE" | "UNSUPPORTED";
   readonly failureMessage?: string;
   readonly onStart?: () => void;
 }
@@ -90,6 +102,11 @@ export function resolveStartupSnapshot(): MissionControlSnapshot {
 
 function destinationId(destination: string) {
   return destination.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
+}
+
+function destinationFromHash(hash: string): typeof destinations[number] {
+  const destination = destinations.find((candidate) => `#${destinationId(candidate)}` === hash);
+  return destination ?? destinations[0];
 }
 
 export function ApprovalReview({ approval, onConfirm, onReject }: { approval: ApprovalReviewModel; onConfirm?: () => void; onReject?: () => void }) {
@@ -154,8 +171,15 @@ function providerSetupStatusState(state: ProviderSetupState): "info" | "success"
   return "neutral";
 }
 
+function providerSupportStatusState(state: ProviderSetupModel["supportState"]): "info" | "success" | "warning" | "error" | "waiting" | "neutral" {
+  if (state === "SUPPORTED") return "success";
+  if (state === "SETUP_REQUIRED" || state === "QUALIFICATION_REQUIRED") return "warning";
+  if (state === "HEALTH_UNAVAILABLE" || state === "UNSUPPORTED") return "error";
+  return "neutral";
+}
+
 export function ProviderSetupPanel({ model }: { model: ProviderSetupModel }) {
-  const actionRequired = model.state === "SETUP_REQUIRED" || model.state === "REPAIR_REQUIRED" || model.state === "SETUP_FAILED";
+  const actionRequired = model.state === "SETUP_REQUIRED" || model.state === "REPAIR_REQUIRED" || model.state === "SETUP_FAILED" || model.state === "SETUP_READY";
   return (
     <Panel heading="Codex provider setup" className="mission-control__provider-setup">
       <div aria-live="polite" className="mission-control__provider-setup-status">
@@ -165,12 +189,27 @@ export function ProviderSetupPanel({ model }: { model: ProviderSetupModel }) {
         <div><dt>Provider</dt><dd>{toInertText(model.providerId)}</dd></div>
         <div><dt>Distribution</dt><dd>{toInertText(model.distributionId)}</dd></div>
         <div><dt>Adapter version</dt><dd>{toInertText(model.adapterVersion)}</dd></div>
+        {model.providerVersion ? <div><dt>Provider version</dt><dd>{toInertText(model.providerVersion)}</dd></div> : null}
+        <div><dt>Support</dt><dd><StatusChip state={providerSupportStatusState(model.supportState)}>{model.supportState}</StatusChip></dd></div>
+        {model.compatibility ? <div><dt>Compatibility</dt><dd>{model.compatibility}</dd></div> : null}
+        {model.health ? <div><dt>Health</dt><dd>{model.health}</dd></div> : null}
+        {model.qualificationState ? <div><dt>Qualification</dt><dd>{model.qualificationState}</dd></div> : null}
+        {model.locality ? <div><dt>Locality</dt><dd>{model.locality}</dd></div> : null}
+        <div><dt>Capabilities</dt><dd>{model.capabilities.length === 0 ? "No capability data" : model.capabilities.map((capability) => `${capability.capabilityId}: ${capability.supported ? "supported" : "unsupported"}`).join(", ")}</dd></div>
+        {model.setupPolicyId ? <div><dt>Setup policy</dt><dd>{toInertText(model.setupPolicyId)}</dd></div> : null}
+        {model.lastVerifiedAt ? <div><dt>Last verified</dt><dd>{toInertText(model.lastVerifiedAt)}</dd></div> : null}
+        {model.conformanceEvidenceRef ? <div><dt>Conformance evidence</dt><dd>{toInertText(model.conformanceEvidenceRef)}</dd></div> : null}
+        {model.qualificationEvidenceRef ? <div><dt>Qualification evidence</dt><dd>{toInertText(model.qualificationEvidenceRef)}</dd></div> : null}
       </dl>
       {model.failureMessage ? <p className="mission-control__provider-setup-error">{toInertText(model.failureMessage)}</p> : null}
       <p className="mission-control__muted">Setup uses only the qualified provider helper. Normal workers remain non-elevated, and readiness is reported only after the independent probe passes.</p>
-      {actionRequired ? <Button disabled={!model.onStart} onClick={model.onStart} variant="primary">{model.state === "REPAIR_REQUIRED" ? "Repair Codex setup" : "Start Codex setup"}</Button> : null}
+      {actionRequired ? <Button disabled={!model.onStart} onClick={model.onStart} variant="primary">{model.state === "REPAIR_REQUIRED" || model.state === "SETUP_FAILED" ? "Repair Codex setup" : model.state === "SETUP_READY" ? "Re-run Codex qualification" : "Start Codex setup"}</Button> : null}
     </Panel>
   );
+}
+
+export function ProviderSetupStatusNotice({ message }: { message: string }) {
+  return <Panel heading="Codex provider setup" className="mission-control__provider-setup"><div aria-live="polite" className="mission-control__provider-setup-status"><StatusChip state="error">UNAVAILABLE</StatusChip></div><p className="mission-control__provider-setup-error">{toInertText(message)}</p><p className="mission-control__muted">This is the sanitized result from the authenticated native boundary. Readiness is shown only after Core records a successful independent probe.</p></Panel>;
 }
 
 export function SessionControlPanel({ model }: { model: SessionControlModel }) {
@@ -214,6 +253,31 @@ export function SessionControlPanel({ model }: { model: SessionControlModel }) {
 }
 
 export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnapshot }) {
+  const [activeDestination, setActiveDestination] = useState(() => destinationFromHash(window.location.hash));
+  const sessionUnlocked = snapshot.sessionControl?.state === "UNLOCKED";
+  const workspaceTitle = snapshot.startupCondition === "REPAIR_REQUIRED"
+    ? "Repair required before Core can start"
+    : snapshot.startupCondition === "DEGRADED"
+      ? "Core is degraded"
+      : sessionUnlocked
+        ? "Session authenticated"
+        : "Ready when authenticated";
+  const workspacePanelHeading = snapshot.startupCondition === "REPAIR_REQUIRED"
+    ? "Core runtime requires repair"
+    : sessionUnlocked
+      ? "Core remains locked"
+      : "JARVIS is locked";
+  const workspaceDescription = snapshot.startupCondition === "REPAIR_REQUIRED"
+    ? "The release-owned Core runtime did not pass preflight. JARVIS will not use a system Node or an unverified fallback. Repair the packaged runtime before Core can start."
+    : snapshot.startupCondition === "DEGRADED"
+      ? "The desktop surface is available in degraded mode. Core transport is not available, and no mission, approval, provider, or project state is being inferred or displayed."
+      : sessionUnlocked
+        ? "The desktop surface and authenticated Core transport are available. The JARVIS session is unlocked. Protected mission state remains unavailable while the Core service is still in its locked implementation state."
+        : "The desktop surface is available and the protected Core transport is authenticated. The JARVIS user session is still locked, so no mission, approval, provider, or project state is being displayed.";
+  const workspaceStatus = snapshot.startupCondition === "LOCKED"
+    ? `LOCKED · ${sessionUnlocked ? "SESSION_UNLOCKED" : "SESSION_LOCKED"}`
+    : `${snapshot.startupCondition} · ${snapshot.transportState}`;
+  const missionControlSelected = activeDestination === destinations[0];
   return (
     <div className="mission-control" data-service-state={snapshot.serviceState} data-startup-condition={snapshot.startupCondition} data-transport-state={snapshot.transportState}>
       <SkipLink targetId="mission-control-main" />
@@ -223,11 +287,16 @@ export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnap
         </a>
         <nav aria-label="Primary navigation">
           <ul className="mission-control__nav-list">
-            {destinations.map((destination, index) => {
-              const current = index === 0;
+            {destinations.map((destination) => {
+              const current = destination === activeDestination;
               return (
                 <li key={destination}>
-                  <a aria-current={current ? "page" : undefined} className={`mission-control__nav-link${current ? " is-current" : ""}`} href={`#${destinationId(destination)}`}>
+                  <a
+                    aria-current={current ? "page" : undefined}
+                    className={`mission-control__nav-link${current ? " is-current" : ""}`}
+                    href={`#${destinationId(destination)}`}
+                    onClick={() => setActiveDestination(destination)}
+                  >
                     {destination}
                   </a>
                 </li>
@@ -252,28 +321,34 @@ export function MissionControlShell({ snapshot }: { snapshot: MissionControlSnap
         </header>
 
         <div className="mission-control__content">
-          <main aria-labelledby="mission-control-title" className="mission-control__workspace" id="mission-control-main">
+          <main aria-labelledby="mission-control-title" className="mission-control__workspace" data-active-destination={destinationId(activeDestination)} id="mission-control-main">
             <div className="mission-control__workspace-heading">
               <p className="mission-control__eyebrow">Current workspace</p>
-              <h2 id="mission-control-title">{snapshot.startupCondition === "REPAIR_REQUIRED" ? "Repair required before Core can start" : snapshot.startupCondition === "DEGRADED" ? "Core is degraded" : "Ready when authenticated"}</h2>
+              <h2 id="mission-control-title">{missionControlSelected ? workspaceTitle : activeDestination}</h2>
             </div>
-            <Panel heading={snapshot.startupCondition === "REPAIR_REQUIRED" ? "Core runtime requires repair" : "JARVIS is locked"}>
-              <p>{toInertText(snapshot.startupCondition === "REPAIR_REQUIRED" ? "The release-owned Core runtime did not pass preflight. JARVIS will not use a system Node or an unverified fallback. Repair the packaged runtime before Core can start." : snapshot.startupCondition === "DEGRADED" ? "The desktop surface is available in degraded mode. Core transport is not available, and no mission, approval, provider, or project state is being inferred or displayed." : "The desktop surface is available and the protected Core transport is authenticated. The JARVIS user session is still locked, so no mission, approval, provider, or project state is being displayed.")}</p>
-              <StatusChip state={snapshot.startupCondition === "REPAIR_REQUIRED" ? "error" : "warning"}>{snapshot.startupCondition} · {snapshot.startupCondition === "LOCKED" ? "SESSION_LOCKED" : snapshot.transportState}</StatusChip>
-            </Panel>
-            <Panel heading="What remains available">
-              <ul className="mission-control__plain-list">
-                <li>Navigation and visual presentation are available.</li>
-                <li>Native window presentation remains controlled by the desktop host.</li>
-                <li>{snapshot.startupCondition === "REPAIR_REQUIRED" ? "Only a verified release-owned runtime may clear this repair state." : "Protected mission state will appear only after the JARVIS user session is unlocked through the typed boundary."}</li>
-              </ul>
-            </Panel>
+            {missionControlSelected ? <>
+              <Panel heading={workspacePanelHeading}>
+                <p>{toInertText(workspaceDescription)}</p>
+                <StatusChip state={snapshot.startupCondition === "REPAIR_REQUIRED" ? "error" : "warning"}>{workspaceStatus}</StatusChip>
+              </Panel>
+              <Panel heading="What remains available">
+                <ul className="mission-control__plain-list">
+                  <li>Navigation and visual presentation are available.</li>
+                  <li>Native window presentation remains controlled by the desktop host.</li>
+                  <li>{snapshot.startupCondition === "REPAIR_REQUIRED" ? "Only a verified release-owned runtime may clear this repair state." : sessionUnlocked ? "Provider setup and protected mission state remain governed by their own authenticated Core gates." : "Protected mission state will appear only after the JARVIS user session is unlocked through the typed boundary."}</li>
+                </ul>
+              </Panel>
+            </> : <Panel heading={`${activeDestination} is not connected`}>
+              <p className="mission-control__muted">This section is available for navigation, but authoritative {activeDestination.toLowerCase()} state is not connected to Core yet.</p>
+              <StatusChip state="warning">LOCKED · CORE_REQUIRED</StatusChip>
+            </Panel>}
           </main>
 
           <aside aria-label="Context and attention" className="mission-control__context">
             {snapshot.sessionControl ? <SessionControlPanel model={snapshot.sessionControl} /> : null}
             {snapshot.approval ? <ApprovalReview approval={snapshot.approval} /> : null}
             {snapshot.providerSetup ? <ProviderSetupPanel model={snapshot.providerSetup} /> : null}
+            {snapshot.providerSetupStatusMessage ? <ProviderSetupStatusNotice message={snapshot.providerSetupStatusMessage} /> : null}
             {snapshot.projectPolicy ? <ProjectPolicyDiagnostics model={snapshot.projectPolicy} /> : <Panel heading="Context"><p className="mission-control__muted">No selected mission, task, project, or artifact.</p></Panel>}
             <Panel heading="Attention">
               <p className="mission-control__muted">No verified attention items are available while Core is locked.</p>

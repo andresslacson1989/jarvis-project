@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { spawn } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { generateRuntimeManifest } from "../../../tools/release/generate-core-runtime-manifest.mjs";
@@ -24,6 +24,7 @@ test("packaged Core resolves its release-owned TUF verifier and dependencies", a
     const node = join(root, "node.exe");
     const core = resolve("services/core/dist/main.js");
     const support = resolve("services/core/dist/release-trust.js");
+    const authoritySupport = resolve("services/core/dist/authority-canonical.js");
     const ipcSupport = resolve("services/core/dist/ipc-bootstrap.js");
     const persistenceSupport = resolve("services/core/dist/persistence.js");
     const schemaSupport = resolve("services/core/dist/schema.js");
@@ -33,15 +34,25 @@ test("packaged Core resolves its release-owned TUF verifier and dependencies", a
     const backupRecoverySupport = resolve("services/core/dist/backup-recovery.js");
     const backupPackageSupport = resolve("services/core/dist/backup-package.js");
     const backupPayloadSupport = resolve("services/core/dist/backup-payload.js");
+    const conversationSupport = resolve("services/core/dist/conversation.js");
+    const conversationWrapperSupport = resolve("services/core/dist/conversation.mjs");
+    const providerRoutingSupport = resolve("services/core/dist/provider-routing.js");
+    const toolRuntimeSupport = resolve("services/core/dist/tool-runtime.mjs");
+    const nativeCapabilitySupport = resolve("services/core/dist/native-capability.mjs");
+    const nativeCapabilityTypes = resolve("services/core/dist/native-capability.mts");
+    const codexAdapterSupport = resolve("services/core/dist/codex-cli-adapter.mjs");
+    const providerExecutionSupport = resolve("services/core/dist/provider-execution.mjs");
+    const providerExecutionTypes = resolve("services/core/dist/provider-execution.mts");
     const preview = join(root, "preview");
     const sourceCommitSha = "b".repeat(40);
-    await writeFile(node, syntheticX64Pe());
+    await copyFile(resolve("target/release/resources/core-runtime/runtime/node.exe"), node);
     await mkdir(join(preview, "runtime"), { recursive: true });
     await mkdir(join(preview, "core", "dist"), { recursive: true });
     await writeFile(join(preview, "core", "package.json"), '{"type":"module"}\n');
     await copyFile(node, join(preview, "runtime", "node.exe"));
     await copyFile(core, join(preview, "core", "dist", "main.js"));
     await copyFile(support, join(preview, "core", "dist", "release-trust.js"));
+    await copyFile(authoritySupport, join(preview, "core", "dist", "authority-canonical.js"));
     await copyFile(ipcSupport, join(preview, "core", "dist", "ipc-bootstrap.js"));
     await copyFile(persistenceSupport, join(preview, "core", "dist", "persistence.js"));
     await copyFile(schemaSupport, join(preview, "core", "dist", "schema.js"));
@@ -51,6 +62,70 @@ test("packaged Core resolves its release-owned TUF verifier and dependencies", a
     await copyFile(backupRecoverySupport, join(preview, "core", "dist", "backup-recovery.js"));
     await copyFile(backupPackageSupport, join(preview, "core", "dist", "backup-package.js"));
     await copyFile(backupPayloadSupport, join(preview, "core", "dist", "backup-payload.js"));
+    await copyFile(conversationSupport, join(preview, "core", "dist", "conversation.js"));
+    await copyFile(conversationWrapperSupport, join(preview, "core", "dist", "conversation.mjs"));
+    await copyFile(providerRoutingSupport, join(preview, "core", "dist", "provider-routing.js"));
+    await copyFile(toolRuntimeSupport, join(preview, "core", "dist", "tool-runtime.mjs"));
+    await copyFile(nativeCapabilitySupport, join(preview, "core", "dist", "native-capability.mjs"));
+    await copyFile(nativeCapabilityTypes, join(preview, "core", "dist", "native-capability.mts"));
+    await copyFile(codexAdapterSupport, join(preview, "core", "dist", "codex-cli-adapter.mjs"));
+    await copyFile(providerExecutionSupport, join(preview, "core", "dist", "provider-execution.mjs"));
+    await copyFile(providerExecutionTypes, join(preview, "core", "dist", "provider-execution.mts"));
+    for (const name of ["main.js", "authority-canonical.js", "schema.js", "conversation.js", "codex-cli-adapter.mjs"]) {
+      const path = join(preview, "core", "dist", name);
+      const source = await readFile(path, "utf8");
+      await writeFile(path, source.replaceAll("../../../packages/", "../packages/").replaceAll("../../../providers/ai/src/codex-cli-adapter.mjs", "./codex-cli-adapter.mjs"));
+    }
+    for (const relativePath of [
+      "packages/protocol/src/provider-runtime.mjs",
+      "packages/protocol/src/provider-runtime.mts",
+      "packages/protocol/src/common.js",
+      "packages/protocol/src/core.js",
+      "packages/protocol/src/platform.js",
+      "packages/protocol/src/project.ts",
+      "packages/protocol/src/tool.ts",
+      "packages/protocol/src/execution-scope.ts",
+      "packages/protocol/src/tool-runtime-types.mjs",
+      "packages/protocol/src/tool-runtime-types.mts",
+      "packages/protocol/src/tool-runtime.mjs",
+      "packages/protocol/src/tool-runtime.mts",
+      "packages/protocol/src/tool-engineering.mjs",
+      "packages/protocol/src/tool-engineering.mts",
+      "packages/protocol/src/tool-filesystem.mjs",
+      "packages/protocol/src/tool-filesystem.mts",
+      "packages/protocol/src/tool-git.mjs",
+      "packages/protocol/src/tool-git.mts",
+      "packages/protocol/src/tool-open.mjs",
+      "packages/protocol/src/tool-open.mts",
+      "packages/protocol/src/tool-status.mjs",
+      "packages/protocol/src/tool-status.mts",
+      "packages/protocol/src/provider-routing.mjs",
+      "packages/protocol/src/authority-runtime.mjs",
+      "packages/protocol/src/state-machine-runtime.mjs",
+      "packages/protocol/src/execution-scope-runtime.mjs",
+      "packages/protocol/src/mission-graph-runtime.mjs",
+      "packages/protocol/src/accounting-runtime.mjs",
+      "packages/protocol/src/worker-runtime.mjs",
+      "packages/protocol/src/worker-recovery-runtime.mjs",
+      "packages/protocol/src/project-policy-runtime.mjs",
+      "packages/protocol/src/project-runtime.mjs",
+      "packages/protocol/src/update-trust-runtime.mjs",
+      "packages/protocol/src/domain-event-runtime.mjs",
+      "packages/protocol/src/config-runtime.mjs",
+      "packages/protocol/src/memory-runtime.mjs",
+      "packages/protocol/src/platform-runtime.mjs",
+      "packages/protocol/src/session-runtime.mjs",
+      "packages/protocol/src/security-audit-runtime.mjs",
+      "packages/protocol/src/authority-canonical-runtime.mjs",
+      "packages/protocol/src/conversation-runtime.mjs",
+      "packages/protocol/src/conversation-runtime.mts",
+      "packages/policy/src/project-policy-mutation.mjs",
+      "packages/policy/src/pre-allow-gates.mjs",
+    ]) {
+      const path = join(preview, "core", relativePath);
+      await mkdir(dirname(path), { recursive: true });
+      await copyFile(resolve(relativePath), path);
+    }
     const previewManifest = await generateRuntimeManifest({
       root: preview,
       nodeVersion: "24.18.0",
@@ -128,6 +203,12 @@ test("packaged Core resolves its release-owned TUF verifier and dependencies", a
         const packagedBackupPayload = await import(
           pathToFileURL(join(packagedRoot, "core", "dist", "backup-payload.js")).href
         );
+        const packagedNativeCapability = await import(
+          pathToFileURL(join(packagedRoot, "core", "dist", "native-capability.mjs")).href
+        );
+        if (typeof packagedNativeCapability.CoreNativeCapabilityClient !== "function") {
+          throw new Error("packaged Core did not include the native capability client");
+        }
         if (typeof packagedBackupPackage.verifyAuthenticatedBackupPackage !== "function") {
           throw new Error("packaged Core did not include authenticated backup package verification");
         }
@@ -167,7 +248,8 @@ test("packaged Core resolves its release-owned TUF verifier and dependencies", a
         process.exitCode = 1;
       }
     `;
-    const child = spawn(process.execPath, ["--input-type=module", "-e", childScript], {
+    const releaseNode = join(output, "runtime", "node.exe");
+    const child = spawn(releaseNode, ["--input-type=module", "-e", childScript], {
       env: { ...process.env, JARVIS_PACKAGED_ROOT: output },
       stdio: ["ignore", "ignore", "pipe"],
     });

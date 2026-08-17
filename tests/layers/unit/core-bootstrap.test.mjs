@@ -463,6 +463,94 @@ test("authenticated Core routes bounded session initialization and authenticatio
   if (!notReady.ok) assert.equal(notReady.error.code, "CORE_SESSION_INITIALIZE_NOT_READY");
 });
 
+test("authenticated Core routes only a validated text conversation envelope to the typed provider boundary", async () => {
+  const request = {
+    protocolVersion: 1,
+    kind: "request",
+    id: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    name: "process_authenticated_text",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ac",
+    payload: {
+      instruction: { id: "018f3b8e-6c68-7abc-8def-0123456789ab", sessionId: "018f3b8e-6c68-7abc-8def-0123456789ad", modality: "TEXT", origin: "LOCAL_UI", text: "What is ready?", receivedAt: "2026-08-16T00:00:00.000Z", conversationId: "018f3b8e-6c68-7abc-8def-0123456789ae" },
+      context: { domain: "jarvis.context-package.v1", schemaVersion: 1, contextId: "context-1", items: [{ itemId: "system-1", sourceLabel: { domain: "jarvis.content-authority.label.v1", schemaVersion: 1, sourceType: "SYSTEM_POLICY", sourceId: "system-1", authorityClass: "CONTENT_ONLY" }, content: "Do not take action." }] },
+      dataPolicy: { sensitivity: "PRIVATE", locality: "LOCAL_ONLY" },
+    },
+  };
+  let received;
+  const shell = new AuthenticatedCoreServiceShell(undefined, undefined, undefined, undefined, undefined, undefined, async (value) => {
+    received = value;
+    return { ok: true, result: { instructionId: request.id, decision: { kind: "ANSWER", text: "ready" } } };
+  });
+  assert.deepEqual(await shell.handle(request), { ok: true, result: { instructionId: request.id, decision: { kind: "ANSWER", text: "ready" } } });
+  assert.equal(received.payload.instruction.text, "What is ready?");
+  const invalid = await shell.handle({ ...request, payload: { ...request.payload, dataPolicy: { sensitivity: "SECRET", locality: "LOCAL_ONLY" } } });
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) assert.equal(invalid.error.code, "CORE_IPC_REQUEST_INVALID");
+});
+
+test("authenticated Core routes only a validated ToolRequest to the Core-owned execution boundary", async () => {
+  const request = {
+    protocolVersion: 1,
+    kind: "request",
+    id: "018f3b8e-6c68-7abc-8def-0123456789ab",
+    name: "execute_tool",
+    correlationId: "018f3b8e-6c68-7abc-8def-0123456789ac",
+    payload: {
+      toolExecutionId: "018f3b8e-6c68-7abc-8def-0123456789ab",
+      toolId: "jarvis.filesystem.read-text",
+      toolVersion: 1,
+      executionScope: { kind: "PROJECT_WORKSPACE", projectId: "project-1", workspaceId: "workspace-1" },
+      authorityEnvelopeId: "018f3b8e-6c68-7abc-8def-0123456789ad",
+      arguments: { path: "README.md" },
+    },
+  };
+
+  const notReady = await new AuthenticatedCoreServiceShell().handle(request);
+  assert.equal(notReady.ok, false);
+  if (!notReady.ok) {
+    assert.equal(notReady.error.code, "CORE_TOOL_RUNTIME_NOT_READY");
+    assert.equal(notReady.error.details.toolExecutionId, request.id);
+  }
+
+  let received;
+  const executed = await new AuthenticatedCoreServiceShell(
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    async (value) => {
+      received = value;
+      return {
+        toolExecutionId: value.payload.toolExecutionId,
+        outcome: "SUCCEEDED",
+        output: { content: "ready" },
+        startedAt: "2026-08-17T00:00:00.000Z",
+        endedAt: "2026-08-17T00:00:00.001Z",
+      };
+    },
+  ).handle(request);
+  assert.deepEqual(executed, {
+    ok: true,
+    result: {
+      toolExecutionId: request.id,
+      outcome: "SUCCEEDED",
+      output: { content: "ready" },
+      startedAt: "2026-08-17T00:00:00.000Z",
+      endedAt: "2026-08-17T00:00:00.001Z",
+    },
+  });
+  assert.equal(received.payload.arguments.path, "README.md");
+
+  const retargeted = await new AuthenticatedCoreServiceShell(undefined, undefined, undefined, undefined, undefined, undefined, undefined, async () => {
+    throw new Error("must not execute retargeted request");
+  }).handle({ ...request, payload: { ...request.payload, toolExecutionId: "018f3b8e-6c68-7abc-8def-0123456789ae" } });
+  assert.equal(retargeted.ok, false);
+  if (!retargeted.ok) assert.equal(retargeted.error.code, "CORE_TOOL_REQUEST_INVALID");
+});
+
 test("authenticated Core transport serves the bounded locked-status round-trip", async () => {
   const [serverSocket, client] = createMemorySocketPair();
   let stopping = false;

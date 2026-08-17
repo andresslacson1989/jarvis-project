@@ -268,7 +268,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **7.6** Setup readiness/conformance probe, cancel/failure/repair semantics, version-update invalidation | **NOT STARTED** | 7.5 | PLAN §9; RT §15; DS §22; VR §17 | — | — | — |
 | ↳ **7.7** Authenticated text ConversationService input→context→orchestrator structured-decision pipeline with bounded repair/reformat and no authority bypass | **NOT STARTED** | 7.3, 6.11, 5.6–5.9 | IC §§4,13,17; RT §11; SEC §12; RP §5 | — | — | — |
 | ↳ **7.8** GENERALIST/orchestrator plus verifier/synthesis provider profiles and capability/locality routing | **NOT STARTED** | 7.7 | PLAN §9; RP §5; IC §17 | — | — | — |
-| ↳ **7.9** WORKSPACE_ENGINEERING profile: exact worktree, controlled env, no unrelated secrets, network denied by default | **NOT STARTED** | 7.3, 6.3, 6.10 | PLAN §9; RT §13; SEC §21 | — | — | — |
+| ↳ **7.9** WORKSPACE_ENGINEERING profile: exact worktree, controlled env, no unrelated secrets, Codex network enabled by default | **NOT STARTED** | 7.3, 6.3, 6.10 | PLAN §9; RT §13; SEC §21; ADR-076 | — | — | — |
 | ↳ **7.10** Real Codex sandbox conformance: writes, network, honest read-access claim, ordinary-worker non-elevation | **NOT STARTED** | 7.6, 7.9 | PLAN §9 Mandatory proof; SEC §§21–23; VR §17 | — | — | — |
 | ↳ **7.11** Provider process containment, cancellation/timeouts/circuit breaker/crash/restart behavior | **NOT STARTED** | 7.3, 2.4–2.5 | PLAN §9; RT §§14,23; VR §§17,19 | — | — | — |
 | ↳ **7.12** Provider fallback/routing that cannot weaken setup/locality/permission/budget/platform support | **NOT STARTED** | 7.8, 7.11 | IC §17; SEC §23; RT §14 | — | — | — |

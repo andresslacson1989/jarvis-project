@@ -32,7 +32,11 @@ pub const CODEX_CLI_PROVIDER_ID: &str = "codex-cli";
 
 const MAX_PROVIDER_ID_BYTES: usize = 64;
 const MAX_ARGUMENTS: usize = 16;
-const MAX_ARGUMENT_BYTES: usize = 512;
+// The qualified Codex Windows setup helper receives one Base64-encoded JSON
+// payload.  A normal release-directory path makes that payload larger than
+// 512 bytes, so keep the argument bounded while allowing the provider's exact
+// contract payload to pass validation.
+const MAX_ARGUMENT_BYTES: usize = 2_048;
 const MAX_TOTAL_ARGUMENT_BYTES: usize = 2_048;
 #[cfg(all(target_os = "windows", not(test)))]
 const UAC_HELPER_TIMEOUT_MS: u32 = 300_000;
@@ -452,23 +456,40 @@ impl WindowsPrivilegeMediator {
         operation: PrivilegeOperationId,
     ) -> Result<(), PrivilegeMediatorError> {
         let helper_path = wide_null(helper.canonical_path.as_os_str());
+        let helper_directory = helper
+            .canonical_path
+            .parent()
+            .expect("qualified helper path must have a parent directory");
+        let helper_directory = wide_null(helper_directory.as_os_str());
         let verb = wide_null(OsStr::new("runas"));
         let parameter_string = windows_parameter_string(arguments.arguments());
         let parameters = wide_null(OsStr::new(&parameter_string));
 
+        // SAFETY: SHELLEXECUTEINFOW is a C ABI value whose zeroed state is the
+        // required initialization before setting the documented fields below.
         let mut execute_info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
         execute_info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
         execute_info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_UNICODE;
         execute_info.lpVerb = verb.as_ptr();
         execute_info.lpFile = helper_path.as_ptr();
         execute_info.lpParameters = parameters.as_ptr();
+        // The Codex helper is a packaged executable and may resolve bundled
+        // resources relative to its release directory. Keep the elevated
+        // launch working directory tied to the already-qualified helper
+        // identity instead of inheriting the host's arbitrary current
+        // directory.
+        execute_info.lpDirectory = helper_directory.as_ptr();
         execute_info.nShow = SW_SHOWNORMAL;
 
         // SAFETY: all pointers refer to NUL-terminated buffers held alive for
-        // the entire synchronous ShellExecuteExW call. The helper path and
-        // argument plan were identity-checked immediately before this call.
+        // the entire synchronous ShellExecuteExW call. The helper path,
+        // helper directory, and argument plan were identity-checked
+        // immediately before this call.
+        // SAFETY: all pointers refer to NUL-terminated buffers alive for this
+        // synchronous call, and the helper identity/arguments were revalidated.
         let launched = unsafe { ShellExecuteExW(&mut execute_info) };
         if launched == 0 {
+            // SAFETY: GetLastError is read immediately after the failed Win32 call.
             let code = unsafe { GetLastError() };
             return Err(PrivilegeMediatorError {
                 code: if code == windows_sys::Win32::Foundation::ERROR_CANCELLED {
@@ -496,6 +517,7 @@ impl WindowsPrivilegeMediator {
             // elevated helper is intentionally not force-terminated here;
             // timeout is reported as failure/uncertain to the owning setup
             // workflow, which must reconcile before retrying.
+            // SAFETY: the process handle is valid and is closed exactly once.
             unsafe { CloseHandle(execute_info.hProcess) };
             return Err(PrivilegeMediatorError {
                 code: PrivilegeMediatorErrorCode::UacTimeout,
@@ -503,6 +525,7 @@ impl WindowsPrivilegeMediator {
             });
         }
         if wait_result != WAIT_OBJECT_0 {
+            // SAFETY: the process handle is valid and is closed exactly once.
             unsafe { CloseHandle(execute_info.hProcess) };
             return Err(PrivilegeMediatorError {
                 code: PrivilegeMediatorErrorCode::UacWaitFailed,
