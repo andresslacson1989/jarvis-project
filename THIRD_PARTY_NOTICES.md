@@ -504,7 +504,7 @@ This file records the repository-reviewed dependency, toolchain, and CI/bootstra
 | npm:tslib | 2.8.1 | DESKTOP_BUILD_TEST | 0BSD | https://github.com/Microsoft/tslib |
 | npm:typescript | 6.0.3 | BUILD_TEST | Apache-2.0 | https://github.com/microsoft/TypeScript |
 | npm:vite | 8.1.5 | DESKTOP_BUILD_TEST | MIT | https://github.com/vitejs/vite |
-| toolchain:Tauri | 2.11.5 | DECLARED_RELEASE_FACT | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
+| toolchain:Tauri | 2.11.5 | DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | toolchain:Node.js | 24.18.0 | BUILD_RUNTIME | MIT | https://github.com/nodejs/node |
 | toolchain:pnpm | 11.21.0 | BUILD_TOOL | MIT | https://github.com/pnpm/pnpm |
 | toolchain:Rust | 1.97.1 | BUILD_TOOL | MIT OR Apache-2.0 | https://github.com/rust-lang/rust |

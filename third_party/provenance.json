@@ -5024,7 +5024,7 @@
       "version": "2.11.5",
       "license": "Apache-2.0 OR MIT",
       "source": "https://github.com/tauri-apps/tauri",
-      "role": "DECLARED_RELEASE_FACT",
+      "role": "DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED",
       "packaged": false,
       "reviewStatus": "APPROVED"
     },
