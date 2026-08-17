@@ -141,7 +141,11 @@ jobs:
           fi
           llvm_bin_dir="$(dirname "$llvm_rc_path")"
           echo "$llvm_bin_dir" >> "$GITHUB_PATH"
-          "$llvm_rc_path" --help >/dev/null
+          probe_rc="$RUNNER_TEMP/jarvis-llvm-rc-probe.rc"
+          probe_res="$RUNNER_TEMP/jarvis-llvm-rc-probe.res"
+          printf '1 ICON DISCARDABLE "%s"\n' "$GITHUB_WORKSPACE/apps/desktop/src-tauri/icons/icon.ico" > "$probe_rc"
+          "$llvm_rc_path" /fo="$probe_res" "$probe_rc"
+          test -s "$probe_res"
 
       - name: Rust formatting
         run: cargo fmt --all -- --check
