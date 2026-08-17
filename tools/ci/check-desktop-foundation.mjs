@@ -4,6 +4,17 @@ import { resolve } from "node:path";
 import { isMain, printViolations, violation } from "./lib.mjs";
 
 const EXPECTED_QUALIFICATION = "DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED";
+const TAURI_HOST_DEPENDENCIES = Object.freeze([
+  "libwebkit2gtk-4.1-dev",
+  "build-essential",
+  "curl",
+  "wget",
+  "file",
+  "libxdo-dev",
+  "libssl-dev",
+  "libayatana-appindicator3-dev",
+  "librsvg2-dev",
+]);
 
 async function readOptional(path) {
   try {
@@ -52,13 +63,22 @@ export async function loadDesktopFoundationSnapshot(rootDir) {
   };
 }
 
-function hasWorkflowStep(workflow, name, run) {
-  if (typeof workflow !== "string") return false;
+function workflowStepBlock(workflow, name) {
+  if (typeof workflow !== "string") return null;
   const start = workflow.indexOf(`      - name: ${name}\n`);
-  if (start < 0) return false;
+  if (start < 0) return null;
   const next = workflow.indexOf("\n      - name: ", start + 1);
-  const block = workflow.slice(start, next < 0 ? workflow.length : next);
-  return block.includes(`\n        run: ${run}`) && !/\n\s+if:/.test(block);
+  return workflow.slice(start, next < 0 ? workflow.length : next);
+}
+
+function hasWorkflowStep(workflow, name, run) {
+  const block = workflowStepBlock(workflow, name);
+  return block !== null && block.includes(`\n        run: ${run}`) && !/\n\s+if:/.test(block);
+}
+
+function hasWorkflowStepFragments(workflow, name, fragments) {
+  const block = workflowStepBlock(workflow, name);
+  return block !== null && fragments.every((fragment) => block.includes(fragment)) && !/\n\s+if:/.test(block);
 }
 
 function add(violations, condition, code, path, detail) {
@@ -132,6 +152,17 @@ export function evaluateDesktopFoundation(snapshot) {
 
   add(violations, hasWorkflowStep(snapshot.workflow, "Desktop foundation contract", "pnpm desktop:foundation:check"), "DESKTOP_FOUNDATION_CI_GATE_MISSING", ".github/workflows/static-ci.yml", "desktop foundation contract gate must be mandatory and unconditional");
   add(violations, hasWorkflowStep(snapshot.workflow, "Desktop Tauri Windows build", "cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc"), "DESKTOP_WINDOWS_BUILD_CI_GATE_MISSING", ".github/workflows/static-ci.yml", "explicit Windows Tauri build gate must be mandatory and unconditional");
+  add(
+    violations,
+    hasWorkflowStepFragments(snapshot.workflow, "Install Tauri host-check system dependencies", [
+      "sudo apt-get update",
+      "sudo apt-get install --no-install-recommends -y",
+      ...TAURI_HOST_DEPENDENCIES,
+    ]),
+    "DESKTOP_TAURI_HOST_DEPS_CI_GATE_MISSING",
+    ".github/workflows/static-ci.yml",
+    "Ubuntu host clippy/build must install the reviewed Tauri development prerequisites without weakening Rust gates",
+  );
 
   return violations;
 }
