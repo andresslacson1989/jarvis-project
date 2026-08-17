@@ -25,6 +25,18 @@ test("current Section 1.1 desktop foundation satisfies the fail-closed contract"
   assert.deepEqual(evaluateDesktopFoundation(snapshot), []);
 });
 
+test("Tauri build-script pairing is host-visible while the WebView runtime stays Windows-only", async () => {
+  const snapshot = await loadDesktopFoundationSnapshot(root);
+  assert.match(
+    snapshot.tauriCargo,
+    /^\[dependencies\]\ntauri = \{ version = "=2\.11\.5", default-features = false \}$/m,
+  );
+  assert.match(
+    snapshot.tauriCargo,
+    /^\[target\.'cfg\(target_os = "windows"\)'\.dependencies\]\ntauri = \{ version = "=2\.11\.5", default-features = false, features = \["wry"\] \}$/m,
+  );
+});
+
 test("missing Tauri manifest fails closed", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
   assert.ok(codes(mutate(snapshot, (copy) => { copy.tauriCargo = null; })).includes("DESKTOP_TAURI_MANIFEST_MISSING"));
