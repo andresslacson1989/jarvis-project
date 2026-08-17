@@ -19,8 +19,8 @@ The two files together are one non-normative implementation matrix. They are not
 
 | Field | Current value |
 |---|---|
-| Active section | `SECTION 0` — Phase 0 requalification in progress |
-| Active subsection | `0.CP` — Phase 0 literal-exit reconciliation |
+| Active section | `SECTION 1` — Windows Tauri Host / Mission Control Foundation / Application-Owned Core |
+| Active subsection | `1.1` — Tauri 2 + React desktop workspace with bundled-local authoritative WebView |
 | Next eligible subsection | `1.1` |
 | Contract suite | JARVIS v1.0.6 |
 | Authoritative implementation sequence | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` |
