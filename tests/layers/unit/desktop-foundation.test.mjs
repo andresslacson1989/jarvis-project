@@ -35,6 +35,18 @@ test("Tauri build-script pairing is host-visible while the WebView runtime stays
     snapshot.tauriCargo,
     /^\[target\.'cfg\(target_os = "windows"\)'\.dependencies\]\ntauri = \{ version = "=2\.11\.5", default-features = false, features = \["wry"\] \}$/m,
   );
+
+  const missingPairing = mutate(snapshot, (copy) => {
+    copy.tauriCargo = copy.tauriCargo.replace(
+      '[dependencies]\ntauri = { version = "=2.11.5", default-features = false }\n\n',
+      "",
+    );
+  });
+  const missingWindowsWry = mutate(snapshot, (copy) => {
+    copy.tauriCargo = copy.tauriCargo.replace(', features = ["wry"]', "");
+  });
+  assert.ok(codes(missingPairing).includes("DESKTOP_TAURI_BUILD_PAIRING_MISSING"));
+  assert.ok(codes(missingWindowsWry).includes("DESKTOP_TAURI_WINDOWS_WRY_MISSING"));
 });
 
 test("missing Tauri manifest fails closed", async () => {
@@ -44,7 +56,7 @@ test("missing Tauri manifest fails closed", async () => {
 
 test("Tauri runtime and build pin drift fail closed", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
-  const runtime = mutate(snapshot, (copy) => { copy.tauriCargo = copy.tauriCargo.replace('tauri = "=2.11.5"', 'tauri = "=9.9.9"'); });
+  const runtime = mutate(snapshot, (copy) => { copy.tauriCargo = copy.tauriCargo.replaceAll('version = "=2.11.5"', 'version = "=9.9.9"'); });
   const build = mutate(snapshot, (copy) => { copy.tauriCargo = copy.tauriCargo.replace('tauri-build = "=2.6.3"', 'tauri-build = "=9.9.9"'); });
   assert.ok(codes(runtime).includes("DESKTOP_TAURI_RUNTIME_PIN_MISMATCH"));
   assert.ok(codes(build).includes("DESKTOP_TAURI_BUILD_PIN_MISMATCH"));
@@ -78,6 +90,14 @@ test("remote renderer resources and custom Tauri commands fail closed", async ()
   const command = mutate(snapshot, (copy) => { copy.mainRs += "\n#[tauri::command]\nfn unsafe_command() {}\n"; });
   assert.ok(codes(remote).includes("DESKTOP_REMOTE_SCRIPT"));
   assert.ok(codes(command).includes("DESKTOP_CUSTOM_COMMAND_SURFACE"));
+});
+
+test("non-Windows runtime support cannot be introduced silently", async () => {
+  const snapshot = await loadDesktopFoundationSnapshot(root);
+  const drifted = mutate(snapshot, (copy) => {
+    copy.mainRs = copy.mainRs.replace('#[cfg(not(target_os = "windows"))]', "");
+  });
+  assert.ok(codes(drifted).includes("DESKTOP_NON_WINDOWS_STUB_MISSING"));
 });
 
 test("Tauri qualification drift fails closed", async () => {
