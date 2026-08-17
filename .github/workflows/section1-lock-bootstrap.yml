@@ -107,7 +107,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          git fetch --no-tags --depth=1 origin master
+          AUTH_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --depth=1 "${AUTH_URL}" master
           test "$(git rev-parse FETCH_HEAD)" = "db6731650d472aa2faa002cf4f0402cc59370768"
           mkdir -p .bootstrap
           cp /tmp/npm-provenance.json .bootstrap/npm-provenance.json
@@ -120,4 +121,4 @@ jobs:
             exit 0
           fi
           git commit -m "build(1.1): capture generated lockfiles and provenance"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF_NAME}
+          git push "${AUTH_URL}" HEAD:${GITHUB_REF_NAME}
