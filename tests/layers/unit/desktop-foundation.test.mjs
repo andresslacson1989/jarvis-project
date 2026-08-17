@@ -114,10 +114,48 @@ test("removing either mandatory Section 1.1 CI gate fails closed", async () => {
   assert.ok(codes(windows).includes("DESKTOP_WINDOWS_BUILD_CI_GATE_MISSING"));
 });
 
-test("removing Tauri host-check prerequisites fails closed", async () => {
+test("mandatory static CI cannot drift back to an Ubuntu host", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
-  const missing = mutate(snapshot, (copy) => {
-    copy.workflow = copy.workflow.replace("libwebkit2gtk-4.1-dev", "removed-webkit-dev");
+  const ubuntu = mutate(snapshot, (copy) => {
+    copy.workflow = copy.workflow.replace(
+      "  static-ci:\n    name: static-ci\n    needs: windows-tauri-build\n    if: ${{ always() }}\n    runs-on: windows-2025",
+      "  static-ci:\n    name: static-ci\n    needs: windows-tauri-build\n    if: ${{ always() }}\n    runs-on: ubuntu-24.04",
+    );
   });
-  assert.ok(codes(missing).includes("DESKTOP_TAURI_HOST_DEPS_CI_GATE_MISSING"));
+  assert.ok(codes(ubuntu).includes("DESKTOP_STATIC_CI_WINDOWS_RUNNER_REQUIRED"));
+});
+
+test("Linux Tauri host prerequisites cannot become Section 1.1 qualification gates", async () => {
+  const snapshot = await loadDesktopFoundationSnapshot(root);
+  const linuxHost = mutate(snapshot, (copy) => {
+    copy.workflow = copy.workflow.replace(
+      "      - name: Rust formatting\n        run: cargo fmt --all -- --check",
+      "      - name: Install Tauri host-check system dependencies\n        shell: bash\n        run: sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev\n\n      - name: Rust formatting\n        run: cargo fmt --all -- --check",
+    );
+  });
+  assert.ok(codes(linuxHost).includes("DESKTOP_LINUX_TAURI_HOST_QUALIFICATION_FORBIDDEN"));
+});
+
+test("clean Windows checkout line-ending policy is mandatory and source rewriting is forbidden", async () => {
+  const snapshot = await loadDesktopFoundationSnapshot(root);
+  const missingPolicy = mutate(snapshot, (copy) => { copy.sourceAttributes = null; });
+  const sourceRewrite = mutate(snapshot, (copy) => {
+    copy.workflow = copy.workflow.replace(
+      "      - name: Install pinned pnpm and Node",
+      "      - name: Normalize Rust source newlines\n        shell: pwsh\n        run: Write-Output normalize\n\n      - name: Install pinned pnpm and Node",
+    );
+  });
+  assert.ok(codes(missingPolicy).includes("DESKTOP_LINE_ENDING_POLICY_MISSING"));
+  assert.ok(codes(sourceRewrite).includes("DESKTOP_SOURCE_REWRITE_CI_FORBIDDEN"));
+});
+
+test("Tauri context generation pairing fails closed if build-context include is reintroduced", async () => {
+  const snapshot = await loadDesktopFoundationSnapshot(root);
+  const incorrect = mutate(snapshot, (copy) => {
+    copy.mainRs = copy.mainRs.replace(
+      "tauri::generate_context!()",
+      "tauri::tauri_build_context!()",
+    );
+  });
+  assert.ok(codes(incorrect).includes("DESKTOP_TAURI_CONTEXT_PAIRING_INVALID"));
 });
