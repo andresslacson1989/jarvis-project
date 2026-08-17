@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 
 const provenancePath = "third_party/provenance.json";
 const noticesPath = "THIRD_PARTY_NOTICES.md";
+const tauriQualification = "DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED";
 
 const current = JSON.parse(await readFile(provenancePath, "utf8"));
 const generated = [
@@ -23,10 +24,16 @@ const dependencies = [...byKey.values()].sort((left, right) =>
     "en",
   ),
 );
+const toolchains = (current.toolchains ?? []).map((toolchain) =>
+  toolchain.name === "Tauri"
+    ? { ...toolchain, role: tauriQualification }
+    : toolchain,
+);
 
 const next = {
   ...current,
   dependencies,
+  toolchains,
 };
 await writeFile(provenancePath, `${JSON.stringify(next, null, 2)}\n`);
 
@@ -36,7 +43,7 @@ for (const dependency of dependencies) {
     `| ${dependency.ecosystem}:${dependency.name} | ${dependency.version} | ${dependency.role} | ${dependency.license} | ${dependency.source} |`,
   );
 }
-for (const toolchain of current.toolchains ?? []) {
+for (const toolchain of toolchains) {
   rows.push(
     `| toolchain:${toolchain.name} | ${toolchain.version} | ${toolchain.role} | ${toolchain.license} | ${toolchain.source} |`,
   );
