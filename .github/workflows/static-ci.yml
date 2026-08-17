@@ -25,6 +25,18 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          actual_sha="$(git rev-parse HEAD)"
+          if [[ "$actual_sha" != "$EXPECTED_SHA" ]]; then
+            echo "Expected exact candidate SHA $EXPECTED_SHA but checked out $actual_sha" >&2
+            exit 1
+          fi
 
       - name: Install pinned pnpm and Node
         uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
@@ -111,7 +123,25 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            llvm
+
+          llvm_rc_path="$(command -v llvm-rc || true)"
+          if [[ -z "$llvm_rc_path" ]]; then
+            for llvm_bin_dir in /usr/lib/llvm-*/bin; do
+              if [[ -x "$llvm_bin_dir/llvm-rc" ]]; then
+                llvm_rc_path="$llvm_bin_dir/llvm-rc"
+                break
+              fi
+            done
+          fi
+          if [[ -z "$llvm_rc_path" || ! -x "$llvm_rc_path" ]]; then
+            echo "llvm-rc was not installed or could not be located" >&2
+            exit 1
+          fi
+          llvm_bin_dir="$(dirname "$llvm_rc_path")"
+          echo "$llvm_bin_dir" >> "$GITHUB_PATH"
+          "$llvm_rc_path" --version
 
       - name: Rust formatting
         run: cargo fmt --all -- --check
