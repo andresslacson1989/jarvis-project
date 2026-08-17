@@ -25,8 +25,9 @@
     "runtime": "2.11.5",
     "build": "2.6.3",
     "javascriptApi": "2.11.1",
+    "cli": "2.11.4",
     "rustPluginOpener": "2.5.4",
     "javascriptPluginOpener": "2.5.4",
-    "qualification": "DECLARED_RELEASE_FACT_NOT_YET_IMPLEMENTED"
+    "qualification": "DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED"
   }
 }

@@ -24,6 +24,7 @@
     "build": "tsc -p tsconfig.build.json",
     "build:core": "pnpm --filter @jarvis/core build",
     "build:ui": "pnpm --filter @jarvis/desktop build:web",
+    "desktop:foundation:check": "node tools/ci/check-desktop-foundation.mjs",
     "ci:evidence": "node tools/ci/generate-evidence.mjs",
     "contract:generate": "node tools/contract/generate-contract-artifacts.mjs --write",
     "contract:check-generated": "node tools/contract/generate-contract-artifacts.mjs --check",

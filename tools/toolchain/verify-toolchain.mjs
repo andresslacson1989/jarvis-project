@@ -56,6 +56,8 @@ function runContains(command, args, expectedFragment, label) {
 
 const baseline = readJson("tools/toolchain/toolchain-baseline.json");
 const pkg = readJson("package.json");
+const desktopPackage = readJson("apps/desktop/package.json");
+const desktopCargo = read("apps/desktop/src-tauri/Cargo.toml");
 const tsconfig = readJson("tsconfig.json");
 const nodeVersion = read(".node-version").trim();
 const workspace = read("pnpm-workspace.yaml");
@@ -73,9 +75,14 @@ assert(baseline.rust?.channel === "stable", "Rust selection must remain stable")
 assert(baseline.tauri?.runtime === "2.11.5", "Tauri runtime release fact mismatch");
 assert(baseline.tauri?.build === "2.6.3", "tauri-build release fact mismatch");
 assert(baseline.tauri?.javascriptApi === "2.11.1", "Tauri JavaScript API release fact mismatch");
+assert(baseline.tauri?.cli === "2.11.4", "Tauri CLI release fact mismatch");
 assert(baseline.tauri?.rustPluginOpener === "2.5.4", "Tauri Rust opener plugin release fact mismatch");
 assert(baseline.tauri?.javascriptPluginOpener === "2.5.4", "Tauri JavaScript opener plugin release fact mismatch");
-assert(baseline.tauri?.qualification === "DECLARED_RELEASE_FACT_NOT_YET_IMPLEMENTED", "Tauri qualification state must remain truthful before host implementation");
+assert(baseline.tauri?.qualification === "DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED", "Tauri qualification state must remain truthful after Section 1.1 implementation");
+assert(desktopPackage.dependencies?.["@tauri-apps/api"] === baseline.tauri.javascriptApi, "desktop Tauri JavaScript API must match the selected release fact");
+assert(desktopPackage.devDependencies?.["@tauri-apps/cli"] === baseline.tauri.cli, "desktop Tauri CLI must match the selected release fact");
+assert(desktopCargo.includes(`tauri-build = "=${baseline.tauri.build}"`), "desktop tauri-build must match the selected release fact");
+assert(desktopCargo.includes(`tauri = "=${baseline.tauri.runtime}"`), "desktop Tauri runtime must match the selected release fact");
 
 const EXPECTED = Object.freeze({
   node: baseline.node.version,
@@ -154,6 +161,7 @@ assert(cargoToml.includes(`rust-version = \"${EXPECTED.rust}\"`), "Cargo rust-ve
 assert(cargoToml.includes(`edition = \"${EXPECTED.rustEdition}\"`), "Cargo edition mismatch");
 assert(cargoLock.includes("version = 4"), "Cargo lockfile version mismatch");
 assert(cargoLock.includes('name = "jarvis-toolchain-smoke"'), "Rust smoke package missing from Cargo.lock");
+assert(cargoLock.includes('name = "jarvis-desktop"'), "JARVIS desktop package missing from Cargo.lock");
 assert(rustSmokeManifest.includes("publish = false"), "Rust smoke crate must be non-publishable");
 assert(rustSmoke.includes("#![forbid(unsafe_code)]"), "Rust smoke crate must forbid unsafe code");
 assert(rustSmoke.includes(EXPECTED.rust), "Rust smoke baseline mismatch");

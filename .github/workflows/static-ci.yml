@@ -86,6 +86,9 @@ jobs:
       - name: Desktop UI build
         run: pnpm build:ui
 
+      - name: Desktop foundation contract
+        run: pnpm desktop:foundation:check
+
       - name: Architecture enforcement
         run: pnpm architecture:check
 
@@ -106,6 +109,9 @@ jobs:
 
       - name: Rust Windows-target build
         run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
+
+      - name: Desktop Tauri Windows build
+        run: cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc
 
       - name: Phase 0 section checkpoint
         run: pnpm phase0:check
