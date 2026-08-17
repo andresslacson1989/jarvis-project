@@ -46,7 +46,7 @@ export function extractFenceAfter(text, marker) {
   const start = text.indexOf(marker);
   if (start < 0) return null;
   const tail = text.slice(start + marker.length);
-  const match = tail.match(/```(?:[A-Za-z0-9_-]+)?\n([\s\S]*?)```/);
+  const match = tail.match(/```(?:[A-Za-z0-9_-]+)?\r?\n([\s\S]*?)```/);
   return match?.[1] ?? null;
 }
 

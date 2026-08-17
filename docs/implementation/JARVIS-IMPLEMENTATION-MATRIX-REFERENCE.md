@@ -1,7 +1,7 @@
 # JARVIS Implementation Execution Matrix
 
 **Document role:** Non-normative execution/status control board derived from the locked active contract suite.  
-**Contract suite:** JARVIS v1.0.5  
+**Contract suite:** JARVIS v1.0.8
 **Authoritative implementation sequence:** `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`  
 **Contract baseline reviewed before this matrix:** `master` at `5766978576a48165a7ec8013ed6a106b0b0ddd17`  
 **Initial implementation state:** application implementation has not started; all mandatory implementation rows begin `NOT STARTED`.  
@@ -42,8 +42,8 @@ Implement the complete contract-defined **Windows 11 x64 `FULL_HOST` JARVIS V1 p
 
 | Abbrev. | Normative source |
 |---|---|
-| `MAN` | `docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md` |
-| `IC` | `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md` |
+| `MAN` | `docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md` |
+| `IC` | `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md` |
 | `RP` | `docs/JARVIS-V1-RELEASE-PROFILE.md` |
 | `PP` | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` |
 | `RT` | `docs/implementation/JARVIS-RUNTIME-CONTRACT.md` |
@@ -89,7 +89,7 @@ This table is a guard against backward dependencies and premature implementation
 | Active section | `SECTION 0 — Repository / Platform Contracts / Toolchain / Governance` |
 | Active subsection | None — `0.3` verified; `0.4` not started |
 | Next eligible subsection | `0.4` |
-| Last matrix review baseline | JARVIS v1.0.5 contract suite at `5766978576a48165a7ec8013ed6a106b0b0ddd17` |
+| Last matrix review baseline | Initial reference review used JARVIS v1.0.5 at `5766978576a48165a7ec8013ed6a106b0b0ddd17`; active routing reconciled to JARVIS v1.0.8 on 2026-08-17 |
 | Production Complete | **NO** |
 
 ## Implementation matrix
@@ -268,7 +268,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **7.6** Setup readiness/conformance probe, cancel/failure/repair semantics, version-update invalidation | **NOT STARTED** | 7.5 | PLAN §9; RT §15; DS §22; VR §17 | — | — | — |
 | ↳ **7.7** Authenticated text ConversationService input→context→orchestrator structured-decision pipeline with bounded repair/reformat and no authority bypass | **NOT STARTED** | 7.3, 6.11, 5.6–5.9 | IC §§4,13,17; RT §11; SEC §12; RP §5 | — | — | — |
 | ↳ **7.8** GENERALIST/orchestrator plus verifier/synthesis provider profiles and capability/locality routing | **NOT STARTED** | 7.7 | PLAN §9; RP §5; IC §17 | — | — | — |
-| ↳ **7.9** WORKSPACE_ENGINEERING profile: exact worktree, controlled env, no unrelated secrets, network denied by default | **NOT STARTED** | 7.3, 6.3, 6.10 | PLAN §9; RT §13; SEC §21 | — | — | — |
+| ↳ **7.9** WORKSPACE_ENGINEERING profile: exact worktree, controlled env, no unrelated secrets, Codex network enabled by default | **NOT STARTED** | 7.3, 6.3, 6.10 | PLAN §9; RT §13; SEC §21; ADR-076 | — | — | — |
 | ↳ **7.10** Real Codex sandbox conformance: writes, network, honest read-access claim, ordinary-worker non-elevation | **NOT STARTED** | 7.6, 7.9 | PLAN §9 Mandatory proof; SEC §§21–23; VR §17 | — | — | — |
 | ↳ **7.11** Provider process containment, cancellation/timeouts/circuit breaker/crash/restart behavior | **NOT STARTED** | 7.3, 2.4–2.5 | PLAN §9; RT §§14,23; VR §§17,19 | — | — | — |
 | ↳ **7.12** Provider fallback/routing that cannot weaken setup/locality/permission/budget/platform support | **NOT STARTED** | 7.8, 7.11 | IC §17; SEC §23; RT §14 | — | — | — |
@@ -697,7 +697,7 @@ Binding post-V1 integration targets remain SSH, Google Workspace, Microsoft 365,
 ## Fresh matrix design review
 
 **Review date:** August 12, 2026  
-**Contract baseline:** live `master` `5766978576a48165a7ec8013ed6a106b0b0ddd17`, JARVIS contract suite v1.0.5.  
+**Contract baseline:** the initial reference review used live `master` `5766978576a48165a7ec8013ed6a106b0b0ddd17`, JARVIS contract suite v1.0.5. Current routing is reconciled to the active JARVIS v1.0.8 suite.
 **Draft reviewed:** initial matrix commit `d937c606785c5b21ddff72ab1ed011dd7c931b11` plus the current hardening amendments in this branch.
 
 The review was performed as a fresh contract/dependency audit rather than a self-approval of the original outline. It re-read `AGENTS.md`, the current manifest, top-level Implementation Contract, Release Profile, every active normative component, the Implementation Plan, and the actual repository copy of this matrix.
@@ -742,4 +742,4 @@ Before this matrix is accepted for implementation, a fresh review must establish
 - [x] The final `Production Complete` declaration binds to one exact source commit and exact signed Windows FULL_HOST artifacts.
 - [x] Fresh review found no known unresolved matrix ordering/coverage/prerequisite defect.
 
-> **Safety statement:** after the fresh review and corrections above, this matrix has no known unresolved planning, authority, ordering, coverage, or prerequisite defect. No planning artifact can guarantee that future implementation code will be bug-free; implementation must still follow the subsection verification loop and exact contract gates. The matrix is accepted only as a safe execution plan against the reviewed v1.0.5 baseline, and it must be revalidated whenever the contract or live repository prerequisites change.
+> **Safety statement:** after the fresh review and corrections above, this reference matrix has no known unresolved planning, authority, ordering, coverage, or prerequisite defect within its recorded review scope. No planning artifact can guarantee that future implementation code will be bug-free; implementation must still follow the subsection verification loop and exact contract gates. It routes work to the active JARVIS v1.0.8 suite and must be revalidated whenever the contract or live repository prerequisites change.

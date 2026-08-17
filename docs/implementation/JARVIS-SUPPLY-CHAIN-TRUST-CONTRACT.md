@@ -1,9 +1,9 @@
 # JARVIS Supply-Chain, Update & Module Trust Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md`  
-**Version:** 1.0.5  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`
+**Version:** 1.0.6
 **Date:** August 12, 2026  
-**Adopted by:** ADR-073
+**Adopted by:** ADR-075
 
 ---
 
@@ -226,14 +226,14 @@ Rollback to a retained module version requires that the exact target remains cur
 
 # 12. TAURI UPDATER AND WINDOWS SIGNING LAYERS
 
-For Windows V1, production application updates SHALL pass all applicable layers:
+For Windows V1, private/internal application updates SHALL pass all applicable layers:
 
 ```text
 TUF metadata authorization + hash/length/version/anti-rollback
 AND
 Tauri updater artifact-signature verification
 AND
-Windows production code-signing / Authenticode policy
+Windows private/internal code-signing / Authenticode policy
 AND
 JARVIS release-manifest / schema / rollback compatibility checks
 ```
@@ -243,6 +243,8 @@ Tauri's runtime updater public key, when rotation is required, SHALL be selected
 A valid Tauri/Authenticode signature does not override TUF revocation/rollback/security-epoch policy.
 
 A valid TUF target does not bypass the platform's required artifact signing checks.
+
+For the active `PRIVATE_INTERNAL` Release Profile, Windows Authenticode accepts a self-signed or private-CA certificate only when the exact certificate identity is recorded in the release manifest, the authorized target profile has explicitly enrolled that identity, and the release evidence does not claim public trust. Unsigned artifacts remain invalid. Public CA trust is required only for a future profile that explicitly enables public distribution.
 
 ---
 
@@ -305,6 +307,7 @@ security_epoch
 target metadata version/hash
 Tauri updater signing key identity
 Windows code-signing identity/timestamp metadata
+Windows signing trust mode and target enrollment evidence
 revocation/minimum-version policy reference
 ```
 
@@ -364,11 +367,11 @@ Tauri/Windows signing remains an additional artifact/platform integrity layer, n
 6. Expired/stale metadata does not silently authorize new targets.
 7. Old valid signatures do not bypass current revocation/anti-rollback policy.
 8. Application and module trust authorities are scoped/delegated separately.
-9. TUF, Tauri signature, and Windows code-signing gates are cumulative for Windows production updates.
+9. TUF, Tauri signature, and Windows code-signing gates are cumulative for Windows private/internal updates; the active private/internal mode does not claim public trust.
 10. Trusted metadata survives ordinary cache cleanup and crashes.
 11. A full root-threshold compromise is not falsely claimed to be safely recoverable in-band.
 12. Update/module trust failures block activation and remain diagnostically explicit.
 
 ---
 
-**END — JARVIS SUPPLY-CHAIN, UPDATE & MODULE TRUST CONTRACT v1.0.5**
+**END — JARVIS SUPPLY-CHAIN, UPDATE & MODULE TRUST CONTRACT v1.0.6**

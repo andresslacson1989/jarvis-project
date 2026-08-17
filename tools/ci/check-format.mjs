@@ -49,6 +49,7 @@ export async function checkFormat(rootDir) {
   const files = await collectFiles(rootDir, {
     include: (file) => {
       const path = relativePath(rootDir, file);
+      if (path.includes("/resources/core-runtime") || path.startsWith("apps/desktop/src-tauri/gen/schemas/")) return false;
       const inControlledRoot = CONTROLLED_ROOTS.some((root) => path === root || path.startsWith(`${root}/`));
       return (inControlledRoot && TEXT_EXTENSIONS.has(extname(file))) || ROOT_TEXT_FILES.has(path);
     },
@@ -66,9 +67,10 @@ export async function checkFormat(rootDir) {
       continue;
     }
 
-    if (text.includes("\r")) {
-      violations.push(violation("FORMAT_CRLF", path, "repository text must use LF, not CR/CRLF"));
-    }
+    // Windows checkouts may materialize tracked LF files as CRLF. Formatting
+    // checks content rather than a Git working-tree transport detail.
+    text = text.replace(/\r\n/g, "\n");
+    if (text.includes("\r")) violations.push(violation("FORMAT_CR", path, "bare CR characters are prohibited"));
     if (text.length > 0 && !text.endsWith("\n")) {
       violations.push(violation("FORMAT_FINAL_NEWLINE", path, "text file must end with one LF newline"));
     }

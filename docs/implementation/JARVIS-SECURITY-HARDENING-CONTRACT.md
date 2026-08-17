@@ -1,8 +1,8 @@
 # JARVIS Security Hardening Contract
 
 **Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`  
-**Version:** 1.0.3  
-**Date:** August 12, 2026
+**Version:** 1.0.4  
+**Date:** August 17, 2026
 
 ---
 
@@ -419,7 +419,7 @@ Workers run non-elevated by default under Job Object lifecycle containment with 
 
 JARVIS SHALL NOT claim workspace-only **read** isolation merely because a provider sandbox restricts writes. The exact provider/OS sandbox read/write/network semantics are measured and release-qualified.
 
-V1 delegated engineering network is denied by default. A profile needing network must explicitly declare/qualify it and remain within DataLocality/authority policy.
+V1 delegated Codex CLI engineering network access is enabled by default and is required for the Codex `WORKSPACE_ENGINEERING` profile. The typed request SHALL declare `networkMode: ENABLED`, and the provider qualification probe SHALL verify bounded network availability. Network access remains subject to DataLocality, authority, secret, external-action, budget, audit, and PermissionEngine policy.
 
 The worker receives no unrelated integration credentials by default.
 

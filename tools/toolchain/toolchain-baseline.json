@@ -14,6 +14,13 @@
     "version": "6.0.3",
     "integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="
   },
+  "tauri": {
+    "runtime": "2.11.5",
+    "build": "2.6.3",
+    "rustPluginOpener": "2.5.4",
+    "javascriptApi": "2.11.1",
+    "javascriptPluginOpener": "2.5.4"
+  },
   "rust": {
     "version": "1.97.1",
     "channel": "stable",

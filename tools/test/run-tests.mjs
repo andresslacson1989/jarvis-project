@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { loadLayerManifest } from "../../tests/harness/layers.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -50,7 +50,7 @@ async function discoverTests(directory) {
   return found;
 }
 
-function scrubbedEnv() {
+function scrubbedEnv(profile) {
   const allowed = [
     "PATH", "Path", "PATHEXT", "SYSTEMROOT", "SystemRoot", "WINDIR", "TEMP", "TMP",
     "HOME", "USERPROFILE", "COMSPEC", "NUMBER_OF_PROCESSORS", "CI", "GITHUB_ACTIONS",
@@ -60,6 +60,7 @@ function scrubbedEnv() {
     if (process.env[key] !== undefined) env[key] = process.env[key];
   }
   env.NODE_ENV = "test";
+  env.JARVIS_TEST_PROFILE = profile;
   env.TZ = "UTC";
   env.JARVIS_TEST_SEED = process.env.JARVIS_TEST_SEED ?? "12648430";
   return env;
@@ -68,13 +69,14 @@ function scrubbedEnv() {
 async function runTestFile(path, normalProfile) {
   const args = [];
   if (normalProfile) {
-    args.push("--import", resolve(root, "tests", "harness", "deny-network.mjs"));
+    args.push("--import", "./tests/harness/deny-network.mjs");
   }
-  args.push("--test", path);
+  const relativeTestPath = relative(root, path).split("\\").join("/");
+  args.push("--test", `./${relativeTestPath}`);
   return new Promise((resolvePromise) => {
     const child = spawn(process.execPath, args, {
       cwd: root,
-      env: scrubbedEnv(),
+      env: scrubbedEnv(normalProfile ? "normal" : "qualification"),
       stdio: "inherit",
       shell: false,
       windowsHide: true,

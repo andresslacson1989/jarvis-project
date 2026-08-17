@@ -1,0 +1,95 @@
+:root {
+  /* Brand: these are the only logo/identity colors. */
+  --brand-blue: #2d7bff;
+  --brand-white: #ffffff;
+  --brand-slate: #0b0f14;
+
+  /* Layered dark surfaces and derived neutrals. */
+  --surface-canvas: var(--brand-slate);
+  --surface-raised: #111821;
+  --surface-panel: #151f2b;
+  --surface-interactive: #1a2736;
+  --surface-muted: #202d3b;
+  --surface-inverse: var(--brand-white);
+  --text-primary: var(--brand-white);
+  --text-secondary: #c2cedc;
+  --text-muted: #8f9eae;
+  --text-inverse: var(--brand-slate);
+  --border-subtle: #2b3a4b;
+  --border-strong: #52677d;
+
+  /* Semantic state colors never replace text/icon/state semantics. */
+  --status-info: var(--brand-blue);
+  --status-success: #50d890;
+  --status-warning: #f4c95d;
+  --status-error: #ff7272;
+  --status-waiting: #b493ff;
+  --status-neutral: #aab7c5;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-sheet: 16px;
+  --radius-pill: 999px;
+
+  --type-display: 44px;
+  --type-page: 28px;
+  --type-section: 20px;
+  --type-heading: 16px;
+  --type-body: 16px;
+  --type-caption: 13px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --line-body: 1.5;
+  --line-tight: 1.25;
+
+  --motion-fast: 120ms;
+  --motion-standard: 180ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --focus-color: var(--brand-blue);
+  --focus-width: 3px;
+  --focus-offset: 2px;
+  --z-skip-link: 100;
+  --content-max: 72rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 1ms;
+    --motion-standard: 1ms;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --surface-canvas: Canvas;
+    --surface-raised: Canvas;
+    --surface-panel: Canvas;
+    --surface-interactive: ButtonFace;
+    --surface-muted: Canvas;
+    --surface-inverse: CanvasText;
+    --text-primary: CanvasText;
+    --text-secondary: CanvasText;
+    --text-muted: GrayText;
+    --text-inverse: Canvas;
+    --border-subtle: ButtonText;
+    --border-strong: ButtonText;
+    --status-info: Highlight;
+    --status-success: CanvasText;
+    --status-warning: CanvasText;
+    --status-error: CanvasText;
+    --status-waiting: CanvasText;
+    --status-neutral: GrayText;
+    --focus-color: Highlight;
+  }
+}

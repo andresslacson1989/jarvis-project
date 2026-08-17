@@ -1,0 +1,2 @@
+# Hash-addressed synthetic fixtures must retain their canonical repository bytes.
+tests/fixtures/**/*.json text eol=lf

@@ -1,6 +1,6 @@
 {
   "name": "jarvis-project",
-  "version": "0.0.0",
+  "version": "1.0.6",
   "private": true,
   "packageManager": "pnpm@11.21.0",
   "engines": {
@@ -10,7 +10,7 @@
   "scripts": {
     "toolchain:verify": "node tools/toolchain/verify-toolchain.mjs",
     "toolchain:verify:metadata": "node tools/toolchain/verify-toolchain.mjs --metadata-only",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm --filter @jarvis/core typecheck && pnpm --filter @jarvis/desktop typecheck",
     "test": "node tools/test/run-tests.mjs --profile normal",
     "test:qualification": "node tools/test/run-tests.mjs --profile qualification",
     "architecture:check": "node tools/architecture/check-architecture.mjs",
@@ -19,9 +19,18 @@
     "security:secrets": "node tools/ci/scan-secrets.mjs",
     "dependency:check": "node tools/ci/check-dependencies.mjs",
     "provenance:check": "node tools/ci/check-provenance.mjs",
+    "release:package-core-runtime": "node tools/release/package-core-runtime.mjs",
+    "release:package-tauri-core-runtime": "node tools/release/package-tauri-core-runtime.mjs",
+    "release:core-runtime-manifest": "node tools/release/generate-core-runtime-manifest.mjs",
+    "release:qualify-core-runtime": "node tools/release/qualify-core-runtime.mjs",
+    "release:qualify-backup-restore": "node tools/release/qualify-backup-restore.mjs",
+    "release:verify-tuf-profile": "node tools/release/verify-tuf-metadata-profile.mjs",
+    "brand:icons": "node tools/assets/generate-brand-icons.mjs",
     "governance:check": "node tools/ci/check-repository-governance.mjs",
     "phase0:check": "node tools/checkpoints/phase0-checkpoint.mjs",
-    "build": "tsc -p tsconfig.build.json",
+    "phase1:check": "node tools/checkpoints/phase1-checkpoint.mjs",
+    "phase3:check": "node tools/checkpoints/phase3-checkpoint.mjs",
+    "build": "tsc -p tsconfig.build.json && pnpm --filter @jarvis/core build && pnpm --filter @jarvis/desktop build:web",
     "ci:evidence": "node tools/ci/generate-evidence.mjs",
     "contract:generate": "node tools/contract/generate-contract-artifacts.mjs --write",
     "contract:check-generated": "node tools/contract/generate-contract-artifacts.mjs --check",
@@ -30,6 +39,11 @@
     "contract:check": "pnpm contract:check-generated && pnpm contract:check-manifest && pnpm contract:check-drift"
   },
   "devDependencies": {
+    "@tufjs/canonical-json": "2.0.0",
+    "@tufjs/models": "5.0.0",
+    "@types/node": "26.2.0",
+    "ajv": "8.17.1",
+    "tuf-js": "6.0.0",
     "typescript": "6.0.3"
   }
 }

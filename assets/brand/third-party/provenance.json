@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-13",
+  "canonicalBrandSources": [
+    {
+      "path": "assets/brand/jarvis-mark.svg",
+      "role": "canonical symbol mark",
+      "sha256": "cba211a013645dd93c629c24f6b155917605c5cac2324a071b55858334281177",
+      "license": "JARVIS project-owned source asset"
+    },
+    {
+      "path": "assets/brand/jarvis-lockup.svg",
+      "role": "canonical wordmark lockup",
+      "sha256": "ddaafa61d18742853bfcadbcb905eedbda3bb5fe72dca62f2616c41ed4890079",
+      "license": "JARVIS project-owned source asset"
+    },
+    {
+      "path": "assets/brand/jarvis-app-icon.svg",
+      "role": "canonical application-icon master",
+      "sha256": "8352c59b982bf30a1b2439a0b9b52354f5938a5c27ce4c2af2a062eb624578ba",
+      "license": "JARVIS project-owned source asset"
+    }
+  ],
+  "thirdPartyVisualAssets": [
+    {
+      "path": "assets/brand/fonts/InterVariable.woff2",
+      "name": "Inter",
+      "version": "4.1",
+      "source": "https://github.com/rsms/inter/releases/tag/v4.1",
+      "sourceArchive": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "sha256": "693b77d4f32ee9b8bfc995589b5fad5e99adf2832738661f5402f9978429a8e3",
+      "license": "SIL Open Font License 1.1",
+      "licenseNotice": "assets/brand/third-party/Inter-OFL.txt"
+    }
+  ],
+  "generatedPlatformAssets": [
+    {
+      "path": "apps/desktop/src-tauri/icons/icon.ico",
+      "source": "assets/brand/jarvis-app-icon.svg",
+      "generator": "tools/assets/generate-brand-icons.mjs",
+      "sha256": "36a7e2c378fcf44f0cf880e6b8e70af607d4a45c6b8450a29084ec1688309db3",
+      "layers": [16, 24, 32, 48, 64, 256]
+    }
+  ]
+}

@@ -8,20 +8,20 @@ export type PlatformFamily = "WINDOWS" | "LINUX" | "ANDROID";
 export type RuntimeRole = "FULL_HOST" | "COMPANION";
 
 export interface PlatformRuntimeIdentity {
-  platform: PlatformFamily;
-  runtimeRole: RuntimeRole;
-  architecture: string;
-  backendProfileId: string;
+  readonly platform: PlatformFamily;
+  readonly runtimeRole: RuntimeRole;
+  readonly architecture: string;
+  readonly backendProfileId: string;
 }
 
 export interface PlatformCompatibility {
-  platform: PlatformFamily;
-  runtimeRoles: RuntimeRole[];
-  osVersionRange?: string;
-  architecture?: string[];
+  readonly platform: PlatformFamily;
+  readonly runtimeRoles: readonly RuntimeRole[];
+  readonly osVersionRange?: string;
+  readonly architecture?: readonly string[];
 }
 
 export interface PlatformPathRef {
-  platform: PlatformFamily;
-  value: string;
+  readonly platform: PlatformFamily;
+  readonly value: string;
 }

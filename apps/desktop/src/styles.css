@@ -1,0 +1,43 @@
+@import "./design-system/tokens.css";
+@import "./design-system/components.css";
+@import "./mission-control.css";
+
+@font-face {
+  font-family: "Inter";
+  src: url("/brand/fonts/InterVariable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  font-family: "Inter", "Segoe UI Variable", "Segoe UI", sans-serif;
+  font-synthesis: none;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-width: 20rem;
+  min-height: 100vh;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}

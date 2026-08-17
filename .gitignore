@@ -6,3 +6,8 @@ coverage/
 *.tsbuildinfo
 
 .artifacts/
+
+# Tauri-generated metadata and packaged Core runtime; release qualification
+# consumes these locally and they are not source-controlled release inputs.
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/resources/

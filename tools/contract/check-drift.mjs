@@ -66,6 +66,11 @@ export function checkContractDriftFromTexts(canonical, docs) {
   if (suite !== canonical.contractSuiteVersion) violations.push(violation("DRIFT_SUITE_VERSION", DOCS.manifest, `expected ${canonical.contractSuiteVersion}, got ${suite ?? "<missing>"}`));
   const profileVersion = regexValue(releaseProfile, /\*\*Profile Version:\*\*\s*([0-9.]+)/);
   if (profileVersion !== canonical.releaseProfileVersion) violations.push(violation("DRIFT_RELEASE_PROFILE_VERSION", DOCS.releaseProfile, `expected ${canonical.releaseProfileVersion}, got ${profileVersion ?? "<missing>"}`));
+  if (canonical.releaseDistributionScope === "PRIVATE_INTERNAL") {
+    expectRegex(violations, "DRIFT_RELEASE_DISTRIBUTION_SCOPE", DOCS.releaseProfile, releaseProfile, /DistributionScope:\s*PRIVATE_INTERNAL/, "private/internal distribution scope is missing");
+    expectRegex(violations, "DRIFT_RELEASE_SIGNING_TRUST_MODE", DOCS.releaseProfile, releaseProfile, /WindowsTrustMode:\s*PRIVATE_INTERNAL_AUTHENTICODE/, "private/internal Windows signing trust mode is missing");
+    expectRegex(violations, "DRIFT_RELEASE_PUBLIC_SCOPE", DOCS.releaseProfile, releaseProfile, /does not claim Microsoft Store, public Internet, or publicly trusted Windows distribution/i, "public distribution must remain explicitly out of scope");
+  }
   const protocolMajor = Number(regexValue(protocol, /\*\*Protocol Major:\*\*\s*(\d+)/));
   if (protocolMajor !== canonical.protocolMajor) violations.push(violation("DRIFT_PROTOCOL_MAJOR", DOCS.protocol, `expected ${canonical.protocolMajor}, got ${Number.isFinite(protocolMajor) ? protocolMajor : "<missing>"}`));
 

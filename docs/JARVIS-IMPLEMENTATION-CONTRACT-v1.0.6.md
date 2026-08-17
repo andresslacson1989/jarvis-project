@@ -1,7 +1,7 @@
 # JARVIS
 ## Implementation, Security, Operations & Production Contract
 
-**Contract Suite Version:** 1.0.6  
+**Contract Suite Version:** 1.0.8
 **Status:** Canonical Implementation-Locked Baseline  
 **Date:** August 12, 2026  
 **V1 Production Platform:** Microsoft Windows 11  
@@ -12,6 +12,7 @@
 **Platform/runtime-role architecture:** ADR-072  
 **Pre-implementation security closure:** ADR-073  
 **Repository-governance capability closure:** ADR-074
+**Private/internal Windows release scope:** ADR-075
 
 ---
 
@@ -20,6 +21,8 @@
 This contract defines how JARVIS SHALL be implemented as a production-grade Windows-first AI operating companion rather than a prototype, chat wrapper, or loosely connected collection of scripts.
 
 V1 is a Windows product. The architecture SHALL nevertheless preserve an explicit future Linux `FULL_HOST` path without weakening Windows security or requiring Linux implementation before V1. A future Android application is treated as a `COMPANION` interaction surface, not as a required full-host runtime.
+
+The active V1 distribution scope is `PRIVATE_INTERNAL`: the Windows FULL_HOST artifact is intended only for the owner and explicitly enrolled internal Windows profiles. V1 SHALL NOT claim Microsoft Store, public Internet, or publicly trusted Windows distribution. Exact artifact signing, TUF authorization, updater signing, rollback/revocation policy, and all security/recovery qualification gates remain mandatory; only the Windows certificate trust mode is private/internal as defined by ADR-075 and the active Release Profile.
 
 A compliant implementation SHALL remain controlled, truthful, recoverable, observable, visually coherent, and architecturally portable at the defined platform boundaries under provider failure, user interruption, crash/restart, network loss, invalid AI output, stale external state, resource pressure, update/migration failure, and adversarial input.
 
@@ -316,10 +319,10 @@ Shell-capable software engineering workers operate under the V1 `WORKSPACE_ENGIN
 - JARVIS assigns the exact project/worktree;
 - writes are limited to the assigned writable workspace by the qualified provider/OS sandbox where supported;
 - provider/native read access outside the workspace is **not** claimed to be impossible unless conformance proves it;
-- delegated network access is denied by default and may be enabled only by an explicit qualified policy;
+- delegated Codex CLI worker network access is enabled by default; the typed Codex workspace request SHALL use `networkMode: ENABLED`;
 - unrelated secrets/credentials are not placed in the worker environment/context;
 - external consequential actions such as GitHub push, deploy, Proxmox change, email/send, or cloud mutation are not delegated merely because a shell/client binary exists;
-- those operations return through registered JARVIS tools/integrations and PermissionEngine.
+- those operations return through registered JARVIS tools/integrations and PermissionEngine. Network availability does not authorize them.
 
 Windows V1 uses Job Objects for lifecycle/resource containment. Job Objects are not filesystem/network security isolation and are not the universal shared abstraction; the shared concept is managed process-tree supervision.
 
@@ -551,7 +554,7 @@ Signed package provenance does not itself make external code safe enough for Cor
 
 V1 does not require an open arbitrary executable-module marketplace. Only modules listed/qualified by the active Release Profile/catalog for the current platform may be presented as supported.
 
-Application-update and supported module-catalog trust SHALL follow `JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`. Windows production application updates require current TUF authorization plus the required Tauri updater signature, Windows code-signing, compatibility, and rollback gates. An old historically valid signature does not override current revocation, release-sequence, or security-epoch policy.
+Application-update and supported module-catalog trust SHALL follow `JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`. Windows V1 application updates require current TUF authorization plus the required Tauri updater signature, private/internal Windows Authenticode signing, compatibility, and rollback gates. An old historically valid signature does not override current revocation, release-sequence, or security-epoch policy.
 
 ---
 
@@ -649,6 +652,8 @@ Verification preference is deterministic checks, verified live state, independen
 The active Release Profile determines the exact platform/provider/integration/voice support matrix.
 
 `Production Complete` for V1 requires the exact signed Windows artifacts for one source commit to pass every mandatory qualification gate in every active normative contract, including:
+
+The V1 completion claim is scoped to the active `PRIVATE_INTERNAL` Release Profile and SHALL NOT imply public distribution or public Windows trust. The exact installer/executables must still be Authenticode-signed, but the active private/internal signing certificate may be self-signed or private-CA-issued when its identity and explicit target trust enrollment are recorded and verified.
 
 - clean install and supported Windows qualification;
 - platform-boundary architecture/import checks proving shared Core/domain does not depend directly on Windows-native implementation modules;
@@ -775,4 +780,4 @@ The absence of Linux/companion delivery from V1 SHALL NOT be used to justify vio
 
 ---
 
-**END — JARVIS IMPLEMENTATION, SECURITY, OPERATIONS & PRODUCTION CONTRACT SUITE v1.0.6**
+**END — JARVIS IMPLEMENTATION, SECURITY, OPERATIONS & PRODUCTION CONTRACT SUITE v1.0.8**

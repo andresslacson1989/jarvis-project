@@ -1,0 +1,37 @@
+{
+  "productName": "JARVIS",
+  "version": "1.0.6",
+  "identifier": "com.jarvis.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:1420"
+  },
+  "app": {
+    "security": {
+      "capabilities": ["main-local-ui"],
+      "csp": {
+        "default-src": ["'self'", "tauri:", "asset:"],
+        "base-uri": ["'none'"],
+        "connect-src": ["'self'", "ipc:", "http://ipc.localhost"],
+        "font-src": ["'self'", "asset:"],
+        "form-action": ["'none'"],
+        "frame-ancestors": ["'none'"],
+        "img-src": ["'self'", "asset:", "data:", "blob:"],
+        "object-src": ["'none'"],
+        "script-src": ["'self'"],
+        "style-src": ["'self'"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "resources": ["resources/core-runtime"],
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "certificateThumbprint": "23DA4DA3E340B66EC4240B4CC845E4387E5BBDD3",
+      "digestAlgorithm": "sha256"
+    }
+  }
+}

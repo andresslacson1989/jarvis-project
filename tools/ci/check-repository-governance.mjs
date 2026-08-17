@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const EXPECTED_REPOSITORY = "andresslacson1989/jarvis-project";
 const EXPECTED_BRANCH = "master";
-const EXPECTED_CI = "static-ci";
+const EXPECTED_CI = "local-phase0-checkpoint";
 const EXPECTED_RESIDUAL_RISK = "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED";
 const REQUIRED_COMPENSATING_CONTROLS = Object.freeze([
   "temporaryImplementationBranches",
@@ -26,11 +27,7 @@ function violation(code, detail) {
   return Object.freeze({ code, detail });
 }
 
-function workflowHasStaticCi(workflowText) {
-  return /^\s{2}static-ci:\s*$/m.test(workflowText) && /^\s{4}name:\s*static-ci\s*$/m.test(workflowText);
-}
-
-export function validateRepositoryGovernanceProfile(profile, workflowText) {
+export function validateRepositoryGovernanceProfile(profile, { phase0ProfileExists = false, workflowExists = false } = {}) {
   const violations = [];
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
     return [violation("GOVERNANCE_PROFILE_INVALID", "profile must be an object")];
@@ -40,7 +37,8 @@ export function validateRepositoryGovernanceProfile(profile, workflowText) {
   if (profile.repository !== EXPECTED_REPOSITORY) violations.push(violation("GOVERNANCE_REPOSITORY", `repository must be ${EXPECTED_REPOSITORY}`));
   if (profile.authoritativeBranch !== EXPECTED_BRANCH) violations.push(violation("GOVERNANCE_AUTHORITATIVE_BRANCH", `authoritativeBranch must be ${EXPECTED_BRANCH}`));
   if (profile.mandatoryCiContext !== EXPECTED_CI) violations.push(violation("GOVERNANCE_REQUIRED_CI_CONTEXT", `mandatoryCiContext must be ${EXPECTED_CI}`));
-  if (!workflowHasStaticCi(String(workflowText ?? ""))) violations.push(violation("GOVERNANCE_CI_WORKFLOW_MISMATCH", "workflow must expose job id/name static-ci"));
+  if (!phase0ProfileExists) violations.push(violation("GOVERNANCE_LOCAL_CHECKPOINT_MISSING", "local Phase 0 checkpoint profile is required"));
+  if (workflowExists) violations.push(violation("GOVERNANCE_GITHUB_ACTIONS_DISABLED", "local-only verification must not retain a GitHub Actions workflow"));
   if (profile.serverModeRequiredWhenAvailable !== true) violations.push(violation("GOVERNANCE_SERVER_MODE_REENABLE_REQUIRED", "server mode must become mandatory when hosting capability becomes available"));
 
   const server = profile.serverSideProtection ?? {};
@@ -81,15 +79,17 @@ export function validateGovernanceContractTexts(implementationContract, verifica
 
 async function main() {
   const root = fileURLToPath(new URL("../..", import.meta.url));
-  const [profileRaw, workflow, implementationContract, verificationContract] = await Promise.all([
+  const [profileRaw, implementationContract, verificationContract] = await Promise.all([
     readFile(resolve(root, "docs/implementation/governance/repository-governance-profile.json"), "utf8"),
-    readFile(resolve(root, ".github/workflows/static-ci.yml"), "utf8"),
     readFile(resolve(root, "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md"), "utf8"),
     readFile(resolve(root, "docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md"), "utf8"),
   ]);
   const profile = JSON.parse(profileRaw);
   const violations = [
-    ...validateRepositoryGovernanceProfile(profile, workflow),
+    ...validateRepositoryGovernanceProfile(profile, {
+      phase0ProfileExists: existsSync(resolve(root, "tools/checkpoints/phase0-checkpoint-profile.json")),
+      workflowExists: existsSync(resolve(root, ".github/workflows/static-ci.yml")),
+    }),
     ...validateGovernanceContractTexts(implementationContract, verificationContract),
   ];
   if (violations.length > 0) {

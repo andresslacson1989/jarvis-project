@@ -1,8 +1,8 @@
 # JARVIS Production Implementation Plan
 
-**Status:** Authoritative dependency/sequencing plan for v1.0.6  
-**Version:** 1.0.6  
-**Date:** August 12, 2026  
+**Status:** Authoritative dependency/sequencing plan for v1.0.8
+**Version:** 1.0.8
+**Date:** August 17, 2026  
 **Release target:** `docs/JARVIS-V1-RELEASE-PROFILE.md`
 
 This is not a simplified MVP plan. Intermediate phases are proof checkpoints; final completion means the active Release Profile and every active normative verification requirement pass for exact signed artifacts.
@@ -39,7 +39,7 @@ The platform boundary is cross-cutting: Phase 0 defines it, Phase 1 composes the
 
 The UI identity/accessibility system is also cross-cutting: Phase 1 establishes it, every later user-facing phase uses it, and final qualification proves the complete product.
 
-The v1.0.5 security closures remain cross-cutting: backup-format cryptography is frozen before persistence depends on it; project-policy trust is explicit before engineering workers consume repository policy; supply-chain trust is established before module/update activation; and voice feasibility is measured early before late product integration. The v1.0.6 repository-governance closure additionally prevents an unavailable paid hosting feature from becoming a hidden implementation prerequisite while preserving stronger server enforcement whenever the hosting capability exists.
+The v1.0.5 security closures remain cross-cutting: backup-format cryptography is frozen before persistence depends on it; project-policy trust is explicit before engineering workers consume repository policy; supply-chain trust is established before module/update activation; and voice feasibility is measured early before late product integration. The v1.0.6 repository-governance closure additionally prevents an unavailable paid hosting feature from becoming a hidden implementation prerequisite while preserving stronger server enforcement whenever the hosting capability exists. ADR-075 changes only the distribution scope to `PRIVATE_INTERNAL`; it does not remove artifact signing, TUF, updater, rollback, or recovery gates.
 
 ---
 
@@ -407,7 +407,7 @@ Measure/verify actual selected Codex behavior:
 - ordinary workers remain non-elevated after setup;
 - provider-internal sandbox credentials do not enter JARVIS logs/Core state;
 - writes confined as required;
-- network denied by default profile;
+- network enabled by default for delegated Codex CLI workers, with bounded live availability proof;
 - read-access boundary documented truthfully;
 - no unrelated credentials in env/context;
 - Job Object descendant containment;
@@ -700,7 +700,7 @@ The cryptographic backup proof exists from Phase 3, voice feasibility evidence e
 - TUF trusted root/targets/snapshot/timestamp state, rotation/revocation/expiry behavior;
 - signed monotonic `releaseSequence` and `securityEpoch` admission;
 - Tauri updater signature verification;
-- Windows production code-signing/Authenticode validation policy;
+- Windows private/internal code-signing/Authenticode validation policy with explicit certificate enrollment;
 - binary/schema/runtime/backup rollback pairing;
 - rollback permitted only when current trusted metadata explicitly authorizes the exact non-revoked compatible target;
 - release manifest generation including platform/runtime/backend/support identity and TUF/signing/security-epoch metadata.
@@ -713,7 +713,7 @@ Full Windows local + portable restore drills pass; generated recovery secret alo
 
 # 21. PHASE 19 — WINDOWS V1 PRODUCTION QUALIFICATION
 
-Run the full v1.0.6 active contract suite on exact signed Windows FULL_HOST Release Candidate artifacts:
+Run the full v1.0.8 active contract suite on exact signed Windows FULL_HOST `PRIVATE_INTERNAL` Release Candidate artifacts:
 
 - contract manifest / Release Profile;
 - authoritative repository/CI governance evidence for the verified hosting capability;
@@ -741,13 +741,14 @@ Run the full v1.0.6 active contract suite on exact signed Windows FULL_HOST Rele
 - resource/performance;
 - clean install/upgrade/authorized rollback;
 - soak;
-- signed packaging/SBOM/license/provenance.
+- privately enrolled signed packaging/SBOM/license/provenance;
+- exact private/internal certificate identity, target trust enrollment, and no-public-distribution statement.
 
 Linux runtime and Android companion tests are explicitly outside this V1 qualification.
 
 ## Exit
 
-Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys and all active v1.0.6 specialized security/governance-contract gates pass; rollback/recovery verified; Production Complete evidence references exact Windows artifacts/source/profile/contract/platform/trust identity.
+Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys and all active v1.0.8 specialized security/governance-contract gates pass; rollback/recovery verified; Production Complete evidence references exact private/internal Windows artifacts/source/profile/contract/platform/trust identity.
 
 ---
 
@@ -860,4 +861,4 @@ Only final checkpoint is Production Complete.
 
 ---
 
-**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.6**
+**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.8**

@@ -12,7 +12,7 @@
     "observedHttpStatus": 403,
     "observedMessage": "Upgrade to GitHub Pro or make this repository public to enable this feature."
   },
-  "mandatoryCiContext": "static-ci",
+  "mandatoryCiContext": "local-phase0-checkpoint",
   "controls": {
     "temporaryImplementationBranches": true,
     "candidateCiRequired": true,

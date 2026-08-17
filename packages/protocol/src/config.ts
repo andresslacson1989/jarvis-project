@@ -1,4 +1,4 @@
-import type { PlatformRuntimeIdentity } from "./platform";
+import type { PlatformRuntimeIdentity } from "./platform.js";
 
 export type ConfigurationDomain =
   | "STARTUP"
@@ -29,4 +29,22 @@ export interface BootstrapConfigurationV1 {
     architecture: "x64";
   };
   developerMode: boolean;
+}
+
+export interface ConfigurationCandidate {
+  readonly candidateId: string;
+  readonly domain: ConfigurationDomain;
+  readonly schemaVersion: number;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly expectedActiveVersion: number;
+  readonly createdAt: string;
+}
+
+export interface ActiveConfiguration {
+  readonly domain: ConfigurationDomain;
+  readonly schemaVersion: number;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly version: number;
+  readonly sourceCandidateId: string;
+  readonly activatedAt: string;
 }

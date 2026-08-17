@@ -1,4 +1,4 @@
-import type { ProjectId, UUIDv7, UtcTimestamp } from "./common";
+import type { ProjectId, UUIDv7, UtcTimestamp } from "./common.js";
 
 export type SessionTrustState = "LOCKED" | "UNLOCKING" | "UNLOCKED" | "LOCKING";
 export type SessionLockedReason =
@@ -14,6 +14,17 @@ export interface SessionState {
   sessionId: UUIDv7 | null;
   unlockedAt: UtcTimestamp | null;
   lockedReason: SessionLockedReason | null;
+}
+
+/**
+ * Durable authentication state for the single authoritative local session.
+ * Passwords, verifiers, and derived key material are deliberately not part
+ * of this record.
+ */
+export interface SessionSecurityState extends SessionState {
+  userId: string;
+  failedUnlockAttempts: number;
+  cooldownUntil: UtcTimestamp | null;
 }
 
 export type InputModality = "TEXT" | "VOICE";

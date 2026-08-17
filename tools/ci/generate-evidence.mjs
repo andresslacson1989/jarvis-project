@@ -20,10 +20,11 @@ const GATES = Object.freeze([
   "architecture-enforcement",
   "normal-tests",
   "dependency-vulnerability-high-plus",
+  "rust-dependency-vulnerability",
   "rustfmt",
   "rust-clippy-warnings-as-errors",
   "rust-host-build",
-  "rust-windows-target-build",
+  "windows-native-msvc-build",
   "phase0-section-checkpoint",
 ]);
 
@@ -54,9 +55,9 @@ export function buildCiEvidence({
       "JARVIS_PHASE0_CHECKPOINT_PASSED=1 is required for PASS evidence",
     );
   }
-  if (contractSuiteVersion !== "1.0.6") {
+  if (contractSuiteVersion !== "1.0.7") {
     throw new Error(
-      `contractSuiteVersion evidence mismatch: expected 1.0.6, got ${contractSuiteVersion ?? "<missing>"}`,
+      `contractSuiteVersion evidence mismatch: expected 1.0.7, got ${contractSuiteVersion ?? "<missing>"}`,
     );
   }
   if (!GOVERNANCE_MODES.has(governanceMode)) {

@@ -1,28 +1,28 @@
 // GENERATED FILE — DO NOT EDIT.
 // Source: packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json
-// Source SHA-256: 78208f5e6e42d0fa2ee34b173cf0673a20128160dd596902c228f7f40c243ce1
+// Source SHA-256: 54d9ed8a6db890ffcc8312f5634176a0f6864f3debf591c77f1b3b93da6bdb26
 
 export const JARVIS_CANONICAL_CONTRACT_VALUES = {
   "schemaVersion": 1,
-  "canonicalValuesId": "jarvis.contract-values.v1.0.6",
-  "contractSuiteVersion": "1.0.6",
-  "releaseProfileVersion": "1.0.5",
+  "canonicalValuesId": "jarvis.contract-values.v1.0.8",
+  "contractSuiteVersion": "1.0.8",
+  "releaseProfileVersion": "1.0.6",
   "contractComponentRevisions": {
-    "implementationContract": "1.0.6",
-    "releaseProfile": "1.0.5",
+    "implementationContract": "1.0.8",
+    "releaseProfile": "1.0.6",
     "platformPortability": "1.0.4",
-    "runtime": "1.0.3",
+    "runtime": "1.0.4",
     "protocolSchema": "1.0.4",
     "dataState": "1.0.3",
-    "securityHardening": "1.0.3",
+    "securityHardening": "1.0.4",
     "backupCryptography": "1.0.5",
     "projectPolicyTrust": "1.0.5",
-    "supplyChainTrust": "1.0.5",
+    "supplyChainTrust": "1.0.6",
     "codingStandards": "1.0.4",
     "operationsUxGovernance": "1.0.3",
     "uiIdentityDesignSystem": "1.0.3",
-    "verificationRelease": "1.0.5",
-    "implementationPlan": "1.0.6"
+    "verificationRelease": "1.0.7",
+    "implementationPlan": "1.0.8"
   },
   "protocolMajor": 1,
   "v1RuntimeTarget": {
@@ -188,7 +188,10 @@ export const JARVIS_CANONICAL_CONTRACT_VALUES = {
     "canonicalization": "RFC_8785_JCS",
     "digest": "SHA_256",
     "digestEncoding": "BASE64URL_NOPAD"
-  }
+  },
+  "releaseDistributionScope": "PRIVATE_INTERNAL",
+  "windowsSigningTrustMode": "PRIVATE_INTERNAL_AUTHENTICODE",
+  "publicDistributionSupported": false
 } as const;
 
 export type JarvisCanonicalContractValues = typeof JARVIS_CANONICAL_CONTRACT_VALUES;
