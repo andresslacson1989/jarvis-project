@@ -113,3 +113,11 @@ test("removing either mandatory Section 1.1 CI gate fails closed", async () => {
   assert.ok(codes(foundation).includes("DESKTOP_FOUNDATION_CI_GATE_MISSING"));
   assert.ok(codes(windows).includes("DESKTOP_WINDOWS_BUILD_CI_GATE_MISSING"));
 });
+
+test("removing Tauri host-check prerequisites fails closed", async () => {
+  const snapshot = await loadDesktopFoundationSnapshot(root);
+  const missing = mutate(snapshot, (copy) => {
+    copy.workflow = copy.workflow.replace("libwebkit2gtk-4.1-dev", "removed-webkit-dev");
+  });
+  assert.ok(codes(missing).includes("DESKTOP_TAURI_HOST_DEPS_CI_GATE_MISSING"));
+});
