@@ -212,6 +212,12 @@ section integration/checkpoint gate passes
 
 Then advance to the first subsection of the next section in the authoritative implementation sequence.
 
+### Mandatory phase-completion stop and independent audit handoff
+
+When a phase/section is finished and its section checkpoint passes, implementation SHALL STOP before beginning any work in the next phase/section. The implementing agent SHALL produce a detailed handoff report for that completed phase/section containing, at minimum: the exact authoritative base and candidate commits; every changed file and its purpose; the applicable contract and matrix traceability; implementation status and scores for every subsection; all required tests, negative tests, live/platform checks, and exact CI results; known limitations, rejected claims, unresolved risks, and external prerequisites; artifacts and their recorded locations; and the exact next eligible phase/section and subsection.
+
+The implementing agent SHALL wait for an independent AI agent or reviewer to audit that handoff and the repository evidence for contract accuracy and implementation correctness. The implementing agent SHALL NOT start, extend, or silently pre-stage implementation for the next phase/section, and SHALL NOT mark the completed phase/section as `VERIFIED` based only on its own report, until the independent audit result is recorded. A request for changes, missing evidence, contradictory repository state, or an inconclusive audit keeps the completed phase/section in `VERIFYING` or `IN PROGRESS` and requires reconciliation before continuation.
+
 ### Evidence hierarchy and no-soft-pass rule
 
 Prefer completion evidence in this order where applicable:
