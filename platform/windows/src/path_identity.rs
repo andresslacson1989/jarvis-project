@@ -6,7 +6,7 @@
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::fs::{canonicalize, metadata, symlink_metadata, File, Metadata, OpenOptions};
+use std::fs::{File, Metadata, OpenOptions, canonicalize, metadata, symlink_metadata};
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf, Prefix};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -560,7 +560,7 @@ fn unique_workspace_temp_path(target: &Path) -> PathBuf {
 fn replace_file_atomically(source: &Path, target: &Path) -> Result<(), WindowsPathError> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{
-        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
     };
     let source_text: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
     let target_text: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
@@ -1023,9 +1023,11 @@ mod tests {
         assert!(resolved.exists);
         assert_eq!(resolved.relative_path, "src/main.txt");
         assert!(resolved.version_token.starts_with("EXISTS:"));
-        assert!(backend
-            .resolve_workspace_target(&root, "..\\outside.txt", true)
-            .is_err());
+        assert!(
+            backend
+                .resolve_workspace_target(&root, "..\\outside.txt", true)
+                .is_err()
+        );
     }
 
     #[cfg(windows)]

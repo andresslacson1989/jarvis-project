@@ -33,6 +33,18 @@
       "required": ["version", "integrity"],
       "additionalProperties": false
     },
+    "tauri": {
+      "type": "object",
+      "properties": {
+        "runtime": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32},
+        "build": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32},
+        "rustPluginOpener": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32},
+        "javascriptApi": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32},
+        "javascriptPluginOpener": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "maxLength": 32}
+      },
+      "required": ["runtime", "build", "rustPluginOpener", "javascriptApi", "javascriptPluginOpener"],
+      "additionalProperties": false
+    },
     "rust": {
       "type": "object",
       "properties": {
@@ -52,6 +64,6 @@
       "additionalProperties": false
     }
   },
-  "required": ["schemaVersion", "profile", "node", "pnpm", "typescript", "rust"],
+  "required": ["schemaVersion", "profile", "node", "pnpm", "typescript", "tauri", "rust"],
   "additionalProperties": false
 }

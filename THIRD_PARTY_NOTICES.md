@@ -121,6 +121,12 @@ This inventory is generated from the exact locked dependency graph used by JARVI
 | npm | tinyglobby | 0.2.17 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | tslib | 2.8.1 | 0BSD | DESKTOP_BUILD_OR_TYPECHECK | no |
 | npm | typescript | 6.0.3 | Apache-2.0 | DESKTOP_BUILD_OR_TYPECHECK | no |
+| npm | ajv | 8.17.1 | MIT | SCHEMA_VALIDATION | no |
+| npm | fast-deep-equal | 3.1.3 | MIT | SCHEMA_VALIDATION | no |
+| npm | fast-uri | 3.1.5 | BSD-3-Clause | SCHEMA_VALIDATION | no |
+| npm | json-schema-traverse | 1.0.0 | MIT | SCHEMA_VALIDATION | no |
+| npm | require-from-string | 2.0.2 | MIT | SCHEMA_VALIDATION | no |
+| toolchain | Tauri | 2.11.5 | Apache-2.0 OR MIT | DESKTOP_RUNTIME | yes |
 | npm | undici-types | 8.3.0 | MIT | CORE_BUILD_OR_TYPECHECK | no |
 | npm | vite | 8.1.5 | MIT | DESKTOP_BUILD_OR_TYPECHECK | no |
 | cargo | adler2 | 2.0.1 | 0BSD OR MIT OR Apache-2.0 | DESKTOP_WINDOWS_RUNTIME | yes |

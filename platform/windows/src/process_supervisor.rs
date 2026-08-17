@@ -557,7 +557,11 @@ mod windows {
             operation: &str,
             profile_id: &str,
         ) -> Result<SupervisedCoreProcess, ProcessSupervisorError> {
-            self.spawn_spec(engineering_launch_spec(workspace_root, operation, profile_id)?)
+            self.spawn_spec(engineering_launch_spec(
+                workspace_root,
+                operation,
+                profile_id,
+            )?)
         }
 
         fn spawn_spec(
@@ -860,29 +864,40 @@ mod windows {
             }
         };
 
-        let program_files = std::env::var_os("ProgramFiles")
-            .ok_or_else(|| invalid_spec("ProgramFiles is required for the qualified Node runtime"))?;
+        let program_files = std::env::var_os("ProgramFiles").ok_or_else(|| {
+            invalid_spec("ProgramFiles is required for the qualified Node runtime")
+        })?;
         let node_root = PathBuf::from(program_files).join("nodejs");
         let node = node_root.join("node.exe");
-        let pnpm_script = node_root.join("node_modules").join("corepack").join("dist").join("pnpm.js");
+        let pnpm_script = node_root
+            .join("node_modules")
+            .join("corepack")
+            .join("dist")
+            .join("pnpm.js");
         if !node.is_file() || !pnpm_script.is_file() {
             return Err(invalid_spec(
                 "the qualified Node/corepack runtime is not installed at the fixed Windows location",
             ));
         }
 
-        let system_root = std::env::var_os("SystemRoot")
-            .ok_or_else(|| invalid_spec("SystemRoot is required for the engineering worker environment"))?;
+        let system_root = std::env::var_os("SystemRoot").ok_or_else(|| {
+            invalid_spec("SystemRoot is required for the engineering worker environment")
+        })?;
         let system_root = PathBuf::from(system_root);
-        let git_bin = PathBuf::from(std::env::var_os("ProgramFiles").expect("ProgramFiles checked"))
-            .join("Git")
-            .join("cmd");
+        let git_bin =
+            PathBuf::from(std::env::var_os("ProgramFiles").expect("ProgramFiles checked"))
+                .join("Git")
+                .join("cmd");
         let system32 = system_root.join("System32");
-        let path = std::env::join_paths([node_root.as_path(), git_bin.as_path(), system32.as_path()])
-            .map_err(|_| invalid_spec("fixed engineering PATH could not be constructed"))?;
+        let path =
+            std::env::join_paths([node_root.as_path(), git_bin.as_path(), system32.as_path()])
+                .map_err(|_| invalid_spec("fixed engineering PATH could not be constructed"))?;
         let mut environment = BTreeMap::new();
         environment.insert(OsString::from("Path"), path);
-        environment.insert(OsString::from("SystemRoot"), system_root.clone().into_os_string());
+        environment.insert(
+            OsString::from("SystemRoot"),
+            system_root.clone().into_os_string(),
+        );
         for key in ["TEMP", "TMP", "USERPROFILE"] {
             if let Some(value) = std::env::var_os(key) {
                 environment.insert(OsString::from(key), value);
@@ -1734,14 +1749,22 @@ mod windows {
             let test_spec = engineering_launch_spec(&workspace, "TEST", "npm.test")
                 .expect("the qualified Node/Corepack runtime must be installed for Windows tests");
             assert_eq!(
-                test_spec.program.file_name().and_then(|value| value.to_str()),
+                test_spec
+                    .program
+                    .file_name()
+                    .and_then(|value| value.to_str()),
                 Some("node.exe")
             );
-            assert_eq!(test_spec.arguments.last().and_then(|value| value.to_str()), Some("test"));
-            assert!(test_spec
-                .environment
-                .keys()
-                .all(|key| key != &OsString::from("NODE_OPTIONS")));
+            assert_eq!(
+                test_spec.arguments.last().and_then(|value| value.to_str()),
+                Some("test")
+            );
+            assert!(
+                test_spec
+                    .environment
+                    .keys()
+                    .all(|key| key != &OsString::from("NODE_OPTIONS"))
+            );
 
             let error = engineering_launch_spec(&workspace, "TEST", "cmd.arbitrary")
                 .expect_err("arbitrary profile IDs must be rejected");

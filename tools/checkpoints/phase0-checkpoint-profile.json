@@ -2,120 +2,37 @@
   "schemaVersion": 1,
   "checkpointId": "0.CP",
   "checkpointName": "Repository Governance + Platform Boundary + Contract-Drift Protection Ready",
-  "contractSuiteVersion": "1.0.7",
-  "requiredNativeWindowsGate": {
-    "jobId": "windows-desktop",
-    "jobName": "windows-desktop",
-    "runner": "windows-2025",
-    "prerequisiteFor": "static-ci",
-    "rustToolchainCommand": "rustup toolchain install 1.97.1 --target x86_64-pc-windows-msvc",
-    "dependencyInstallCommand": "pnpm install --frozen-lockfile --ignore-scripts",
-    "frontendBuildCommand": "pnpm --filter @jarvis/desktop build:web",
-    "buildCommand": "cargo check --locked --workspace --target x86_64-pc-windows-msvc"
-  },
-  "requiredWorkflowSteps": [
-    {
-      "name": "Install dependencies without lifecycle scripts",
-      "run": "pnpm install --frozen-lockfile --ignore-scripts"
-    },
-    {
-      "name": "Verify exact toolchain",
-      "run": "pnpm toolchain:verify"
-    },
-    {
-      "name": "Format hygiene",
-      "run": "pnpm format:check"
-    },
-    {
-      "name": "Schema integrity",
-      "run": "pnpm schema:check"
-    },
-    {
-      "name": "Generated contract artifacts",
-      "run": "pnpm contract:check-generated"
-    },
-    {
-      "name": "Contract manifest",
-      "run": "pnpm contract:check-manifest"
-    },
-    {
-      "name": "Contract and profile drift",
-      "run": "pnpm contract:check-drift"
-    },
-    {
-      "name": "Repository governance",
-      "run": "pnpm governance:check"
-    },
-    {
-      "name": "Secret scan",
-      "run": "pnpm security:secrets"
-    },
-    {
-      "name": "Dependency inventory",
-      "run": "pnpm dependency:check"
-    },
-    {
-      "name": "License and provenance",
-      "run": "pnpm provenance:check"
-    },
-    {
-      "name": "TypeScript strict typecheck",
-      "run": "pnpm typecheck"
-    },
-    {
-      "name": "TypeScript build",
-      "run": "pnpm build"
-    },
-    {
-      "name": "Architecture enforcement",
-      "run": "pnpm architecture:check"
-    },
-    {
-      "name": "Normal deterministic tests",
-      "run": "pnpm test"
-    },
-    {
-      "name": "Node dependency vulnerability gate",
-      "run": "pnpm audit --audit-level high"
-    },
-    {
-      "name": "Install pinned RustSec audit tool",
-      "run": "cargo install cargo-audit --version 0.22.2 --locked"
-    },
-    {
-      "name": "Rust dependency vulnerability gate",
-      "run": "cargo audit"
-    },
-    {
-      "name": "Rust formatting",
-      "run": "cargo fmt --all -- --check"
-    },
-    {
-      "name": "Rust clippy warnings-as-errors",
-      "run": "cargo clippy --locked -p jarvis-toolchain-smoke --all-targets --all-features -- -D warnings"
-    },
-    {
-      "name": "Rust host build",
-      "run": "cargo check --locked -p jarvis-toolchain-smoke --all-targets --all-features"
-    }
+  "contractSuiteVersion": "1.0.8",
+  "requiredComponentBuilds": [
+    { "packageName": "@jarvis/core", "script": "build", "scriptCommand": "tsc -p tsconfig.build.json && node ../../tools/release/prepare-core-build.mjs", "rootBuildCommand": "pnpm --filter @jarvis/core build" },
+    { "packageName": "@jarvis/desktop", "script": "build:web", "scriptCommand": "vite build", "rootBuildCommand": "pnpm --filter @jarvis/desktop build:web" },
+    { "crate": "jarvis-desktop-host", "command": "cargo check --locked -p jarvis-desktop-host --target x86_64-pc-windows-msvc" }
+  ],
+  "requiredLocalGates": [
+    { "command": "pnpm", "args": ["toolchain:verify"] },
+    { "command": "pnpm", "args": ["format:check"] },
+    { "command": "pnpm", "args": ["schema:check"] },
+    { "command": "pnpm", "args": ["contract:check-generated"] },
+    { "command": "pnpm", "args": ["contract:check-manifest"] },
+    { "command": "pnpm", "args": ["contract:check-drift"] },
+    { "command": "pnpm", "args": ["governance:check"] },
+    { "command": "pnpm", "args": ["security:secrets"] },
+    { "command": "pnpm", "args": ["dependency:check"] },
+    { "command": "pnpm", "args": ["provenance:check"] },
+    { "command": "pnpm", "args": ["typecheck"] },
+    { "command": "pnpm", "args": ["--filter", "@jarvis/core", "build"] },
+    { "command": "pnpm", "args": ["--filter", "@jarvis/desktop", "build:web"] },
+    { "command": "cargo", "args": ["check", "--locked", "-p", "jarvis-desktop-host", "--target", "x86_64-pc-windows-msvc"] },
+    { "command": "pnpm", "args": ["architecture:check"] },
+    { "command": "pnpm", "args": ["test"] },
+    { "command": "pnpm", "args": ["audit", "--audit-level", "high"] },
+    { "command": "cargo", "args": ["audit"] },
+    { "command": "cargo", "args": ["fmt", "--all", "--", "--check"] },
+    { "command": "cargo", "args": ["clippy", "--locked", "-p", "jarvis-toolchain-smoke", "--all-targets", "--all-features", "--", "-D", "warnings"] },
+    { "command": "cargo", "args": ["check", "--locked", "-p", "jarvis-toolchain-smoke", "--all-targets", "--all-features"] }
   ],
   "requiredEvidencePaths": [
-    "docs/implementation/evidence/0.1-implementation-admission.md",
-    "docs/implementation/evidence/0.2-monorepo-boundaries.md",
-    "docs/implementation/evidence/0.3-platform-runtime-identity.md",
-    "docs/implementation/evidence/0.4-platform-capability-contracts.md",
-    "docs/implementation/evidence/0.5-platform-composition-root.md",
-    "docs/implementation/evidence/0.6-protocol-schema-foundation.md",
-    "docs/implementation/evidence/0.7-canonical-contract-values.md",
-    "docs/implementation/evidence/0.8-pinned-toolchain-baseline.md",
-    "docs/implementation/evidence/0.9-test-layer-architecture.md",
-    "docs/implementation/evidence/0.10-architecture-enforcement.md",
-    "docs/implementation/evidence/0.11-static-ci-baseline.md",
-    "docs/implementation/evidence/0.12-contract-reproducibility-and-drift.md",
-    "docs/implementation/evidence/0.13-master-protection-blocker.md"
+    "docs/implementation/evidence/0.1-implementation-admission.md", "docs/implementation/evidence/0.2-monorepo-boundaries.md", "docs/implementation/evidence/0.3-platform-runtime-identity.md", "docs/implementation/evidence/0.4-platform-capability-contracts.md", "docs/implementation/evidence/0.5-platform-composition-root.md", "docs/implementation/evidence/0.6-protocol-schema-foundation.md", "docs/implementation/evidence/0.7-canonical-contract-values.md", "docs/implementation/evidence/0.8-pinned-toolchain-baseline.md", "docs/implementation/evidence/0.9-test-layer-architecture.md", "docs/implementation/evidence/0.10-architecture-enforcement.md", "docs/implementation/evidence/0.11-static-ci-baseline.md", "docs/implementation/evidence/0.12-contract-reproducibility-and-drift.md", "docs/implementation/evidence/0.13-master-protection-blocker.md"
   ],
-  "forbiddenActivePaths": [
-    "docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md",
-    "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md"
-  ]
+  "forbiddenActivePaths": ["docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md", "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md"]
 }

@@ -42,6 +42,7 @@
     "@tufjs/canonical-json": "2.0.0",
     "@tufjs/models": "5.0.0",
     "@types/node": "26.2.0",
+    "ajv": "8.17.1",
     "tuf-js": "6.0.0",
     "typescript": "6.0.3"
   }

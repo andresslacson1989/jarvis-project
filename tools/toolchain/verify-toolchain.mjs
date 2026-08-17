@@ -86,6 +86,8 @@ const cargoToml = read("Cargo.toml");
 const cargoLock = read("Cargo.lock");
 const rustSmokeManifest = read("tools/toolchain/rust-smoke/Cargo.toml");
 const rustSmoke = read("tools/toolchain/rust-smoke/src/lib.rs");
+const desktopPackage = readJson("apps/desktop/package.json");
+const desktopCargo = read("apps/desktop/src-tauri/Cargo.toml");
 
 assert(baseline.schemaVersion === 1, "toolchain baseline schema version mismatch");
 assert(baseline.profile === "JARVIS_V1_WINDOWS_FULL_HOST", "toolchain profile mismatch");
@@ -101,7 +103,10 @@ const EXPECTED = Object.freeze({
   rustTarget: baseline.rust.target,
   lockfileVersion: baseline.pnpm.lockfileVersion,
   typescriptIntegrity: baseline.typescript.integrity,
+  tauri: baseline.tauri,
 });
+
+assert(EXPECTED.tauri && typeof EXPECTED.tauri === "object", "Tauri release facts are required");
 
 assert(pkg.private === true, "root package must remain private");
 assert(pkg.packageManager === `pnpm@${EXPECTED.pnpm}`, "packageManager pin mismatch");
@@ -153,12 +158,25 @@ for (const [key, value] of [
 ]) {
   assert(workspace.includes(`${key}: ${value}`), `pnpm hardening setting ${key} mismatch`);
 }
-assert(workspace.includes("allowBuilds: {}"), "dependency build scripts must be deny-by-default");
+const allowedBuilds = workspace.match(/allowBuilds:\s*\n((?:  [^\n]+\n?)*)/);
+assert(allowedBuilds !== null, "dependency build-script allowlist is required");
+assert(
+  allowedBuilds[1].trim() === "better-sqlite3-multiple-ciphers: true",
+  "dependency build scripts must be deny-by-default except the exact reviewed native dependency",
+);
 
 assert(lockfile.includes(`lockfileVersion: '${EXPECTED.lockfileVersion}'`), "pnpm lockfile version mismatch");
 assert(lockfile.includes(`specifier: ${EXPECTED.typescript}`), "TypeScript lock specifier mismatch");
 assert(lockfile.includes(`version: ${EXPECTED.typescript}`), "TypeScript lock version mismatch");
 assert(lockfile.includes(EXPECTED.typescriptIntegrity), "TypeScript lock integrity mismatch");
+
+assert(desktopCargo.includes(`tauri-build = { version = "=${EXPECTED.tauri.build}"`), "Tauri build pin mismatch");
+assert(desktopCargo.includes(`tauri = { version = "=${EXPECTED.tauri.runtime}"`), "Tauri runtime pin mismatch");
+assert(desktopCargo.includes(`tauri-plugin-opener = "=${EXPECTED.tauri.rustPluginOpener}"`), "Tauri Rust opener plugin pin mismatch");
+assert(desktopPackage.dependencies?.["@tauri-apps/api"] === EXPECTED.tauri.javascriptApi, "Tauri JavaScript API pin mismatch");
+assert(desktopPackage.dependencies?.["@tauri-apps/plugin-opener"] === EXPECTED.tauri.javascriptPluginOpener, "Tauri JavaScript opener plugin pin mismatch");
+assert(cargoLock.includes('name = "tauri"\nversion = "' + EXPECTED.tauri.runtime + '"'), "Cargo.lock Tauri runtime pin mismatch");
+assert(cargoLock.includes('name = "tauri-build"\nversion = "' + EXPECTED.tauri.build + '"'), "Cargo.lock Tauri build pin mismatch");
 
 assert(rustToolchain.includes(`channel = \"${EXPECTED.rust}\"`), "Rust toolchain pin mismatch");
 for (const component of baseline.rust.components) {

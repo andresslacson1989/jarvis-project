@@ -17,7 +17,7 @@ const fallbackProfile = Object.freeze({
     reason: "HOSTING_PLAN_LIMITATION",
     observedHttpStatus: 403,
   },
-  mandatoryCiContext: "static-ci",
+  mandatoryCiContext: "local-phase0-checkpoint",
   controls: {
     temporaryImplementationBranches: true,
     candidateCiRequired: true,
@@ -34,8 +34,8 @@ function clone(value) {
   return structuredClone(value);
 }
 
-function codes(profile, workflow = "jobs:\n  static-ci:\n    name: static-ci\n") {
-  return validateRepositoryGovernanceProfile(profile, workflow).map((item) => item.code);
+function codes(profile, options = { phase0ProfileExists: true, workflowExists: false }) {
+  return validateRepositoryGovernanceProfile(profile, options).map((item) => item.code);
 }
 
 test("0.13 compensating governance profile is accepted only for unavailable server protection", () => {
@@ -63,8 +63,9 @@ for (const [name, mutate, expected] of [
   });
 }
 
-test("workflow must expose the exact static-ci check identity", () => {
-  assert.ok(codes(clone(fallbackProfile), "jobs:\n  build:\n    name: build\n").includes("GOVERNANCE_CI_WORKFLOW_MISMATCH"));
+test("local-only governance requires the checkpoint and rejects a workflow", () => {
+  assert.ok(codes(clone(fallbackProfile), { phase0ProfileExists: false, workflowExists: false }).includes("GOVERNANCE_LOCAL_CHECKPOINT_MISSING"));
+  assert.ok(codes(clone(fallbackProfile), { phase0ProfileExists: true, workflowExists: true }).includes("GOVERNANCE_GITHUB_ACTIONS_DISABLED"));
 });
 
 test("server-enforced mode requires all effective server controls", () => {

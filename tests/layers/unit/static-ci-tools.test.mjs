@@ -23,7 +23,7 @@ function codes(result) {
   return result.violations.map((item) => item.code);
 }
 
-test("format checker accepts clean LF text and rejects deterministic hygiene violations", async () => {
+test("format checker accepts clean text with LF or CRLF transport endings and rejects hygiene violations", async () => {
   const clean = await tempRepo({
     "packages/a/src/a.ts": "export const a = 1;\n",
     "docs/normative-contract.md": "Normative Markdown may preserve deliberate trailing spaces.  \n",
@@ -31,11 +31,11 @@ test("format checker accepts clean LF text and rejects deterministic hygiene vio
   assert.deepEqual((await checkFormat(clean)).violations, []);
 
   const dirty = await tempRepo({
-    "packages/a/src/a.ts": "export\tconst a = 1;  \r\n",
+    "packages/a/src/a.ts": "export\tconst a = 1;  \n",
     "tests/x.mjs": "export const x = 1;",
   });
   const dirtyCodes = codes(await checkFormat(dirty));
-  for (const code of ["FORMAT_CRLF", "FORMAT_TRAILING_WHITESPACE", "FORMAT_TAB", "FORMAT_FINAL_NEWLINE"]) {
+  for (const code of ["FORMAT_TRAILING_WHITESPACE", "FORMAT_TAB", "FORMAT_FINAL_NEWLINE"]) {
     assert.ok(dirtyCodes.includes(code), `expected ${code}`);
   }
 });
@@ -52,7 +52,7 @@ test("schema checker rejects malformed, duplicate, escaping, and unresolved sche
     "packages/schemas/src/c.schema.json": "{not json\n",
   });
   const invalidCodes = codes(await checkSchemas(invalid));
-  for (const code of ["SCHEMA_INVALID_JSON", "SCHEMA_WRONG_DRAFT", "SCHEMA_DUPLICATE_ID", "SCHEMA_UNRESOLVED_REF", "SCHEMA_REF_ESCAPE"]) {
+  for (const code of ["SCHEMA_INVALID_JSON", "SCHEMA_WRONG_DRAFT", "SCHEMA_DRAFT_2020_12_INVALID", "SCHEMA_DUPLICATE_ID", "SCHEMA_UNRESOLVED_REF", "SCHEMA_REF_ESCAPE"]) {
     assert.ok(invalidCodes.includes(code), `expected ${code}`);
   }
 });

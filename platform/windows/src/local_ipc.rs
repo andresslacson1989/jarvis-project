@@ -1057,71 +1057,68 @@ fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
 #[cfg(windows)]
 mod windows {
     use super::{
-        encode_frame, AuthenticatedCoreSession, AuthenticatedCoreStatus, BootstrapMaterial,
-        ChallengeWire, CoreStatusRequestWire, CoreStatusResponseWire, EmptyPayloadWire, HelloWire,
-        LocalBackupDekProtectionRequest, LocalBackupDekProtectionRequestWire,
-        LocalBackupDekResponseWire, LocalBackupDekUnprotectionRequest,
-        LocalBackupDekUnprotectionRequestWire, LocalIpcError, LocalIpcState,
-        ProviderSetupCompletePayloadWire, ProviderSetupCompleteRequestWire,
-        ProviderSetupStartPayloadWire, ProviderSetupStartRequest, ProviderSetupStartRequestWire,
-        ProviderSetupStartResponse, ProviderSetupStartResponseWire,
-        ProviderSetupStatusRecord, ProviderSetupStatusRequestWire, ProviderCapabilityStatus,
-        ProviderSetupStatusResponseWire, SessionAuthenticateRequestWire,
-        AuthenticatedTextConversationRequest, AuthenticatedTextConversationRequestWire,
-        AuthenticatedTextConversationResponse, AuthenticatedTextConversationResponseWire,
-        ToolExecutionRequest, ToolExecutionRequestWire, ToolExecutionResponseWire,
-        NativeCapabilityDispatchError, NativeCapabilityRequestWire,
-        SessionAuthenticateResponseWire, SessionAuthenticationResult,
-        SessionInitializeResponseWire, SessionMutationPayloadWire,
-        SessionMutationRequestWire, SessionPasswordVerifierResponseWire,
-        SessionSecurityState, SessionSecurityStateWire, SessionStatus, SessionStatusRequestWire,
-        SessionStatusResponseWire,
+        AuthenticatedCoreSession, AuthenticatedCoreStatus, AuthenticatedTextConversationRequest,
+        AuthenticatedTextConversationRequestWire, AuthenticatedTextConversationResponse,
+        AuthenticatedTextConversationResponseWire, BOOTSTRAP_DATABASE_DEK_BYTES, BootstrapMaterial,
+        ChallengeWire, CoreStatusRequestWire, CoreStatusResponseWire, EmptyPayloadWire,
+        HANDSHAKE_NONCE_BYTES, HelloWire, IPC_PROTOCOL_MAJOR, LocalBackupDekProtectionRequest,
+        LocalBackupDekProtectionRequestWire, LocalBackupDekResponseWire,
+        LocalBackupDekUnprotectionRequest, LocalBackupDekUnprotectionRequestWire, LocalIpcError,
+        LocalIpcState, MAX_IPC_FRAME_BYTES, MAX_LOCAL_BACKUP_SLOT_BYTES,
+        MAX_SESSION_PASSWORD_BYTES, NativeCapabilityDispatchError, NativeCapabilityRequestWire,
+        ProviderCapabilityStatus, ProviderSetupCompletePayloadWire,
+        ProviderSetupCompleteRequestWire, ProviderSetupStartPayloadWire, ProviderSetupStartRequest,
+        ProviderSetupStartRequestWire, ProviderSetupStartResponse, ProviderSetupStartResponseWire,
+        ProviderSetupStatusRecord, ProviderSetupStatusRequestWire, ProviderSetupStatusResponseWire,
         SecureStorageHandleOperationRequest, SecureStorageHandleOperationRequestWire,
         SecureStorageOperation, SecureStorageProtectionRequest, SecureStorageProtectionRequestWire,
         SecureStorageProtectionResponseWire, SecureStorageResponseAckWire,
-        SessionPasswordDerivationRequest, SessionPasswordDerivationRequestWire,
-        SessionPasswordVerificationRequest, SessionPasswordVerificationRequestWire,
-        SessionPasswordVerificationResponseWire, SessionPasswordVerifier,
-        WelcomeWire, BOOTSTRAP_DATABASE_DEK_BYTES,
-        HANDSHAKE_NONCE_BYTES, IPC_PROTOCOL_MAJOR, MAX_IPC_FRAME_BYTES,
-        MAX_LOCAL_BACKUP_SLOT_BYTES, MAX_SESSION_PASSWORD_BYTES,
+        SessionAuthenticateRequestWire, SessionAuthenticateResponseWire,
+        SessionAuthenticationResult, SessionInitializeResponseWire, SessionMutationPayloadWire,
+        SessionMutationRequestWire, SessionPasswordDerivationRequest,
+        SessionPasswordDerivationRequestWire, SessionPasswordVerificationRequest,
+        SessionPasswordVerificationRequestWire, SessionPasswordVerificationResponseWire,
+        SessionPasswordVerifier, SessionPasswordVerifierResponseWire, SessionSecurityState,
+        SessionSecurityStateWire, SessionStatus, SessionStatusRequestWire,
+        SessionStatusResponseWire, ToolExecutionRequest, ToolExecutionRequestWire,
+        ToolExecutionResponseWire, WelcomeWire, encode_frame,
     };
     use serde::{Deserialize, Serialize};
     use std::ffi::c_void;
-    use std::mem::{size_of, MaybeUninit};
+    use std::mem::{MaybeUninit, size_of};
     use std::os::windows::ffi::OsStrExt;
     use std::ptr::null_mut;
-    use std::sync::mpsc::{channel, RecvTimeoutError};
+    use std::sync::mpsc::{RecvTimeoutError, channel};
     use std::thread::sleep;
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use windows_sys::Win32::Foundation::{
-        CloseHandle, GetLastError, LocalFree, SetHandleInformation, ERROR_PIPE_CONNECTED, HANDLE,
-        HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE,
+        CloseHandle, ERROR_PIPE_CONNECTED, GetLastError, HANDLE, HANDLE_FLAG_INHERIT,
+        INVALID_HANDLE_VALUE, LocalFree, SetHandleInformation,
     };
     use windows_sys::Win32::Security::Authorization::{
         ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
     };
     use windows_sys::Win32::Security::Cryptography::{
-        BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+        BCRYPT_USE_SYSTEM_PREFERRED_RNG, BCryptGenRandom,
     };
     use windows_sys::Win32::Security::{
-        GetTokenInformation, TokenUser, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER,
+        GetTokenInformation, SECURITY_ATTRIBUTES, TOKEN_QUERY, TOKEN_USER, TokenUser,
     };
     use windows_sys::Win32::Storage::FileSystem::{
-        ReadFile, WriteFile, FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX,
+        FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX, ReadFile, WriteFile,
     };
+    use windows_sys::Win32::System::IO::CancelSynchronousIo;
     use windows_sys::Win32::System::Pipes::{
         ConnectNamedPipe, CreateNamedPipeW, CreatePipe, DisconnectNamedPipe,
-        GetNamedPipeClientSessionId, PeekNamedPipe, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS,
-        PIPE_TYPE_BYTE, PIPE_WAIT,
+        GetNamedPipeClientSessionId, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS,
+        PIPE_TYPE_BYTE, PIPE_WAIT, PeekNamedPipe,
     };
     use windows_sys::Win32::System::RemoteDesktop::ProcessIdToSessionId;
     use windows_sys::Win32::System::Threading::{
         GetCurrentProcess, GetCurrentProcessId, GetCurrentThreadId, OpenProcessToken, OpenThread,
         THREAD_TERMINATE,
     };
-    use windows_sys::Win32::System::IO::CancelSynchronousIo;
 
     const PIPE_BUFFER_BYTES: u32 = 64 * 1024;
     // Explicit named-pipe exchange rights. This is the union of the
@@ -1553,27 +1550,59 @@ mod windows {
         }
     }
 
-    fn decode_session_security_state(value: SessionSecurityStateWire) -> Result<SessionSecurityState, LocalIpcError> {
+    fn decode_session_security_state(
+        value: SessionSecurityStateWire,
+    ) -> Result<SessionSecurityState, LocalIpcError> {
         if value.user_id.is_empty() || value.user_id.len() > 256 || value.user_id.contains('\0') {
-            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session user identity is invalid"));
+            return Err(plain_error(
+                LocalIpcState::ControlPlaneResponseInvalid,
+                "Core session user identity is invalid",
+            ));
         }
-        if !matches!(value.state.as_str(), "LOCKED" | "UNLOCKING" | "UNLOCKED" | "LOCKING") {
-            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session state is invalid"));
+        if !matches!(
+            value.state.as_str(),
+            "LOCKED" | "UNLOCKING" | "UNLOCKED" | "LOCKING"
+        ) {
+            return Err(plain_error(
+                LocalIpcState::ControlPlaneResponseInvalid,
+                "Core session state is invalid",
+            ));
         }
         if let Some(session_id) = value.session_id.as_ref() {
-            if !is_uuid_v7(session_id) { return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session id is invalid")); }
+            if !is_uuid_v7(session_id) {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core session id is invalid",
+                ));
+            }
         }
         if value.failed_unlock_attempts > 31 {
-            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session retry state is invalid"));
+            return Err(plain_error(
+                LocalIpcState::ControlPlaneResponseInvalid,
+                "Core session retry state is invalid",
+            ));
         }
-        if value.state == "UNLOCKED" && (value.session_id.is_none() || value.unlocked_at.is_none() || value.locked_reason.is_some()) {
-            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core unlocked session state is inconsistent"));
+        if value.state == "UNLOCKED"
+            && (value.session_id.is_none()
+                || value.unlocked_at.is_none()
+                || value.locked_reason.is_some())
+        {
+            return Err(plain_error(
+                LocalIpcState::ControlPlaneResponseInvalid,
+                "Core unlocked session state is inconsistent",
+            ));
         }
         if value.state != "UNLOCKED" && value.unlocked_at.is_some() {
-            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core locked session state is inconsistent"));
+            return Err(plain_error(
+                LocalIpcState::ControlPlaneResponseInvalid,
+                "Core locked session state is inconsistent",
+            ));
         }
         if value.state == "LOCKED" && value.locked_reason.is_none() {
-            return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core locked session reason is missing"));
+            return Err(plain_error(
+                LocalIpcState::ControlPlaneResponseInvalid,
+                "Core locked session reason is missing",
+            ));
         }
         Ok(SessionSecurityState {
             user_id: value.user_id,
@@ -2026,26 +2055,63 @@ mod windows {
             request_id: String,
             provider_id: String,
         ) -> Result<ProviderSetupStartResponse, LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
-                return Err(plain_error(LocalIpcState::AuthenticationFailed, "provider setup completion requires the current authenticated session"));
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "provider setup completion requires the current authenticated session",
+                ));
             }
-            if !is_uuid_v7(&request_id) || provider_id.is_empty() || provider_id.len() > 256 || provider_id.contains('\0') {
-                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "provider setup completion identity is invalid"));
+            if !is_uuid_v7(&request_id)
+                || provider_id.is_empty()
+                || provider_id.len() > 256
+                || provider_id.contains('\0')
+            {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "provider setup completion identity is invalid",
+                ));
             }
             let correlation_id = random_uuid_v7()?;
-            write_json_frame(self.handle.raw(), &ProviderSetupCompleteRequestWire {
-                protocol_version: IPC_PROTOCOL_MAJOR,
-                kind: "request",
-                id: request_id.clone(),
-                name: "complete_provider_setup",
-                correlation_id,
-                payload: ProviderSetupCompletePayloadWire { request_id: request_id.clone(), provider_id, action: "SETUP_PROBE_PASSED" },
+            write_json_frame(
+                self.handle.raw(),
+                &ProviderSetupCompleteRequestWire {
+                    protocol_version: IPC_PROTOCOL_MAJOR,
+                    kind: "request",
+                    id: request_id.clone(),
+                    name: "complete_provider_setup",
+                    correlation_id,
+                    payload: ProviderSetupCompletePayloadWire {
+                        request_id: request_id.clone(),
+                        provider_id,
+                        action: "SETUP_PROBE_PASSED",
+                    },
+                },
+            )?;
+            let response: ProviderSetupStartResponseWire =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if !response.ok || response.error.is_some() {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "Core rejected the provider setup completion",
+                ));
+            }
+            let result = response.result.ok_or_else(|| {
+                plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core provider setup completion omitted its result",
+                )
             })?;
-            let response: ProviderSetupStartResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
-            if !response.ok || response.error.is_some() { return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the provider setup completion")); }
-            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup completion omitted its result"))?;
-            if result.request_id != request_id || result.state != "SETUP_READY" { return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup completion was not ready")); }
-            Ok(ProviderSetupStartResponse { request_id: result.request_id, state: "SETUP_READY" })
+            if result.request_id != request_id || result.state != "SETUP_READY" {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core provider setup completion was not ready",
+                ));
+            }
+            Ok(ProviderSetupStartResponse {
+                request_id: result.request_id,
+                state: "SETUP_READY",
+            })
         }
 
         pub fn request_provider_setup_probe_failed(
@@ -2054,59 +2120,134 @@ mod windows {
             request_id: String,
             provider_id: String,
         ) -> Result<ProviderSetupStartResponse, LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id { return Err(plain_error(LocalIpcState::AuthenticationFailed, "provider setup failure requires the current authenticated session")); }
-            if !is_uuid_v7(&request_id) || provider_id.is_empty() || provider_id.len() > 256 || provider_id.contains('\0') { return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "provider setup failure identity is invalid")); }
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "provider setup failure requires the current authenticated session",
+                ));
+            }
+            if !is_uuid_v7(&request_id)
+                || provider_id.is_empty()
+                || provider_id.len() > 256
+                || provider_id.contains('\0')
+            {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "provider setup failure identity is invalid",
+                ));
+            }
             let correlation_id = random_uuid_v7()?;
-            write_json_frame(self.handle.raw(), &ProviderSetupCompleteRequestWire { protocol_version: IPC_PROTOCOL_MAJOR, kind: "request", id: request_id.clone(), name: "complete_provider_setup", correlation_id, payload: ProviderSetupCompletePayloadWire { request_id: request_id.clone(), provider_id, action: "SETUP_PROBE_FAILED" } })?;
-            let response: ProviderSetupStartResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
-            if !response.ok || response.error.is_some() { return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the provider setup failure")); }
-            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup failure omitted its result"))?;
-            if result.request_id != request_id || result.state != "SETUP_FAILED" { return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup failure was not persisted")); }
-            Ok(ProviderSetupStartResponse { request_id: result.request_id, state: "SETUP_FAILED" })
+            write_json_frame(
+                self.handle.raw(),
+                &ProviderSetupCompleteRequestWire {
+                    protocol_version: IPC_PROTOCOL_MAJOR,
+                    kind: "request",
+                    id: request_id.clone(),
+                    name: "complete_provider_setup",
+                    correlation_id,
+                    payload: ProviderSetupCompletePayloadWire {
+                        request_id: request_id.clone(),
+                        provider_id,
+                        action: "SETUP_PROBE_FAILED",
+                    },
+                },
+            )?;
+            let response: ProviderSetupStartResponseWire =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            if !response.ok || response.error.is_some() {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "Core rejected the provider setup failure",
+                ));
+            }
+            let result = response.result.ok_or_else(|| {
+                plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core provider setup failure omitted its result",
+                )
+            })?;
+            if result.request_id != request_id || result.state != "SETUP_FAILED" {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core provider setup failure was not persisted",
+                ));
+            }
+            Ok(ProviderSetupStartResponse {
+                request_id: result.request_id,
+                state: "SETUP_FAILED",
+            })
         }
 
         pub fn request_provider_setup_status(
             &self,
             session: &AuthenticatedCoreSession,
         ) -> Result<Vec<ProviderSetupStatusRecord>, LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
-                return Err(plain_error(LocalIpcState::AuthenticationFailed, "provider setup status requires the current authenticated session"));
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "provider setup status requires the current authenticated session",
+                ));
             }
             let request_id = random_uuid_v7()?;
             let correlation_id = random_uuid_v7()?;
-            write_json_frame(self.handle.raw(), &ProviderSetupStatusRequestWire {
-                protocol_version: IPC_PROTOCOL_MAJOR,
-                kind: "request",
-                id: request_id,
-                name: "get_provider_setup_status",
-                correlation_id,
-                payload: serde_json::json!({}),
-            })?;
-            let response: ProviderSetupStatusResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            write_json_frame(
+                self.handle.raw(),
+                &ProviderSetupStatusRequestWire {
+                    protocol_version: IPC_PROTOCOL_MAJOR,
+                    kind: "request",
+                    id: request_id,
+                    name: "get_provider_setup_status",
+                    correlation_id,
+                    payload: serde_json::json!({}),
+                },
+            )?;
+            let response: ProviderSetupStatusResponseWire =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
             if !response.ok || response.error.is_some() {
-                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the provider setup status request"));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "Core rejected the provider setup status request",
+                ));
             }
-            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core provider setup status omitted its result"))?;
-            Ok(result.providers.into_iter().map(|record| ProviderSetupStatusRecord {
-                provider_id: record.provider_id,
-                distribution_id: record.distribution_id,
-                adapter_version: record.adapter_version,
-                provider_version: record.provider_version,
-                setup_policy_id: record.setup_policy_id,
-                state: record.state,
-                last_attempt_at: record.last_attempt_at,
-                last_attempt_outcome: record.last_attempt_outcome,
-                sanitized_failure_reason: record.sanitized_failure_reason,
-                last_verified_at: record.last_verified_at,
-                conformance_evidence_ref: record.conformance_evidence_ref,
-                compatibility: record.compatibility,
-                health: record.health,
-                qualification_state: record.qualification_state,
-                qualification_evidence_ref: record.qualification_evidence_ref,
-                locality: record.locality,
-                capabilities: record.capabilities.into_iter().map(|capability| ProviderCapabilityStatus { capability_id: capability.capability_id, supported: capability.supported }).collect(),
-                support_state: record.support_state,
-            }).collect())
+            let result = response.result.ok_or_else(|| {
+                plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core provider setup status omitted its result",
+                )
+            })?;
+            Ok(result
+                .providers
+                .into_iter()
+                .map(|record| ProviderSetupStatusRecord {
+                    provider_id: record.provider_id,
+                    distribution_id: record.distribution_id,
+                    adapter_version: record.adapter_version,
+                    provider_version: record.provider_version,
+                    setup_policy_id: record.setup_policy_id,
+                    state: record.state,
+                    last_attempt_at: record.last_attempt_at,
+                    last_attempt_outcome: record.last_attempt_outcome,
+                    sanitized_failure_reason: record.sanitized_failure_reason,
+                    last_verified_at: record.last_verified_at,
+                    conformance_evidence_ref: record.conformance_evidence_ref,
+                    compatibility: record.compatibility,
+                    health: record.health,
+                    qualification_state: record.qualification_state,
+                    qualification_evidence_ref: record.qualification_evidence_ref,
+                    locality: record.locality,
+                    capabilities: record
+                        .capabilities
+                        .into_iter()
+                        .map(|capability| ProviderCapabilityStatus {
+                            capability_id: capability.capability_id,
+                            supported: capability.supported,
+                        })
+                        .collect(),
+                    support_state: record.support_state,
+                })
+                .collect())
         }
 
         pub fn request_authenticated_text_conversation(
@@ -2114,11 +2255,18 @@ mod windows {
             session: &AuthenticatedCoreSession,
             request: AuthenticatedTextConversationRequest,
         ) -> Result<AuthenticatedTextConversationResponse, LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
-                return Err(plain_error(LocalIpcState::AuthenticationFailed, "conversation request requires the current authenticated session"));
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "conversation request requires the current authenticated session",
+                ));
             }
             if !is_uuid_v7(&request.request_id) {
-                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "conversation request identity is invalid"));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "conversation request identity is invalid",
+                ));
             }
             let correlation_id = random_uuid_v7()?;
             let payload = serde_json::json!({
@@ -2126,21 +2274,36 @@ mod windows {
                 "context": request.context,
                 "dataPolicy": request.data_policy,
             });
-            write_json_frame(self.handle.raw(), &AuthenticatedTextConversationRequestWire {
-                protocol_version: IPC_PROTOCOL_MAJOR,
-                kind: "request",
-                id: request.request_id.clone(),
-                name: "process_authenticated_text",
-                correlation_id,
-                payload,
-            })?;
-            let response: AuthenticatedTextConversationResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            write_json_frame(
+                self.handle.raw(),
+                &AuthenticatedTextConversationRequestWire {
+                    protocol_version: IPC_PROTOCOL_MAJOR,
+                    kind: "request",
+                    id: request.request_id.clone(),
+                    name: "process_authenticated_text",
+                    correlation_id,
+                    payload,
+                },
+            )?;
+            let response: AuthenticatedTextConversationResponseWire =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
             if !response.ok || response.error.is_some() {
-                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the authenticated conversation request"));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "Core rejected the authenticated conversation request",
+                ));
             }
-            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core conversation response omitted its result"))?;
+            let result = response.result.ok_or_else(|| {
+                plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core conversation response omitted its result",
+                )
+            })?;
             if !result.is_object() {
-                return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core conversation response is not an object"));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core conversation response is not an object",
+                ));
             }
             Ok(AuthenticatedTextConversationResponse { result })
         }
@@ -2154,13 +2317,17 @@ mod windows {
             session: &AuthenticatedCoreSession,
             request: ToolExecutionRequest,
         ) -> Result<serde_json::Value, LocalIpcError> {
-            self.request_tool_execution_with_native_handler(session, request, |_capability, _arguments| {
-                Err(NativeCapabilityDispatchError {
-                    code: "NATIVE_CAPABILITY_UNQUALIFIED".to_owned(),
-                    message: "native capability is not composed on this host".to_owned(),
-                    retryable: false,
-                })
-            })
+            self.request_tool_execution_with_native_handler(
+                session,
+                request,
+                |_capability, _arguments| {
+                    Err(NativeCapabilityDispatchError {
+                        code: "NATIVE_CAPABILITY_UNQUALIFIED".to_owned(),
+                        message: "native capability is not composed on this host".to_owned(),
+                        retryable: false,
+                    })
+                },
+            )
         }
 
         /// Forward one ToolRequest while allowing the single authenticated
@@ -2175,9 +2342,13 @@ mod windows {
             mut native_handler: F,
         ) -> Result<serde_json::Value, LocalIpcError>
         where
-            F: FnMut(&str, serde_json::Value) -> Result<serde_json::Value, NativeCapabilityDispatchError>,
+            F: FnMut(
+                &str,
+                serde_json::Value,
+            ) -> Result<serde_json::Value, NativeCapabilityDispatchError>,
         {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
                 return Err(plain_error(
                     LocalIpcState::AuthenticationFailed,
                     "tool execution request requires the current authenticated session",
@@ -2185,61 +2356,123 @@ mod windows {
             }
             let payload = request.tool_request;
             let object = payload.as_object().ok_or_else(|| {
-                plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool request must be an object")
+                plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "tool request must be an object",
+                )
             })?;
             let tool_execution_id = object
                 .get("toolExecutionId")
                 .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool execution identity is missing"))?
+                .ok_or_else(|| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        "tool execution identity is missing",
+                    )
+                })?
                 .to_owned();
             if !is_uuid_v7(&tool_execution_id) {
-                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool execution identity is invalid"));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "tool execution identity is invalid",
+                ));
             }
             let tool_id = object
                 .get("toolId")
                 .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool identity is missing"))?;
+                .ok_or_else(|| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        "tool identity is missing",
+                    )
+                })?;
             if tool_id.is_empty() || tool_id.len() > 256 || tool_id.contains('\0') {
-                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool identity is invalid"));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "tool identity is invalid",
+                ));
             }
             let tool_version = object
                 .get("toolVersion")
                 .and_then(serde_json::Value::as_u64)
-                .ok_or_else(|| plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool version is invalid"))?;
+                .ok_or_else(|| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        "tool version is invalid",
+                    )
+                })?;
             if tool_version == 0 || tool_version > u32::MAX as u64 {
-                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool version is invalid"));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "tool version is invalid",
+                ));
             }
-            let authority_envelope_id = object.get("authorityEnvelopeId").and_then(serde_json::Value::as_str);
+            let authority_envelope_id = object
+                .get("authorityEnvelopeId")
+                .and_then(serde_json::Value::as_str);
             let task_id = object.get("taskId").and_then(serde_json::Value::as_str);
-            if object.get("executionScope").and_then(serde_json::Value::as_object).is_none()
-                || object.get("arguments").and_then(serde_json::Value::as_object).is_none()
+            if object
+                .get("executionScope")
+                .and_then(serde_json::Value::as_object)
+                .is_none()
+                || object
+                    .get("arguments")
+                    .and_then(serde_json::Value::as_object)
+                    .is_none()
                 || authority_envelope_id.is_none()
                 || !authority_envelope_id.is_some_and(is_uuid_v7)
                 || (object.contains_key("taskId") && !task_id.is_some_and(is_uuid_v7))
-                || (object.contains_key("idempotencyKey") && object.get("idempotencyKey").and_then(serde_json::Value::as_str).is_none())
+                || (object.contains_key("idempotencyKey")
+                    && object
+                        .get("idempotencyKey")
+                        .and_then(serde_json::Value::as_str)
+                        .is_none())
             {
-                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "tool request boundary fields are invalid"));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "tool request boundary fields are invalid",
+                ));
             }
-            if serde_json::to_vec(&payload).map(|bytes| bytes.len() > MAX_IPC_FRAME_BYTES / 2).unwrap_or(true) {
-                return Err(plain_error(LocalIpcState::FrameTooLarge, "tool request exceeds the bounded IPC payload ceiling"));
+            if serde_json::to_vec(&payload)
+                .map(|bytes| bytes.len() > MAX_IPC_FRAME_BYTES / 2)
+                .unwrap_or(true)
+            {
+                return Err(plain_error(
+                    LocalIpcState::FrameTooLarge,
+                    "tool request exceeds the bounded IPC payload ceiling",
+                ));
             }
             let correlation_id = random_uuid_v7()?;
-            write_json_frame(self.handle.raw(), &ToolExecutionRequestWire {
-                protocol_version: IPC_PROTOCOL_MAJOR,
-                kind: "request",
-                id: tool_execution_id.clone(),
-                name: "execute_tool",
-                correlation_id,
-                payload,
-            })?;
+            write_json_frame(
+                self.handle.raw(),
+                &ToolExecutionRequestWire {
+                    protocol_version: IPC_PROTOCOL_MAJOR,
+                    kind: "request",
+                    id: tool_execution_id.clone(),
+                    name: "execute_tool",
+                    correlation_id,
+                    payload,
+                },
+            )?;
             loop {
-                let response_value: serde_json::Value = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
-                if response_value.get("name").and_then(serde_json::Value::as_str) == Some("native_capability")
-                    && response_value.get("kind").and_then(serde_json::Value::as_str) == Some("request")
+                let response_value: serde_json::Value =
+                    read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+                if response_value
+                    .get("name")
+                    .and_then(serde_json::Value::as_str)
+                    == Some("native_capability")
+                    && response_value
+                        .get("kind")
+                        .and_then(serde_json::Value::as_str)
+                        == Some("request")
                 {
-                    let native_request: NativeCapabilityRequestWire = serde_json::from_value(response_value).map_err(|_| {
-                        plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core native capability request is malformed")
-                    })?;
+                    let native_request: NativeCapabilityRequestWire =
+                        serde_json::from_value(response_value).map_err(|_| {
+                            plain_error(
+                                LocalIpcState::ControlPlaneResponseInvalid,
+                                "Core native capability request is malformed",
+                            )
+                        })?;
                     if native_request.protocol_version != IPC_PROTOCOL_MAJOR
                         || native_request.kind != "request"
                         || native_request.id != native_request.correlation_id
@@ -2249,11 +2482,19 @@ mod windows {
                         || native_request.payload.capability.len() > 128
                         || native_request.payload.capability.contains('\0')
                         || !native_request.payload.arguments.is_object()
-                        || serde_json::to_vec(&native_request.payload.arguments).map(|bytes| bytes.len() > MAX_IPC_FRAME_BYTES / 2).unwrap_or(true)
+                        || serde_json::to_vec(&native_request.payload.arguments)
+                            .map(|bytes| bytes.len() > MAX_IPC_FRAME_BYTES / 2)
+                            .unwrap_or(true)
                     {
-                        return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core native capability request failed typed boundary validation"));
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core native capability request failed typed boundary validation",
+                        ));
                     }
-                    let response = match native_handler(&native_request.payload.capability, native_request.payload.arguments) {
+                    let response = match native_handler(
+                        &native_request.payload.capability,
+                        native_request.payload.arguments,
+                    ) {
                         Ok(result) => serde_json::json!({
                             "ok": true,
                             "result": result,
@@ -2276,30 +2517,76 @@ mod windows {
                     write_json_frame(self.handle.raw(), &response)?;
                     continue;
                 }
-                let response: ToolExecutionResponseWire = serde_json::from_value(response_value).map_err(|_| {
-                    plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool response is malformed")
+                let response: ToolExecutionResponseWire = serde_json::from_value(response_value)
+                    .map_err(|_| {
+                        plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core tool response is malformed",
+                        )
+                    })?;
+                if response.ok {
+                    if response.error.is_some() {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core tool response contains both result and error",
+                        ));
+                    }
+                    let result = response.result.ok_or_else(|| {
+                        plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core tool response omitted its result",
+                        )
+                    })?;
+                    let result_object = result.as_object().ok_or_else(|| {
+                        plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core tool result is not an object",
+                        )
+                    })?;
+                    if result_object
+                        .get("toolExecutionId")
+                        .and_then(serde_json::Value::as_str)
+                        != Some(tool_execution_id.as_str())
+                        || !matches!(
+                            result_object
+                                .get("outcome")
+                                .and_then(serde_json::Value::as_str),
+                            Some("SUCCEEDED" | "FAILED" | "DENIED" | "CANCELLED" | "UNCERTAIN")
+                        )
+                    {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core tool result identity or outcome is invalid",
+                        ));
+                    }
+                    return Ok(result);
+                }
+                if response.result.is_some() {
+                    return Err(plain_error(
+                        LocalIpcState::ControlPlaneResponseInvalid,
+                        "Core tool error response contains a result",
+                    ));
+                }
+                let error = response.error.ok_or_else(|| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneResponseInvalid,
+                        "Core tool error response omitted its error",
+                    )
                 })?;
-            if response.ok {
-                if response.error.is_some() {
-                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool response contains both result and error"));
-                }
-                let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool response omitted its result"))?;
-                let result_object = result.as_object().ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool result is not an object"))?;
-                if result_object.get("toolExecutionId").and_then(serde_json::Value::as_str) != Some(tool_execution_id.as_str())
-                    || !matches!(result_object.get("outcome").and_then(serde_json::Value::as_str), Some("SUCCEEDED" | "FAILED" | "DENIED" | "CANCELLED" | "UNCERTAIN"))
+                if error.code.is_empty()
+                    || error.category.is_empty()
+                    || error.message.is_empty()
+                    || !is_uuid_v7(&error.correlation_id)
                 {
-                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool result identity or outcome is invalid"));
+                    return Err(plain_error(
+                        LocalIpcState::ControlPlaneResponseInvalid,
+                        "Core tool error response is invalid",
+                    ));
                 }
-                return Ok(result);
-            }
-            if response.result.is_some() {
-                return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool error response contains a result"));
-            }
-            let error = response.error.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool error response omitted its error"))?;
-            if error.code.is_empty() || error.category.is_empty() || error.message.is_empty() || !is_uuid_v7(&error.correlation_id) {
-                return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core tool error response is invalid"));
-            }
-            return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, format!("Core tool request rejected: {}", error.code)));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    format!("Core tool request rejected: {}", error.code),
+                ));
             }
         }
 
@@ -2307,60 +2594,120 @@ mod windows {
             &self,
             session: &AuthenticatedCoreSession,
         ) -> Result<SessionStatus, LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
-                return Err(plain_error(LocalIpcState::AuthenticationFailed, "session status requires the current authenticated session"));
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "session status requires the current authenticated session",
+                ));
             }
             let request_id = random_uuid_v7()?;
             let correlation_id = random_uuid_v7()?;
-            write_json_frame(self.handle.raw(), &SessionStatusRequestWire {
-                protocol_version: IPC_PROTOCOL_MAJOR,
-                kind: "request",
-                id: request_id,
-                name: "get_session_status",
-                correlation_id,
-                payload: EmptyPayloadWire {},
-            })?;
-            let response: SessionStatusResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+            write_json_frame(
+                self.handle.raw(),
+                &SessionStatusRequestWire {
+                    protocol_version: IPC_PROTOCOL_MAJOR,
+                    kind: "request",
+                    id: request_id,
+                    name: "get_session_status",
+                    correlation_id,
+                    payload: EmptyPayloadWire {},
+                },
+            )?;
+            let response: SessionStatusResponseWire =
+                read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
             if !response.ok || response.error.is_some() {
-                return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the session status request"));
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneRequestFailed,
+                    "Core rejected the session status request",
+                ));
             }
-            let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session status omitted its result"))?;
-            if (!result.initialized && result.state.is_some()) || (result.initialized && result.state.is_none()) {
-                return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session status initialization flag does not match its state"));
+            let result = response.result.ok_or_else(|| {
+                plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core session status omitted its result",
+                )
+            })?;
+            if (!result.initialized && result.state.is_some())
+                || (result.initialized && result.state.is_none())
+            {
+                return Err(plain_error(
+                    LocalIpcState::ControlPlaneResponseInvalid,
+                    "Core session status initialization flag does not match its state",
+                ));
             }
-            let state = result.state.map(|value| {
-                if value.user_id.is_empty() || value.user_id.len() > 256 || value.user_id.contains('\0') {
-                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session user identity is invalid"));
-                }
-                if !matches!(value.state.as_str(), "LOCKED" | "UNLOCKING" | "UNLOCKED" | "LOCKING") {
-                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session state is invalid"));
-                }
-                if let Some(session_id) = value.session_id.as_ref() {
-                    if !is_uuid_v7(session_id) { return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session id is invalid")); }
-                }
-                if value.failed_unlock_attempts > 31 {
-                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session retry state is invalid"));
-                }
-                if value.state == "UNLOCKED" && (value.session_id.is_none() || value.unlocked_at.is_none() || value.locked_reason.is_some()) {
-                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core unlocked session state is inconsistent"));
-                }
-                if value.state != "UNLOCKED" && value.unlocked_at.is_some() {
-                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core locked session state is inconsistent"));
-                }
-                if value.state == "LOCKED" && value.locked_reason.is_none() {
-                    return Err(plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core locked session reason is missing"));
-                }
-                Ok(SessionSecurityState {
-                    user_id: value.user_id,
-                    state: value.state,
-                    session_id: value.session_id,
-                    unlocked_at: value.unlocked_at,
-                    locked_reason: value.locked_reason,
-                    failed_unlock_attempts: value.failed_unlock_attempts,
-                    cooldown_until: value.cooldown_until,
+            let state = result
+                .state
+                .map(|value| {
+                    if value.user_id.is_empty()
+                        || value.user_id.len() > 256
+                        || value.user_id.contains('\0')
+                    {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core session user identity is invalid",
+                        ));
+                    }
+                    if !matches!(
+                        value.state.as_str(),
+                        "LOCKED" | "UNLOCKING" | "UNLOCKED" | "LOCKING"
+                    ) {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core session state is invalid",
+                        ));
+                    }
+                    if let Some(session_id) = value.session_id.as_ref() {
+                        if !is_uuid_v7(session_id) {
+                            return Err(plain_error(
+                                LocalIpcState::ControlPlaneResponseInvalid,
+                                "Core session id is invalid",
+                            ));
+                        }
+                    }
+                    if value.failed_unlock_attempts > 31 {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core session retry state is invalid",
+                        ));
+                    }
+                    if value.state == "UNLOCKED"
+                        && (value.session_id.is_none()
+                            || value.unlocked_at.is_none()
+                            || value.locked_reason.is_some())
+                    {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core unlocked session state is inconsistent",
+                        ));
+                    }
+                    if value.state != "UNLOCKED" && value.unlocked_at.is_some() {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core locked session state is inconsistent",
+                        ));
+                    }
+                    if value.state == "LOCKED" && value.locked_reason.is_none() {
+                        return Err(plain_error(
+                            LocalIpcState::ControlPlaneResponseInvalid,
+                            "Core locked session reason is missing",
+                        ));
+                    }
+                    Ok(SessionSecurityState {
+                        user_id: value.user_id,
+                        state: value.state,
+                        session_id: value.session_id,
+                        unlocked_at: value.unlocked_at,
+                        locked_reason: value.locked_reason,
+                        failed_unlock_attempts: value.failed_unlock_attempts,
+                        cooldown_until: value.cooldown_until,
+                    })
                 })
-            }).transpose()?;
-            Ok(SessionStatus { initialized: result.initialized, state })
+                .transpose()?;
+            Ok(SessionStatus {
+                initialized: result.initialized,
+                state,
+            })
         }
 
         pub fn request_session_initialize(
@@ -2368,14 +2715,29 @@ mod windows {
             session: &AuthenticatedCoreSession,
             password: Vec<u8>,
         ) -> Result<SessionStatus, LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
-                return Err(plain_error(LocalIpcState::AuthenticationFailed, "session initialization requires the current authenticated session"));
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "session initialization requires the current authenticated session",
+                ));
             }
             let result = (|| {
                 let user_id = current_user_sid_string()?;
-                let password_text = String::from_utf8(password.clone()).map_err(|_| plain_error(LocalIpcState::ControlPlaneRequestFailed, "session password must be valid UTF-8"))?;
-                if password_text.is_empty() || password_text.len() > MAX_SESSION_PASSWORD_BYTES || password_text.contains('\0') {
-                    return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "session password is outside the bounded limit"));
+                let password_text = String::from_utf8(password.clone()).map_err(|_| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        "session password must be valid UTF-8",
+                    )
+                })?;
+                if password_text.is_empty()
+                    || password_text.len() > MAX_SESSION_PASSWORD_BYTES
+                    || password_text.contains('\0')
+                {
+                    return Err(plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        "session password is outside the bounded limit",
+                    ));
                 }
                 let request_id = random_uuid_v7()?;
                 let correlation_id = random_uuid_v7()?;
@@ -2385,17 +2747,37 @@ mod windows {
                     id: request_id,
                     name: "initialize_session",
                     correlation_id,
-                    payload: SessionMutationPayloadWire { user_id, password: password_text },
+                    payload: SessionMutationPayloadWire {
+                        user_id,
+                        password: password_text,
+                    },
                 };
                 write_json_frame(self.handle.raw(), &wire)?;
                 wire.payload.password.into_bytes().fill(0);
-                let response: SessionInitializeResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+                let response: SessionInitializeResponseWire =
+                    read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
                 if !response.ok || response.error.is_some() {
-                    return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the session initialization request"));
+                    return Err(plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        "Core rejected the session initialization request",
+                    ));
                 }
-                let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session initialization omitted its result"))?;
-                let state = result.state.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session initialization omitted its state"))?;
-                Ok(SessionStatus { initialized: result.initialized, state: Some(decode_session_security_state(state)?) })
+                let result = response.result.ok_or_else(|| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneResponseInvalid,
+                        "Core session initialization omitted its result",
+                    )
+                })?;
+                let state = result.state.ok_or_else(|| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneResponseInvalid,
+                        "Core session initialization omitted its state",
+                    )
+                })?;
+                Ok(SessionStatus {
+                    initialized: result.initialized,
+                    state: Some(decode_session_security_state(state)?),
+                })
             })();
             let mut password = password;
             password.fill(0);
@@ -2407,14 +2789,29 @@ mod windows {
             session: &AuthenticatedCoreSession,
             password: Vec<u8>,
         ) -> Result<SessionAuthenticationResult, LocalIpcError> {
-            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id {
-                return Err(plain_error(LocalIpcState::AuthenticationFailed, "session authentication requires the current authenticated session"));
+            if session.protocol_major != IPC_PROTOCOL_MAJOR || session.session_id != self.session_id
+            {
+                return Err(plain_error(
+                    LocalIpcState::AuthenticationFailed,
+                    "session authentication requires the current authenticated session",
+                ));
             }
             let result = (|| {
                 let user_id = current_user_sid_string()?;
-                let password_text = String::from_utf8(password.clone()).map_err(|_| plain_error(LocalIpcState::ControlPlaneRequestFailed, "session password must be valid UTF-8"))?;
-                if password_text.is_empty() || password_text.len() > MAX_SESSION_PASSWORD_BYTES || password_text.contains('\0') {
-                    return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "session password is outside the bounded limit"));
+                let password_text = String::from_utf8(password.clone()).map_err(|_| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        "session password must be valid UTF-8",
+                    )
+                })?;
+                if password_text.is_empty()
+                    || password_text.len() > MAX_SESSION_PASSWORD_BYTES
+                    || password_text.contains('\0')
+                {
+                    return Err(plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        "session password is outside the bounded limit",
+                    ));
                 }
                 let request_id = random_uuid_v7()?;
                 let correlation_id = random_uuid_v7()?;
@@ -2424,17 +2821,38 @@ mod windows {
                     id: request_id,
                     name: "authenticate_session",
                     correlation_id,
-                    payload: SessionMutationPayloadWire { user_id, password: password_text },
+                    payload: SessionMutationPayloadWire {
+                        user_id,
+                        password: password_text,
+                    },
                 };
                 write_json_frame(self.handle.raw(), &wire)?;
                 wire.payload.password.into_bytes().fill(0);
-                let response: SessionAuthenticateResponseWire = read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
+                let response: SessionAuthenticateResponseWire =
+                    read_json_frame(self.handle.raw(), Instant::now() + HANDSHAKE_TIMEOUT)?;
                 if !response.ok || response.error.is_some() {
-                    return Err(plain_error(LocalIpcState::ControlPlaneRequestFailed, "Core rejected the session authentication request"));
+                    return Err(plain_error(
+                        LocalIpcState::ControlPlaneRequestFailed,
+                        "Core rejected the session authentication request",
+                    ));
                 }
-                let result = response.result.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session authentication omitted its result"))?;
-                let state = result.state.ok_or_else(|| plain_error(LocalIpcState::ControlPlaneResponseInvalid, "Core session authentication omitted its state"))?;
-                Ok(SessionAuthenticationResult { status: result.status, retry_after_ms: result.retry_after_ms, state: decode_session_security_state(state)? })
+                let result = response.result.ok_or_else(|| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneResponseInvalid,
+                        "Core session authentication omitted its result",
+                    )
+                })?;
+                let state = result.state.ok_or_else(|| {
+                    plain_error(
+                        LocalIpcState::ControlPlaneResponseInvalid,
+                        "Core session authentication omitted its state",
+                    )
+                })?;
+                Ok(SessionAuthenticationResult {
+                    status: result.status,
+                    retry_after_ms: result.retry_after_ms,
+                    state: decode_session_security_state(state)?,
+                })
             })();
             let mut password = password;
             password.fill(0);
@@ -3174,7 +3592,7 @@ mod windows {
     mod tests {
         use super::*;
         use crate::local_ipc::{
-            constant_time_equal, handshake_proof, hex_decode, hex_encode, BOOTSTRAP_SECRET_BYTES,
+            BOOTSTRAP_SECRET_BYTES, constant_time_equal, handshake_proof, hex_decode, hex_encode,
         };
         use std::io::Write;
         use std::path::{Path, PathBuf};
@@ -3184,7 +3602,7 @@ mod windows {
         use std::thread::{self, sleep};
         use windows_sys::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
         use windows_sys::Win32::Security::{
-            CreateRestrictedToken, ImpersonateLoggedOnUser, RevertToSelf, DISABLE_MAX_PRIVILEGE,
+            CreateRestrictedToken, DISABLE_MAX_PRIVILEGE, ImpersonateLoggedOnUser, RevertToSelf,
             SID_AND_ATTRIBUTES, TOKEN_DUPLICATE,
         };
         use windows_sys::Win32::Storage::FileSystem::{
@@ -3238,9 +3656,11 @@ mod windows {
             assert_ne!(first.endpoint_name(), second.endpoint_name());
             assert!(first.endpoint_name().starts_with(r"\\.\pipe\jarvis-core-"));
             assert!(!first.endpoint_name().contains("http"));
-            assert!(first
-                .security_descriptor_sddl()
-                .starts_with("D:P(A;;0x0012019F;;;S-1-"));
+            assert!(
+                first
+                    .security_descriptor_sddl()
+                    .starts_with("D:P(A;;0x0012019F;;;S-1-")
+            );
             assert!(!first.security_descriptor_sddl().contains("GA"));
             assert!(!first.security_descriptor_sddl().contains("WD"));
             assert!(!first.security_descriptor_sddl().contains("AN"));
@@ -3551,7 +3971,10 @@ mod windows {
                 assert_eq!(tool_request["protocolVersion"], 1);
                 assert_eq!(tool_request["kind"], "request");
                 assert_eq!(tool_request["name"], "execute_tool");
-                assert_eq!(tool_request["id"], tool_request["payload"]["toolExecutionId"]);
+                assert_eq!(
+                    tool_request["id"],
+                    tool_request["payload"]["toolExecutionId"]
+                );
                 assert_eq!(tool_request["payload"]["toolId"], "status");
                 assert_eq!(tool_request["payload"]["toolVersion"], 1);
                 write_json_frame(
@@ -3702,7 +4125,9 @@ mod windows {
                         }),
                     },
                     |capability, arguments| {
-                        *observed_by_handler.lock().expect("handler observation lock") =
+                        *observed_by_handler
+                            .lock()
+                            .expect("handler observation lock") =
                             Some((capability.to_owned(), arguments));
                         Ok(serde_json::json!({ "serviceState": "READY" }))
                     },
@@ -3711,7 +4136,10 @@ mod windows {
             assert_eq!(result["outcome"], "SUCCEEDED");
             assert_eq!(
                 observed.lock().expect("handler observation lock").as_ref(),
-                Some(&("status.system".to_owned(), serde_json::json!({ "request": "test" })))
+                Some(&(
+                    "status.system".to_owned(),
+                    serde_json::json!({ "request": "test" })
+                ))
             );
             client.join().expect("client thread must exit");
         }
@@ -3752,7 +4180,10 @@ mod windows {
                     },
                 )
                 .expect_err("missing scope and authority must fail before pipe write");
-            assert_eq!(missing_fields.state, LocalIpcState::ControlPlaneRequestFailed);
+            assert_eq!(
+                missing_fields.state,
+                LocalIpcState::ControlPlaneRequestFailed
+            );
             server.disconnect_client();
         }
 
@@ -3816,9 +4247,8 @@ mod windows {
             let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
             let candidates = [
                 manifest_dir.join("../../../target/release/resources/core-runtime"),
-                manifest_dir.join(
-                    "../../../target/x86_64-pc-windows-msvc/release/resources/core-runtime",
-                ),
+                manifest_dir
+                    .join("../../../target/x86_64-pc-windows-msvc/release/resources/core-runtime"),
             ];
             candidates
                 .iter()
@@ -4059,8 +4489,14 @@ mod windows {
                 .expect("provider status result must be present")
                 .providers[0];
             assert_eq!(record.provider_version.as_deref(), Some("0.147.0"));
-            assert_eq!(record.setup_policy_id.as_deref(), Some("codex-cli-windows-v1"));
-            assert_eq!(record.last_attempt_outcome.as_deref(), Some("AUTHENTICATED_USER_START"));
+            assert_eq!(
+                record.setup_policy_id.as_deref(),
+                Some("codex-cli-windows-v1")
+            );
+            assert_eq!(
+                record.last_attempt_outcome.as_deref(),
+                Some("AUTHENTICATED_USER_START")
+            );
 
             let unknown_field = serde_json::json!({
                 "ok": true,
@@ -4072,7 +4508,9 @@ mod windows {
                     "unexpected": true
                 }]}
             });
-            assert!(serde_json::from_value::<ProviderSetupStatusResponseWire>(unknown_field).is_err());
+            assert!(
+                serde_json::from_value::<ProviderSetupStatusResponseWire>(unknown_field).is_err()
+            );
         }
 
         #[test]

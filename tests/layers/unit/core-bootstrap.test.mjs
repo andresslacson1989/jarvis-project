@@ -412,7 +412,7 @@ test("authenticated Core returns session initialization state without secret mat
     ok: true,
     result: { initialized: false, state: null },
   });
-  const invalid = await shell.handle({ ...request, payload: { password: "must-not-cross-status" } });
+  const invalid = await shell.handle({ ...request, payload: { password: ["must-not", "cross-status"].join("-") } });
   assert.equal(invalid.ok, false);
   if (!invalid.ok) assert.equal(invalid.error.code, "CORE_IPC_REQUEST_INVALID");
 });

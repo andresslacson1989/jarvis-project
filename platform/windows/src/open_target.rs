@@ -6,7 +6,7 @@
 
 use crate::path_identity::{PlatformPathsAndIdentity, RegisteredWorkspace};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::process::{Command, Stdio};
 
@@ -32,8 +32,12 @@ struct FileArguments {
     relative_path: String,
 }
 
-pub fn open_project(registration: &RegisteredWorkspace, arguments: Value) -> Result<Value, OpenTargetError> {
-    let input: WorkspaceArguments = serde_json::from_value(arguments).map_err(|_| OpenTargetError::Invalid)?;
+pub fn open_project(
+    registration: &RegisteredWorkspace,
+    arguments: Value,
+) -> Result<Value, OpenTargetError> {
+    let input: WorkspaceArguments =
+        serde_json::from_value(arguments).map_err(|_| OpenTargetError::Invalid)?;
     ensure_identity(registration, &input.project_id, &input.workspace_id)?;
     launch_explorer(&registration.root_identity().canonical_path, None)?;
     Ok(json!({
@@ -48,12 +52,20 @@ pub fn open_file(
     registration: &RegisteredWorkspace,
     arguments: Value,
 ) -> Result<Value, OpenTargetError> {
-    let input: FileArguments = serde_json::from_value(arguments).map_err(|_| OpenTargetError::Invalid)?;
+    let input: FileArguments =
+        serde_json::from_value(arguments).map_err(|_| OpenTargetError::Invalid)?;
     ensure_identity(registration, &input.project_id, &input.workspace_id)?;
     let target = backend
-        .resolve_workspace_target(&registration.root_identity().canonical_path, &input.relative_path, false)
+        .resolve_workspace_target(
+            &registration.root_identity().canonical_path,
+            &input.relative_path,
+            false,
+        )
         .map_err(|_| OpenTargetError::TargetUnavailable)?;
-    launch_explorer(&target.target.canonical_path, Some(&target.target.canonical_path))?;
+    launch_explorer(
+        &target.target.canonical_path,
+        Some(&target.target.canonical_path),
+    )?;
     Ok(json!({
         "targetKind": "FILE",
         "targetIdentity": identity("file", target.target.case_insensitive_key.as_bytes()),
@@ -61,7 +73,11 @@ pub fn open_file(
     }))
 }
 
-fn ensure_identity(registration: &RegisteredWorkspace, project_id: &str, workspace_id: &str) -> Result<(), OpenTargetError> {
+fn ensure_identity(
+    registration: &RegisteredWorkspace,
+    project_id: &str,
+    workspace_id: &str,
+) -> Result<(), OpenTargetError> {
     if project_id == registration.project_id() && workspace_id == registration.workspace_id() {
         Ok(())
     } else {
@@ -69,7 +85,10 @@ fn ensure_identity(registration: &RegisteredWorkspace, project_id: &str, workspa
     }
 }
 
-fn launch_explorer(target: &std::path::Path, selected_file: Option<&std::path::Path>) -> Result<(), OpenTargetError> {
+fn launch_explorer(
+    target: &std::path::Path,
+    selected_file: Option<&std::path::Path>,
+) -> Result<(), OpenTargetError> {
     let mut command = Command::new("explorer.exe");
     if let Some(file) = selected_file {
         command.arg(format!("/select,{}", file.display()));
@@ -87,6 +106,9 @@ fn launch_explorer(target: &std::path::Path, selected_file: Option<&std::path::P
 
 fn identity(prefix: &str, value: &[u8]) -> String {
     let digest = Sha256::digest(value);
-    let hex = digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    let hex = digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     format!("{prefix}-{hex}")
 }

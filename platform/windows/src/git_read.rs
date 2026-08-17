@@ -7,7 +7,7 @@
 
 use crate::path_identity::{PlatformPathsAndIdentity, RegisteredWorkspace};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use std::path::Path;
@@ -63,12 +63,20 @@ pub fn read_git(
 ) -> Result<Value, GitReadError> {
     let input: GitArguments = serde_json::from_value(arguments)
         .map_err(|_| GitReadError::Invalid("Git arguments are invalid".to_owned()))?;
-    if input.project_id != registration.project_id() || input.workspace_id != registration.workspace_id() {
-        return Err(GitReadError::Invalid("Git workspace identity does not match the binding".to_owned()));
+    if input.project_id != registration.project_id()
+        || input.workspace_id != registration.workspace_id()
+    {
+        return Err(GitReadError::Invalid(
+            "Git workspace identity does not match the binding".to_owned(),
+        ));
     }
     let (workspace_root, repository_root) = resolve_repository(backend, registration)?;
-    let workspace_identity = stable_identity("workspace", registration.root_identity().case_insensitive_key.as_bytes());
-    let repository_identity = stable_identity("repository", repository_root.to_string_lossy().as_bytes());
+    let workspace_identity = stable_identity(
+        "workspace",
+        registration.root_identity().case_insensitive_key.as_bytes(),
+    );
+    let repository_identity =
+        stable_identity("repository", repository_root.to_string_lossy().as_bytes());
     let branch = read_branch_name(&workspace_root)?;
     let head_commit = read_head_commit(&workspace_root);
     let observed_at = utc_now();
@@ -108,8 +116,22 @@ pub fn read_git(
         }
         "DIFF" => {
             let max_bytes = bounded_diff_bytes(input.max_bytes)?;
-            let output = run_git(&workspace_root, &["-c", "core.pager=cat", "diff", "--no-ext-diff", "--no-textconv", "--no-color", "--no-renames", "--"], max_bytes)?;
-            let patch = String::from_utf8(output.stdout).map_err(|_| GitReadError::Failed("Git diff was not valid UTF-8".to_owned()))?;
+            let output = run_git(
+                &workspace_root,
+                &[
+                    "-c",
+                    "core.pager=cat",
+                    "diff",
+                    "--no-ext-diff",
+                    "--no-textconv",
+                    "--no-color",
+                    "--no-renames",
+                    "--",
+                ],
+                max_bytes,
+            )?;
+            let patch = String::from_utf8(output.stdout)
+                .map_err(|_| GitReadError::Failed("Git diff was not valid UTF-8".to_owned()))?;
             let bytes = patch.as_bytes().len();
             Ok(json!({
                 "operation": "DIFF",
@@ -127,7 +149,20 @@ pub fn read_git(
             let max_entries = bounded_entries(input.max_entries)?;
             let max_bytes = bounded_log_bytes(input.max_bytes)?;
             let count = max_entries.to_string();
-            let output = run_git(&workspace_root, &["-c", "core.pager=cat", "log", "--no-decorate", "--no-color", "--format=%H%x00%an%x00%aI%x00%s%x00", "-n", &count], max_bytes)?;
+            let output = run_git(
+                &workspace_root,
+                &[
+                    "-c",
+                    "core.pager=cat",
+                    "log",
+                    "--no-decorate",
+                    "--no-color",
+                    "--format=%H%x00%an%x00%aI%x00%s%x00",
+                    "-n",
+                    &count,
+                ],
+                max_bytes,
+            )?;
             let (entries, bytes, truncated) = parse_log(&output.stdout, max_entries, max_bytes)?;
             Ok(json!({
                 "operation": "LOG",
@@ -141,7 +176,9 @@ pub fn read_git(
                 "observedAt": observed_at,
             }))
         }
-        _ => Err(GitReadError::Invalid("unsupported Git operation".to_owned())),
+        _ => Err(GitReadError::Invalid(
+            "unsupported Git operation".to_owned(),
+        )),
     }
 }
 
@@ -171,13 +208,21 @@ fn resolve_repository(
     registration: &RegisteredWorkspace,
 ) -> Result<(std::path::PathBuf, std::path::PathBuf), GitReadError> {
     let workspace_root = registration.root_identity().canonical_path.clone();
-    let output = run_git(&workspace_root, &["rev-parse", "--show-toplevel"], 16 * 1024)?;
+    let output = run_git(
+        &workspace_root,
+        &["rev-parse", "--show-toplevel"],
+        16 * 1024,
+    )?;
     let root_text = text_line(&output.stdout)?;
     let repository = backend
         .resolve_project_root(Path::new(root_text))
-        .map_err(|_| GitReadError::Failed("Git repository root could not be identity-checked".to_owned()))?;
+        .map_err(|_| {
+            GitReadError::Failed("Git repository root could not be identity-checked".to_owned())
+        })?;
     if repository.case_insensitive_key != registration.root_identity().case_insensitive_key {
-        return Err(GitReadError::Failed("Git repository root does not match the bound workspace".to_owned()));
+        return Err(GitReadError::Failed(
+            "Git repository root does not match the bound workspace".to_owned(),
+        ));
     }
     Ok((workspace_root, repository.canonical_path))
 }
@@ -188,41 +233,87 @@ fn read_branch_name(root: &Path) -> Result<String, GitReadError> {
         return Ok("DETACHED".to_owned());
     }
     let branch = text_line(&output.stdout).unwrap_or("DETACHED").to_owned();
-    if branch.is_empty() || branch.len() > 1024 || branch.bytes().any(|byte| byte == 0 || byte == b'\r' || byte == b'\n') {
-        return Err(GitReadError::Failed("Git branch identity is invalid".to_owned()));
+    if branch.is_empty()
+        || branch.len() > 1024
+        || branch
+            .bytes()
+            .any(|byte| byte == 0 || byte == b'\r' || byte == b'\n')
+    {
+        return Err(GitReadError::Failed(
+            "Git branch identity is invalid".to_owned(),
+        ));
     }
     Ok(branch)
 }
 
 fn read_head_commit(root: &Path) -> String {
-    match run_git(root, &["rev-parse", "--verify", "HEAD"], 4096).ok().and_then(|output| text_line(&output.stdout).ok().map(str::to_owned)) {
-        Some(commit) if commit.len() >= 40 && commit.len() <= 64 && commit.bytes().all(|byte| byte.is_ascii_hexdigit()) => commit,
+    match run_git(root, &["rev-parse", "--verify", "HEAD"], 4096)
+        .ok()
+        .and_then(|output| text_line(&output.stdout).ok().map(str::to_owned))
+    {
+        Some(commit)
+            if commit.len() >= 40
+                && commit.len() <= 64
+                && commit.bytes().all(|byte| byte.is_ascii_hexdigit()) =>
+        {
+            commit
+        }
         _ => "UNBORN".to_owned(),
     }
 }
 
 fn read_upstream(root: &Path) -> Result<(String, u64, u64), GitReadError> {
-    let upstream = run_git_allow_failure(root, &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], 4096)
-        .ok()
-        .filter(|output| output.status == Some(0))
-        .and_then(|output| text_line(&output.stdout).ok().map(str::to_owned));
+    let upstream = run_git_allow_failure(
+        root,
+        &[
+            "rev-parse",
+            "--abbrev-ref",
+            "--symbolic-full-name",
+            "@{upstream}",
+        ],
+        4096,
+    )
+    .ok()
+    .filter(|output| output.status == Some(0))
+    .and_then(|output| text_line(&output.stdout).ok().map(str::to_owned));
     let Some(upstream) = upstream.filter(|value| !value.is_empty()) else {
         return Ok(("NONE".to_owned(), 0, 0));
     };
-    let counts = run_git(root, &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"], 4096)?;
+    let counts = run_git(
+        root,
+        &["rev-list", "--left-right", "--count", "HEAD...@{upstream}"],
+        4096,
+    )?;
     let values: Vec<u64> = text_line(&counts.stdout)
         .unwrap_or("")
         .split_whitespace()
-        .map(|value| value.parse::<u64>().map_err(|_| GitReadError::Failed("Git divergence counts are invalid".to_owned())))
+        .map(|value| {
+            value
+                .parse::<u64>()
+                .map_err(|_| GitReadError::Failed("Git divergence counts are invalid".to_owned()))
+        })
         .collect::<Result<_, _>>()?;
     if values.len() != 2 {
-        return Err(GitReadError::Failed("Git divergence counts are invalid".to_owned()));
+        return Err(GitReadError::Failed(
+            "Git divergence counts are invalid".to_owned(),
+        ));
     }
     Ok((upstream, values[0], values[1]))
 }
 
 fn read_status(root: &Path, max_entries: usize) -> Result<(Vec<Value>, bool), GitReadError> {
-    let output = run_git(root, &["-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all"], MAX_COMMAND_OUTPUT)?;
+    let output = run_git(
+        root,
+        &[
+            "-c",
+            "core.quotepath=false",
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+        ],
+        MAX_COMMAND_OUTPUT,
+    )?;
     let mut entries = Vec::new();
     let mut records = output.stdout.split(|byte| *byte == 0);
     let mut truncated = false;
@@ -231,21 +322,28 @@ fn read_status(root: &Path, max_entries: usize) -> Result<(Vec<Value>, bool), Gi
             continue;
         }
         if record.len() < 4 || record[2] != b' ' {
-            return Err(GitReadError::Failed("Git status record is invalid".to_owned()));
+            return Err(GitReadError::Failed(
+                "Git status record is invalid".to_owned(),
+            ));
         }
         let index_state = status_state(record[0]);
         let worktree_state = status_state(record[1]);
         let mut path = &record[3..];
         if matches!(record[0], b'R' | b'C') || matches!(record[1], b'R' | b'C') {
-            path = records.next().ok_or_else(|| GitReadError::Failed("Git rename record is incomplete".to_owned()))?;
+            path = records.next().ok_or_else(|| {
+                GitReadError::Failed("Git rename record is incomplete".to_owned())
+            })?;
         }
         if entries.len() == max_entries {
             truncated = true;
             break;
         }
-        let path = std::str::from_utf8(path).map_err(|_| GitReadError::Failed("Git status path is not UTF-8".to_owned()))?;
+        let path = std::str::from_utf8(path)
+            .map_err(|_| GitReadError::Failed("Git status path is not UTF-8".to_owned()))?;
         if path.is_empty() || path.contains('\0') || path.split('/').any(|part| part == "..") {
-            return Err(GitReadError::Failed("Git status path escaped the workspace".to_owned()));
+            return Err(GitReadError::Failed(
+                "Git status path escaped the workspace".to_owned(),
+            ));
         }
         entries.push(json!({ "path": path.replace('\\', "/"), "indexState": index_state, "worktreeState": worktree_state }));
     }
@@ -268,37 +366,66 @@ fn status_state(value: u8) -> &'static str {
     }
 }
 
-fn parse_log(stdout: &[u8], max_entries: usize, max_bytes: usize) -> Result<(Vec<Value>, usize, bool), GitReadError> {
+fn parse_log(
+    stdout: &[u8],
+    max_entries: usize,
+    max_bytes: usize,
+) -> Result<(Vec<Value>, usize, bool), GitReadError> {
     let mut entries = Vec::new();
     let mut fields = stdout.split(|byte| *byte == 0);
     while entries.len() < max_entries {
         let Some(commit) = fields.next() else { break };
-        if commit.is_empty() { break; }
-        let author = fields.next().ok_or_else(|| GitReadError::Failed("Git log record is incomplete".to_owned()))?;
-        let authored_at = fields.next().ok_or_else(|| GitReadError::Failed("Git log record is incomplete".to_owned()))?;
-        let subject = fields.next().ok_or_else(|| GitReadError::Failed("Git log record is incomplete".to_owned()))?;
+        if commit.is_empty() {
+            break;
+        }
+        let author = fields
+            .next()
+            .ok_or_else(|| GitReadError::Failed("Git log record is incomplete".to_owned()))?;
+        let authored_at = fields
+            .next()
+            .ok_or_else(|| GitReadError::Failed("Git log record is incomplete".to_owned()))?;
+        let subject = fields
+            .next()
+            .ok_or_else(|| GitReadError::Failed("Git log record is incomplete".to_owned()))?;
         let commit = text_utf8(commit)?;
         let author = text_utf8(author)?;
         let authored_at = text_utf8(authored_at)?;
         let subject = text_utf8(subject)?;
-        if commit.len() < 40 || commit.len() > 64 || !commit.bytes().all(|byte| byte.is_ascii_hexdigit()) || author.is_empty() || authored_at.is_empty() || subject.is_empty() {
+        if commit.len() < 40
+            || commit.len() > 64
+            || !commit.bytes().all(|byte| byte.is_ascii_hexdigit())
+            || author.is_empty()
+            || authored_at.is_empty()
+            || subject.is_empty()
+        {
             return Err(GitReadError::Failed("Git log record is invalid".to_owned()));
         }
         entries.push(json!({ "commit": commit, "author": author, "authoredAt": authored_at, "subject": subject }));
     }
-    let truncated = entries.len() == max_entries && fields.next().is_some_and(|value| !value.is_empty());
+    let truncated =
+        entries.len() == max_entries && fields.next().is_some_and(|value| !value.is_empty());
     Ok((entries, stdout.len().min(max_bytes), truncated))
 }
 
-fn run_git(root: &Path, arguments: &[&str], max_output: usize) -> Result<GitCommandOutput, GitReadError> {
+fn run_git(
+    root: &Path,
+    arguments: &[&str],
+    max_output: usize,
+) -> Result<GitCommandOutput, GitReadError> {
     let output = run_git_allow_failure(root, arguments, max_output)?;
     if output.status != Some(0) {
-        return Err(GitReadError::Failed("Git returned a non-success result".to_owned()));
+        return Err(GitReadError::Failed(
+            "Git returned a non-success result".to_owned(),
+        ));
     }
     Ok(output)
 }
 
-fn run_git_allow_failure(root: &Path, arguments: &[&str], max_output: usize) -> Result<GitCommandOutput, GitReadError> {
+fn run_git_allow_failure(
+    root: &Path,
+    arguments: &[&str],
+    max_output: usize,
+) -> Result<GitCommandOutput, GitReadError> {
     let mut command = Command::new("git.exe");
     command
         .current_dir(root)
@@ -308,14 +435,25 @@ fn run_git_allow_failure(root: &Path, arguments: &[&str], max_output: usize) -> 
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut child = command.spawn().map_err(|_| GitReadError::Unavailable("git.exe could not be started".to_owned()))?;
-    let stdout = child.stdout.take().ok_or_else(|| GitReadError::Unavailable("Git stdout was not available".to_owned()))?;
-    let stderr = child.stderr.take().ok_or_else(|| GitReadError::Unavailable("Git stderr was not available".to_owned()))?;
+    let mut child = command
+        .spawn()
+        .map_err(|_| GitReadError::Unavailable("git.exe could not be started".to_owned()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| GitReadError::Unavailable("Git stdout was not available".to_owned()))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| GitReadError::Unavailable("Git stderr was not available".to_owned()))?;
     let stdout_thread = thread::spawn(move || read_bounded(stdout, max_output));
     let stderr_thread = thread::spawn(move || read_bounded(stderr, MAX_ERROR_OUTPUT));
     let deadline = Instant::now() + GIT_TIMEOUT;
     let status = loop {
-        match child.try_wait().map_err(|_| GitReadError::Failed("Git process status could not be read".to_owned()))? {
+        match child
+            .try_wait()
+            .map_err(|_| GitReadError::Failed("Git process status could not be read".to_owned()))?
+        {
             Some(status) => break Some(status.code().unwrap_or(-1)),
             None if Instant::now() >= deadline => {
                 let _ = child.kill();
@@ -327,42 +465,65 @@ fn run_git_allow_failure(root: &Path, arguments: &[&str], max_output: usize) -> 
             None => thread::sleep(Duration::from_millis(10)),
         }
     };
-    let stdout = stdout_thread.join().map_err(|_| GitReadError::Failed("Git stdout reader failed".to_owned()))??;
-    let _stderr = stderr_thread.join().map_err(|_| GitReadError::Failed("Git stderr reader failed".to_owned()))??;
+    let stdout = stdout_thread
+        .join()
+        .map_err(|_| GitReadError::Failed("Git stdout reader failed".to_owned()))??;
+    let _stderr = stderr_thread
+        .join()
+        .map_err(|_| GitReadError::Failed("Git stderr reader failed".to_owned()))??;
     let output = GitCommandOutput { status, stdout };
     if output.stdout.len() > max_output {
-        return Err(GitReadError::Failed("Git output exceeded the bounded limit".to_owned()));
+        return Err(GitReadError::Failed(
+            "Git output exceeded the bounded limit".to_owned(),
+        ));
     }
     Ok(output)
 }
 
 fn read_bounded<R: Read>(reader: R, limit: usize) -> Result<Vec<u8>, GitReadError> {
     let mut output = Vec::new();
-    reader.take((limit + 1) as u64).read_to_end(&mut output).map_err(|_| GitReadError::Failed("Git output could not be read".to_owned()))?;
+    reader
+        .take((limit + 1) as u64)
+        .read_to_end(&mut output)
+        .map_err(|_| GitReadError::Failed("Git output could not be read".to_owned()))?;
     Ok(output)
 }
 
 fn text_line(bytes: &[u8]) -> Result<&str, GitReadError> {
-    let text = std::str::from_utf8(bytes).map_err(|_| GitReadError::Failed("Git output is not UTF-8".to_owned()))?;
+    let text = std::str::from_utf8(bytes)
+        .map_err(|_| GitReadError::Failed("Git output is not UTF-8".to_owned()))?;
     Ok(text.trim_end_matches(['\r', '\n']))
 }
 
 fn text_utf8(bytes: &[u8]) -> Result<String, GitReadError> {
-    Ok(std::str::from_utf8(bytes).map_err(|_| GitReadError::Failed("Git output is not UTF-8".to_owned()))?.to_owned())
+    Ok(std::str::from_utf8(bytes)
+        .map_err(|_| GitReadError::Failed("Git output is not UTF-8".to_owned()))?
+        .to_owned())
 }
 
 fn stable_identity(prefix: &str, value: &[u8]) -> String {
     let digest = Sha256::digest(value);
-    let hex = digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    let hex = digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     format!("{prefix}-{hex}")
 }
 
 fn utc_now() -> String {
-    let seconds = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let seconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
     let days = seconds / 86_400;
     let day_seconds = seconds % 86_400;
     let (year, month, day) = civil_from_days(days as i64);
-    format!("{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.000Z", day_seconds / 3600, (day_seconds % 3600) / 60, day_seconds % 60)
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.000Z",
+        day_seconds / 3600,
+        (day_seconds % 3600) / 60,
+        day_seconds % 60
+    )
 }
 
 fn civil_from_days(days: i64) -> (i64, i64, i64) {
