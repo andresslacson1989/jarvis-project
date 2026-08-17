@@ -164,6 +164,7 @@ export function evaluateDesktopFoundation(snapshot) {
   }
   if (pkg && typeof pkg === "object") {
     add(violations, pkg.scripts?.["build:web"] === "tsc -p tsconfig.json --noEmit && vite build", "DESKTOP_WEB_BUILD_NOT_VITE", "apps/desktop/package.json", "build:web must typecheck then create the Vite production bundle");
+    add(violations, pkg.scripts?.tauri === "tauri", "DESKTOP_TAURI_CLI_SCRIPT_DRIFT", "apps/desktop/package.json", "tauri package script must invoke the pinned local @tauri-apps/cli binary without substitution");
     add(violations, pkg.dependencies?.["@tauri-apps/api"] === api, "DESKTOP_TAURI_JS_PIN_MISMATCH", "apps/desktop/package.json", `@tauri-apps/api must equal ${String(api)}`);
     add(violations, pkg.devDependencies?.["@tauri-apps/cli"] === cli, "DESKTOP_TAURI_CLI_PIN_MISMATCH", "apps/desktop/package.json", `@tauri-apps/cli must equal ${String(cli)}`);
   }
