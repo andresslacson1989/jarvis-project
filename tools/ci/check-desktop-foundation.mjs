@@ -11,6 +11,8 @@ const LINUX_TAURI_HOST_MARKERS = Object.freeze([
   "libayatana-appindicator3-dev",
   "librsvg2-dev",
 ]);
+const PRODUCTION_TAURI_COMMAND =
+  "pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci";
 
 async function readOptional(path) {
   try {
@@ -108,9 +110,16 @@ function workflowJobBlock(workflow, name) {
   return match?.[0] ?? null;
 }
 
-function hasWorkflowStep(workflow, name, run) {
+function hasWorkflowStep(workflow, name, run, workingDirectory) {
   const block = workflowStepBlock(workflow, name);
-  return block !== null && block.includes(`\n        run: ${run}`) && !/\n {8}if:/.test(block);
+  return (
+    block !== null &&
+    block.includes(`\n        run: ${run}`) &&
+    (workingDirectory === undefined ||
+      block.includes(`\n        working-directory: ${workingDirectory}`)) &&
+    !/\n {8}if:/.test(block) &&
+    !/\n {8}continue-on-error:/.test(block)
+  );
 }
 
 function add(violations, condition, code, path, detail) {
@@ -127,6 +136,7 @@ export function evaluateDesktopFoundation(snapshot) {
   const api = baseline?.tauri?.javascriptApi;
   const cli = baseline?.tauri?.cli;
   const workflowText = typeof snapshot.workflow === "string" ? snapshot.workflow : "";
+  const windowsTauriJob = workflowJobBlock(snapshot.workflow, "windows-tauri-build");
   const staticCiJob = workflowJobBlock(snapshot.workflow, "static-ci");
 
   add(violations, snapshot.rootCargo !== null, "DESKTOP_ROOT_CARGO_MISSING", "Cargo.toml", "root Cargo workspace is required");
@@ -168,6 +178,7 @@ export function evaluateDesktopFoundation(snapshot) {
     add(violations, windowsRuntimeOk, "DESKTOP_TAURI_WINDOWS_WRY_MISSING", "apps/desktop/src-tauri/Cargo.toml", "Windows V1 must enable the wry WebView runtime only in the Windows dependency block");
   }
   if (config && typeof config === "object") {
+    add(violations, config.build?.beforeBuildCommand === "pnpm build:web", "DESKTOP_TAURI_BEFORE_BUILD_COMMAND_MISSING", "apps/desktop/src-tauri/tauri.conf.json", "production Tauri build must invoke the real Vite renderer build through beforeBuildCommand");
     add(violations, config.build?.frontendDist === "../dist", "DESKTOP_FRONTEND_DIST_NOT_LOCAL", "apps/desktop/src-tauri/tauri.conf.json", "production frontendDist must be ../dist");
     add(violations, config.build?.devUrl === "http://localhost:5173", "DESKTOP_DEV_URL_UNEXPECTED", "apps/desktop/src-tauri/tauri.conf.json", "development URL must remain fixed localhost:5173");
   }
@@ -197,7 +208,19 @@ export function evaluateDesktopFoundation(snapshot) {
   }
 
   add(violations, hasWorkflowStep(snapshot.workflow, "Desktop foundation contract", "pnpm desktop:foundation:check"), "DESKTOP_FOUNDATION_CI_GATE_MISSING", ".github/workflows/static-ci.yml", "desktop foundation contract gate must be mandatory and unconditional");
-  add(violations, hasWorkflowStep(snapshot.workflow, "Desktop Tauri Windows build", "cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc"), "DESKTOP_WINDOWS_BUILD_CI_GATE_MISSING", ".github/workflows/static-ci.yml", "explicit Windows Tauri build gate must be mandatory and unconditional");
+  add(
+    violations,
+    windowsTauriJob !== null &&
+      hasWorkflowStep(
+        windowsTauriJob,
+        "Desktop Tauri production build",
+        PRODUCTION_TAURI_COMMAND,
+        "apps/desktop",
+      ),
+    "DESKTOP_TAURI_PRODUCTION_BUILD_CI_GATE_MISSING",
+    ".github/workflows/static-ci.yml",
+    "native Windows qualification must run the pinned Tauri CLI production build, exercise beforeBuildCommand/frontendDist, and skip installer bundling",
+  );
   add(
     violations,
     staticCiJob !== null && /\n\s+runs-on:\s*windows-2025\s*\n/.test(`${staticCiJob}\n`),

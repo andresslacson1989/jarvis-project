@@ -25,7 +25,7 @@ const childIds = [
 
 function workflowFromProfile() {
   const gates = profile.requiredWorkflowSteps
-    .filter(({ name }) => !["Rust Windows-target build", "Desktop Tauri Windows build"].includes(name))
+    .filter(({ name }) => name !== "Rust Windows-target build")
     .map(
       ({ name, run }) =>
         `      - name: ${name}\n        run: ${run}\n`,
@@ -54,12 +54,13 @@ jobs:
         run: git rev-parse HEAD
       - name: Rust Windows-target build
         run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
-      - name: Desktop Tauri Windows build
-        run: cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc
+      - name: Desktop Tauri production build
+        working-directory: apps/desktop
+        run: pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci
   static-ci:
     name: static-ci
     needs: windows-tauri-build
-    runs-on: ubuntu-24.04
+    runs-on: windows-2025
     steps:
       - name: Checkout
         uses: actions/checkout@${"a".repeat(40)}
@@ -145,13 +146,22 @@ test("native Windows Tauri topology fails closed", () => {
     ["windows job", (workflow) => workflow.replace("  windows-tauri-build:", "  removed-windows-job:")],
     ["static dependency", (workflow) => workflow.replace("    needs: windows-tauri-build\n", "")],
     ["Windows target", (workflow) => workflow.replaceAll("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc")],
-    ["Tauri command", (workflow) => workflow.replace("cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc", "cargo check --locked -p jarvis-desktop")],
+    ["production Tauri command", (workflow) => workflow.replace("pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci", "cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc")],
+    ["production Tauri working directory", (workflow) => workflow.replace("        working-directory: apps/desktop\n", "")],
     ["synthetic checkout", (workflow) => workflow.replace("github.event.pull_request.head.sha", "github.sha")],
-    ["Ubuntu cross-build", (workflow) => workflow.replace("      - name: Verify native Windows Tauri prerequisite", "      - name: Rust Windows-target build\n        run: cargo check --locked --workspace --target x86_64-pc-windows-msvc\n\n      - name: Verify native Windows Tauri prerequisite")],
+    ["duplicate Windows cross-build", (workflow) => workflow.replace("      - name: Verify native Windows Tauri prerequisite", "      - name: Rust Windows-target build\n        run: cargo check --locked --workspace --target x86_64-pc-windows-msvc\n\n      - name: Verify native Windows Tauri prerequisite")],
   ];
   for (const [label, mutate] of cases) {
     assert.ok(codes({ workflow: mutate(workflowFromProfile()) }).some((code) => code.startsWith("PHASE0_")), label);
   }
+});
+
+test("conditional native production Tauri gate fails closed", () => {
+  const workflow = workflowFromProfile().replace(
+    "      - name: Desktop Tauri production build\n        working-directory: apps/desktop",
+    "      - name: Desktop Tauri production build\n        if: false\n        working-directory: apps/desktop",
+  );
+  assert.ok(codes({ workflow }).includes("PHASE0_NATIVE_WINDOWS_GATE_MISSING"));
 });
 
 test("conditional mandatory Phase 0 gate fails closed", () => {

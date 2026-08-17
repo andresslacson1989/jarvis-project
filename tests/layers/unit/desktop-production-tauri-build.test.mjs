@@ -33,6 +33,8 @@ test("Section 1.1 requires a real production Tauri build rather than cargo check
     ["target", productionWorkflow.replace(" --target x86_64-pc-windows-msvc", "")],
     ["ci", productionWorkflow.replace(" --ci", "")],
     ["working directory", productionWorkflow.replace("        working-directory: apps/desktop\n", "")],
+    ["conditional", productionWorkflow.replace("        working-directory: apps/desktop\n", "        if: always()\n        working-directory: apps/desktop\n")],
+    ["continue-on-error", productionWorkflow.replace("        working-directory: apps/desktop\n", "        continue-on-error: true\n        working-directory: apps/desktop\n")],
   ]) {
     assert.ok(
       desktopCodes({ ...snapshot, workflow }).includes("DESKTOP_TAURI_PRODUCTION_BUILD_CI_GATE_MISSING"),

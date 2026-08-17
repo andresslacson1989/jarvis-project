@@ -19,6 +19,8 @@ const REQUIRED_CHILDREN = Object.freeze([
   "0.12",
   "0.13",
 ]);
+const PRODUCTION_TAURI_COMMAND =
+  "pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci";
 
 function violation(code, path, detail) {
   return Object.freeze({ code, path, detail });
@@ -53,6 +55,14 @@ export function parseWorkflowSteps(text) {
   }
 
   return steps;
+}
+
+function workflowStepBlock(workflow, name) {
+  const normalized = String(workflow).replace(/\r\n/g, "\n");
+  const start = normalized.indexOf(`- name: ${name}\n`);
+  if (start < 0) return null;
+  const next = normalized.indexOf("\n      - name: ", start + 1);
+  return normalized.slice(start, next < 0 ? normalized.length : next);
 }
 
 function matrixRowStatus(matrix, id) {
@@ -152,10 +162,7 @@ export function validatePhase0Snapshot({
 
   const steps = parseWorkflowSteps(workflowText);
   let lastIndex = -1;
-  const nativeWindowsGateNames = new Set([
-    "Rust Windows-target build",
-    "Desktop Tauri Windows build",
-  ]);
+  const nativeWindowsGateNames = new Set(["Rust Windows-target build"]);
 
   for (const required of profile.requiredWorkflowSteps ?? []) {
     if (nativeWindowsGateNames.has(required.name)) continue;
@@ -221,14 +228,48 @@ export function validatePhase0Snapshot({
   ) {
     violations.push(violation("PHASE0_NATIVE_WINDOWS_EXACT_CHECKOUT_MISSING", ".github/workflows/static-ci.yml", "native Windows job must check out and verify the literal candidate SHA"));
   }
-  for (const [name, command] of [
-    ["Rust Windows-target build", "cargo check --locked --workspace --target x86_64-pc-windows-msvc"],
-    ["Desktop Tauri Windows build", "cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc"],
-  ]) {
-    if (!windowsJob.includes(`- name: ${name}`) || !windowsJob.includes(`run: ${command}`)) {
-      violations.push(violation("PHASE0_NATIVE_WINDOWS_GATE_MISSING", ".github/workflows/static-ci.yml", `${name} must run in the native Windows prerequisite`));
-    }
+
+  const rustWindowsStep = workflowStepBlock(
+    windowsJob,
+    "Rust Windows-target build",
+  );
+  if (
+    rustWindowsStep === null ||
+    !rustWindowsStep.includes(
+      "run: cargo check --locked --workspace --target x86_64-pc-windows-msvc",
+    ) ||
+    /\n\s+if:/.test(rustWindowsStep) ||
+    /\n\s+continue-on-error:/.test(rustWindowsStep)
+  ) {
+    violations.push(
+      violation(
+        "PHASE0_NATIVE_WINDOWS_GATE_MISSING",
+        ".github/workflows/static-ci.yml",
+        "Rust Windows-target build must run unconditionally in the native Windows prerequisite",
+      ),
+    );
   }
+
+  const productionTauriStep = workflowStepBlock(
+    windowsJob,
+    "Desktop Tauri production build",
+  );
+  if (
+    productionTauriStep === null ||
+    !productionTauriStep.includes(`run: ${PRODUCTION_TAURI_COMMAND}`) ||
+    !productionTauriStep.includes("working-directory: apps/desktop") ||
+    /\n\s+if:/.test(productionTauriStep) ||
+    /\n\s+continue-on-error:/.test(productionTauriStep)
+  ) {
+    violations.push(
+      violation(
+        "PHASE0_NATIVE_WINDOWS_GATE_MISSING",
+        ".github/workflows/static-ci.yml",
+        "Desktop Tauri production build must run unconditionally from apps/desktop in the native Windows prerequisite",
+      ),
+    );
+  }
+
   if (!/\n\s+needs:\s*windows-tauri-build\s*\n/.test(staticJob)) {
     violations.push(violation("PHASE0_STATIC_CI_WINDOWS_DEPENDENCY_MISSING", ".github/workflows/static-ci.yml", "static-ci must depend on the native Windows Tauri prerequisite"));
   }

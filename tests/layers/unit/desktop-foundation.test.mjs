@@ -76,6 +76,12 @@ test("remote production renderer target fails closed", async () => {
   assert.ok(codes(remote).includes("DESKTOP_FRONTEND_DIST_NOT_LOCAL"));
 });
 
+test("Tauri production build hook must invoke the real renderer build", async () => {
+  const snapshot = await loadDesktopFoundationSnapshot(root);
+  const missingHook = mutate(snapshot, (copy) => { copy.tauriConfig.build.beforeBuildCommand = ""; });
+  assert.ok(codes(missingHook).includes("DESKTOP_TAURI_BEFORE_BUILD_COMMAND_MISSING"));
+});
+
 test("non-Vite build or removed Cargo workspace membership fails closed", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
   const build = mutate(snapshot, (copy) => { copy.desktopPackage.scripts["build:web"] = "tsc -p tsconfig.json --noEmit"; });
@@ -109,9 +115,9 @@ test("Tauri qualification drift fails closed", async () => {
 test("removing either mandatory Section 1.1 CI gate fails closed", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
   const foundation = mutate(snapshot, (copy) => { copy.workflow = copy.workflow.replace("      - name: Desktop foundation contract\n        run: pnpm desktop:foundation:check\n\n", ""); });
-  const windows = mutate(snapshot, (copy) => { copy.workflow = copy.workflow.replace("      - name: Desktop Tauri Windows build\n        shell: pwsh\n        run: cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc\n", ""); });
+  const production = mutate(snapshot, (copy) => { copy.workflow = copy.workflow.replace("      - name: Desktop Tauri production build\n        shell: pwsh\n        working-directory: apps/desktop\n        run: pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci\n", ""); });
   assert.ok(codes(foundation).includes("DESKTOP_FOUNDATION_CI_GATE_MISSING"));
-  assert.ok(codes(windows).includes("DESKTOP_WINDOWS_BUILD_CI_GATE_MISSING"));
+  assert.ok(codes(production).includes("DESKTOP_TAURI_PRODUCTION_BUILD_CI_GATE_MISSING"));
 });
 
 test("mandatory static CI cannot drift back to an Ubuntu host", async () => {

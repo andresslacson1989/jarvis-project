@@ -68,9 +68,10 @@ jobs:
         shell: pwsh
         run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
 
-      - name: Desktop Tauri Windows build
+      - name: Desktop Tauri production build
         shell: pwsh
-        run: cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc
+        working-directory: apps/desktop
+        run: pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci
 
   static-ci:
     name: static-ci
