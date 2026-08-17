@@ -98,6 +98,21 @@ jobs:
       - name: Node dependency vulnerability gate
         run: pnpm audit --audit-level high
 
+      - name: Install Tauri host-check system dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
       - name: Rust formatting
         run: cargo fmt --all -- --check
 
