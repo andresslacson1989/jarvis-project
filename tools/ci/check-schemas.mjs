@@ -2,9 +2,29 @@ import { readFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import Ajv2020 from "ajv/dist/2020.js";
 import { isMain, relativePath, violation, printViolations } from "./lib.mjs";
 
 const DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema";
+
+export function validateDraft202012Schema(schema) {
+  const validator = new Ajv2020({ allErrors: true, strict: true, validateFormats: false });
+  let valid = false;
+  let thrownError;
+  try {
+    valid = validator.validateSchema(schema);
+  } catch (error) {
+    thrownError = error instanceof Error ? error.message : String(error);
+  }
+  return Object.freeze({
+    valid,
+    errors: valid
+      ? []
+      : thrownError
+        ? [thrownError]
+        : (validator.errors ?? []).map((error) => `${error.instancePath || "#"} ${error.message ?? "schema validation failed"}`),
+  });
+}
 
 async function collectSchemas(current, out) {
   if (!existsSync(current)) return;
@@ -54,6 +74,10 @@ export async function checkSchemas(rootDir) {
     }
     if (schema.$schema !== DRAFT_2020_12) {
       violations.push(violation("SCHEMA_WRONG_DRAFT", path, `expected ${DRAFT_2020_12}`));
+    }
+    const draftValidation = validateDraft202012Schema(schema);
+    if (!draftValidation.valid) {
+      violations.push(violation("SCHEMA_DRAFT_2020_12_INVALID", path, draftValidation.errors.join("; ").slice(0, 2_048)));
     }
     if (typeof schema.$id === "string") {
       const prior = ids.get(schema.$id);

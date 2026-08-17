@@ -106,6 +106,16 @@ test("missing mandatory Phase 0 gate fails closed", () => {
   assert.ok(codes({ workflow }).includes("PHASE0_REQUIRED_GATE_MISSING"));
 });
 
+test("independent Core and UI build gates are mandatory", () => {
+  for (const gate of ["Core build", "Desktop UI build"]) {
+    const workflow = workflowFromProfile().replace(
+      `      - name: ${gate}\n        run: ${gate === "Core build" ? "pnpm build:core" : "pnpm build:ui"}\n\n`,
+      "",
+    );
+    assert.ok(codes({ workflow }).includes("PHASE0_REQUIRED_GATE_MISSING"), gate);
+  }
+});
+
 test("conditional mandatory Phase 0 gate fails closed", () => {
   const workflow = workflowFromProfile().replace(
     "      - name: Contract and profile drift\n        run: pnpm contract:check-drift",

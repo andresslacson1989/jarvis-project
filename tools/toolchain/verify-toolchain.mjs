@@ -70,6 +70,12 @@ assert(baseline.schemaVersion === 1, "toolchain baseline schema version mismatch
 assert(baseline.profile === "JARVIS_V1_WINDOWS_FULL_HOST", "toolchain profile mismatch");
 assert(baseline.node?.lifecycle === "LTS", "Node selection must remain on the selected LTS line");
 assert(baseline.rust?.channel === "stable", "Rust selection must remain stable");
+assert(baseline.tauri?.runtime === "2.11.5", "Tauri runtime release fact mismatch");
+assert(baseline.tauri?.build === "2.6.3", "tauri-build release fact mismatch");
+assert(baseline.tauri?.javascriptApi === "2.11.1", "Tauri JavaScript API release fact mismatch");
+assert(baseline.tauri?.rustPluginOpener === "2.5.4", "Tauri Rust opener plugin release fact mismatch");
+assert(baseline.tauri?.javascriptPluginOpener === "2.5.4", "Tauri JavaScript opener plugin release fact mismatch");
+assert(baseline.tauri?.qualification === "DECLARED_RELEASE_FACT_NOT_YET_IMPLEMENTED", "Tauri qualification state must remain truthful before host implementation");
 
 const EXPECTED = Object.freeze({
   node: baseline.node.version,
@@ -157,12 +163,14 @@ if (metadataOnly) process.exit(0);
 
 const actualNode = process.version.replace(/^v/, "");
 assert(actualNode === EXPECTED.node, `Node mismatch: expected ${EXPECTED.node}, got ${actualNode}`);
-runExact("pnpm", ["--version"], EXPECTED.pnpm, "pnpm");
+if (process.platform === "win32") {
+  runExact("cmd.exe", ["/d", "/s", "/c", "pnpm --version"], EXPECTED.pnpm, "pnpm");
+} else {
+  runExact("pnpm", ["--version"], EXPECTED.pnpm, "pnpm");
+}
 
-const tscExecutable = process.platform === "win32"
-  ? resolve(root, "node_modules", ".bin", "tsc.cmd")
-  : resolve(root, "node_modules", ".bin", "tsc");
-runExact(tscExecutable, ["--version"], `Version ${EXPECTED.typescript}`, "TypeScript");
+const tscScript = resolve(root, "node_modules", "typescript", "bin", "tsc");
+runExact(process.execPath, [tscScript, "--version"], `Version ${EXPECTED.typescript}`, "TypeScript");
 runContains("rustc", ["--version"], `rustc ${EXPECTED.rust} `, "rustc");
 runContains("cargo", ["--version"], `cargo ${EXPECTED.rust} `, "cargo");
 runContains("rustfmt", ["--version"], "rustfmt ", "rustfmt");

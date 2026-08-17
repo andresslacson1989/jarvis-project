@@ -1,0 +1,9 @@
+{
+  "name": "@jarvis/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:web": "tsc -p tsconfig.build.json"
+  }
+}

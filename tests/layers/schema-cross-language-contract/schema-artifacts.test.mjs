@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { validateDraft202012Schema } from "../../../tools/ci/check-schemas.mjs";
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -25,4 +26,14 @@ test("all repository JSON schema artifacts are valid Draft 2020-12 JSON", async 
     const parsed = JSON.parse(await readFile(path, "utf8"));
     assert.equal(parsed.$schema, "https://json-schema.org/draft/2020-12/schema", path);
   }
+});
+
+test("a syntactically valid document with an invalid Draft 2020-12 schema shape is rejected", () => {
+  const result = validateDraft202012Schema({
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    $id: "urn:test:invalid-schema-shape",
+    type: 42,
+  });
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.length > 0);
 });

@@ -50,8 +50,21 @@
       },
       "required": ["version", "channel", "edition", "target", "components"],
       "additionalProperties": false
+    },
+    "tauri": {
+      "type": "object",
+      "properties": {
+        "runtime": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "build": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "javascriptApi": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "rustPluginOpener": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "javascriptPluginOpener": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "qualification": {"const": "DECLARED_RELEASE_FACT_NOT_YET_IMPLEMENTED"}
+      },
+      "required": ["runtime", "build", "javascriptApi", "rustPluginOpener", "javascriptPluginOpener", "qualification"],
+      "additionalProperties": false
     }
   },
-  "required": ["schemaVersion", "profile", "node", "pnpm", "typescript", "rust"],
+  "required": ["schemaVersion", "profile", "node", "pnpm", "typescript", "rust", "tauri"],
   "additionalProperties": false
 }
