@@ -49,9 +49,16 @@ The two files together are one non-normative implementation matrix. They are not
 | ↳ **0.13** Authoritative `master` repository governance: server-enforced when available, compensating controls when unavailable | **VERIFIED** | 0.11, 0.12 | PLAN §2; IC §28; RP §17; VR §33; ADR-074 | 10 CA / 8 scoped | None within `0.13` scope; hosting residual risk is explicit and contract-approved only while server protection is unavailable | `8996d6947fd60b415e32485ee3777914f80cd590`; `docs/implementation/evidence/0.13-master-protection-blocker.md`; governance mode `COMPENSATING_CONTROLS`; live `master` truthfully `protected=false`; pre-integration run `31637736770` PASS; non-force authoritative integration PASS; post-integration `master` run `31637928189` PASS; server-side mode becomes mandatory when available |
 | ↳ **0.CP** SECTION CHECKPOINT — Phase 0 clean-checkout, governance, platform-boundary, and drift proof | **VERIFIED** | 0.1–0.13 | PLAN §2 Exit; PLAN §26 checkpoint; VR §§6,9,33 | 10 CA / 8 scoped | None within the Phase 0 checkpoint scope; server-side protection limitation remains explicitly recorded | Separate Core/UI gates are implemented and mandatory; candidate `7221d70b...` exact-head static-ci `31988167248` passed; evidence reconciliation integrated non-force as `bc82d724f511cbd7d57364760223fa03b66af660`; final authoritative master static-ci `31988970480` passed; reconciled evidence in `docs/implementation/evidence/0.CP-phase0-checkpoint.md` |
 
+### SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core
+
+| Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
+|---|---|---|---|---:|---|---|
+| **SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core** | **IN PROGRESS** | 0.CP | `Phase 1`; checkpoint: Windows Desktop Trust + Mission Control Foundation Ready | — | 1.1 is the only active subsection; later Section 1 work remains not started | Live master-based candidate branch `impl/section1-1.1-tauri-react`; exact current candidate CI is failing and the section is not eligible for verification |
+| ↳ **1.1** Tauri 2 + React desktop workspace with bundled-local authoritative WebView | **IN PROGRESS** | 0.CP | PLAN §3; RT §§2–5; RP §3; UI §8 | — | Windows ICO resource/checker gate was red; fix is in progress; native Windows-target proof and independent audit remain outstanding | Candidate base `21e362da...`; focused resource tests and desktop foundation check pass locally after the fix; Linux-host Rust verification was resource-exhausted by Windows paging-file error; exact candidate CI must be rerun |
+
 ## Future-section status summary
 
-Sections 1–19 remain `NOT STARTED` except contract-permitted optional rows already marked `DEFERRED` in the reference plan. Their complete subsection definitions, dependencies, traceability, and final release-gate ownership remain in `JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` until each parent section becomes active and is promoted into this live board.
+Sections 2–19 remain `NOT STARTED` except contract-permitted optional rows already marked `DEFERRED` in the reference plan. Their complete subsection definitions, dependencies, traceability, and final release-gate ownership remain in `JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` until each parent section becomes active and is promoted into this live board.
 
 ## Maintenance invariants
 

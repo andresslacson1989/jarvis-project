@@ -25,6 +25,30 @@ async function readOptional(path) {
   }
 }
 
+async function readBinaryOptional(path) {
+  try {
+    return await readFile(path);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+function isValidWindowsIco(icon) {
+  if (!Buffer.isBuffer(icon) || icon.length < 22) return false;
+  if (icon.readUInt16LE(0) !== 0 || icon.readUInt16LE(2) !== 1) return false;
+  const count = icon.readUInt16LE(4);
+  if (count < 1 || icon.length < 6 + count * 16) return false;
+  for (let index = 0; index < count; index += 1) {
+    const entry = 6 + index * 16;
+    const size = icon.readUInt32LE(entry + 8);
+    const offset = icon.readUInt32LE(entry + 12);
+    if (size === 0 || offset < 6 + count * 16 || offset + size > icon.length) return false;
+    if (icon[offset] === 0x89 && icon[offset + 1] === 0x50 && icon[offset + 2] === 0x4e && icon[offset + 3] === 0x47) return true;
+  }
+  return false;
+}
+
 function parseJson(text) {
   if (text === null) return null;
   try {
@@ -36,7 +60,7 @@ function parseJson(text) {
 
 export async function loadDesktopFoundationSnapshot(rootDir) {
   const read = (relativePath) => readOptional(resolve(rootDir, relativePath));
-  const [rootCargo, desktopPackageText, tauriCargo, tauriConfigText, indexHtml, stylesCss, mainRs, toolchainText, workflow] = await Promise.all([
+  const [rootCargo, desktopPackageText, tauriCargo, tauriConfigText, indexHtml, stylesCss, mainRs, toolchainText, workflow, windowsResourceIcon] = await Promise.all([
     read("Cargo.toml"),
     read("apps/desktop/package.json"),
     read("apps/desktop/src-tauri/Cargo.toml"),
@@ -46,6 +70,7 @@ export async function loadDesktopFoundationSnapshot(rootDir) {
     read("apps/desktop/src-tauri/src/main.rs"),
     read("tools/toolchain/toolchain-baseline.json"),
     read(".github/workflows/static-ci.yml"),
+    readBinaryOptional(resolve(rootDir, "apps/desktop/src-tauri/icons/icon.ico")),
   ]);
   return {
     rootCargo,
@@ -60,6 +85,7 @@ export async function loadDesktopFoundationSnapshot(rootDir) {
     toolchain: parseJson(toolchainText),
     toolchainText,
     workflow,
+    windowsResourceIcon,
   };
 }
 
@@ -101,6 +127,7 @@ export function evaluateDesktopFoundation(snapshot) {
   add(violations, snapshot.desktopPackageText !== null, "DESKTOP_PACKAGE_MISSING", "apps/desktop/package.json", "desktop package manifest is required");
   add(violations, snapshot.indexHtml !== null, "DESKTOP_INDEX_MISSING", "apps/desktop/index.html", "bundled renderer entry point is required");
   add(violations, snapshot.mainRs !== null, "DESKTOP_TAURI_MAIN_MISSING", "apps/desktop/src-tauri/src/main.rs", "Tauri application entry point is required");
+  add(violations, isValidWindowsIco(snapshot.windowsResourceIcon), "DESKTOP_WINDOWS_RESOURCE_ICON_MISSING", "apps/desktop/src-tauri/icons/icon.ico", "a valid Windows ICO resource with at least one image entry is required");
   add(violations, snapshot.toolchainText !== null, "DESKTOP_TOOLCHAIN_BASELINE_MISSING", "tools/toolchain/toolchain-baseline.json", "toolchain baseline is required");
 
   if (snapshot.desktopPackageText !== null && pkg === undefined) {
