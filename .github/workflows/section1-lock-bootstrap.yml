@@ -102,6 +102,9 @@ jobs:
       - name: Generate provenance metadata
         run: node .github/scripts/section1-bootstrap-provenance.mjs
 
+      - name: Canonicalize provenance and notices
+        run: node .github/scripts/section1-merge-provenance.mjs
+
       - name: Revalidate master and capture generated files
         shell: bash
         env:
@@ -115,10 +118,10 @@ jobs:
           cp /tmp/cargo-provenance.json .bootstrap/cargo-provenance.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml Cargo.lock .bootstrap/npm-provenance.json .bootstrap/cargo-provenance.json
+          git add pnpm-lock.yaml Cargo.lock third_party/provenance.json THIRD_PARTY_NOTICES.md .bootstrap/npm-provenance.json .bootstrap/cargo-provenance.json
           if git diff --cached --quiet; then
             echo "generated dependency state already captured"
             exit 0
           fi
-          git commit -m "build(1.1): capture generated lockfiles and provenance"
+          git commit -m "build(1.1): canonicalize generated dependency state"
           git push "${AUTH_URL}" HEAD:${GITHUB_REF_NAME}
