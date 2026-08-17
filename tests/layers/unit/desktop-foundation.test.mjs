@@ -55,7 +55,7 @@ test("remote production renderer target fails closed", async () => {
 test("non-Vite build or removed Cargo workspace membership fails closed", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
   const build = mutate(snapshot, (copy) => { copy.desktopPackage.scripts["build:web"] = "tsc -p tsconfig.json --noEmit"; });
-  const workspace = mutate(snapshot, (copy) => { copy.rootCargo = copy.rootCargo.replace(', "apps/desktop/src-tauri"', ""); });
+  const workspace = mutate(snapshot, (copy) => { copy.rootCargo = copy.rootCargo.replaceAll(', "apps/desktop/src-tauri"', ""); });
   assert.ok(codes(build).includes("DESKTOP_WEB_BUILD_NOT_VITE"));
   assert.ok(codes(workspace).includes("DESKTOP_CARGO_WORKSPACE_MISSING"));
 });
