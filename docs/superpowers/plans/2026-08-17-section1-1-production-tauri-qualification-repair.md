@@ -1,109 +1,92 @@
 # Section 1.1 Production Tauri Qualification Repair Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: use TDD, systematic debugging, code-review verification, and verification-before-completion. Execute each task against the live feature branch after revalidating `master` and the branch tip.
+> **For agentic workers:** use TDD, systematic debugging, code-review verification, and verification-before-completion. Revalidate `master` and the feature tip before writes.
 
-**Goal:** Prove Section 1.1’s production bundled-local Tauri/React boundary on the exact Windows candidate by replacing the misleading `cargo check` “Desktop Tauri Windows build” gate with a genuine Tauri release-mode build that consumes the real Vite `dist`, while preserving all existing Phase 0/static/security/governance gates and keeping installer/release and Section 1.2 scope out.
+**Goal:** Prove Section 1.1’s production bundled-local Tauri/React boundary on the exact Windows source candidate using a genuine release-mode Tauri application build, while preserving every inherited Phase 0/static/security/governance gate and keeping installer/release and Section 1.2 work out of scope.
 
-**Architecture:** Keep the existing two-job native-Windows CI topology. The `windows-tauri-build` prerequisite remains the native application qualification job, but its explicit desktop gate will execute the pinned Tauri CLI production build with bundling disabled. The desktop-foundation and Phase 0 validators will fail closed if that production gate is removed, weakened back to `cargo check`, made skippable, moved off native Windows, or disconnected from exact-candidate evidence.
+**Authoritative production command:** from `apps/desktop`:
 
-**Tech stack:** Windows Server 2025 GitHub Actions runner; Node 24.18.0; pnpm 11.21.0; Rust 1.97.1; `x86_64-pc-windows-msvc`; Tauri 2.11.5; `tauri-build` 2.6.3; `@tauri-apps/cli` 2.11.4; React/Vite.
+```text
+pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci
+```
 
-## Global constraints
+The workflow uses the package-local pinned CLI through the exact desktop script `"tauri": "tauri"`. The checker must fail closed if that script is substituted. Do not replace the proven working-directory form with a different command spelling unless the workflow, checker, tests, and fresh qualification are deliberately updated together.
 
-- Normative contracts are read-only.
-- V1 qualification target is `WINDOWS + FULL_HOST + x64`.
-- Section 1.1 remains `IN PROGRESS` until complete exact-head evidence and fresh independent review pass.
-- No Section 1.2 CSP/capability/navigation/devtools implementation.
-- No installer/signing/updater/release-packaging work; `tauri build --no-bundle` is used specifically to exercise production application build semantics without bundling.
-- No Linux runtime qualification or Linux WebKit/GTK prerequisites.
-- No system Node assumption; toolchain pins and frozen lockfiles remain mandatory.
-- Exact PR-head checkout and evidence binding remain mandatory.
-- Existing Phase 0 gates must remain at least as strong as before.
+## Required semantics
 
----
+- V1 qualification target is `WINDOWS + FULL_HOST + x64` on `windows-2025`.
+- Keep native workspace `cargo check --locked --workspace --target x86_64-pc-windows-msvc` as a separate compile gate.
+- Never represent Cargo check as the production Tauri proof.
+- Tauri must invoke configured `beforeBuildCommand: pnpm build:web`, Vite must produce local `dist`, `frontendDist` must be `../dist`, and the optimized release application must emit `jarvis-desktop.exe`.
+- `--no-bundle` avoids installer/signing/updater scope while still exercising production application semantics.
+- Normative contracts remain read-only.
+- Linux runtime qualification and WebKitGTK/GTK prerequisites remain outside V1.
+- Exact PR-head checkout, candidate binding, Phase 0 gates, and compensating governance controls remain mandatory.
 
-### Task 1: Encode the review blocker as RED tests
+## Review-defect regression coverage
 
-**Files:**
-- Modify: `tests/layers/unit/desktop-foundation.test.mjs`
-- Modify: `tests/layers/unit/phase0-checkpoint.test.mjs`
+The deterministic suite must directly cover all of these:
 
-**Required behavior:**
-- Reject `cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc` as the explicit production Tauri qualification gate.
-- Require an unconditional native-Windows step named `Desktop Tauri production build` running the pinned package-local CLI through pnpm: `pnpm --dir apps/desktop tauri build --no-bundle --target x86_64-pc-windows-msvc --ci`.
-- Reject removal of `--no-bundle`, `--target x86_64-pc-windows-msvc`, or the Tauri CLI build verb.
-- Preserve exact-head checkout and native Windows prerequisite assertions.
+1. Replace the production Tauri command with Cargo check → fail.
+2. Remove production build flags/target/working directory or make the gate conditional → fail.
+3. Redirect `apps/desktop`'s `tauri` package script to a successful no-op → `DESKTOP_TAURI_CLI_SCRIPT_DRIFT`.
+4. Move `windows-tauri-build.runs-on` from `windows-2025` to `ubuntu-24.04` → `PHASE0_NATIVE_WINDOWS_JOB_MISSING`.
+5. Keep the separate downstream `static-ci` Windows-runner regression; it is not a substitute for item 4.
+6. Reintroduce Linux Tauri host prerequisites → fail.
+7. Break exact-head checkout/evidence aggregation or use synthetic PR merge SHA as candidate → fail.
 
-**RED proof:** The new tests must fail against the pre-fix workflow/checkers because the current workflow uses only `cargo check`.
+A missing focused mutation test is a verification defect even when the production checker already implements the invariant.
 
-### Task 2: Implement the genuine production Tauri gate
+## Evidence lifecycle correction
 
-**Files:**
-- Modify: `.github/workflows/static-ci.yml`
-- Modify: `tools/ci/check-desktop-foundation.mjs`
-- Modify: `tools/checkpoints/phase0-checkpoint.mjs`
-- Modify: `tests/layers/unit/desktop-foundation.test.mjs`
-- Modify: `tests/layers/unit/phase0-checkpoint.test.mjs`
+The functional implementation proof and evidence-bearing review head are distinct when documentation/tests change after a functional run.
 
-**Implementation:**
-- In `windows-tauri-build`, retain the workspace native MSVC `cargo check` as a separate compile gate.
-- Replace the mislabeled desktop `cargo check` step with:
-  `pnpm --dir apps/desktop tauri build --no-bundle --target x86_64-pc-windows-msvc --ci`
-- Do not separately prebuild a synthetic `dist` in that job; allow Tauri CLI to run configured `beforeBuildCommand` (`pnpm build:web`) and consume configured `frontendDist` (`../dist`).
-- Keep `bundle.active=false`; `--no-bundle` makes the CI intent explicit and prevents installer-generation scope.
-- Update fail-closed validators to require the production Tauri command rather than the old `cargo check` string.
-- Ensure Phase 0 aggregation still requires native Windows success and does not reinterpret this as Linux/cross-build qualification.
+- Functional proof currently recorded by the evidence document: `2c5ed5017ec867afbcfaaa49eef1403ed2aa4c04`, run `32021889928`, native job `95363120563`, static job `95366512263`.
+- Checked-in evidence must describe the real Tauri path and explicitly distinguish the Phase 0 aggregate payload from Section 1.1’s native production-Tauri job/log evidence.
+- The later repository head containing reconciled evidence and additional regression coverage must receive its own exact-head Windows CI.
+- Do not claim the reconciled evidence existed at the earlier functional SHA.
+- After the later head’s CI completes, record that exact head/run/job identity in PR #7 metadata. Updating PR metadata does not mutate the source candidate.
+- Keep Section 1 and 1.1 `IN PROGRESS` throughout review correction.
 
-**GREEN proof:** Focused desktop-foundation and Phase 0 tests pass; desktop checker and Phase 0 checkpoint pass locally/CI.
+## Exact-head qualification requirements
 
-### Task 3: Qualify the exact candidate on GitHub Actions
+For the evidence-bearing review candidate require, on one literal SHA:
 
-**Files:** no source changes during the run.
+- `windows-tauri-build` on `windows-2025` — success;
+- native workspace MSVC compile — success;
+- `Desktop Tauri production build` — success and not skipped;
+- completed log proves `beforeBuildCommand → Vite production dist → optimized Tauri release → jarvis-desktop.exe`;
+- downstream `static-ci` depends on the native result and succeeds;
+- exact toolchain, format, schema, generated contract, manifest/drift, governance, secrets, dependency/provenance, TypeScript/Core/UI, desktop foundation, architecture, deterministic tests, audit, Rust fmt/clippy/host build, Phase 0 checkpoint, and candidate-bound evidence all succeed;
+- the focused native-runner Ubuntu mutation executes and passes in the deterministic suite.
 
-**Required evidence:**
-- PR exact head SHA equals checked-out SHA.
-- `windows-tauri-build` succeeds on `windows-2025`.
-- Native workspace MSVC build succeeds.
-- `Desktop Tauri production build` succeeds and is not skipped.
-- `static-ci` succeeds on the same exact SHA.
-- Desktop UI build, desktop foundation, architecture, deterministic tests, audit, Rust fmt/clippy/host build, Phase 0 checkpoint, and candidate-bound evidence all succeed.
-- No required step is skipped/conditional.
+No source/evidence file changes occur during this run.
 
-### Task 4: Reconcile evidence and matrix truthfully
+## Fresh unbiased audit before a fixed decision
 
-**Files:**
-- Modify: `docs/implementation/evidence/1.1-tauri-react-desktop-foundation.md`
-- Modify: `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md`
-- Modify PR #7 body if needed.
+After exact-head CI succeeds, re-fetch live `master`, feature head, PR #7, `AGENTS.md`, active manifest/contracts, complete PR diff, current application/CI/checker/test/dependency/evidence surface, and exact CI logs. Evaluate from scratch:
 
-**Rules:**
-- Record the exact qualifying SHA/run/job IDs.
-- Replace any historical claim that `cargo check` was an explicit Tauri production build.
-- Keep Section 1 and 1.1 `IN PROGRESS` pending final independent review/integration.
-- Do not change historical Phase 0 rows.
-- Do not mark 1.1 `VERIFIED` before review and controlled integration.
-
-### Task 5: Fresh unbiased contract audit before declaring fixed
-
-Re-fetch live `master`, feature head, PR #7, exact CI, `AGENTS.md`, and governing Section 1.1 contract documents. Re-read the actual changed files and complete PR diff.
-
-Evaluate from scratch:
 - production bundled-local asset consumption;
 - native Windows qualification;
-- pinned dependency/toolchain consistency;
-- exact candidate evidence binding;
-- fail-closed test quality;
-- security/authority scope boundaries;
-- Linux portability without Linux runtime qualification;
+- exact dependency/toolchain pins;
+- candidate/evidence lifecycle truthfulness;
+- fail-closed/adversarial test precision;
+- renderer/native authority boundaries;
+- Linux portability without false Linux runtime qualification;
 - Phase 0 preservation;
-- absence of Section 1.2+ leakage;
-- evidence/matrix truthfulness.
+- absence of 1.2+ leakage.
 
-**Completion threshold:**
-- Contract Accuracy = **10/10 exactly**.
-- Production readiness/practices/enterprise hardening >= 8/10.
-- Atomicity/idempotency >= 8/10 where applicable.
-- Exact-head Windows CI = success.
-- No blocking review finding remains.
+**Repository-side blocker closure threshold:**
+- Contract Accuracy = **10/10 exactly** from the fresh audit;
+- production readiness/practices/enterprise hardening >= 8/10;
+- test/verification quality >= 8/10;
+- maintainability/architecture >= 8/10;
+- atomicity/idempotency >= 8/10 where applicable;
+- exact-head CI success;
+- no known repository-side blocking defect from the independent review remains.
 
-If any condition fails, Section 1.1 remains `IN PROGRESS` and the observed defect is repaired before another completion decision.
+Passing this threshold means the candidate is ready for **renewed independent review**; it does not by itself mark subsection 1.1 `VERIFIED`.
+
+## Integration boundary
+
+Only after renewed independent review passes: immediately revalidate live `master`, reconcile movement, integrate non-force, verify resulting authoritative tip/diff and post-integration CI, then update matrix status in a controlled manner. Do not begin 1.2 before 1.1 is actually closed.
