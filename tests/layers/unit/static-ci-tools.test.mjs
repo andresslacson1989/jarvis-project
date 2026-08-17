@@ -136,6 +136,18 @@ test("CI evidence is Phase-0 scoped, commit-bound, and requires the aggregate ch
       }),
     /JARVIS_PHASE0_CHECKPOINT_PASSED/,
   );
+  assert.throws(
+    () =>
+      buildCiEvidence({
+        env: {
+          GITHUB_SHA: "a".repeat(40),
+          JARVIS_STATIC_CI_GATES_PASSED: "1",
+          JARVIS_PHASE0_CHECKPOINT_PASSED: "1",
+        },
+        versions: {},
+      }),
+    /JARVIS_WINDOWS_TAURI_GATES_PASSED/,
+  );
 
   const evidence = buildCiEvidence({
     env: {
@@ -147,6 +159,7 @@ test("CI evidence is Phase-0 scoped, commit-bound, and requires the aggregate ch
       RUNNER_ARCH: "X64",
       JARVIS_STATIC_CI_GATES_PASSED: "1",
       JARVIS_PHASE0_CHECKPOINT_PASSED: "1",
+      JARVIS_WINDOWS_TAURI_GATES_PASSED: "1",
     },
     versions: {
       node: "24.18.0",

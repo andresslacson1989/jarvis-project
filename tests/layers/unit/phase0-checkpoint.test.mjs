@@ -25,6 +25,7 @@ const childIds = [
 
 function workflowFromProfile() {
   const gates = profile.requiredWorkflowSteps
+    .filter(({ name }) => !["Rust Windows-target build", "Desktop Tauri Windows build"].includes(name))
     .map(
       ({ name, run }) =>
         `      - name: ${name}\n        run: ${run}\n`,
@@ -37,8 +38,27 @@ on:
 permissions:
   contents: read
 jobs:
+  windows-tauri-build:
+    name: windows-tauri-build
+    runs-on: windows-2025
+    steps:
+      - name: Checkout
+        uses: actions/checkout@${"a".repeat(40)}
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          ref: \${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      - name: Verify exact checkout
+        env:
+          EXPECTED_SHA: candidate
+        run: git rev-parse HEAD
+      - name: Rust Windows-target build
+        run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
+      - name: Desktop Tauri Windows build
+        run: cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc
   static-ci:
     name: static-ci
+    needs: windows-tauri-build
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -48,10 +68,14 @@ jobs:
           fetch-depth: 1
 
 ${gates}
+      - name: Verify native Windows Tauri prerequisite
+        run: verify native Windows prerequisite
       - name: Phase 0 section checkpoint
         run: pnpm phase0:check
 
       - name: Static CI evidence
+        env:
+          JARVIS_WINDOWS_TAURI_GATES_PASSED: '1'
         run: pnpm ci:evidence
 `;
 }
@@ -116,6 +140,20 @@ test("independent Core and UI build gates are mandatory", () => {
   }
 });
 
+test("native Windows Tauri topology fails closed", () => {
+  const cases = [
+    ["windows job", (workflow) => workflow.replace("  windows-tauri-build:", "  removed-windows-job:")],
+    ["static dependency", (workflow) => workflow.replace("    needs: windows-tauri-build\n", "")],
+    ["Windows target", (workflow) => workflow.replaceAll("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc")],
+    ["Tauri command", (workflow) => workflow.replace("cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc", "cargo check --locked -p jarvis-desktop")],
+    ["synthetic checkout", (workflow) => workflow.replace("github.event.pull_request.head.sha", "github.sha")],
+    ["Ubuntu cross-build", (workflow) => workflow.replace("      - name: Verify native Windows Tauri prerequisite", "      - name: Rust Windows-target build\n        run: cargo check --locked --workspace --target x86_64-pc-windows-msvc\n\n      - name: Verify native Windows Tauri prerequisite")],
+  ];
+  for (const [label, mutate] of cases) {
+    assert.ok(codes({ workflow: mutate(workflowFromProfile()) }).some((code) => code.startsWith("PHASE0_")), label);
+  }
+});
+
 test("conditional mandatory Phase 0 gate fails closed", () => {
   const workflow = workflowFromProfile().replace(
     "      - name: Contract and profile drift\n        run: pnpm contract:check-drift",
@@ -130,8 +168,8 @@ test("Phase 0 checkpoint must precede evidence", () => {
   const workflow = workflowFromProfile()
     .replace(checkpoint, "")
     .replace(
-      "      - name: Static CI evidence\n        run: pnpm ci:evidence",
-      `      - name: Static CI evidence\n        run: pnpm ci:evidence\n\n${checkpoint.trimEnd()}`,
+      "      - name: Static CI evidence\n        env:\n          JARVIS_WINDOWS_TAURI_GATES_PASSED: '1'\n        run: pnpm ci:evidence",
+      `      - name: Static CI evidence\n        env:\n          JARVIS_WINDOWS_TAURI_GATES_PASSED: '1'\n        run: pnpm ci:evidence\n\n${checkpoint.trimEnd()}`,
     );
   assert.ok(codes({ workflow }).includes("PHASE0_EVIDENCE_ORDER"));
 });

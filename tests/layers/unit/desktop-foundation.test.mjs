@@ -109,7 +109,7 @@ test("Tauri qualification drift fails closed", async () => {
 test("removing either mandatory Section 1.1 CI gate fails closed", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
   const foundation = mutate(snapshot, (copy) => { copy.workflow = copy.workflow.replace("      - name: Desktop foundation contract\n        run: pnpm desktop:foundation:check\n\n", ""); });
-  const windows = mutate(snapshot, (copy) => { copy.workflow = copy.workflow.replace("      - name: Desktop Tauri Windows build\n        run: cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc\n\n", ""); });
+  const windows = mutate(snapshot, (copy) => { copy.workflow = copy.workflow.replace("      - name: Desktop Tauri Windows build\n        shell: pwsh\n        run: cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc\n", ""); });
   assert.ok(codes(foundation).includes("DESKTOP_FOUNDATION_CI_GATE_MISSING"));
   assert.ok(codes(windows).includes("DESKTOP_WINDOWS_BUILD_CI_GATE_MISSING"));
 });

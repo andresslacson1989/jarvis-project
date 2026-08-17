@@ -152,8 +152,13 @@ export function validatePhase0Snapshot({
 
   const steps = parseWorkflowSteps(workflowText);
   let lastIndex = -1;
+  const nativeWindowsGateNames = new Set([
+    "Rust Windows-target build",
+    "Desktop Tauri Windows build",
+  ]);
 
   for (const required of profile.requiredWorkflowSteps ?? []) {
+    if (nativeWindowsGateNames.has(required.name)) continue;
     const index = steps.findIndex((step) => step.name === required.name);
     if (index < 0) {
       violations.push(
@@ -197,6 +202,44 @@ export function validatePhase0Snapshot({
         ),
       );
     }
+  }
+
+  const windowsJob = workflowText.match(
+    /\n  windows-tauri-build:\s*\n([\s\S]*?)(?=\n  static-ci:\s*\n|$)/,
+  )?.[1] ?? "";
+  const staticJob = workflowText.match(
+    /\n  static-ci:\s*\n([\s\S]*?)(?=\n  [A-Za-z0-9_-]+:\s*\n|$)/,
+  )?.[1] ?? "";
+  if (!/\n\s+runs-on:\s*windows-2025\s*\n/.test(windowsJob)) {
+    violations.push(violation("PHASE0_NATIVE_WINDOWS_JOB_MISSING", ".github/workflows/static-ci.yml", "native Windows Tauri prerequisite must run on windows-2025"));
+  }
+  if (
+    !/github\.event\.pull_request\.head\.sha/.test(windowsJob) ||
+    !/Verify exact checkout/.test(windowsJob) ||
+    !/git rev-parse HEAD/.test(windowsJob) ||
+    !/EXPECTED_SHA/.test(windowsJob)
+  ) {
+    violations.push(violation("PHASE0_NATIVE_WINDOWS_EXACT_CHECKOUT_MISSING", ".github/workflows/static-ci.yml", "native Windows job must check out and verify the literal candidate SHA"));
+  }
+  for (const [name, command] of [
+    ["Rust Windows-target build", "cargo check --locked --workspace --target x86_64-pc-windows-msvc"],
+    ["Desktop Tauri Windows build", "cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc"],
+  ]) {
+    if (!windowsJob.includes(`- name: ${name}`) || !windowsJob.includes(`run: ${command}`)) {
+      violations.push(violation("PHASE0_NATIVE_WINDOWS_GATE_MISSING", ".github/workflows/static-ci.yml", `${name} must run in the native Windows prerequisite`));
+    }
+  }
+  if (!/\n\s+needs:\s*windows-tauri-build\s*\n/.test(staticJob)) {
+    violations.push(violation("PHASE0_STATIC_CI_WINDOWS_DEPENDENCY_MISSING", ".github/workflows/static-ci.yml", "static-ci must depend on the native Windows Tauri prerequisite"));
+  }
+  if (!staticJob.includes("Verify native Windows Tauri prerequisite") || !staticJob.includes("JARVIS_WINDOWS_TAURI_GATES_PASSED")) {
+    violations.push(violation("PHASE0_STATIC_CI_WINDOWS_AGGREGATION_MISSING", ".github/workflows/static-ci.yml", "static-ci must fail closed and pass native Windows completion into evidence"));
+  }
+  if (
+    staticJob.includes("cargo check --locked --workspace --target x86_64-pc-windows-msvc") ||
+    staticJob.includes("cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc")
+  ) {
+    violations.push(violation("PHASE0_UBUNTU_WINDOWS_CROSS_BUILD_FORBIDDEN", ".github/workflows/static-ci.yml", "MSVC Windows-target Cargo builds must run only in the native Windows prerequisite"));
   }
 
   const checkpointIndex = steps.findIndex(

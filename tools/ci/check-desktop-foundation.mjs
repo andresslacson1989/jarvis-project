@@ -91,20 +91,21 @@ export async function loadDesktopFoundationSnapshot(rootDir) {
 
 function workflowStepBlock(workflow, name) {
   if (typeof workflow !== "string") return null;
-  const start = workflow.indexOf(`      - name: ${name}\n`);
+  const normalized = workflow.replace(/\r\n/g, "\n");
+  const start = normalized.indexOf(`- name: ${name}\n`);
   if (start < 0) return null;
-  const next = workflow.indexOf("\n      - name: ", start + 1);
-  return workflow.slice(start, next < 0 ? workflow.length : next);
+  const next = normalized.indexOf("\n      - name: ", start + 1);
+  return normalized.slice(start, next < 0 ? normalized.length : next);
 }
 
 function hasWorkflowStep(workflow, name, run) {
   const block = workflowStepBlock(workflow, name);
-  return block !== null && block.includes(`\n        run: ${run}`) && !/\n\s+if:/.test(block);
+  return block !== null && block.includes(`\n        run: ${run}`) && !/\n {8}if:/.test(block);
 }
 
 function hasWorkflowStepFragments(workflow, name, fragments) {
   const block = workflowStepBlock(workflow, name);
-  return block !== null && fragments.every((fragment) => block.includes(fragment)) && !/\n\s+if:/.test(block);
+  return block !== null && fragments.every((fragment) => block.includes(fragment)) && !/\n {8}if:/.test(block);
 }
 
 function add(violations, condition, code, path, detail) {

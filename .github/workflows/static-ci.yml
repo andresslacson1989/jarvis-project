@@ -15,8 +15,67 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows-tauri-build:
+    name: windows-tauri-build
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $actualSha = (git rev-parse HEAD).Trim()
+          if ($actualSha -ne $env:EXPECTED_SHA) {
+            throw "Expected exact candidate SHA $env:EXPECTED_SHA but checked out $actualSha"
+          }
+
+      - name: Install pinned pnpm and Node
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.21.0
+          runtime: node@24.18.0
+          install: false
+          cache: false
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.97.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc
+          rustup default 1.97.1
+
+      - name: Install dependencies without lifecycle scripts
+        shell: pwsh
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Verify exact toolchain
+        shell: pwsh
+        run: pnpm toolchain:verify
+
+      - name: Windows Rust formatting
+        shell: pwsh
+        run: cargo fmt --all -- --check
+
+      - name: Rust Windows-target build
+        shell: pwsh
+        run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
+
+      - name: Desktop Tauri Windows build
+        shell: pwsh
+        run: cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc
+
   static-ci:
     name: static-ci
+    needs: windows-tauri-build
+    if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -35,6 +94,16 @@ jobs:
           actual_sha="$(git rev-parse HEAD)"
           if [[ "$actual_sha" != "$EXPECTED_SHA" ]]; then
             echo "Expected exact candidate SHA $EXPECTED_SHA but checked out $actual_sha" >&2
+            exit 1
+          fi
+
+      - name: Verify native Windows Tauri prerequisite
+        shell: bash
+        env:
+          WINDOWS_TAURI_RESULT: ${{ needs.windows-tauri-build.result }}
+        run: |
+          if [[ "$WINDOWS_TAURI_RESULT" != "success" ]]; then
+            echo "Native Windows Tauri prerequisite was $WINDOWS_TAURI_RESULT" >&2
             exit 1
           fi
 
@@ -123,29 +192,7 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev \
-            llvm
-
-          llvm_rc_path="$(command -v llvm-rc || true)"
-          if [[ -z "$llvm_rc_path" ]]; then
-            for llvm_bin_dir in /usr/lib/llvm-*/bin; do
-              if [[ -x "$llvm_bin_dir/llvm-rc" ]]; then
-                llvm_rc_path="$llvm_bin_dir/llvm-rc"
-                break
-              fi
-            done
-          fi
-          if [[ -z "$llvm_rc_path" || ! -x "$llvm_rc_path" ]]; then
-            echo "llvm-rc was not installed or could not be located" >&2
-            exit 1
-          fi
-          llvm_bin_dir="$(dirname "$llvm_rc_path")"
-          echo "$llvm_bin_dir" >> "$GITHUB_PATH"
-          probe_rc="$RUNNER_TEMP/jarvis-llvm-rc-probe.rc"
-          probe_res="$RUNNER_TEMP/jarvis-llvm-rc-probe.res"
-          printf '1 ICON DISCARDABLE "%s"\n' "$GITHUB_WORKSPACE/apps/desktop/src-tauri/icons/icon.ico" > "$probe_rc"
-          "$llvm_rc_path" "/fo$probe_res" "$probe_rc"
-          test -s "$probe_res"
+            librsvg2-dev
 
       - name: Rust formatting
         run: cargo fmt --all -- --check
@@ -156,12 +203,6 @@ jobs:
       - name: Rust host build
         run: cargo check --locked --workspace --all-targets --all-features
 
-      - name: Rust Windows-target build
-        run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
-
-      - name: Desktop Tauri Windows build
-        run: cargo check --locked -p jarvis-desktop --target x86_64-pc-windows-msvc
-
       - name: Phase 0 section checkpoint
         run: pnpm phase0:check
 
@@ -169,4 +210,5 @@ jobs:
         env:
           JARVIS_STATIC_CI_GATES_PASSED: '1'
           JARVIS_PHASE0_CHECKPOINT_PASSED: '1'
+          JARVIS_WINDOWS_TAURI_GATES_PASSED: '1'
         run: pnpm ci:evidence

@@ -54,6 +54,11 @@ export function buildCiEvidence({
       "JARVIS_PHASE0_CHECKPOINT_PASSED=1 is required for PASS evidence",
     );
   }
+  if (env.JARVIS_WINDOWS_TAURI_GATES_PASSED !== "1") {
+    throw new Error(
+      "JARVIS_WINDOWS_TAURI_GATES_PASSED=1 is required for PASS evidence",
+    );
+  }
   if (contractSuiteVersion !== "1.0.6") {
     throw new Error(
       `contractSuiteVersion evidence mismatch: expected 1.0.6, got ${contractSuiteVersion ?? "<missing>"}`,
