@@ -405,22 +405,24 @@ tool path or final PermissionEngine-to-native execution qualification.
 
 ### Current 8.CP packaged-runtime reconciliation (2026-08-17)
 
-The source Core build was regenerated and packaged from the current source
-commit with the pinned Windows Node 24.18.0 runtime. The candidate at
-`C:\Users\junme\AppData\Local\Temp\jarvis-core-candidate-20260817-03` contains
-the typed `listProviderSetupStatusViews()` response and the complete source
-Core dependency tree. The exact public TUF metadata was refreshed through the
-Proxmox-hosted signer CT; repository profile verification passed with
-targets/snapshot/timestamp version 4 and target manifest SHA-256
-`2be8063f3ac81090bb07c9ca389beea70eff52be0e6644f0f96873ffbd638cc9`.
+The source Core build was regenerated and packaged from clean local commit
+`8f1161b54cc4beeb0c7f842d54453a22ce8ff8c7` with the pinned Windows Node
+24.18.0 runtime. The exact candidate is at
+`C:\Users\junme\AppData\Local\Temp\jarvis-core-candidate-20260817-04` and
+its runtime manifest SHA-256 is
+`1c43c3ed78e59a303fbe5b23b032f492863a9e24e3a0c4009304fa8727aa01de`.
+The exact public TUF metadata was refreshed through the Proxmox-hosted signer
+CT at `192.168.99.2`; repository profile verification passed with
+targets/snapshot/timestamp version 5 and `keyCustodyEvidence=EXTERNAL_REQUIRED`.
 Packaged Core qualification passed authenticated startup and controlled stop
 under Node 24.18.0. The release host was rebuilt from that candidate and
 visually inspected at
-`C:\Users\junme\AppData\Local\Temp\jarvis-8cp-window-refreshed.png`:
-Mission Control is nonblank, Core reaches authenticated transport, and the
-fresh profile correctly shows `NOT_INITIALIZED`/`Create session`; the prior
-`FrameMalformed` state is gone. This closes the stale-package defect, but 8.CP
-remains `IN PROGRESS` because live PermissionEngine-to-native tool execution,
+`C:\Users\junme\AppData\Local\Temp\jarvis-8cp-window-20260817-05.png`:
+Mission Control is nonblank and responsive, Core reaches authenticated
+transport, and the fresh profile correctly shows `Core locked` /
+`SESSION_LOCKED`; the prior blank/malformed-frame launch is not present. This
+closes the stale-package and stale-profile visual defects, but 8.CP remains
+`IN PROGRESS` because live PermissionEngine-to-native tool execution,
 postconditions, and the remaining end-to-end qualification gates are still
 required. `keyCustodyEvidence=EXTERNAL_REQUIRED` remains recorded.
 
@@ -437,9 +439,9 @@ opens now require matching target-kind, non-empty target-identity, and
 `OPEN_REQUESTED` evidence; APPLICATION remains fail-closed without a
 contract-defined allowlist. Focused Core runtime/composition coverage passes
 7/7, the pinned normal profile passes 81/81 files, and root/Core/desktop
-typechecks pass. The existing signed candidate was not relabeled for this
-source change because the repository remains dirty; a new exact candidate and
-TUF refresh require a clean source commit.
+typechecks pass. The exact candidate and TUF refresh are bound to local commit
+`8f1161b54cc4beeb0c7f842d54453a22ce8ff8c7`; the candidate remains external and
+generated and is not a repository-tracked release artifact.
 
 ## Future-section status summary
 

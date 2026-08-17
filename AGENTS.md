@@ -333,10 +333,45 @@ bounded non-empty target identity, and report `OPEN_REQUESTED`. APPLICATION
 opens remain fail-closed because the active contract still lacks an
 application allowlist and identity binding. Focused Core runtime/composition
 coverage passes 7/7, the pinned normal profile passes 81/81 files, and root,
-Core, and desktop typechecks pass. A refreshed release package was not created
-because the repository intentionally remains dirty with uncommitted
-implementation work; the existing signed candidate must not be treated as
-containing this new source change.
+Core, and desktop typechecks pass. These changes are bound to local commit
+`8f1161b54cc4beeb0c7f842d54453a22ce8ff8c7`.
+
+### Current 8.CP exact candidate 04 and visual record (2026-08-17)
+
+The exact source-bound candidate was regenerated after the clean local commit
+at `C:\Users\junme\AppData\Local\Temp\jarvis-core-candidate-20260817-04`.
+It is temporary external/generated qualification material, not repository
+source or a public release. Its runtime manifest is 7,781 bytes with SHA-256
+`1c43c3ed78e59a303fbe5b23b032f492863a9e24e3a0c4009304fa8727aa01de` and
+source commit `8f1161b54cc4beeb0c7f842d54453a22ce8ff8c7`. Public TUF metadata
+was refreshed by `jarvissigner` inside CT 106 through the Proxmox host
+`root@192.168.99.2`; targets/snapshot/timestamp are version 5, profile
+verification and packaged Core qualification pass, and
+`keyCustodyEvidence=EXTERNAL_REQUIRED` remains truthful. Private keys stayed
+inside the signer CT and were not copied to Windows.
+
+Candidate 04 was installed into the generated resource directory
+`G:\Jarvis Project\apps\desktop\src-tauri\resources\core-runtime\`; the
+previous generated resource was preserved at
+`G:\Jarvis Project\apps\desktop\src-tauri\resources\core-runtime-stale-20260817-02`.
+The release host is
+`G:\Jarvis Project\target\release\jarvis-desktop-host.exe`. After the first
+launch still selected a stale database, the existing data directory was
+reversibly preserved at
+`C:\Users\junme\AppData\Local\JARVIS\data-legacy-20260817-084900-before-clean-profile`
+and the previously preserved fresh-profile directory was copied back to the
+active data path. The relaunch reached `stage=CoreAuthenticated`, showed a
+responsive nonblank Mission Control window, and displayed the expected fresh
+profile `Core locked` / `SESSION_LOCKED` state with no blank or malformed
+frame. Visual evidence is retained at
+`C:\Users\junme\AppData\Local\Temp\jarvis-8cp-window-20260817-05.png`.
+The candidate, generated resource, backup, and screenshot are external or
+ignored qualification artifacts; no private key, password, recovery secret,
+or credential was recorded.
+
+The temporary metadata-refresh helper archive and script used for this
+candidate were non-secret transfer artifacts and were removed from the
+repository workspace after use; they were not release inputs.
 
 ### TUF signing location and operating procedure
 
