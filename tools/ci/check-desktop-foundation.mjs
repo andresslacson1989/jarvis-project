@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { isMain, printViolations, violation } from "./lib.mjs";
 
 const EXPECTED_QUALIFICATION = "DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED";
@@ -102,10 +102,14 @@ export function evaluateDesktopFoundation(snapshot) {
     add(violations, pkg.devDependencies?.["@tauri-apps/cli"] === cli, "DESKTOP_TAURI_CLI_PIN_MISMATCH", "apps/desktop/package.json", `@tauri-apps/cli must equal ${String(cli)}`);
   }
   if (typeof snapshot.tauriCargo === "string") {
+    const basePairing = `[dependencies]\ntauri = { version = "=${String(runtime)}", default-features = false }`;
+    const windowsRuntime = `[target.'cfg(target_os = "windows")'.dependencies]\ntauri = { version = "=${String(runtime)}", default-features = false, features = ["wry"] }`;
+    const basePairingOk = snapshot.tauriCargo.includes(basePairing);
+    const windowsRuntimeOk = snapshot.tauriCargo.includes(windowsRuntime);
     add(violations, snapshot.tauriCargo.includes(`tauri-build = "=${String(build)}"`), "DESKTOP_TAURI_BUILD_PIN_MISMATCH", "apps/desktop/src-tauri/Cargo.toml", `tauri-build must equal ${String(build)}`);
-    const windowsDependency = `[target.'cfg(target_os = "windows")'.dependencies]`;
-    add(violations, snapshot.tauriCargo.includes(windowsDependency) && snapshot.tauriCargo.includes(`tauri = "=${String(runtime)}"`), "DESKTOP_TAURI_RUNTIME_PIN_MISMATCH", "apps/desktop/src-tauri/Cargo.toml", `Windows Tauri runtime must equal ${String(runtime)}`);
-    add(violations, !/^\[dependencies\][\s\S]*?^tauri\s*=/m.test(snapshot.tauriCargo), "DESKTOP_TAURI_RUNTIME_NOT_WINDOWS_SCOPED", "apps/desktop/src-tauri/Cargo.toml", "Tauri runtime dependency must remain Windows-scoped in V1");
+    add(violations, basePairingOk && windowsRuntimeOk, "DESKTOP_TAURI_RUNTIME_PIN_MISMATCH", "apps/desktop/src-tauri/Cargo.toml", `Tauri runtime must equal ${String(runtime)} in both host-pairing and Windows WebView dependencies`);
+    add(violations, basePairingOk, "DESKTOP_TAURI_BUILD_PAIRING_MISSING", "apps/desktop/src-tauri/Cargo.toml", "tauri-build requires a host-visible tauri dependency with default features disabled");
+    add(violations, windowsRuntimeOk, "DESKTOP_TAURI_WINDOWS_WRY_MISSING", "apps/desktop/src-tauri/Cargo.toml", "Windows V1 must enable the wry WebView runtime only in the Windows dependency block");
   }
   if (config && typeof config === "object") {
     add(violations, config.build?.frontendDist === "../dist", "DESKTOP_FRONTEND_DIST_NOT_LOCAL", "apps/desktop/src-tauri/tauri.conf.json", "production frontendDist must be ../dist");
@@ -120,6 +124,7 @@ export function evaluateDesktopFoundation(snapshot) {
   }
   if (typeof snapshot.mainRs === "string") {
     add(violations, !snapshot.mainRs.includes("invoke_handler") && !/#\s*\[\s*tauri::command/.test(snapshot.mainRs), "DESKTOP_CUSTOM_COMMAND_SURFACE", "apps/desktop/src-tauri/src/main.rs", "Section 1.1 must not add a consequential custom Tauri command surface");
+    add(violations, snapshot.mainRs.includes('#[cfg(not(target_os = "windows"))]') && snapshot.mainRs.includes("only qualified for Windows"), "DESKTOP_NON_WINDOWS_STUB_MISSING", "apps/desktop/src-tauri/src/main.rs", "non-Windows builds must remain an explicit unsupported stub rather than a Tauri runtime");
   }
   if (baseline && typeof baseline === "object") {
     add(violations, baseline.tauri?.qualification === EXPECTED_QUALIFICATION, "DESKTOP_TAURI_QUALIFICATION_MISMATCH", "tools/toolchain/toolchain-baseline.json", `Tauri qualification must be ${EXPECTED_QUALIFICATION}`);
