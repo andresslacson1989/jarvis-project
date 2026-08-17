@@ -37,6 +37,16 @@ jobs:
             throw "Expected exact candidate SHA $env:EXPECTED_SHA but checked out $actualSha"
           }
 
+      - name: Normalize Rust source newlines
+        shell: pwsh
+        run: |
+          $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+          foreach ($path in (git ls-files '*.rs')) {
+            $absolutePath = Join-Path $PWD $path
+            $text = [System.IO.File]::ReadAllText($absolutePath)
+            [System.IO.File]::WriteAllText($absolutePath, $text.Replace("`r`n", "`n"), $utf8NoBom)
+          }
+
       - name: Install pinned pnpm and Node
         uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
         with:
