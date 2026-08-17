@@ -30,6 +30,7 @@
     "contract:check": "pnpm contract:check-generated && pnpm contract:check-manifest && pnpm contract:check-drift"
   },
   "devDependencies": {
+    "ajv": "8.17.1",
     "typescript": "6.0.3"
   }
 }

@@ -67,6 +67,7 @@ export async function checkProvenance(rootDir) {
       ["Node.js", baseline.node?.version],
       ["pnpm", baseline.pnpm?.version],
       ["Rust", baseline.rust?.version],
+      ["Tauri", baseline.tauri?.runtime],
     ]);
     for (const [name, expectedVersion] of expectedToolchains) {
       const record = toolchains.find((item) => item.name === name);

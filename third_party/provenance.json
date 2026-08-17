@@ -30,6 +30,15 @@
   ],
   "toolchains": [
     {
+      "name": "Tauri",
+      "version": "2.11.5",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/tauri-apps/tauri",
+      "role": "DECLARED_RELEASE_FACT",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
       "name": "Node.js",
       "version": "24.18.0",
       "license": "MIT",
