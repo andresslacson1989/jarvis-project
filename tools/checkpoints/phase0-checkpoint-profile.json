@@ -57,6 +57,14 @@
       "run": "pnpm build"
     },
     {
+      "name": "Core build",
+      "run": "pnpm build:core"
+    },
+    {
+      "name": "Desktop UI build",
+      "run": "pnpm build:ui"
+    },
+    {
       "name": "Architecture enforcement",
       "run": "pnpm architecture:check"
     },

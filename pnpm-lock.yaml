@@ -15,6 +15,10 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
 
+  apps/desktop: {}
+
+  services/core: {}
+
 packages:
 
   ajv@8.17.1:
