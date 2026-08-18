@@ -2,7 +2,7 @@
 
 **Suite Version:** 1.0.6  
 **Status:** Canonical current contract manifest  
-**Date:** August 12, 2026
+**Date:** August 18, 2026
 
 ---
 
@@ -23,7 +23,7 @@ Component revisions are explicit; a suite-version change does not require rewrit
 | # | Document | Current component revision | Role |
 |---|---|---:|---|
 | 1 | `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md` | 1.0.6 | top-level product/architecture/security/production contract |
-| 2 | `docs/JARVIS-V1-RELEASE-PROFILE.md` | 1.0.5 | exact Windows V1 production support target |
+| 2 | `docs/JARVIS-V1-RELEASE-PROFILE.md` | 1.0.6 | exact Windows V1 production support target |
 | 3 | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | 1.0.4 | Windows/Linux full-host portability and future companion boundary |
 | 4 | `docs/implementation/JARVIS-RUNTIME-CONTRACT.md` | 1.0.3 | Windows V1 runtime specialization and process behavior |
 | 5 | `docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md` | 1.0.4 | canonical V1 protocol/domain/platform schemas |
@@ -32,7 +32,7 @@ Component revisions are explicit; a suite-version change does not require rewrit
 | 8 | `docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md` | 1.0.5 | exact backup format, AEAD/chunk/key-slot/recovery-factor semantics |
 | 9 | `docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md` | 1.0.5 | deterministic project-policy candidate/enrollment/change trust boundary |
 | 10 | `docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md` | 1.0.5 | TUF-based update/module trust-root lifecycle, revocation and anti-rollback |
-| 11 | `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md` | 1.0.4 | coding/package/platform-boundary standards |
+| 11 | `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md` | 1.0.5 | coding/package/platform-boundary standards |
 | 12 | `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md` | 1.0.3 | operational/user-visible/governance semantics |
 | 13 | `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md` | 1.0.3 | unified Mission Control identity/adaptive design system |
 | 14 | `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md` | 1.0.5 | central release evidence plus all cumulative active-contract gates |
@@ -44,17 +44,19 @@ Component revisions are explicit; a suite-version change does not require rewrit
 
 Several unchanged component revisions retain historical header text naming their earlier parent suite. Their inclusion in the current suite is governed exclusively by this manifest and the v1.0.6 top-level contract. Those historical header references do not make superseded top-level contracts current and do not create an overlay.
 
-The specialized security contracts remain cumulative specializations of compatible broad rules in the inherited Data/Security/Operations components. The v1.0.5 security closure remains fully active. The v1.0.6 Verification and Implementation Plan revisions add the repository-governance capability closure required by ADR-074. These current component rules are part of one suite, not ADR overrides.
+The specialized security contracts remain cumulative specializations of compatible broad rules in the inherited Data/Security/Operations components. The v1.0.5 security closure remains fully active. The v1.0.6 Verification and Implementation Plan revisions add the repository-governance capability closure required by ADR-074. Release Profile 1.0.6 and Coding Standards 1.0.5 synchronize their repository-governance gates and invariants with that already-active rule. This synchronization is a contract-coherence repair, not a new repository-governance semantic. These current component rules are part of one suite, not ADR overrides.
 
 ---
 
 # 3. CURRENT DECISION BOUNDARY
 
-The suite incorporates the accepted current effects of ADRs through **ADR-074**.
+The suite incorporates the accepted current effects of ADRs through **ADR-075**.
 
 ADR-073 closes the backup cryptographic format/recovery-factor strength, project-policy trust admission, update/module trust-root lifecycle, early voice-feasibility sequencing, post-V1 integration release coupling, and repeated-contract-value drift risks.
 
 ADR-074 makes repository-governance qualification hosting-capability-aware: server-side protection remains mandatory when the hosting plan exposes it, while an explicitly verified unavailable hosting capability may use auditable compensating integration controls without becoming a paid-plan prerequisite or being misrepresented as protected.
+
+ADR-075 repairs the normative-suite synchronization omission left by ADR-074 by advancing only the Release Profile and Coding Standards component revisions and aligning their stale protected-`master` absolutes with the already-active capability-aware rule. JARVIS v1.0.6 suite semantics remain unchanged.
 
 ADRs are rationale/history, not implementation overrides.
 

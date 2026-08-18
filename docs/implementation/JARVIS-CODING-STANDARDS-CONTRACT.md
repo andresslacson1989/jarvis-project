@@ -1,8 +1,8 @@
 # JARVIS Production Coding Standards Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.4.md`  
-**Version:** 1.0.4  
-**Date:** August 12, 2026
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`  
+**Version:** 1.0.5  
+**Date:** August 18, 2026
 
 ---
 
@@ -632,7 +632,13 @@ CI SHALL detect direct imports of Windows native implementations from shared Cor
 
 Security-sensitive packages should have strong meaningful branch coverage; target numbers shall not drive low-value tests.
 
-Before Phase 0 completes, mandatory CI checks SHALL be attached to protected `master` through GitHub ruleset/branch-protection equivalent. Force pushes and branch deletion are prohibited; bypass is narrow/auditable.
+Before Phase 0 completes, repository-governance mode SHALL follow the verified hosting provider/account capability.
+
+When server-side branch protection or repository rulesets are available, mandatory CI checks SHALL be attached to protected `master`; force pushes and branch deletion are prohibited and bypass SHALL be narrow/auditable.
+
+If server-side protection/rulesets are unavailable because of a verified hosting plan/platform capability limitation, `COMPENSATING_CONTROLS` MAY be used only with temporary implementation branches, mandatory CI on the exact candidate commit, immediate live `master` tip revalidation and stale-movement reconciliation, non-force integration, post-integration tip/diff/CI/audit verification, and truthful reporting that `master` is not server-protected.
+
+The fallback SHALL NOT weaken or waive mandatory CI and SHALL end when effective server-side protection becomes available.
 
 ---
 
@@ -715,7 +721,7 @@ Production code/CI SHALL make these statements true:
 18. JARVIS-managed production KDF profiles meet the current floor and are versioned.
 19. GitHub/Proxmox support claims cannot exceed the signed capability/platform matrix.
 20. Canonical UI identity/assets/accessibility are release-tested, not optional styling.
-21. CI and repository protection enforce major package/security/config/history boundaries.
+21. CI plus the active qualified repository-governance mode enforce major package/security/config/history boundaries; server protection is mandatory when available and compensating controls remain explicit when it is not.
 22. Shared Core/domain/policy/protocol code cannot import Windows-native backend implementations.
 23. OS selection is concentrated in composition/platform adapters rather than scattered through domain/features.
 24. Platform capability absence never triggers an unsafe weaker fallback.
@@ -732,4 +738,4 @@ Production code/CI SHALL make these statements true:
 
 ---
 
-**END — JARVIS PRODUCTION CODING STANDARDS CONTRACT v1.0.4**
+**END — JARVIS PRODUCTION CODING STANDARDS CONTRACT v1.0.5**
