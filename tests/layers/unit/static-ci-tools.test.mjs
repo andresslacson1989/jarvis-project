@@ -194,6 +194,19 @@ test("CI evidence is Phase-0 scoped, commit-bound, and requires every aggregate 
     () => buildCiEvidence({ env: { GITHUB_SHA: "a".repeat(40), JARVIS_STATIC_CI_GATES_PASSED: "1", JARVIS_PHASE0_CHECKPOINT_PASSED: "1", JARVIS_WINDOWS_TAURI_GATES_PASSED: "1" }, versions: {} }),
     /JARVIS_RUST_AUDIT_PASSED/,
   );
+  assert.throws(
+    () => buildCiEvidence({
+      env: {
+        GITHUB_SHA: "a".repeat(40),
+        JARVIS_STATIC_CI_GATES_PASSED: "1",
+        JARVIS_PHASE0_CHECKPOINT_PASSED: "1",
+        JARVIS_WINDOWS_TAURI_GATES_PASSED: "1",
+        JARVIS_RUST_AUDIT_PASSED: "1",
+      },
+      versions: {},
+    }),
+    /JARVIS_RUSTSEC_REVIEW_PASSED/,
+  );
 
   const evidence = buildCiEvidence({
     env: {
@@ -207,6 +220,7 @@ test("CI evidence is Phase-0 scoped, commit-bound, and requires every aggregate 
       JARVIS_PHASE0_CHECKPOINT_PASSED: "1",
       JARVIS_WINDOWS_TAURI_GATES_PASSED: "1",
       JARVIS_RUST_AUDIT_PASSED: "1",
+      JARVIS_RUSTSEC_REVIEW_PASSED: "1",
     },
     versions: {
       node: "24.18.0",
@@ -229,6 +243,7 @@ test("CI evidence is Phase-0 scoped, commit-bound, and requires every aggregate 
   assert.equal(evidence.runId, "123");
   assert.ok(evidence.gates.includes("repository-governance"));
   assert.ok(evidence.gates.includes("rust-dependency-vulnerability-rustsec"));
+  assert.ok(evidence.gates.includes("rustsec-informational-warning-review"));
   assert.ok(evidence.gates.includes("phase0-section-checkpoint"));
   assert.deepEqual(evidence.toolchain, {
     node: "24.18.0",
