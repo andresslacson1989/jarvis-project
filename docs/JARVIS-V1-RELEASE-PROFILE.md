@@ -1,9 +1,9 @@
 # JARVIS V1 Production Release Profile
 
-**Profile Version:** 1.0.5  
+**Profile Version:** 1.0.6  
 **Status:** Canonical production-support target  
-**Date:** August 12, 2026  
-**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md`
+**Date:** August 18, 2026  
+**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`
 
 ---
 
@@ -13,7 +13,7 @@ The architecture describes what JARVIS may support over time. This Release Profi
 
 A capability that exists only in an ADR, experimental code, historical contract, or unqualified module/platform is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after full qualification.
 
-V1 is intentionally **Windows-only as a production FULL_HOST release**. The v1.0.5 architecture preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden.
+V1 is intentionally **Windows-only as a production FULL_HOST release**. The v1.0.6 contract suite preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden.
 
 ---
 
@@ -417,7 +417,7 @@ These are Windows V1 qualification requirements. Future Linux voice support must
 
 Wake word may remain disabled/unqualified and is not required for V1.
 
-Before broad feature implementation proceeds beyond the early platform/persistence foundation, the v1.0.5 Implementation Plan SHALL run an early real-hardware feasibility spike for candidate STT/VAD/TTS/AEC/barge-in/device/resource/licensing behavior. Passing that spike is evidence of stack feasibility, not final Voice Production Complete.
+Before broad feature implementation proceeds beyond the early platform/persistence foundation, the v1.0.6 Implementation Plan SHALL run an early real-hardware feasibility spike for candidate STT/VAD/TTS/AEC/barge-in/device/resource/licensing behavior. Passing that spike is evidence of stack feasibility, not final Voice Production Complete.
 
 ---
 
@@ -571,12 +571,25 @@ No raw credentials/private user data/private signing keys/recovery factors appea
 
 # 17. REPOSITORY GOVERNANCE GATE
 
-Before Phase 0 may be declared complete, authoritative `master` SHALL have an active GitHub ruleset/branch-protection equivalent that:
+Before Phase 0 may be declared complete, the effective repository-governance mode SHALL be determined from verified hosting provider/account capability.
+
+When server-side branch protection or repository rulesets are available for the authoritative repository, authoritative `master` SHALL use an active server-enforced equivalent that:
 
 - prevents branch deletion;
 - blocks force pushes;
-- requires mandatory CI status checks once those checks exist;
+- requires the mandatory CI status check/context once that check exists;
 - uses narrowly controlled and auditable bypass permissions.
+
+If server-side protection/rulesets are unavailable because of a verified hosting plan/platform capability limitation, the `COMPENSATING_CONTROLS` mode MAY satisfy this gate only when all of the following hold:
+
+- normal implementation work occurs on temporary implementation branches rather than routine direct writes to `master`;
+- mandatory CI passes for the exact candidate commit before integration;
+- the live `master` tip is revalidated immediately before integration, and unexpected movement is reconciled rather than overwritten;
+- integration is non-force;
+- post-integration verification proves the resulting authoritative tip, intended diff/ancestry, required CI, and audit/evidence state;
+- repository status states truthfully that `master` is not server-protected and preserves the residual risk of an out-of-band administrator force push/deletion.
+
+`COMPENSATING_CONTROLS` SHALL NOT be selected when effective server-side protection is available. If the hosting provider/account later exposes the required protection/ruleset capability, server-enforced mode becomes mandatory.
 
 A pull-request requirement is strongly preferred once implementation changes begin. No second long-lived branch becomes an alternate source of truth.
 
@@ -629,4 +642,4 @@ Documentation completion alone never satisfies this gate.
 
 ---
 
-**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.5**
+**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.6**
