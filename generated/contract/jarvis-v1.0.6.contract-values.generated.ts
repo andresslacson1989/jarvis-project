@@ -1,15 +1,15 @@
 // GENERATED FILE — DO NOT EDIT.
 // Source: packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json
-// Source SHA-256: 78208f5e6e42d0fa2ee34b173cf0673a20128160dd596902c228f7f40c243ce1
+// Source SHA-256: 4ae7ed2aa1e2ea89ff1688a4d2edad9aa44bb1d5256ee816b7695f3ba2b56777
 
 export const JARVIS_CANONICAL_CONTRACT_VALUES = {
   "schemaVersion": 1,
   "canonicalValuesId": "jarvis.contract-values.v1.0.6",
   "contractSuiteVersion": "1.0.6",
-  "releaseProfileVersion": "1.0.5",
+  "releaseProfileVersion": "1.0.6",
   "contractComponentRevisions": {
     "implementationContract": "1.0.6",
-    "releaseProfile": "1.0.5",
+    "releaseProfile": "1.0.6",
     "platformPortability": "1.0.4",
     "runtime": "1.0.3",
     "protocolSchema": "1.0.4",
@@ -18,7 +18,7 @@ export const JARVIS_CANONICAL_CONTRACT_VALUES = {
     "backupCryptography": "1.0.5",
     "projectPolicyTrust": "1.0.5",
     "supplyChainTrust": "1.0.5",
-    "codingStandards": "1.0.4",
+    "codingStandards": "1.0.5",
     "operationsUxGovernance": "1.0.3",
     "uiIdentityDesignSystem": "1.0.3",
     "verificationRelease": "1.0.5",
