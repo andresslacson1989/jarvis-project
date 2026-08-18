@@ -3,7 +3,7 @@
     "schemaVersion": 1,
     "doNotEdit": true,
     "source": "packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json",
-    "sourceSha256": "68dbc21bde0ef481353638f2ec8a737df7a3e1531bfffc8212cf47a7f2b52ade",
+    "sourceSha256": "4ae7ed2aa1e2ea89ff1688a4d2edad9aa44bb1d5256ee816b7695f3ba2b56777",
     "canonicalValuesId": "jarvis.contract-values.v1.0.6"
   },
   "values": {
