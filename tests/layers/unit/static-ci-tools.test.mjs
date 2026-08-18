@@ -102,10 +102,10 @@ test("provenance checker rejects floating/unknown actions, license mismatch, and
       schemaVersion: 1,
       dependencies: [{ ecosystem: "npm", name: "typescript", version: "6.0.3", license: "Apache-2.0", source: "https://example.invalid/typescript", role: "BUILD_TEST", packaged: false, reviewStatus: "APPROVED" }],
       ciActions: [{ repository: "actions/checkout", release: "v7", commit: "0123456789012345678901234567890123456789", license: "MIT", reviewStatus: "APPROVED" }],
-      toolchains: [{ name: "Node.js", version: "1.0.0", license: "MIT", source: "https://example.invalid/node", role: "BUILD_RUNTIME" }],
+      toolchains: [{ name: "Node.js", version: "1.0.0", license: "MIT", source: "https://example.invalid/node", role: "BUILD_RUNTIME", reviewStatus: "APPROVED" }],
     }) + "\n",
-    "THIRD_PARTY_NOTICES.md": "# Notices\nTypeScript 6.0.3 Apache-2.0\n",
-    "tools/toolchain/toolchain-baseline.json": JSON.stringify({ schemaVersion: 1, node: { version: "24.18.0" }, pnpm: { version: "11.21.0" }, rust: { version: "1.97.1" }, typescript: { version: "6.0.3" } }) + "\n",
+    "THIRD_PARTY_NOTICES.md": "# Notices\nTypeScript 6.0.3 Apache-2.0\nNode.js 1.0.0 MIT\nactions/checkout v7 MIT\n",
+    "tools/toolchain/toolchain-baseline.json": JSON.stringify({ schemaVersion: 1, node: { version: "24.18.0" }, pnpm: { version: "11.21.0" }, rust: { version: "1.97.1" }, typescript: { version: "6.0.3" }, tauri: { runtime: "2.11.5" } }) + "\n",
     "node_modules/typescript/package.json": JSON.stringify({ name: "typescript", version: "6.0.3", license: "MIT" }) + "\n",
   });
   const resultCodes = codes(await checkProvenance(root));
@@ -115,38 +115,84 @@ test("provenance checker rejects floating/unknown actions, license mismatch, and
   assert.ok(resultCodes.includes("PROVENANCE_TOOLCHAIN_MISMATCH"));
 });
 
-test("CI evidence is Phase-0 scoped, commit-bound, and requires the aggregate checkpoint flag", () => {
+test("security-tool provenance accepts only approved non-packaged scanners with notices", async () => {
+  const baseline = {
+    schemaVersion: 1,
+    node: { version: "24.18.0" },
+    pnpm: { version: "11.21.0" },
+    rust: { version: "1.97.1" },
+    typescript: { version: "6.0.3" },
+    tauri: { runtime: "2.11.5" },
+  };
+  const dependencies = [
+    { ecosystem: "npm", name: "typescript", version: "6.0.3", license: "MIT", source: "https://example.invalid/typescript", role: "BUILD_TEST", packaged: false, reviewStatus: "APPROVED" },
+  ];
+  const toolchains = [
+    { name: "Node.js", version: "24.18.0", license: "MIT", source: "https://example.invalid/node", role: "BUILD_RUNTIME", reviewStatus: "APPROVED" },
+    { name: "pnpm", version: "11.21.0", license: "MIT", source: "https://example.invalid/pnpm", role: "BUILD_TOOL", reviewStatus: "APPROVED" },
+    { name: "Rust", version: "1.97.1", license: "Apache-2.0 OR MIT", source: "https://example.invalid/rust", role: "BUILD_RUNTIME", reviewStatus: "APPROVED" },
+    { name: "Tauri", version: "2.11.5", license: "Apache-2.0 OR MIT", source: "https://example.invalid/tauri", role: "DESKTOP_RUNTIME", reviewStatus: "APPROVED" },
+  ];
+  const mainProvenance = { schemaVersion: 1, dependencies, ciActions: [], toolchains };
+  const mainNotices = [
+    "TypeScript 6.0.3 MIT",
+    "Node.js 24.18.0 MIT",
+    "pnpm 11.21.0 MIT",
+    "Rust 1.97.1 Apache-2.0 OR MIT",
+    "Tauri 2.11.5 Apache-2.0 OR MIT",
+  ].join("\n") + "\n";
+  const approvedTool = {
+    name: "cargo-audit",
+    version: "0.22.2",
+    ecosystem: "cargo",
+    license: "Apache-2.0 OR MIT",
+    source: "https://github.com/rustsec/rustsec",
+    registry: "https://crates.io/crates/cargo-audit",
+    role: "DEPENDENCY_VULNERABILITY_SCAN",
+    packaged: false,
+    installCommand: "cargo install cargo-audit --locked --version 0.22.2 --no-default-features",
+    reviewStatus: "APPROVED",
+  };
+
+  const clean = await tempRepo({
+    "third_party/provenance.json": JSON.stringify(mainProvenance) + "\n",
+    "THIRD_PARTY_NOTICES.md": mainNotices,
+    "tools/toolchain/toolchain-baseline.json": JSON.stringify(baseline) + "\n",
+    "third_party/security-tools.json": JSON.stringify({ schemaVersion: 1, tools: [approvedTool] }) + "\n",
+    "third_party/SECURITY_TOOL_NOTICES.md": "cargo-audit 0.22.2 Apache-2.0 OR MIT\n",
+  });
+  assert.deepEqual((await checkProvenance(clean)).violations, []);
+
+  const dirty = await tempRepo({
+    "third_party/provenance.json": JSON.stringify(mainProvenance) + "\n",
+    "THIRD_PARTY_NOTICES.md": mainNotices,
+    "tools/toolchain/toolchain-baseline.json": JSON.stringify(baseline) + "\n",
+    "third_party/security-tools.json": JSON.stringify({ schemaVersion: 1, tools: [{ ...approvedTool, packaged: true, reviewStatus: "PENDING", source: "http://example.invalid" }] }) + "\n",
+    "third_party/SECURITY_TOOL_NOTICES.md": "cargo-audit 0.22.2\n",
+  });
+  const dirtyCodes = codes(await checkProvenance(dirty));
+  for (const code of ["PROVENANCE_SECURITY_TOOL_UNAPPROVED", "PROVENANCE_SECURITY_TOOL_PACKAGED", "PROVENANCE_SECURITY_TOOL_SOURCE", "PROVENANCE_SECURITY_TOOL_NOTICE"]) {
+    assert.ok(dirtyCodes.includes(code), `expected ${code}`);
+  }
+});
+
+test("CI evidence is Phase-0 scoped, commit-bound, and requires every aggregate prerequisite flag", () => {
   assert.throws(() => buildCiEvidence({ env: {}, versions: {} }), /GITHUB_SHA/);
   assert.throws(
-    () =>
-      buildCiEvidence({
-        env: { GITHUB_SHA: "a".repeat(40) },
-        versions: {},
-      }),
+    () => buildCiEvidence({ env: { GITHUB_SHA: "a".repeat(40) }, versions: {} }),
     /JARVIS_STATIC_CI_GATES_PASSED/,
   );
   assert.throws(
-    () =>
-      buildCiEvidence({
-        env: {
-          GITHUB_SHA: "a".repeat(40),
-          JARVIS_STATIC_CI_GATES_PASSED: "1",
-        },
-        versions: {},
-      }),
+    () => buildCiEvidence({ env: { GITHUB_SHA: "a".repeat(40), JARVIS_STATIC_CI_GATES_PASSED: "1" }, versions: {} }),
     /JARVIS_PHASE0_CHECKPOINT_PASSED/,
   );
   assert.throws(
-    () =>
-      buildCiEvidence({
-        env: {
-          GITHUB_SHA: "a".repeat(40),
-          JARVIS_STATIC_CI_GATES_PASSED: "1",
-          JARVIS_PHASE0_CHECKPOINT_PASSED: "1",
-        },
-        versions: {},
-      }),
+    () => buildCiEvidence({ env: { GITHUB_SHA: "a".repeat(40), JARVIS_STATIC_CI_GATES_PASSED: "1", JARVIS_PHASE0_CHECKPOINT_PASSED: "1" }, versions: {} }),
     /JARVIS_WINDOWS_TAURI_GATES_PASSED/,
+  );
+  assert.throws(
+    () => buildCiEvidence({ env: { GITHUB_SHA: "a".repeat(40), JARVIS_STATIC_CI_GATES_PASSED: "1", JARVIS_PHASE0_CHECKPOINT_PASSED: "1", JARVIS_WINDOWS_TAURI_GATES_PASSED: "1" }, versions: {} }),
+    /JARVIS_RUST_AUDIT_PASSED/,
   );
 
   const evidence = buildCiEvidence({
@@ -160,6 +206,7 @@ test("CI evidence is Phase-0 scoped, commit-bound, and requires the aggregate ch
       JARVIS_STATIC_CI_GATES_PASSED: "1",
       JARVIS_PHASE0_CHECKPOINT_PASSED: "1",
       JARVIS_WINDOWS_TAURI_GATES_PASSED: "1",
+      JARVIS_RUST_AUDIT_PASSED: "1",
     },
     versions: {
       node: "24.18.0",
@@ -181,6 +228,7 @@ test("CI evidence is Phase-0 scoped, commit-bound, and requires the aggregate ch
   assert.equal(evidence.commitSha, "a".repeat(40));
   assert.equal(evidence.runId, "123");
   assert.ok(evidence.gates.includes("repository-governance"));
+  assert.ok(evidence.gates.includes("rust-dependency-vulnerability-rustsec"));
   assert.ok(evidence.gates.includes("phase0-section-checkpoint"));
   assert.deepEqual(evidence.toolchain, {
     node: "24.18.0",

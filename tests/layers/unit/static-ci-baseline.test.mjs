@@ -8,6 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 const requiredFiles = [
   ".github/workflows/static-ci.yml",
+  ".cargo/audit.toml",
   "tools/ci/lib.mjs",
   "tools/ci/check-format.mjs",
   "tools/ci/check-schemas.mjs",
@@ -16,6 +17,8 @@ const requiredFiles = [
   "tools/ci/check-provenance.mjs",
   "tools/ci/generate-evidence.mjs",
   "third_party/provenance.json",
+  "third_party/security-tools.json",
+  "third_party/SECURITY_TOOL_NOTICES.md",
   "THIRD_PARTY_NOTICES.md",
   "tsconfig.build.json",
 ];
@@ -38,6 +41,8 @@ test("static CI workflow is least-privileged and uses immutable action SHAs", { 
   }
   assert.match(workflow, /persist-credentials:\s*false/);
   assert.match(workflow, /pnpm audit --audit-level high/);
+  assert.match(workflow, /cargo install cargo-audit --locked --version 0\.22\.2 --no-default-features/);
+  assert.match(workflow, /cargo audit --file Cargo\.lock --target-os windows --target-arch x86_64/);
   assert.match(workflow, /cargo clippy[^\n]*-D warnings/);
   assert.match(workflow, /rustup toolchain install 1\.97\.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc/);
 });

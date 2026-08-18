@@ -1,0 +1,15 @@
+[advisories]
+ignore = []
+severity_threshold = "none"
+
+[database]
+fetch = true
+stale = false
+
+[target]
+arch = ["x86_64"]
+os = ["windows"]
+
+[yanked]
+enabled = true
+update_index = true

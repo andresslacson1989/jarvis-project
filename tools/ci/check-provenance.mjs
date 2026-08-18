@@ -26,13 +26,78 @@ async function workflowFiles(rootDir) {
     .sort((a, b) => a.localeCompare(b, "en"));
 }
 
+async function checkSecurityToolProvenance(rootDir, violations) {
+  const profilePath = resolve(rootDir, "third_party", "security-tools.json");
+  const noticesPath = resolve(rootDir, "third_party", "SECURITY_TOOL_NOTICES.md");
+  if (!existsSync(profilePath)) {
+    violations.push(violation("PROVENANCE_SECURITY_TOOLS_MISSING", "third_party/security-tools.json", "CI security-tool provenance is required"));
+    return 0;
+  }
+  if (!existsSync(noticesPath)) {
+    violations.push(violation("PROVENANCE_SECURITY_TOOL_NOTICES_MISSING", "third_party/SECURITY_TOOL_NOTICES.md", "CI security-tool notices are required"));
+    return 0;
+  }
+
+  let profile;
+  try {
+    profile = await readJson(profilePath);
+  } catch (error) {
+    violations.push(violation("PROVENANCE_SECURITY_TOOLS_INVALID", "third_party/security-tools.json", error instanceof Error ? error.message : String(error)));
+    return 0;
+  }
+
+  if (profile.schemaVersion !== 1 || !Array.isArray(profile.tools)) {
+    violations.push(violation("PROVENANCE_SECURITY_TOOLS_INVALID", "third_party/security-tools.json", "schemaVersion must be 1 and tools must be an array"));
+    return Array.isArray(profile.tools) ? profile.tools.length : 0;
+  }
+
+  const notices = (await readFile(noticesPath, "utf8")).toLowerCase();
+  const seen = new Set();
+  for (const tool of profile.tools) {
+    const name = String(tool?.name ?? "");
+    const version = String(tool?.version ?? "");
+    const identity = `${name || "<missing>"}@${version || "<missing>"}`;
+    if (seen.has(identity)) {
+      violations.push(violation("PROVENANCE_SECURITY_TOOL_DUPLICATE", "third_party/security-tools.json", `duplicate security tool ${identity}`));
+    }
+    seen.add(identity);
+
+    for (const field of ["name", "version", "ecosystem", "license", "source", "registry", "role", "installCommand"]) {
+      if (typeof tool?.[field] !== "string" || tool[field].trim().length === 0) {
+        violations.push(violation("PROVENANCE_SECURITY_TOOL_INCOMPLETE", "third_party/security-tools.json", `${identity} missing ${field}`));
+      }
+    }
+    if (tool.ecosystem !== "cargo") {
+      violations.push(violation("PROVENANCE_SECURITY_TOOL_ECOSYSTEM", "third_party/security-tools.json", `${identity} must use cargo ecosystem`));
+    }
+    if (tool.reviewStatus !== "APPROVED") {
+      violations.push(violation("PROVENANCE_SECURITY_TOOL_UNAPPROVED", "third_party/security-tools.json", `${identity} is not APPROVED`));
+    }
+    if (tool.packaged !== false) {
+      violations.push(violation("PROVENANCE_SECURITY_TOOL_PACKAGED", "third_party/security-tools.json", `${identity} must be CI-only with packaged=false`));
+    }
+    if (!String(tool.source ?? "").startsWith("https://") || !String(tool.registry ?? "").startsWith("https://")) {
+      violations.push(violation("PROVENANCE_SECURITY_TOOL_SOURCE", "third_party/security-tools.json", `${identity} source and registry must use HTTPS`));
+    }
+
+    for (const expected of [tool.name, tool.version, tool.license]) {
+      if (!notices.includes(String(expected ?? "").toLowerCase())) {
+        violations.push(violation("PROVENANCE_SECURITY_TOOL_NOTICE", "third_party/SECURITY_TOOL_NOTICES.md", `missing name/version/license for ${identity}`));
+        break;
+      }
+    }
+  }
+
+  return profile.tools.length;
+}
+
 export async function checkProvenance(rootDir) {
   const violations = [];
   const provenancePath = resolve(rootDir, "third_party", "provenance.json");
   const noticesPath = resolve(rootDir, "THIRD_PARTY_NOTICES.md");
   const baselinePath = resolve(rootDir, "tools", "toolchain", "toolchain-baseline.json");
   if (!existsSync(provenancePath)) {
-    return { dependencyCount: 0, ciActionCount: 0, toolchainCount: 0, violations: [violation("PROVENANCE_MISSING", "third_party/provenance.json", "provenance inventory is required")] };
+    return { dependencyCount: 0, ciActionCount: 0, toolchainCount: 0, securityToolCount: 0, violations: [violation("PROVENANCE_MISSING", "third_party/provenance.json", "provenance inventory is required")] };
   }
 
   const provenance = await readJson(provenancePath);
@@ -130,7 +195,8 @@ export async function checkProvenance(rootDir) {
     }
   }
 
-  return { dependencyCount: dependencies.length, ciActionCount: ciActions.length, toolchainCount: toolchains.length, violations };
+  const securityToolCount = await checkSecurityToolProvenance(rootDir, violations);
+  return { dependencyCount: dependencies.length, ciActionCount: ciActions.length, toolchainCount: toolchains.length, securityToolCount, violations };
 }
 
 if (isMain(import.meta.url)) {
@@ -140,5 +206,5 @@ if (isMain(import.meta.url)) {
     printViolations("provenance", result.violations);
     process.exit(1);
   }
-  console.log(`[provenance] PASS dependencies=${result.dependencyCount} actions=${result.ciActionCount} toolchains=${result.toolchainCount}`);
+  console.log(`[provenance] PASS dependencies=${result.dependencyCount} actions=${result.ciActionCount} toolchains=${result.toolchainCount} securityTools=${result.securityToolCount}`);
 }

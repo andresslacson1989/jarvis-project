@@ -78,7 +78,7 @@ jobs:
     needs: windows-tauri-build
     if: ${{ always() }}
     runs-on: windows-2025
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -120,6 +120,21 @@ jobs:
           rustup set profile minimal
           rustup toolchain install 1.97.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc
           rustup default 1.97.1
+
+      - name: Install pinned cargo-audit
+        shell: pwsh
+        run: cargo install cargo-audit --locked --version 0.22.2 --no-default-features
+
+      - name: Verify pinned cargo-audit
+        shell: pwsh
+        run: |
+          $auditVersion = (cargo audit --version).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw "cargo-audit version check failed with exit code $LASTEXITCODE"
+          }
+          if ($auditVersion -notmatch '0\.22\.2$') {
+            throw "Expected cargo-audit 0.22.2 but found $auditVersion"
+          }
 
       - name: Install dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -178,6 +193,10 @@ jobs:
       - name: Node dependency vulnerability gate
         run: pnpm audit --audit-level high
 
+      - name: Rust dependency vulnerability audit
+        shell: pwsh
+        run: cargo audit --file Cargo.lock --target-os windows --target-arch x86_64
+
       - name: Rust formatting
         run: cargo fmt --all -- --check
 
@@ -196,4 +215,5 @@ jobs:
           JARVIS_STATIC_CI_GATES_PASSED: '1'
           JARVIS_PHASE0_CHECKPOINT_PASSED: '1'
           JARVIS_WINDOWS_TAURI_GATES_PASSED: '1'
+          JARVIS_RUST_AUDIT_PASSED: '1'
         run: pnpm ci:evidence

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "tools": [
+    {
+      "name": "cargo-audit",
+      "version": "0.22.2",
+      "ecosystem": "cargo",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/rustsec/rustsec",
+      "registry": "https://crates.io/crates/cargo-audit",
+      "role": "DEPENDENCY_VULNERABILITY_SCAN",
+      "packaged": false,
+      "installCommand": "cargo install cargo-audit --locked --version 0.22.2 --no-default-features",
+      "reviewStatus": "APPROVED"
+    }
+  ]
+}

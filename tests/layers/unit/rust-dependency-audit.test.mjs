@@ -14,29 +14,48 @@ function readJson(path) {
   return JSON.parse(read(path));
 }
 
-test("Rust dependency vulnerability audit is exact-pinned, provenance-tracked, mandatory, and least-privileged", () => {
+test("Rust dependency vulnerability audit is exact-pinned, provenance-tracked, mandatory, target-scoped, and least-privileged", () => {
   const workflow = read(".github/workflows/static-ci.yml");
-  const baseline = readJson("tools/toolchain/toolchain-baseline.json");
-  const provenance = readJson("third_party/provenance.json");
+  const auditConfig = read(".cargo/audit.toml");
+  const securityTools = readJson("third_party/security-tools.json");
+  const evidenceGenerator = read("tools/ci/generate-evidence.mjs");
 
-  assert.equal(baseline.cargoAudit?.version, "0.22.2", "cargo-audit must be pinned in the canonical toolchain baseline");
-
-  const auditTool = provenance.toolchains?.find((record) => record.name === "cargo-audit");
-  assert.ok(auditTool, "cargo-audit must be present in approved toolchain provenance");
+  assert.equal(securityTools.schemaVersion, 1);
+  const auditTool = securityTools.tools?.find((record) => record.name === "cargo-audit");
+  assert.ok(auditTool, "cargo-audit must be present in approved CI security-tool provenance");
   assert.equal(auditTool.version, "0.22.2");
+  assert.equal(auditTool.ecosystem, "cargo");
+  assert.equal(auditTool.role, "DEPENDENCY_VULNERABILITY_SCAN");
+  assert.equal(auditTool.packaged, false);
   assert.equal(auditTool.reviewStatus, "APPROVED");
+  assert.equal(
+    auditTool.installCommand,
+    "cargo install cargo-audit --locked --version 0.22.2 --no-default-features",
+  );
+
+  assert.match(auditConfig, /^\[advisories\][\s\S]*?ignore\s*=\s*\[\][\s\S]*?severity_threshold\s*=\s*"none"/m);
+  assert.match(auditConfig, /^\[database\][\s\S]*?fetch\s*=\s*true[\s\S]*?stale\s*=\s*false/m);
+  assert.match(auditConfig, /^\[target\][\s\S]*?arch\s*=\s*\["x86_64"\][\s\S]*?os\s*=\s*\["windows"\]/m);
 
   assert.match(workflow, /^permissions:\s*\n\s+contents:\s*read\s*$/m, "workflow must retain contents: read least privilege");
   assert.doesNotMatch(workflow, /^\s+checks:\s*write\s*$/m, "Rust audit must not require Checks API write permission");
   assert.doesNotMatch(workflow, /^\s+issues:\s*write\s*$/m, "Rust audit must not require issue-write permission");
 
-  assert.match(workflow, /- name:\s*Install pinned cargo-audit[\s\S]*?cargo install cargo-audit --locked --version 0\.22\.2\b/);
-  assert.match(workflow, /- name:\s*Verify pinned cargo-audit[\s\S]*?cargo audit --version[\s\S]*?0\.22\.2/);
-  assert.match(workflow, /- name:\s*Rust dependency vulnerability audit[\s\S]*?run:\s*cargo audit\b/);
+  assert.match(workflow, /- name:\s*Install pinned cargo-audit[\s\S]*?cargo install cargo-audit --locked --version 0\.22\.2 --no-default-features\b/);
+  assert.match(workflow, /- name:\s*Verify pinned cargo-audit[\s\S]*?cargo audit --version[\s\S]*?0\\\.22\\\.2\$/);
 
-  const auditIndex = workflow.indexOf("- name: Rust dependency vulnerability audit");
-  const evidenceIndex = workflow.indexOf("- name: Static CI evidence");
-  assert.ok(auditIndex >= 0, "Rust dependency vulnerability audit step must exist");
-  assert.ok(evidenceIndex >= 0, "Static CI evidence step must exist");
-  assert.ok(auditIndex < evidenceIndex, "Rust dependency vulnerability audit must pass before CI evidence can be emitted");
+  const auditStepStart = workflow.indexOf("- name: Rust dependency vulnerability audit");
+  const evidenceStepStart = workflow.indexOf("- name: Static CI evidence");
+  assert.ok(auditStepStart >= 0, "Rust dependency vulnerability audit step must exist");
+  assert.ok(evidenceStepStart >= 0, "Static CI evidence step must exist");
+  assert.ok(auditStepStart < evidenceStepStart, "Rust dependency vulnerability audit must pass before CI evidence can be emitted");
+  const auditStep = workflow.slice(auditStepStart, workflow.indexOf("\n      - name:", auditStepStart + 1));
+  assert.match(auditStep, /cargo audit --file Cargo\.lock --target-os windows --target-arch x86_64\b/);
+  for (const forbidden of ["--ignore", "--no-fetch", "--stale", "--no-yanked"]) {
+    assert.ok(!auditStep.includes(forbidden), `Rust dependency audit must not weaken scanning with ${forbidden}`);
+  }
+
+  assert.match(workflow, /JARVIS_RUST_AUDIT_PASSED:\s*'1'/);
+  assert.match(evidenceGenerator, /"rust-dependency-vulnerability-rustsec"/);
+  assert.match(evidenceGenerator, /JARVIS_RUST_AUDIT_PASSED=1 is required for PASS evidence/);
 });
