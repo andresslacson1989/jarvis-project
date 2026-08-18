@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -58,4 +58,49 @@ test("Rust dependency vulnerability audit is exact-pinned, provenance-tracked, m
   assert.match(workflow, /JARVIS_RUST_AUDIT_PASSED:\s*'1'/);
   assert.match(evidenceGenerator, /"rust-dependency-vulnerability-rustsec"/);
   assert.match(evidenceGenerator, /JARVIS_RUST_AUDIT_PASSED=1 is required for PASS evidence/);
+});
+
+test("RustSec informational warnings require explicit Windows reachability review before PASS evidence", () => {
+  const reviewPath = resolve(root, "third_party", "rustsec-advisory-review.json");
+  const checkerPath = resolve(root, "tools", "ci", "check-rustsec-advisories.mjs");
+
+  assert.equal(
+    existsSync(reviewPath),
+    true,
+    "third_party/rustsec-advisory-review.json must record the exact reviewed RustSec informational-warning set",
+  );
+  assert.equal(
+    existsSync(checkerPath),
+    true,
+    "tools/ci/check-rustsec-advisories.mjs must fail closed on advisory/reachability drift",
+  );
+
+  const workflow = read(".github/workflows/static-ci.yml");
+  const evidenceGenerator = read("tools/ci/generate-evidence.mjs");
+
+  assert.match(
+    workflow,
+    /cargo metadata --locked --format-version 1 --filter-platform x86_64-pc-windows-msvc/,
+    "CI must derive the actual Windows-resolved Cargo dependency graph instead of inferring reachability from Cargo.lock",
+  );
+  assert.match(
+    workflow,
+    /cargo audit --json --file Cargo\.lock --target-os windows --target-arch x86_64/,
+    "CI must preserve machine-readable RustSec findings for deterministic review",
+  );
+  assert.match(
+    workflow,
+    /node tools\/ci\/check-rustsec-advisories\.mjs/,
+    "CI must compare live RustSec findings and Windows reachability with the reviewed warning set",
+  );
+  assert.match(
+    workflow,
+    /JARVIS_RUSTSEC_REVIEW_PASSED:\s*'1'/,
+    "PASS evidence must be conditioned on the reviewed RustSec-warning gate",
+  );
+  assert.match(
+    evidenceGenerator,
+    /JARVIS_RUSTSEC_REVIEW_PASSED=1 is required for PASS evidence/,
+    "evidence generation must fail closed if RustSec warning review did not pass",
+  );
 });
