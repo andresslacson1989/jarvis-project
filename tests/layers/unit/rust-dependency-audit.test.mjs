@@ -60,7 +60,7 @@ test("Rust dependency vulnerability audit is exact-pinned, provenance-tracked, m
   assert.match(evidenceGenerator, /JARVIS_RUST_AUDIT_PASSED=1 is required for PASS evidence/);
 });
 
-test("RustSec informational warnings require explicit Windows reachability review before PASS evidence", () => {
+test("RustSec informational warnings require explicit Windows target-resolution review before PASS evidence", () => {
   const reviewPath = resolve(root, "third_party", "rustsec-advisory-review.json");
   const checkerPath = resolve(root, "tools", "ci", "check-rustsec-advisories.mjs");
 
@@ -72,7 +72,7 @@ test("RustSec informational warnings require explicit Windows reachability revie
   assert.equal(
     existsSync(checkerPath),
     true,
-    "tools/ci/check-rustsec-advisories.mjs must fail closed on advisory/reachability drift",
+    "tools/ci/check-rustsec-advisories.mjs must fail closed on advisory/target-resolution drift",
   );
 
   const workflow = read(".github/workflows/static-ci.yml");
@@ -80,8 +80,8 @@ test("RustSec informational warnings require explicit Windows reachability revie
 
   assert.match(
     workflow,
-    /cargo metadata --locked --format-version 1 --filter-platform x86_64-pc-windows-msvc/,
-    "CI must derive the actual Windows-resolved Cargo dependency graph instead of inferring reachability from Cargo.lock",
+    /cargo metadata --locked --format-version 1 --all-features --filter-platform x86_64-pc-windows-msvc/,
+    "CI must derive the actual Windows-resolved Cargo dependency graph with the same all-features selection used by qualification",
   );
   assert.match(
     workflow,
@@ -91,7 +91,7 @@ test("RustSec informational warnings require explicit Windows reachability revie
   assert.match(
     workflow,
     /node tools\/ci\/check-rustsec-advisories\.mjs/,
-    "CI must compare live RustSec findings and Windows reachability with the reviewed warning set",
+    "CI must compare live RustSec findings and Windows target resolution with the reviewed warning set",
   );
   assert.match(
     workflow,

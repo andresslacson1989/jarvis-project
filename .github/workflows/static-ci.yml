@@ -195,7 +195,40 @@ jobs:
 
       - name: Rust dependency vulnerability audit
         shell: pwsh
-        run: cargo audit --file Cargo.lock --target-os windows --target-arch x86_64
+        run: |
+          cargo audit --file Cargo.lock --target-os windows --target-arch x86_64
+          if ($LASTEXITCODE -ne 0) {
+            throw "Human-readable RustSec audit failed with exit code $LASTEXITCODE"
+          }
+
+          $auditPath = Join-Path $env:RUNNER_TEMP "jarvis-rustsec-audit.json"
+          $auditOutput = & cargo audit --json --file Cargo.lock --target-os windows --target-arch x86_64
+          $auditExit = $LASTEXITCODE
+          if ($auditExit -ne 0) {
+            throw "Machine-readable RustSec audit failed with exit code $auditExit"
+          }
+          [System.IO.File]::WriteAllText(
+            $auditPath,
+            ($auditOutput -join [Environment]::NewLine),
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+          $metadataPath = Join-Path $env:RUNNER_TEMP "jarvis-cargo-metadata-windows.json"
+          $metadataOutput = & cargo metadata --locked --format-version 1 --all-features --filter-platform x86_64-pc-windows-msvc
+          $metadataExit = $LASTEXITCODE
+          if ($metadataExit -ne 0) {
+            throw "Windows Cargo metadata resolution failed with exit code $metadataExit"
+          }
+          [System.IO.File]::WriteAllText(
+            $metadataPath,
+            ($metadataOutput -join [Environment]::NewLine),
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+          node tools/ci/check-rustsec-advisories.mjs $auditPath $metadataPath third_party/rustsec-advisory-review.json
+          if ($LASTEXITCODE -ne 0) {
+            throw "RustSec informational-warning review failed with exit code $LASTEXITCODE"
+          }
 
       - name: Rust formatting
         run: cargo fmt --all -- --check
@@ -216,4 +249,5 @@ jobs:
           JARVIS_PHASE0_CHECKPOINT_PASSED: '1'
           JARVIS_WINDOWS_TAURI_GATES_PASSED: '1'
           JARVIS_RUST_AUDIT_PASSED: '1'
+          JARVIS_RUSTSEC_REVIEW_PASSED: '1'
         run: pnpm ci:evidence

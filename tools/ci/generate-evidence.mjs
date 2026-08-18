@@ -21,6 +21,7 @@ const GATES = Object.freeze([
   "normal-tests",
   "dependency-vulnerability-high-plus",
   "rust-dependency-vulnerability-rustsec",
+  "rustsec-informational-warning-review",
   "rustfmt",
   "rust-clippy-warnings-as-errors",
   "rust-host-build",
@@ -83,6 +84,11 @@ export function buildCiEvidence({
   if (env.JARVIS_RUST_AUDIT_PASSED !== "1") {
     throw new Error(
       "JARVIS_RUST_AUDIT_PASSED=1 is required for PASS evidence",
+    );
+  }
+  if (env.JARVIS_RUSTSEC_REVIEW_PASSED !== "1") {
+    throw new Error(
+      "JARVIS_RUSTSEC_REVIEW_PASSED=1 is required for PASS evidence",
     );
   }
   if (contractSuiteVersion !== "1.0.6") {
