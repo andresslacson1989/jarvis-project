@@ -195,12 +195,11 @@ jobs:
 
       - name: Rust dependency vulnerability audit
         shell: pwsh
-        run: |
-          cargo audit --file Cargo.lock --target-os windows --target-arch x86_64
-          if ($LASTEXITCODE -ne 0) {
-            throw "Human-readable RustSec audit failed with exit code $LASTEXITCODE"
-          }
+        run: cargo audit --file Cargo.lock --target-os windows --target-arch x86_64
 
+      - name: RustSec informational warning review
+        shell: pwsh
+        run: |
           $auditPath = Join-Path $env:RUNNER_TEMP "jarvis-rustsec-audit.json"
           $auditOutput = & cargo audit --json --file Cargo.lock --target-os windows --target-arch x86_64
           $auditExit = $LASTEXITCODE

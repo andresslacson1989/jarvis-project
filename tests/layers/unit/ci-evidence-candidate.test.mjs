@@ -18,6 +18,7 @@ function env(overrides = {}) {
     JARVIS_PHASE0_CHECKPOINT_PASSED: "1",
     JARVIS_WINDOWS_TAURI_GATES_PASSED: "1",
     JARVIS_RUST_AUDIT_PASSED: "1",
+    JARVIS_RUSTSEC_REVIEW_PASSED: "1",
     ...overrides,
   };
 }
