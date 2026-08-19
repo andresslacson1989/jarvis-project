@@ -4,9 +4,11 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { loadLayerManifest } from "../../tests/harness/layers.mjs";
+import { buildNodeTestArgs } from "./test-runner-args.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
+const denyNetworkPreload = resolve(root, "tests", "harness", "deny-network.mjs");
 
 function fail(message, code = 1) {
   console.error(`[tests] ${message}`);
@@ -66,11 +68,11 @@ function scrubbedEnv() {
 }
 
 async function runTestFile(path, normalProfile) {
-  const args = [];
-  if (normalProfile) {
-    args.push("--import", resolve(root, "tests", "harness", "deny-network.mjs"));
-  }
-  args.push("--test", path);
+  const args = buildNodeTestArgs({
+    preloadPath: denyNetworkPreload,
+    testFile: path,
+    normalProfile,
+  });
   return new Promise((resolvePromise) => {
     const child = spawn(process.execPath, args, {
       cwd: root,

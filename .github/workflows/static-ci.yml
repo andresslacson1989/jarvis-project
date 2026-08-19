@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  static-ci:
-    name: static-ci
-    runs-on: ubuntu-24.04
+  windows-tauri-build:
+    name: windows-tauri-build
+    runs-on: windows-2025
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -25,6 +25,17 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 1
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $actualSha = (git rev-parse HEAD).Trim()
+          if ($actualSha -ne $env:EXPECTED_SHA) {
+            throw "Expected exact candidate SHA $env:EXPECTED_SHA but checked out $actualSha"
+          }
 
       - name: Install pinned pnpm and Node
         uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
@@ -35,11 +46,95 @@ jobs:
           cache: false
 
       - name: Install pinned Rust toolchain
-        shell: bash
+        shell: pwsh
         run: |
           rustup set profile minimal
           rustup toolchain install 1.97.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc
           rustup default 1.97.1
+
+      - name: Install dependencies without lifecycle scripts
+        shell: pwsh
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Verify exact toolchain
+        shell: pwsh
+        run: pnpm toolchain:verify
+
+      - name: Windows Rust formatting
+        shell: pwsh
+        run: cargo fmt --all -- --check
+
+      - name: Rust Windows-target build
+        shell: pwsh
+        run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
+
+      - name: Desktop Tauri production build
+        shell: pwsh
+        working-directory: apps/desktop
+        run: pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci
+
+  static-ci:
+    name: static-ci
+    needs: windows-tauri-build
+    if: ${{ always() }}
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact checkout
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          $actualSha = (git rev-parse HEAD).Trim()
+          if ($actualSha -ne $env:EXPECTED_SHA) {
+            throw "Expected exact candidate SHA $env:EXPECTED_SHA but checked out $actualSha"
+          }
+
+      - name: Verify native Windows Tauri prerequisite
+        shell: pwsh
+        env:
+          WINDOWS_TAURI_RESULT: ${{ needs.windows-tauri-build.result }}
+        run: |
+          if ($env:WINDOWS_TAURI_RESULT -ne "success") {
+            throw "Native Windows Tauri prerequisite was $env:WINDOWS_TAURI_RESULT"
+          }
+
+      - name: Install pinned pnpm and Node
+        uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2
+        with:
+          version: 11.21.0
+          runtime: node@24.18.0
+          install: false
+          cache: false
+
+      - name: Install pinned Rust toolchain
+        shell: pwsh
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.97.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc
+          rustup default 1.97.1
+
+      - name: Install pinned cargo-audit
+        shell: pwsh
+        run: cargo install cargo-audit --locked --version 0.22.2 --no-default-features
+
+      - name: Verify pinned cargo-audit
+        shell: pwsh
+        run: |
+          $auditVersion = (cargo audit --version).Trim()
+          if ($LASTEXITCODE -ne 0) {
+            throw "cargo-audit version check failed with exit code $LASTEXITCODE"
+          }
+          if ($auditVersion -notmatch '0\.22\.2$') {
+            throw "Expected cargo-audit 0.22.2 but found $auditVersion"
+          }
 
       - name: Install dependencies without lifecycle scripts
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -86,6 +181,9 @@ jobs:
       - name: Desktop UI build
         run: pnpm build:ui
 
+      - name: Desktop foundation contract
+        run: pnpm desktop:foundation:check
+
       - name: Architecture enforcement
         run: pnpm architecture:check
 
@@ -94,6 +192,42 @@ jobs:
 
       - name: Node dependency vulnerability gate
         run: pnpm audit --audit-level high
+
+      - name: Rust dependency vulnerability audit
+        shell: pwsh
+        run: cargo audit --file Cargo.lock --target-os windows --target-arch x86_64
+
+      - name: RustSec informational warning review
+        shell: pwsh
+        run: |
+          $auditPath = Join-Path $env:RUNNER_TEMP "jarvis-rustsec-audit.json"
+          $auditOutput = & cargo audit --json --file Cargo.lock --target-os windows --target-arch x86_64
+          $auditExit = $LASTEXITCODE
+          if ($auditExit -ne 0) {
+            throw "Machine-readable RustSec audit failed with exit code $auditExit"
+          }
+          [System.IO.File]::WriteAllText(
+            $auditPath,
+            ($auditOutput -join [Environment]::NewLine),
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+          $metadataPath = Join-Path $env:RUNNER_TEMP "jarvis-cargo-metadata-windows.json"
+          $metadataOutput = & cargo metadata --locked --format-version 1 --all-features --filter-platform x86_64-pc-windows-msvc
+          $metadataExit = $LASTEXITCODE
+          if ($metadataExit -ne 0) {
+            throw "Windows Cargo metadata resolution failed with exit code $metadataExit"
+          }
+          [System.IO.File]::WriteAllText(
+            $metadataPath,
+            ($metadataOutput -join [Environment]::NewLine),
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+          node tools/ci/check-rustsec-advisories.mjs $auditPath $metadataPath third_party/rustsec-advisory-review.json
+          if ($LASTEXITCODE -ne 0) {
+            throw "RustSec informational-warning review failed with exit code $LASTEXITCODE"
+          }
 
       - name: Rust formatting
         run: cargo fmt --all -- --check
@@ -104,14 +238,15 @@ jobs:
       - name: Rust host build
         run: cargo check --locked --workspace --all-targets --all-features
 
-      - name: Rust Windows-target build
-        run: cargo check --locked --workspace --target x86_64-pc-windows-msvc
-
       - name: Phase 0 section checkpoint
         run: pnpm phase0:check
 
       - name: Static CI evidence
         env:
+          JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           JARVIS_STATIC_CI_GATES_PASSED: '1'
           JARVIS_PHASE0_CHECKPOINT_PASSED: '1'
+          JARVIS_WINDOWS_TAURI_GATES_PASSED: '1'
+          JARVIS_RUST_AUDIT_PASSED: '1'
+          JARVIS_RUSTSEC_REVIEW_PASSED: '1'
         run: pnpm ci:evidence

@@ -77,6 +77,10 @@
       "run": "pnpm audit --audit-level high"
     },
     {
+      "name": "Rust dependency vulnerability audit",
+      "run": "cargo audit --file Cargo.lock --target-os windows --target-arch x86_64"
+    },
+    {
       "name": "Rust formatting",
       "run": "cargo fmt --all -- --check"
     },

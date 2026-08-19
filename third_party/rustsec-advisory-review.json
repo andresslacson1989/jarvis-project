@@ -1,0 +1,175 @@
+{
+  "schemaVersion": 1,
+  "target": "x86_64-pc-windows-msvc",
+  "auditTool": {
+    "name": "cargo-audit",
+    "version": "0.22.2"
+  },
+  "warnings": [
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2024-0370",
+      "package": {
+        "name": "proc-macro-error",
+        "version": "1.0.4"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "Cargo's Windows/x64 all-features resolved graph does not contain this package; CI fails if target resolution changes."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2024-0411",
+      "package": {
+        "name": "gdkwayland-sys",
+        "version": "0.18.2"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "Tauri's GTK/WebKit dependency family is target-gated away from Windows; CI independently verifies this from filtered Cargo metadata."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2024-0412",
+      "package": {
+        "name": "gdk",
+        "version": "0.18.2"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "Tauri's GTK/WebKit dependency family is target-gated away from Windows; CI independently verifies this from filtered Cargo metadata."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2024-0413",
+      "package": {
+        "name": "atk",
+        "version": "0.18.2"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "Tauri's GTK/WebKit dependency family is target-gated away from Windows; CI independently verifies this from filtered Cargo metadata."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2024-0415",
+      "package": {
+        "name": "gtk",
+        "version": "0.18.2"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "Tauri's GTK/WebKit dependency family is target-gated away from Windows; CI independently verifies this from filtered Cargo metadata."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2024-0416",
+      "package": {
+        "name": "atk-sys",
+        "version": "0.18.2"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "Tauri's GTK/WebKit dependency family is target-gated away from Windows; CI independently verifies this from filtered Cargo metadata."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2024-0418",
+      "package": {
+        "name": "gdk-sys",
+        "version": "0.18.2"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "Tauri's GTK/WebKit dependency family is target-gated away from Windows; CI independently verifies this from filtered Cargo metadata."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2024-0419",
+      "package": {
+        "name": "gtk3-macros",
+        "version": "0.18.2"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "Tauri's GTK/WebKit dependency family is target-gated away from Windows; CI independently verifies this from filtered Cargo metadata."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2024-0420",
+      "package": {
+        "name": "gtk-sys",
+        "version": "0.18.2"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "Tauri's GTK/WebKit dependency family is target-gated away from Windows; CI independently verifies this from filtered Cargo metadata."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2025-0075",
+      "package": {
+        "name": "unic-char-range",
+        "version": "0.9.0"
+      },
+      "windowsResolved": true,
+      "disposition": "REVIEWED_WINDOWS_TRANSITIVE_INFORMATIONAL",
+      "rationale": "RustSec classifies this as unmaintained, not a vulnerability; it is Windows-resolved transitively through the pinned Tauri/urlpattern dependency graph."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2025-0080",
+      "package": {
+        "name": "unic-common",
+        "version": "0.9.0"
+      },
+      "windowsResolved": true,
+      "disposition": "REVIEWED_WINDOWS_TRANSITIVE_INFORMATIONAL",
+      "rationale": "RustSec classifies this as unmaintained, not a vulnerability; it is Windows-resolved transitively through the pinned Tauri/urlpattern dependency graph."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2025-0081",
+      "package": {
+        "name": "unic-char-property",
+        "version": "0.9.0"
+      },
+      "windowsResolved": true,
+      "disposition": "REVIEWED_WINDOWS_TRANSITIVE_INFORMATIONAL",
+      "rationale": "RustSec classifies this as unmaintained, not a vulnerability; it is Windows-resolved transitively through the pinned Tauri/urlpattern dependency graph."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2025-0098",
+      "package": {
+        "name": "unic-ucd-version",
+        "version": "0.9.0"
+      },
+      "windowsResolved": true,
+      "disposition": "REVIEWED_WINDOWS_TRANSITIVE_INFORMATIONAL",
+      "rationale": "RustSec classifies this as unmaintained, not a vulnerability; it is Windows-resolved transitively through the pinned Tauri/urlpattern dependency graph."
+    },
+    {
+      "kind": "unmaintained",
+      "advisoryId": "RUSTSEC-2025-0100",
+      "package": {
+        "name": "unic-ucd-ident",
+        "version": "0.9.0"
+      },
+      "windowsResolved": true,
+      "disposition": "REVIEWED_WINDOWS_TRANSITIVE_INFORMATIONAL",
+      "rationale": "RustSec classifies this as unmaintained, not a vulnerability; it is Windows-resolved transitively through the pinned Tauri/urlpattern dependency graph."
+    },
+    {
+      "kind": "unsound",
+      "advisoryId": "RUSTSEC-2024-0429",
+      "package": {
+        "name": "glib",
+        "version": "0.18.5"
+      },
+      "windowsResolved": false,
+      "disposition": "WINDOWS_TARGET_UNRESOLVED",
+      "rationale": "The affected glib package is outside the Windows/x64 resolved graph; the checker hard-fails if an unsound advisory ever becomes Windows target-resolved."
+    }
+  ]
+}

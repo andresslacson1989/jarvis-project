@@ -1,0 +1,15 @@
+[package]
+name = "jarvis-desktop"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[build-dependencies]
+tauri-build = "=2.6.3"
+
+[dependencies]
+tauri = { version = "=2.11.5", default-features = false }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+tauri = { version = "=2.11.5", default-features = false, features = ["wry"] }

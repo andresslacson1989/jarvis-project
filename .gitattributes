@@ -1,0 +1,9 @@
+# Canonical text checkout policy for reproducible Windows CI.
+* text=auto eol=lf
+
+# Binary application resources must never be text-normalized.
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
