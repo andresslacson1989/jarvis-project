@@ -10,9 +10,7 @@ fn allows_authoritative_navigation(url: &tauri::Url) -> bool {
 
     #[cfg(not(debug_assertions))]
     {
-        url.scheme() == "http"
-            && url.host_str() == Some("tauri.localhost")
-            && url.port().is_none()
+        url.scheme() == "http" && url.host_str() == Some("tauri.localhost") && url.port().is_none()
     }
 }
 
