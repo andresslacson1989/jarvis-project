@@ -10,7 +10,9 @@ fn allows_authoritative_navigation(url: &tauri::Url) -> bool {
 
     #[cfg(not(debug_assertions))]
     {
-        url.scheme() == "http" && url.host_str() == Some("tauri.localhost")
+        url.scheme() == "http"
+            && url.host_str() == Some("tauri.localhost")
+            && url.port().is_none()
     }
 }
 
@@ -77,6 +79,9 @@ mod tests {
         ));
         assert!(!allows_authoritative_navigation(
             &"tauri://localhost/index.html".parse().unwrap()
+        ));
+        assert!(!allows_authoritative_navigation(
+            &"http://tauri.localhost:9999/index.html".parse().unwrap()
         ));
     }
 }

@@ -35,3 +35,15 @@ test("desktop security boundary rejects unexpected CSP origins", async () => {
   config.app.security.devCsp = config.app.security.devCsp.replace(" https://evil.example", "") + "; default-src 'self'";
   assert.ok(validateDesktopSecurity({ config, capability, nativeSource, externalLinkSource }).includes("DESKTOP_SECURITY_DEV_CSP_MISSING"));
 });
+
+test("desktop security boundary rejects an unexpected bundled-app port", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { resolve } = await import("node:path");
+  const root = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
+  const nativeSource = await readFile(resolve(root, "apps/desktop/src-tauri/src/main.rs"), "utf8");
+  const capability = JSON.parse(await readFile(resolve(root, "apps/desktop/src-tauri/capabilities/main-local-ui.json"), "utf8"));
+  const config = JSON.parse(await readFile(resolve(root, "apps/desktop/src-tauri/tauri.conf.json"), "utf8"));
+  const externalLinkSource = await readFile(resolve(root, "apps/desktop/src/external-link.ts"), "utf8");
+  const mutated = nativeSource.replace("&& url.port().is_none()", "&& url.port() == Some(9999)");
+  assert.ok(validateDesktopSecurity({ config, capability, nativeSource: mutated, externalLinkSource }).includes("DESKTOP_SECURITY_RELEASE_ORIGIN_BOUNDARY_MISSING"));
+});

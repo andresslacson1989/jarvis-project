@@ -39,6 +39,10 @@ export function validateDesktopSecurity({ config, capability, nativeSource, exte
   if (!nativeSource.includes(".devtools(false)") || !nativeSource.includes(".on_navigation(") || !nativeSource.includes("NewWindowResponse::Deny")) {
     violations.push("DESKTOP_SECURITY_NATIVE_POLICY_MISSING");
   }
+  const releaseOrigin = 'url.scheme() == "http"\n            && url.host_str() == Some("tauri.localhost")\n            && url.port().is_none()';
+  if (!nativeSource.includes(releaseOrigin) || nativeSource.includes('url.scheme() == "tauri"')) {
+    violations.push("DESKTOP_SECURITY_RELEASE_ORIGIN_BOUNDARY_MISSING");
+  }
   if (!externalLinkSource.includes("@tauri-apps/plugin-opener") || !externalLinkSource.includes("new URL") || !externalLinkSource.includes("url.username") || !externalLinkSource.includes("url.password")) {
     violations.push("DESKTOP_SECURITY_EXTERNAL_LINK_BOUNDARY_MISSING");
   }
