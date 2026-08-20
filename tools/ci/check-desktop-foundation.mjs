@@ -170,10 +170,11 @@ export function evaluateDesktopFoundation(snapshot) {
   }
   if (typeof snapshot.tauriCargo === "string") {
     const basePairing = `[dependencies]\ntauri = { version = "=${String(runtime)}", default-features = false }`;
+    const basePairingWithEmptyFeatures = `[dependencies]\ntauri = { version = "=${String(runtime)}", default-features = false , features = [] }`;
     const windowsRuntime = `[target.'cfg(target_os = "windows")'.dependencies]\ntauri = { version = "=${String(runtime)}", default-features = false, features = ["wry"] }`;
-    const basePairingOk = snapshot.tauriCargo.includes(basePairing);
+    const basePairingOk = snapshot.tauriCargo.includes(basePairing) || snapshot.tauriCargo.includes(basePairingWithEmptyFeatures);
     const windowsRuntimeOk = snapshot.tauriCargo.includes(windowsRuntime);
-    add(violations, snapshot.tauriCargo.includes(`tauri-build = "=${String(build)}"`), "DESKTOP_TAURI_BUILD_PIN_MISMATCH", "apps/desktop/src-tauri/Cargo.toml", `tauri-build must equal ${String(build)}`);
+    add(violations, snapshot.tauriCargo.includes(`tauri-build = "=${String(build)}"`) || snapshot.tauriCargo.includes(`tauri-build = { version = "=${String(build)}", features = [] }`), "DESKTOP_TAURI_BUILD_PIN_MISMATCH", "apps/desktop/src-tauri/Cargo.toml", `tauri-build must equal ${String(build)}`);
     add(violations, basePairingOk && windowsRuntimeOk, "DESKTOP_TAURI_RUNTIME_PIN_MISMATCH", "apps/desktop/src-tauri/Cargo.toml", `Tauri runtime must equal ${String(runtime)} in both host-pairing and Windows WebView dependencies`);
     add(violations, basePairingOk, "DESKTOP_TAURI_BUILD_PAIRING_MISSING", "apps/desktop/src-tauri/Cargo.toml", "tauri-build requires a host-visible tauri dependency with default features disabled");
     add(violations, windowsRuntimeOk, "DESKTOP_TAURI_WINDOWS_WRY_MISSING", "apps/desktop/src-tauri/Cargo.toml", "Windows V1 must enable the wry WebView runtime only in the Windows dependency block");

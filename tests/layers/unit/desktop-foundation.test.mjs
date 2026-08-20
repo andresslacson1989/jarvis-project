@@ -29,7 +29,7 @@ test("Tauri build-script pairing is host-visible while the WebView runtime stays
   const snapshot = await loadDesktopFoundationSnapshot(root);
   assert.match(
     snapshot.tauriCargo,
-    /^\[dependencies\]\ntauri = \{ version = "=2\.11\.5", default-features = false \}$/m,
+    /^\[dependencies\]\ntauri = \{ version = "=2\.11\.5", default-features = false\s*(?:,\s*features = \[\])?\s*\}$/m,
   );
   assert.match(
     snapshot.tauriCargo,
@@ -38,7 +38,7 @@ test("Tauri build-script pairing is host-visible while the WebView runtime stays
 
   const missingPairing = mutate(snapshot, (copy) => {
     copy.tauriCargo = copy.tauriCargo.replace(
-      /^tauri = \{ version = "=2\.11\.5", default-features = false \}\r?\n/m,
+      /^tauri = \{ version = "=2\.11\.5", default-features = false\s*(?:,\s*features = \[\])?\s*\}\r?\n/m,
       "",
     );
   });
@@ -57,7 +57,7 @@ test("missing Tauri manifest fails closed", async () => {
 test("Tauri runtime and build pin drift fail closed", async () => {
   const snapshot = await loadDesktopFoundationSnapshot(root);
   const runtime = mutate(snapshot, (copy) => { copy.tauriCargo = copy.tauriCargo.replaceAll('version = "=2.11.5"', 'version = "=9.9.9"'); });
-  const build = mutate(snapshot, (copy) => { copy.tauriCargo = copy.tauriCargo.replace('tauri-build = "=2.6.3"', 'tauri-build = "=9.9.9"'); });
+  const build = mutate(snapshot, (copy) => { copy.tauriCargo = copy.tauriCargo.replace('tauri-build = "=2.6.3"', 'tauri-build = "=9.9.9"').replace('tauri-build = { version = "=2.6.3", features = [] }', 'tauri-build = { version = "=9.9.9", features = [] }'); });
   assert.ok(codes(runtime).includes("DESKTOP_TAURI_RUNTIME_PIN_MISMATCH"));
   assert.ok(codes(build).includes("DESKTOP_TAURI_BUILD_PIN_MISMATCH"));
 });

@@ -8,10 +8,14 @@ export function validateDesktopSecurity({ config, capability, nativeSource, exte
   const violations = [];
   const csp = config?.app?.security?.csp;
   const devCsp = config?.app?.security?.devCsp;
-  if (typeof csp !== "string" || !csp.includes("default-src 'self'") || !csp.includes("connect-src 'self'") || !csp.includes("script-src 'self'")) {
+  const parseCsp = (value) => new Map(String(value).split(";").map((directive) => directive.trim().split(/\s+/)).filter(([name]) => name).map(([name, ...sources]) => [name, sources]));
+  const production = typeof csp === "string" ? parseCsp(csp) : new Map();
+  const development = typeof devCsp === "string" ? parseCsp(devCsp) : new Map();
+  const exactSources = (policy, name, expected) => JSON.stringify(policy.get(name) ?? []) === JSON.stringify(expected);
+  if (!exactSources(production, "default-src", ["'self'"]) || !exactSources(production, "connect-src", ["'self'"]) || !exactSources(production, "script-src", ["'self'"])) {
     violations.push("DESKTOP_SECURITY_RESTRICTIVE_CSP_MISSING");
   }
-  if (typeof devCsp !== "string" || !devCsp.includes("http://127.0.0.1:5173")) {
+  if (!exactSources(development, "default-src", ["'self'"]) || !exactSources(development, "connect-src", ["'self'", "http://127.0.0.1:5173"]) || !exactSources(development, "script-src", ["'self'"])) {
     violations.push("DESKTOP_SECURITY_DEV_CSP_MISSING");
   }
   if (config?.app?.windows?.length !== 0) {
@@ -26,9 +30,10 @@ export function validateDesktopSecurity({ config, capability, nativeSource, exte
   if (!nativeSource.includes(".devtools(false)") || !nativeSource.includes(".on_navigation(") || !nativeSource.includes("NewWindowResponse::Deny")) {
     violations.push("DESKTOP_SECURITY_NATIVE_POLICY_MISSING");
   }
-  if (!externalLinkSource.includes("@tauri-apps/plugin-opener") || !externalLinkSource.includes("/^https?:\\/\\//i")) {
+  if (!externalLinkSource.includes("@tauri-apps/plugin-opener") || !externalLinkSource.includes("new URL") || !externalLinkSource.includes("url.username") || !externalLinkSource.includes("url.password")) {
     violations.push("DESKTOP_SECURITY_EXTERNAL_LINK_BOUNDARY_MISSING");
   }
+  if (!nativeSource.includes("url.port() == Some(5173)")) violations.push("DESKTOP_SECURITY_DEBUG_PORT_BOUNDARY_MISSING");
   return violations;
 }
 
@@ -37,7 +42,10 @@ export async function checkDesktopSecurity(root = ROOT) {
   const capability = JSON.parse(await readFile(resolve(root, "apps/desktop/src-tauri/capabilities/main-local-ui.json"), "utf8"));
   const nativeSource = await readFile(resolve(root, "apps/desktop/src-tauri/src/main.rs"), "utf8");
   const externalLinkSource = await readFile(resolve(root, "apps/desktop/src/external-link.ts"), "utf8");
-  return validateDesktopSecurity({ config, capability, nativeSource, externalLinkSource });
+  const rendererSource = await readFile(resolve(root, "apps/desktop/src/App.tsx"), "utf8");
+  const violations = validateDesktopSecurity({ config, capability, nativeSource, externalLinkSource });
+  if (/(dangerouslySetInnerHTML|innerHTML|eval\s*\(|new Function|<iframe|invoke\s*\()/i.test(rendererSource)) violations.push("DESKTOP_SECURITY_INERT_CONTENT_EXECUTION_PATH");
+  return violations;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
