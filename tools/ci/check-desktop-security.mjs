@@ -7,8 +7,12 @@ const ROOT = resolve(fileURLToPath(new URL("../../", import.meta.url)));
 export function validateDesktopSecurity({ config, capability, nativeSource, externalLinkSource }) {
   const violations = [];
   const csp = config?.app?.security?.csp;
-  if (typeof csp !== "string" || !csp.includes("default-src 'self'") || !csp.includes("script-src 'self'")) {
+  const devCsp = config?.app?.security?.devCsp;
+  if (typeof csp !== "string" || !csp.includes("default-src 'self'") || !csp.includes("connect-src 'self'") || !csp.includes("script-src 'self'")) {
     violations.push("DESKTOP_SECURITY_RESTRICTIVE_CSP_MISSING");
+  }
+  if (typeof devCsp !== "string" || !devCsp.includes("http://127.0.0.1:5173")) {
+    violations.push("DESKTOP_SECURITY_DEV_CSP_MISSING");
   }
   if (config?.app?.windows?.length !== 0) {
     violations.push("DESKTOP_SECURITY_WINDOW_CONFIG_NOT_NATIVE_CONTROLLED");
