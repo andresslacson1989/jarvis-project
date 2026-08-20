@@ -10,7 +10,7 @@ fn allows_authoritative_navigation(url: &tauri::Url) -> bool {
 
     #[cfg(not(debug_assertions))]
     {
-        url.scheme() == "tauri" && url.host_str() == Some("localhost")
+        url.scheme() == "http" && url.host_str() == Some("tauri.localhost")
     }
 }
 
@@ -73,6 +73,9 @@ mod tests {
     #[test]
     fn release_navigation_policy_allows_only_bundled_app_origin() {
         assert!(allows_authoritative_navigation(
+            &"http://tauri.localhost/index.html".parse().unwrap()
+        ));
+        assert!(!allows_authoritative_navigation(
             &"tauri://localhost/index.html".parse().unwrap()
         ));
     }
