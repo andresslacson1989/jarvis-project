@@ -38,7 +38,7 @@ test("Tauri build-script pairing is host-visible while the WebView runtime stays
 
   const missingPairing = mutate(snapshot, (copy) => {
     copy.tauriCargo = copy.tauriCargo.replace(
-      '[dependencies]\ntauri = { version = "=2.11.5", default-features = false }\n\n',
+      /^tauri = \{ version = "=2\.11\.5", default-features = false \}\r?\n/m,
       "",
     );
   });
