@@ -32,4 +32,6 @@ test("desktop security boundary rejects unexpected CSP origins", async () => {
   config.app.security.csp = config.app.security.csp.replace("; connect-src 'self' https://evil.example", "");
   config.app.security.devCsp += " https://evil.example";
   assert.ok(validateDesktopSecurity({ config, capability, nativeSource, externalLinkSource }).includes("DESKTOP_SECURITY_DEV_CSP_MISSING"));
+  config.app.security.devCsp = config.app.security.devCsp.replace(" https://evil.example", "") + "; default-src 'self'";
+  assert.ok(validateDesktopSecurity({ config, capability, nativeSource, externalLinkSource }).includes("DESKTOP_SECURITY_DEV_CSP_MISSING"));
 });
