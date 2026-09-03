@@ -415,12 +415,13 @@ export function validatePhase0Snapshot({
     }
   }
 
-  if (currentCandidateSha !== null || evidenceCandidateSha !== null || matrixCandidateSha !== null) {
+  if (explicitCandidateSha !== null || currentCandidateSha !== null || evidenceCandidateSha !== null || matrixCandidateSha !== null) {
     const candidateSha = explicitCandidateSha ?? currentCandidateSha;
     const checkoutSha = checkedOutSha ?? currentCandidateSha;
     const candidateShapeValid = /^[0-9a-f]{40}$/.test(String(candidateSha ?? ""));
     const checkoutShapeValid = /^[0-9a-f]{40}$/.test(String(checkoutSha ?? ""));
-    const recordsMatch = evidenceCandidateSha === candidateSha && matrixCandidateSha === candidateSha;
+    const recordsPresent = evidenceCandidateSha !== null || matrixCandidateSha !== null;
+    const recordsMatch = explicitCandidateSha !== null || !recordsPresent || (evidenceCandidateSha === candidateSha && matrixCandidateSha === candidateSha);
     let checkoutRelationshipValid = true;
     if (explicitCandidateSha !== null) {
       checkoutRelationshipValid = checkoutSha === explicitCandidateSha;

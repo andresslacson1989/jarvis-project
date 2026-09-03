@@ -239,6 +239,8 @@ jobs:
         run: cargo check --locked --workspace --all-targets --all-features
 
       - name: Phase 0 section checkpoint
+        env:
+          JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: pnpm phase0:check
 
       - name: Static CI evidence

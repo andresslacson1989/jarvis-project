@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import {
   checkPhase0,
   validatePhase0Snapshot,
@@ -260,6 +262,36 @@ test("stale Phase-0 candidate evidence fails closed", () => {
 
 test("checked-in Phase-0 records are coherent without self-referential HEAD binding", async () => {
   assert.deepEqual(await checkPhase0(process.cwd()), []);
+});
+
+test("the real evidence revision passes implicit mode and explicit current-checkout mode", async () => {
+  const previous = process.env.JARVIS_CANDIDATE_SHA;
+  try {
+    delete process.env.JARVIS_CANDIDATE_SHA;
+    assert.deepEqual(await checkPhase0(process.cwd()), []);
+    process.env.JARVIS_CANDIDATE_SHA = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    assert.deepEqual(await checkPhase0(process.cwd()), []);
+  } finally {
+    if (previous === undefined) delete process.env.JARVIS_CANDIDATE_SHA;
+    else process.env.JARVIS_CANDIDATE_SHA = previous;
+  }
+});
+
+test("candidate mode does not accept an evidence revision as the exact implementation checkout", async () => {
+  const previous = process.env.JARVIS_CANDIDATE_SHA;
+  try {
+    process.env.JARVIS_CANDIDATE_SHA = "6c72d9f9861ff858e34754d4bddcb749c6950598";
+    const result = await checkPhase0(process.cwd());
+    assert.ok(result.some(({ code }) => code === "PHASE0_CANDIDATE_MISMATCH"));
+  } finally {
+    if (previous === undefined) delete process.env.JARVIS_CANDIDATE_SHA;
+    else process.env.JARVIS_CANDIDATE_SHA = previous;
+  }
+});
+
+test("LocalCI exports the explicit candidate before the Phase-0 gate", () => {
+  const script = readFileSync(".localci/ci.sh", "utf8");
+  assert.ok(script.indexOf("export JARVIS_CANDIDATE_SHA=") < script.indexOf("run_gate phase0-section-checkpoint"));
 });
 
 test("candidate CI requires the checked-out SHA to equal the explicit candidate", () => {

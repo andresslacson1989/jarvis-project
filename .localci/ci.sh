@@ -137,9 +137,10 @@ run_gate rust-clippy-warnings-as-errors cargo clippy --locked --workspace --all-
 run_gate rust-host-build cargo check --locked --workspace --all-targets --all-features
 run_gate rust-windows-target-build cargo check --locked --workspace --target x86_64-pc-windows-msvc
 run_gate windows-tauri-production-build pnpm --dir apps/desktop tauri build --no-bundle --target x86_64-pc-windows-msvc --ci
-run_gate phase0-section-checkpoint pnpm phase0:check
 
 export JARVIS_CANDIDATE_SHA=${LOCALCI_RESOLVED_COMMIT}
+run_gate phase0-section-checkpoint pnpm phase0:check
+
 export JARVIS_CI_AUTHORITY=LOCALCI
 export JARVIS_CI_GATE_RESULTS_PATH=${gate_results}
 export LOCALCI_OBSERVED_CHECKOUT_SHA=${actual_checkout_sha}
