@@ -70,6 +70,9 @@ function localCiEnv(overrides = {}) {
     JARVIS_CANDIDATE_SHA: candidateSha,
     LOCALCI_EXPECTED_COMMIT: candidateSha,
     LOCALCI_RESOLVED_COMMIT: candidateSha,
+    LOCALCI_OBSERVED_CHECKOUT_SHA: candidateSha,
+    LOCALCI_OBSERVED_REPOSITORY: "andresslacson1989/jarvis-project",
+    LOCALCI_OBSERVED_REF: "refs/heads/codex/example",
     LOCALCI_INSTANCE_ID: "CT107-WINDOWS-01",
     LOCALCI_JOB_ID: "01M1TEST0000000000000000000",
     LOCALCI_PIPELINE_ID: "static-ci",
@@ -119,4 +122,53 @@ test("LocalCI evidence rejects omitted, duplicate, failed, and mismatched gate/s
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: parseLocalCiGateResults(localCiGateText()),
   }), /must match exactly/);
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv({ LOCALCI_OBSERVED_CHECKOUT_SHA: syntheticMergeSha }),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: localCiGateText(),
+  }), /observed checkout SHA/);
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv({ LOCALCI_OBSERVED_REPOSITORY: "attacker/repo" }),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: localCiGateText(),
+  }), /repository identity/);
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv({ LOCALCI_OBSERVED_REF: "refs/heads/other" }),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: localCiGateText(),
+  }), /observed ref/);
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv(),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: [],
+  }), /every mandatory gate/);
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv(),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: [{ gate: GATES[0], status: "FAILED" }],
+  }), /not successful/);
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv({ LOCALCI_REQUESTED_REF: "refs/tags/v1" }),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: localCiGateText(),
+  }), /observed ref/);
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv({ LOCALCI_STARTED_AT: "2026-09-03T00:00:01Z" }),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: localCiGateText(),
+  }), /ordered/);
 });

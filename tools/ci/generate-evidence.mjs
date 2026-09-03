@@ -151,6 +151,29 @@ export function parseLocalCiGateResults(text) {
   return Object.freeze(results);
 }
 
+function requirePattern(value, name, pattern) {
+  const result = requireValue(value, name);
+  if (!pattern.test(result)) throw new Error(`${name} has an invalid value`);
+  return result;
+}
+
+function orderedTimestamps(values) {
+  const parsed = values.map((value, index) => {
+    const text = requirePattern(value, `LocalCI timestamp ${index + 1}`, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    const time = Date.parse(text);
+    if (!Number.isFinite(time)) throw new Error(`LocalCI timestamp ${index + 1} is invalid`);
+    return time;
+  });
+  if (parsed.some((time, index) => index > 0 && time < parsed[index - 1])) throw new Error("LocalCI timestamps must be ordered");
+}
+
+function validateLocalCiGateResults(gateResults) {
+  if (Array.isArray(gateResults)) {
+    return parseLocalCiGateResults(gateResults.map((value) => JSON.stringify(value)).join("\n"));
+  }
+  return parseLocalCiGateResults(gateResults);
+}
+
 export function buildLocalCiExecutionEvidence({ env, versions, contractSuiteVersion, governanceMode, gateResults }) {
   const commitSha = resolveCandidateSha(env);
   if (contractSuiteVersion !== "1.0.7") throw new Error(`contractSuiteVersion evidence mismatch: expected 1.0.7, got ${contractSuiteVersion ?? "<missing>"}`);
@@ -158,7 +181,14 @@ export function buildLocalCiExecutionEvidence({ env, versions, contractSuiteVers
   const expectedCommit = requireValue(env.LOCALCI_EXPECTED_COMMIT, "LOCALCI_EXPECTED_COMMIT");
   const resolvedCommit = requireValue(env.LOCALCI_RESOLVED_COMMIT, "LOCALCI_RESOLVED_COMMIT");
   if (expectedCommit !== commitSha || resolvedCommit !== commitSha) throw new Error("LocalCI expected, resolved, and candidate commit identities must match exactly");
-  const verifiedGates = Array.isArray(gateResults) ? gateResults : parseLocalCiGateResults(gateResults);
+  if (requireValue(env.LOCALCI_OBSERVED_CHECKOUT_SHA, "LOCALCI_OBSERVED_CHECKOUT_SHA") !== commitSha) throw new Error("LocalCI observed checkout SHA must match the candidate commit exactly");
+  if (requireValue(env.LOCALCI_OBSERVED_REPOSITORY, "LOCALCI_OBSERVED_REPOSITORY") !== "andresslacson1989/jarvis-project") throw new Error("LocalCI observed repository identity is not approved");
+  if (requireValue(env.LOCALCI_OBSERVED_REF, "LOCALCI_OBSERVED_REF") !== env.LOCALCI_REQUESTED_REF) throw new Error("LocalCI observed ref must match the requested ref exactly");
+  const requestedRef = requirePattern(env.LOCALCI_REQUESTED_REF, "LOCALCI_REQUESTED_REF", /^refs\/heads\/[A-Za-z0-9._\/-]+$/);
+  const queuedAt = requireValue(env.LOCALCI_QUEUED_AT, "LOCALCI_QUEUED_AT");
+  const startedAt = requireValue(env.LOCALCI_STARTED_AT, "LOCALCI_STARTED_AT");
+  orderedTimestamps([queuedAt, startedAt]);
+  const verifiedGates = validateLocalCiGateResults(gateResults);
   return Object.freeze({
     schemaVersion: 3,
     scope: "PHASE_0_STATIC_CI",
@@ -174,15 +204,20 @@ export function buildLocalCiExecutionEvidence({ env, versions, contractSuiteVers
       pipelineVersion: requireValue(env.LOCALCI_PIPELINE_VERSION, "LOCALCI_PIPELINE_VERSION"),
     }),
     requestedRevision: Object.freeze({
-      ref: requireValue(env.LOCALCI_REQUESTED_REF, "LOCALCI_REQUESTED_REF"),
+      ref: requestedRef,
       expectedCommit,
       resolvedCommit,
     }),
-    timestamps: Object.freeze({
-      queuedAt: requireValue(env.LOCALCI_QUEUED_AT, "LOCALCI_QUEUED_AT"),
-      startedAt: requireValue(env.LOCALCI_STARTED_AT, "LOCALCI_STARTED_AT"),
+    observedCheckout: Object.freeze({
+      repository: env.LOCALCI_OBSERVED_REPOSITORY,
+      ref: env.LOCALCI_OBSERVED_REF,
+      sha: env.LOCALCI_OBSERVED_CHECKOUT_SHA,
     }),
-    runner: Object.freeze({ os: requireValue(env.LOCALCI_RUNNER_OS, "LOCALCI_RUNNER_OS"), arch: requireValue(env.LOCALCI_RUNNER_ARCH, "LOCALCI_RUNNER_ARCH") }),
+    timestamps: Object.freeze({
+      queuedAt,
+      startedAt,
+    }),
+    runner: Object.freeze({ os: requirePattern(env.LOCALCI_RUNNER_OS, "LOCALCI_RUNNER_OS", /^Windows$/), arch: requirePattern(env.LOCALCI_RUNNER_ARCH, "LOCALCI_RUNNER_ARCH", /^X64$/) }),
     toolchain: Object.freeze({ ...versions }),
     gateResults: verifiedGates,
     finalizationRequirement: "LOCALCI_CONTROL_PLANE_MUST_APPEND_TERMINAL_STATUS_FINISHED_AT_LOG_AND_ARTIFACT_HASHES_RETENTION_EXPORT_AND_CANCELLATION_RECOVERY_EVIDENCE",

@@ -4,6 +4,8 @@ set -Eeuo pipefail
 readonly gate_results='reports/localci-gate-results.jsonl'
 readonly rustsec_audit='reports/localci-rustsec-audit.json'
 readonly cargo_metadata='reports/localci-cargo-metadata-windows.json'
+source "$(dirname "${BASH_SOURCE[0]}")/worker-qualification.sh"
+# The authoritative profile requires an independently observed native Windows worker.
 
 mkdir -p reports
 : >"${gate_results}"
@@ -15,6 +17,17 @@ require_value() {
     exit 78
   fi
 }
+
+readonly expected_repository='andresslacson1989/jarvis-project'
+readonly repository_root=$(git rev-parse --show-toplevel)
+cd "${repository_root}"
+
+for tracked_state in "$(git diff --quiet; echo $?)" "$(git diff --cached --quiet; echo $?)"; do
+  if [[ ${tracked_state} != 0 ]]; then
+    printf 'LocalCI checkout must have no tracked changes\n' >&2
+    exit 78
+  fi
+done
 
 for variable_name in \
   LOCALCI_JOB_ID \
@@ -31,19 +44,30 @@ for variable_name in \
   require_value "${variable_name}"
 done
 
+require_value LOCALCI_REPOSITORY
+if [[ ${LOCALCI_REPOSITORY} != "${expected_repository}" ]] ||
+  [[ ! ${LOCALCI_REQUESTED_REF} =~ ^refs/heads/[A-Za-z0-9._/-]+$ ]]; then
+  printf 'LocalCI repository/ref binding is invalid\n' >&2
+  exit 78
+fi
+
+actual_checkout_sha=$(git rev-parse --verify HEAD)
+actual_checkout_ref=$(git symbolic-ref --quiet --short HEAD || true)
+if [[ ! ${actual_checkout_sha} =~ ^[0-9a-f]{40}$ ]] ||
+  [[ ${actual_checkout_sha} != "${LOCALCI_EXPECTED_COMMIT}" ]] ||
+  [[ ${actual_checkout_sha} != "${LOCALCI_RESOLVED_COMMIT}" ]] ||
+  [[ ${actual_checkout_ref} != "${LOCALCI_REQUESTED_REF#refs/heads/}" ]]; then
+  printf 'LocalCI checkout SHA does not match the server-approved revision\n' >&2
+  exit 78
+fi
+
 if [[ ! ${LOCALCI_EXPECTED_COMMIT} =~ ^[0-9a-f]{40}$ ]] ||
   [[ ${LOCALCI_EXPECTED_COMMIT} != "${LOCALCI_RESOLVED_COMMIT}" ]]; then
   printf 'LocalCI expected/resolved commit binding is invalid\n' >&2
   exit 78
 fi
 
-case "${OS:-}:$(uname -s)" in
-  Windows_NT:*|*:MINGW*|*:MSYS*|*:CYGWIN*) ;;
-  *)
-    printf 'The authoritative JARVIS LocalCI profile requires a native Windows worker\n' >&2
-    exit 78
-    ;;
-esac
+validate_localci_worker "$(uname -s)" "${LOCALCI_RUNNER_OS}" "${LOCALCI_RUNNER_ARCH}"
 
 run_gate() {
   local gate_id=$1
@@ -88,9 +112,9 @@ run_gate dependency-vulnerability-high-plus pnpm audit --audit-level high
 run_gate cargo-audit-install cargo install cargo-audit --locked --version 0.22.2 --no-default-features
 run_gate cargo-audit-version sh -c 'cargo audit --version | grep -Eq "0\\.22\\.2$"'
 run_gate rust-dependency-vulnerability-rustsec cargo audit --file Cargo.lock --target-os windows --target-arch x86_64
-run_gate rustsec-audit-json sh -c 'cargo audit --json --file Cargo.lock --target-os windows --target-arch x86_64 >"$1"' sh "${rustsec_audit}"
-run_gate cargo-metadata-windows sh -c 'cargo metadata --locked --format-version 1 --all-features --filter-platform x86_64-pc-windows-msvc >"$1"' sh "${cargo_metadata}"
-run_gate rustsec-informational-warning-review node tools/ci/check-rustsec-advisories.mjs "${rustsec_audit}" "${cargo_metadata}" third_party/rustsec-advisory-review.json
+run_gate rustsec-audit-json sh -c 'cargo audit --json --file Cargo.lock --target-os windows --target-arch x86_64 >"$1"' sh reports/localci-rustsec-audit.json
+run_gate cargo-metadata-windows sh -c 'cargo metadata --locked --format-version 1 --all-features --filter-platform x86_64-pc-windows-msvc >"$1"' sh reports/localci-cargo-metadata-windows.json
+run_gate rustsec-informational-warning-review node tools/ci/check-rustsec-advisories.mjs reports/localci-rustsec-audit.json reports/localci-cargo-metadata-windows.json third_party/rustsec-advisory-review.json
 run_gate rustfmt cargo fmt --all -- --check
 run_gate rust-clippy-warnings-as-errors cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 run_gate rust-host-build cargo check --locked --workspace --all-targets --all-features
@@ -101,4 +125,9 @@ run_gate phase0-section-checkpoint pnpm phase0:check
 export JARVIS_CANDIDATE_SHA=${LOCALCI_RESOLVED_COMMIT}
 export JARVIS_CI_AUTHORITY=LOCALCI
 export JARVIS_CI_GATE_RESULTS_PATH=${gate_results}
+export LOCALCI_OBSERVED_CHECKOUT_SHA=${actual_checkout_sha}
+export LOCALCI_OBSERVED_REPOSITORY=${LOCALCI_REPOSITORY}
+export LOCALCI_OBSERVED_REF=${LOCALCI_REQUESTED_REF}
 run_gate static-ci-evidence pnpm ci:evidence
+printf 'LOCALCI_JOB_RESULT=PENDING_AUTHORITY_FINALIZATION\n' >&2
+exit 78

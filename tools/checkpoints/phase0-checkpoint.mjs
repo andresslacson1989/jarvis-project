@@ -89,6 +89,8 @@ export function validatePhase0Snapshot({
   linuxSourcePaths = [],
   androidSourcePaths = [],
   existingPaths = new Set(),
+  currentEvidenceStatus = null,
+  governanceQualificationStatus = null,
 }) {
   const violations = [];
 
@@ -395,6 +397,17 @@ export function validatePhase0Snapshot({
     }
   }
 
+  if (currentEvidenceStatus !== null || governanceQualificationStatus !== null) {
+    const status = section0Status(matrix);
+    const expected = status === "VERIFIED" ? "VERIFIED" : "VERIFYING";
+    const expectedQualification = status === "VERIFIED" ? "QUALIFIED" : "VERIFYING";
+    if (status !== "VERIFIED" && status !== "VERIFYING") {
+      violations.push(violation("PHASE0_SECTION_STATUS_INVALID", "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md", "Section 0 must be VERIFIED or VERIFYING"));
+    } else if (currentEvidenceStatus !== expected || governanceQualificationStatus !== expectedQualification) {
+      violations.push(violation("PHASE0_CURRENT_EVIDENCE_STALE", "docs/implementation/evidence/0.CP-phase0-checkpoint.md", "current checkpoint evidence and selected authority status must match the live Section 0 status"));
+    }
+  }
+
   for (const path of profile.requiredEvidencePaths ?? []) {
     if (!existingPaths.has(path)) {
       violations.push(
@@ -456,7 +469,7 @@ export async function checkPhase0(rootDir) {
   );
   const profile = JSON.parse(await readFile(profilePath, "utf8"));
 
-  const [workflow, packageJson, canonicalValues, matrix, linuxSourcePaths, androidSourcePaths] =
+  const [workflow, packageJson, canonicalValues, matrix, checkpointEvidence, governanceProfile, linuxSourcePaths, androidSourcePaths] =
     await Promise.all([
       readFile(resolve(rootDir, ".github/workflows/static-ci.yml"), "utf8"),
       readFile(resolve(rootDir, "package.json"), "utf8").then(JSON.parse),
@@ -471,6 +484,8 @@ export async function checkPhase0(rootDir) {
         resolve(rootDir, "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md"),
         "utf8",
       ),
+      readFile(resolve(rootDir, "docs/implementation/evidence/0.CP-phase0-checkpoint.md"), "utf8"),
+      readFile(resolve(rootDir, "docs/implementation/governance/repository-governance-profile.json"), "utf8").then(JSON.parse),
       collectRuntimeSources(rootDir, "platform/linux"),
       collectRuntimeSources(rootDir, "platform/android"),
     ]);
@@ -492,6 +507,8 @@ export async function checkPhase0(rootDir) {
     linuxSourcePaths,
     androidSourcePaths,
     existingPaths,
+    currentEvidenceStatus: checkpointEvidence.match(/^\*\*(VERIFIED|VERIFYING)\b/m)?.[1] ?? null,
+    governanceQualificationStatus: governanceProfile?.mandatoryCi?.selectedAuthority?.qualificationStatus ?? null,
   });
 }
 

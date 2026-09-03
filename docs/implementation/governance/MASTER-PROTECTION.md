@@ -4,7 +4,7 @@
 **Decisions:** ADR-074, ADR-076
 **Authoritative branch:** `master`  
 **Mandatory CI pipeline:** `static-ci`
-**Selected CI authority:** `LOCALCI` (qualified JARVIS repository-CI scope)
+**Selected CI authority:** `LOCALCI` (VERIFYING; not yet qualified)
 
 This document is an operational implementation aid for the repository-governance requirements in the active top-level contract §28, Verification Contract §33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
@@ -94,7 +94,7 @@ The machine-readable governance profile SHALL be updated to `SERVER_ENFORCED` on
 
 ## What this exception does not permit
 
-The v1.0.6 exception does not permit:
+The v1.0.7 exception does not permit:
 
 - claiming `master` is protected when GitHub reports it is not;
 - disabling an available server-side protection feature to remain in fallback mode;

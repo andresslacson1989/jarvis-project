@@ -237,6 +237,18 @@ test("live matrix suite drift fails checkpoint", () => {
   );
 });
 
+test("current checkpoint evidence cannot remain VERIFIED while LocalCI is VERIFYING", () => {
+  const matrixWithSection =
+    `| Contract suite | JARVIS v1.0.7 |\n| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFYING** |\n` +
+    childIds.map((id) => `| ↳ **${id}** x | **VERIFIED** |`).join("\n");
+  const result = codes({
+    matrix: matrixWithSection,
+    currentEvidenceStatus: "VERIFIED",
+    governanceQualificationStatus: "VERIFYING",
+  });
+  assert.ok(result.includes("PHASE0_CURRENT_EVIDENCE_STALE"));
+});
+
 test("missing child evidence fails checkpoint", () => {
   const existingPaths = new Set(allEvidencePaths);
   existingPaths.delete(profile.requiredEvidencePaths.at(-1));

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GATES } from "./generate-evidence.mjs";
+import { LOCALCI_GATE_COMMANDS } from "./localci-gate-manifest.mjs";
 
 const EXPECTED_REPOSITORY = "andresslacson1989/jarvis-project";
 const EXPECTED_BRANCH = "master";
@@ -81,13 +82,17 @@ export function validateRepositoryGovernanceProfile(profile, workflowText, local
     if (selected.instanceIdentity !== "CT107" || selected.pipelineProfile !== "tauri2418" || selected.repositoryPipeline !== ".localci/ci.sh") {
       violations.push(violation("GOVERNANCE_LOCALCI_IDENTITY", "selected LocalCI identity/profile/pipeline must match the qualified profile"));
     }
-    const localCiText = String(localCiScript);
+    const localCiText = String(localCiScript).replace(/\r\n/g, "\n");
     if (!localCiText.includes("set -Eeuo pipefail")) violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_MISSING", "qualified LocalCI repository pipeline must fail closed"));
-    const declaredGates = [...localCiText.matchAll(/^run_gate\s+([a-z0-9-]+)\s+/gm)].map((match) => match[1]).filter((gate) => gate !== "static-ci-evidence");
+    const declaredCommands = [...localCiText.matchAll(/^run_gate\s+([a-z0-9-]+)\s+(.+)$/gm)].filter(([, gate]) => gate !== "static-ci-evidence").map(([, gate, command]) => [gate, command.trim()]);
+    const declaredGates = declaredCommands.map(([gate]) => gate);
     if (JSON.stringify(declaredGates) !== JSON.stringify(GATES)) {
-      violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_INCOMPLETE", "LocalCI pipeline must declare every mandatory gate exactly once and in canonical order"));
+      violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_INCOMPLETE", "LocalCI pipeline must declare every mandatory gate exactly once in canonical order"));
     }
-    for (const marker of ["LOCALCI_EXPECTED_COMMIT", "LOCALCI_RESOLVED_COMMIT", "LOCALCI_JOB_ID", "native Windows worker", "JARVIS_CI_GATE_RESULTS_PATH"]) {
+    if (JSON.stringify(declaredCommands) !== JSON.stringify(LOCALCI_GATE_COMMANDS)) {
+      violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_COMMAND_MISMATCH", "LocalCI pipeline must use the canonical mandatory gate commands and arguments exactly"));
+    }
+    for (const marker of ["LOCALCI_EXPECTED_COMMIT", "LOCALCI_RESOLVED_COMMIT", "LOCALCI_JOB_ID", "LOCALCI_REPOSITORY", "LOCALCI_OBSERVED_CHECKOUT_SHA", "LOCALCI_OBSERVED_REPOSITORY", "LOCALCI_OBSERVED_REF", "native Windows", "JARVIS_CI_GATE_RESULTS_PATH", "PENDING_AUTHORITY_FINALIZATION"]) {
       if (!localCiText.includes(marker)) violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_METADATA_MISSING", `LocalCI pipeline is missing ${marker}`));
     }
     for (const control of REQUIRED_LOCALCI_CONTROLS) {
@@ -97,9 +102,9 @@ export function validateRepositoryGovernanceProfile(profile, workflowText, local
     if (selected.qualificationStatus === "VERIFYING") {
       if (!selected.lastObservedRun || !Array.isArray(selected.qualificationBlockers) || selected.qualificationBlockers.length === 0) violations.push(violation("GOVERNANCE_LOCALCI_QUALIFICATION_STATE_INVALID", "VERIFYING LocalCI authority must record an observed run and explicit blockers"));
     }
-    const timestamps = [evidence.queuedAt, evidence.startedAt, evidence.finishedAt];
+    const timestamps = [evidence.timestamps?.queuedAt, evidence.timestamps?.startedAt, evidence.timestamps?.finishedAt];
     const evidenceGates = Array.isArray(evidence.gateResults) ? evidence.gateResults.map((item) => item?.gate) : [];
-    if (selected.qualificationStatus === "QUALIFIED" && (evidence.authorityType !== "LOCALCI" || evidence.instanceIdentity !== selected.instanceIdentity || evidence.pipelineIdentity !== EXPECTED_CI || !String(evidence.pipelineVersion ?? "") || !String(evidence.requestedRef ?? "").startsWith("refs/") || !/^[0-9a-f]{40}$/.test(String(evidence.expectedCommit ?? "")) || evidence.expectedCommit !== evidence.resolvedCommit || evidence.terminalStatus !== "SUCCEEDED" || !String(evidence.jobId ?? "") || timestamps.some((value) => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value ?? ""))) || JSON.stringify(evidenceGates) !== JSON.stringify(GATES) || evidence.gateResults?.some((item) => item?.status !== "PASSED") || !/^[0-9a-f]{64}$/.test(String(evidence.logs?.sha256 ?? "")) || !String(evidence.logs?.exportIdentity ?? "") || !/^[0-9a-f]{64}$/.test(String(evidence.artifacts?.indexSha256 ?? "")) || !String(evidence.artifacts?.exportIdentity ?? "") || evidence.cancellationRecovery?.status !== "PASSED" || !String(evidence.cancellationRecovery?.evidenceIdentity ?? ""))) {
+    if (selected.qualificationStatus === "QUALIFIED" && (evidence.authority?.type !== "LOCALCI" || evidence.authority.instanceIdentity !== selected.instanceIdentity || evidence.authority.pipelineIdentity !== EXPECTED_CI || !String(evidence.authority.pipelineVersion ?? "") || !/^refs\/heads\/[A-Za-z0-9._\/-]+$/.test(String(evidence.requestedRevision?.ref ?? "")) || !/^[0-9a-f]{40}$/.test(String(evidence.requestedRevision?.expectedCommit ?? "")) || evidence.requestedRevision.expectedCommit !== evidence.requestedRevision.resolvedCommit || evidence.terminalStatus !== "SUCCEEDED" || !String(evidence.authority.jobId ?? "") || timestamps.some((value) => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value ?? ""))) || new Date(evidence.timestamps?.queuedAt).getTime() > new Date(evidence.timestamps?.startedAt).getTime() || new Date(evidence.timestamps?.startedAt).getTime() > new Date(evidence.timestamps?.finishedAt).getTime() || evidence.runner?.os !== "Windows" || evidence.runner?.arch !== "X64" || evidence.observedCheckout?.sha !== evidence.requestedRevision.expectedCommit || evidence.observedCheckout?.repository !== EXPECTED_REPOSITORY || evidence.observedCheckout?.ref !== evidence.requestedRevision.ref || JSON.stringify(evidenceGates) !== JSON.stringify(GATES) || evidence.gateResults?.some((item) => item?.status !== "PASSED") || !/^[0-9a-f]{64}$/.test(String(evidence.logs?.sha256 ?? "")) || !String(evidence.logs?.exportIdentity ?? "") || !/^[0-9a-f]{64}$/.test(String(evidence.artifacts?.indexSha256 ?? "")) || !String(evidence.artifacts?.exportIdentity ?? "") || evidence.cancellationRecovery?.status !== "PASSED" || !String(evidence.cancellationRecovery?.evidenceIdentity ?? ""))) {
       violations.push(violation("GOVERNANCE_LOCALCI_EVIDENCE_INVALID", "LocalCI qualification requires successful exact-SHA job evidence"));
     }
   }

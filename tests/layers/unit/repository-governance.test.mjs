@@ -31,18 +31,12 @@ const fallbackProfile = Object.freeze({
       repositoryPipeline: ".localci/ci.sh",
       qualificationStatus: "QUALIFIED",
       qualificationEvidence: {
-        authorityType: "LOCALCI",
-        instanceIdentity: "CT107",
-        jobId: "job-1",
-        pipelineIdentity: "static-ci",
-        pipelineVersion: "tauri2418-windows-v1",
-        requestedRef: "refs/heads/codex/example",
-        expectedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2",
-        resolvedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2",
-        queuedAt: "2026-09-04T00:00:00Z",
-        startedAt: "2026-09-04T00:00:01Z",
-        finishedAt: "2026-09-04T00:01:00Z",
+        authority: { type: "LOCALCI", instanceIdentity: "CT107", jobId: "job-1", pipelineIdentity: "static-ci", pipelineVersion: "tauri2418-windows-v1" },
+        requestedRevision: { ref: "refs/heads/codex/example", expectedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2", resolvedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2" },
+        observedCheckout: { sha: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2", repository: "andresslacson1989/jarvis-project", ref: "refs/heads/codex/example" },
+        timestamps: { queuedAt: "2026-09-04T00:00:00Z", startedAt: "2026-09-04T00:00:01Z", finishedAt: "2026-09-04T00:01:00Z" },
         gateResults: GATES.map((gate) => ({ gate, status: "PASSED" })),
+        runner: { os: "Windows", arch: "X64" },
         terminalStatus: "SUCCEEDED",
         logs: { sha256: "a".repeat(64), exportIdentity: "logs-export-1" },
         artifacts: { indexSha256: "b".repeat(64), exportIdentity: "artifacts-export-1" },
@@ -111,7 +105,7 @@ for (const [name, mutate, expected] of [
   ["required CI context cannot drift", (p) => { p.mandatoryCi.pipelineIdentity = "something-else"; }, "GOVERNANCE_REQUIRED_CI_CONTEXT"],
   ["eligible authority set cannot drift", (p) => { p.mandatoryCi.eligibleAuthorityTypes = ["LOCALCI"]; }, "GOVERNANCE_CI_AUTHORITY_SET"],
   ["selected authority status must be valid", (p) => { p.mandatoryCi.selectedAuthority.qualificationStatus = "DEMO"; }, "GOVERNANCE_CI_AUTHORITY_STATUS_INVALID"],
-  ["LocalCI exact-SHA evidence is mandatory", (p) => { p.mandatoryCi.selectedAuthority.qualificationEvidence.resolvedCommit = "bad"; }, "GOVERNANCE_LOCALCI_EVIDENCE_INVALID"],
+  ["LocalCI exact-SHA evidence is mandatory", (p) => { p.mandatoryCi.selectedAuthority.qualificationEvidence.requestedRevision.resolvedCommit = "bad"; }, "GOVERNANCE_LOCALCI_EVIDENCE_INVALID"],
   ["LocalCI isolation requirements cannot be weakened", (p) => { p.mandatoryCi.localCiRequirements.rootlessJobIsolation = "OPTIONAL"; }, "GOVERNANCE_LOCALCI_REQUIREMENT_MISSING"],
 ]) {
   test(name, () => {
@@ -153,6 +147,33 @@ test("LocalCI repository pipeline rejects omission of every mandatory gate", () 
     const mutated = qualifiedLocalCiScript.replace(new RegExp(`^run_gate ${gate.replaceAll("-", "\\-")} .*$`, "m"), "");
     assert.ok(codes(clone(fallbackProfile), undefined, mutated).includes("GOVERNANCE_LOCALCI_PIPELINE_INCOMPLETE"), `omitting ${gate} must fail closed`);
   }
+});
+
+test("LocalCI repository pipeline rejects command or argument weakening", () => {
+  for (const mutation of [
+    ["pnpm install --frozen-lockfile --ignore-scripts", "true"],
+    ["cargo check --locked --workspace --target x86_64-pc-windows-msvc", "cargo check --workspace"],
+    ["pnpm --dir apps/desktop tauri build --no-bundle --target x86_64-pc-windows-msvc --ci", "true"],
+  ]) {
+    const mutated = qualifiedLocalCiScript.replace(mutation[0], mutation[1]);
+    assert.ok(codes(clone(fallbackProfile), undefined, mutated).includes("GOVERNANCE_LOCALCI_PIPELINE_COMMAND_MISMATCH"));
+  }
+});
+
+test("LocalCI worker qualification rejects Linux/WSL spoofing and accepts native Windows", () => {
+  const workerScript = readFileSync(new URL("../../../.localci/worker-qualification.sh", import.meta.url), "utf8");
+  assert.match(workerScript, /observed_uname/);
+  assert.match(workerScript, /attested_os.*Windows/);
+  assert.match(workerScript, /attested_arch.*X64/);
+  assert.match(workerScript, /MINGW\|MSYS\|CYGWIN/);
+  assert.doesNotMatch(workerScript, /Windows_NT:\*\|/);
+});
+
+test("operational governance documentation cannot claim LocalCI qualification while profile is VERIFYING", () => {
+  const document = readFileSync(new URL("../../../docs/implementation/governance/MASTER-PROTECTION.md", import.meta.url), "utf8");
+  assert.match(document, /Selected CI authority:\*\* `LOCALCI` \(VERIFYING; not yet qualified\)/);
+  assert.doesNotMatch(document, /Selected CI authority:\*\* `LOCALCI` \(qualified JARVIS repository-CI scope\)/);
+  assert.match(document, /v1\.0\.7 exception/);
 });
 
 test("server-enforced mode requires all effective server controls", () => {
