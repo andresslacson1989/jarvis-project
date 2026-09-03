@@ -24,6 +24,15 @@
       "pipelineProfile": "tauri2418",
       "repositoryPipeline": ".localci/ci.sh",
       "qualificationScope": "JARVIS_REPOSITORY_CI",
+      "qualificationException": {
+        "record": "docs/implementation/governance/LOCALCI-CT107-QUALIFICATION-EXCEPTION-2026-09-04.md",
+        "id": "JARVIS-CT107-QUAL-EXCEPTION-2026-09-04-v1",
+        "scope": "ONE_BOUNDED_NON_MUTATING_CT107_QUALIFICATION_RUN",
+        "candidateSha": "0fc861fca5e8d5d382176fce143607af61ee994c",
+        "allowedOperationalActions": ["TLS_VERIFY", "AUTHENTICATED_JOB_SUBMIT", "JOB_OBSERVE", "JOB_CANCEL_RECOVERY", "CT_STOP_START_IF_REQUIRED_FOR_RECOVERY_HEALTH"],
+        "forbiddenActions": ["SETUP_CHANGE", "CONFIGURATION_CHANGE", "REGISTRATION_CHANGE", "INSTALLATION", "DESTRUCTIVE_ACTION", "UNRELATED_RESOURCE_CHANGE"],
+        "expires": "TERMINAL_RESULT_OR_ABORT_OR_CONTROL_PLANE_TIMEOUT"
+      },
       "submissionContract": {
         "pipelineProfile": "tauri2418",
         "fullRefRequired": true,
