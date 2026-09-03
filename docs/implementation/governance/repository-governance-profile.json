@@ -24,6 +24,13 @@
       "pipelineProfile": "tauri2418",
       "repositoryPipeline": ".localci/ci.sh",
       "qualificationScope": "JARVIS_REPOSITORY_CI",
+      "submissionContract": {
+        "pipelineProfile": "tauri2418",
+        "fullRefRequired": true,
+        "requestedCommitOptional": true,
+        "idempotencyKeyRequired": true,
+        "serverResolutionAttestationRequired": true
+      },
       "qualificationStatus": "VERIFYING",
       "lastObservedRun": {
         "jobId": "01m1kcwwthcagkcnd2trznn8hf",

@@ -19,6 +19,7 @@ require_value() {
 }
 
 readonly expected_repository='andresslacson1989/jarvis-project'
+readonly expected_pipeline_profile='tauri2418'
 readonly repository_root=$(git rev-parse --show-toplevel)
 cd "${repository_root}"
 
@@ -33,6 +34,8 @@ for variable_name in \
   LOCALCI_JOB_ID \
   LOCALCI_INSTANCE_ID \
   LOCALCI_PIPELINE_ID \
+  LOCALCI_PIPELINE_PROFILE \
+  LOCALCI_IDEMPOTENCY_KEY \
   LOCALCI_PIPELINE_VERSION \
   LOCALCI_REQUESTED_REF \
   LOCALCI_EXPECTED_COMMIT \
@@ -45,18 +48,32 @@ for variable_name in \
 done
 
 require_value LOCALCI_REPOSITORY
+require_value LOCALCI_SERVER_RESOLVED_REPOSITORY
+require_value LOCALCI_SERVER_RESOLVED_REF
+require_value LOCALCI_RESOLUTION_ATTESTATION_ID
 if [[ ${LOCALCI_REPOSITORY} != "${expected_repository}" ]] ||
-  [[ ! ${LOCALCI_REQUESTED_REF} =~ ^refs/heads/[A-Za-z0-9._/-]+$ ]]; then
+  [[ ${LOCALCI_SERVER_RESOLVED_REPOSITORY} != "${expected_repository}" ]] ||
+  [[ ${LOCALCI_PIPELINE_PROFILE} != "${expected_pipeline_profile}" ]] ||
+  [[ ! ${LOCALCI_IDEMPOTENCY_KEY} =~ ^[A-Za-z0-9._:-]{1,128}$ ]] ||
+  [[ ! ${LOCALCI_REQUESTED_REF} =~ ^refs/heads/[A-Za-z0-9._/-]+$ ]] ||
+  [[ ${LOCALCI_SERVER_RESOLVED_REF} != "${LOCALCI_REQUESTED_REF}" ]]; then
   printf 'LocalCI repository/ref binding is invalid\n' >&2
+  exit 78
+fi
+
+if [[ -n ${LOCALCI_REQUESTED_COMMIT:-} ]] && [[ ${LOCALCI_REQUESTED_COMMIT} != "${LOCALCI_EXPECTED_COMMIT}" ]]; then
+  printf 'LocalCI optional requested commit does not match the expected commit\n' >&2
   exit 78
 fi
 
 actual_checkout_sha=$(git rev-parse --verify HEAD)
 actual_checkout_ref=$(git symbolic-ref --quiet --short HEAD || true)
+actual_remote_url=$(git remote get-url origin)
 if [[ ! ${actual_checkout_sha} =~ ^[0-9a-f]{40}$ ]] ||
   [[ ${actual_checkout_sha} != "${LOCALCI_EXPECTED_COMMIT}" ]] ||
   [[ ${actual_checkout_sha} != "${LOCALCI_RESOLVED_COMMIT}" ]] ||
-  [[ ${actual_checkout_ref} != "${LOCALCI_REQUESTED_REF#refs/heads/}" ]]; then
+  [[ -n ${actual_checkout_ref} && ${actual_checkout_ref} != "${LOCALCI_REQUESTED_REF#refs/heads/}" ]] ||
+  [[ ! ${actual_remote_url} =~ ^(https://github\.com/andresslacson1989/jarvis-project\.git|git@github\.com:andresslacson1989/jarvis-project\.git)$ ]]; then
   printf 'LocalCI checkout SHA does not match the server-approved revision\n' >&2
   exit 78
 fi
@@ -126,8 +143,9 @@ export JARVIS_CANDIDATE_SHA=${LOCALCI_RESOLVED_COMMIT}
 export JARVIS_CI_AUTHORITY=LOCALCI
 export JARVIS_CI_GATE_RESULTS_PATH=${gate_results}
 export LOCALCI_OBSERVED_CHECKOUT_SHA=${actual_checkout_sha}
-export LOCALCI_OBSERVED_REPOSITORY=${LOCALCI_REPOSITORY}
-export LOCALCI_OBSERVED_REF=${LOCALCI_REQUESTED_REF}
+export LOCALCI_OBSERVED_REPOSITORY=${actual_remote_url}
+export LOCALCI_OBSERVED_REF=${LOCALCI_SERVER_RESOLVED_REF}
+export LOCALCI_SERVER_RESOLUTION_ATTESTATION_ID=${LOCALCI_RESOLUTION_ATTESTATION_ID}
 run_gate static-ci-evidence pnpm ci:evidence
 printf 'LOCALCI_JOB_RESULT=PENDING_AUTHORITY_FINALIZATION\n' >&2
 exit 78

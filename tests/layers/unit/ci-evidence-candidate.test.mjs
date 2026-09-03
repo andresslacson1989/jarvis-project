@@ -70,12 +70,18 @@ function localCiEnv(overrides = {}) {
     JARVIS_CANDIDATE_SHA: candidateSha,
     LOCALCI_EXPECTED_COMMIT: candidateSha,
     LOCALCI_RESOLVED_COMMIT: candidateSha,
+    LOCALCI_REQUESTED_COMMIT: candidateSha,
     LOCALCI_OBSERVED_CHECKOUT_SHA: candidateSha,
-    LOCALCI_OBSERVED_REPOSITORY: "andresslacson1989/jarvis-project",
+    LOCALCI_OBSERVED_REPOSITORY: "https://github.com/andresslacson1989/jarvis-project.git",
     LOCALCI_OBSERVED_REF: "refs/heads/codex/example",
+    LOCALCI_SERVER_RESOLVED_REPOSITORY: "andresslacson1989/jarvis-project",
+    LOCALCI_SERVER_RESOLVED_REF: "refs/heads/codex/example",
+    LOCALCI_RESOLUTION_ATTESTATION_ID: "resolution-1",
     LOCALCI_INSTANCE_ID: "CT107-WINDOWS-01",
     LOCALCI_JOB_ID: "01M1TEST0000000000000000000",
     LOCALCI_PIPELINE_ID: "static-ci",
+    LOCALCI_PIPELINE_PROFILE: "tauri2418",
+    LOCALCI_IDEMPOTENCY_KEY: "manual-test-unique-001",
     LOCALCI_PIPELINE_VERSION: "tauri2418-windows-v1",
     LOCALCI_REQUESTED_REF: "refs/heads/codex/example",
     LOCALCI_QUEUED_AT: "2026-09-04T00:00:00Z",
@@ -107,8 +113,27 @@ test("LocalCI execution evidence binds server identities and every measured gate
   assert.equal(evidence.authority.type, "LOCALCI");
   assert.equal(evidence.requestedRevision.expectedCommit, candidateSha);
   assert.equal(evidence.requestedRevision.resolvedCommit, candidateSha);
+  assert.equal(evidence.requestedRevision.requestedCommit, candidateSha);
+  assert.equal(evidence.submission.pipelineProfile, "tauri2418");
+  assert.equal(evidence.submission.idempotencyKey, "manual-test-unique-001");
+  assert.equal(evidence.serverResolution.ref, "refs/heads/codex/example");
   assert.deepEqual(evidence.gateResults.map(({ gate }) => gate), GATES);
   assert.equal(evidence.status, "GATES_PASS_PENDING_AUTHORITY_FINALIZATION");
+});
+
+test("LocalCI replay identity is stable and distinct idempotency keys are not conflated", () => {
+  const args = {
+    env: localCiEnv(),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: localCiGateText(),
+  };
+  const first = buildLocalCiExecutionEvidence(args);
+  const replay = buildLocalCiExecutionEvidence(args);
+  assert.deepEqual(first.submission, replay.submission);
+  const distinct = buildLocalCiExecutionEvidence({ ...args, env: localCiEnv({ LOCALCI_IDEMPOTENCY_KEY: "manual-test-unique-002" }) });
+  assert.notEqual(first.submission.idempotencyKey, distinct.submission.idempotencyKey);
 });
 
 test("LocalCI evidence rejects omitted, duplicate, failed, and mismatched gate/source evidence", () => {
@@ -135,7 +160,7 @@ test("LocalCI evidence rejects omitted, duplicate, failed, and mismatched gate/s
     contractSuiteVersion: "1.0.7",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
-  }), /repository identity/);
+  }), /observed repository remote/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ LOCALCI_OBSERVED_REF: "refs/heads/other" }),
     versions,
@@ -171,4 +196,18 @@ test("LocalCI evidence rejects omitted, duplicate, failed, and mismatched gate/s
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   }), /ordered/);
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv({ LOCALCI_IDEMPOTENCY_KEY: "" }),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: localCiGateText(),
+  }), /LOCALCI_IDEMPOTENCY_KEY/);
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv({ LOCALCI_PIPELINE_PROFILE: "smoke" }),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: localCiGateText(),
+  }), /LOCALCI_PIPELINE_PROFILE/);
 });

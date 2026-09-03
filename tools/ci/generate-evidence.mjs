@@ -182,8 +182,11 @@ export function buildLocalCiExecutionEvidence({ env, versions, contractSuiteVers
   const resolvedCommit = requireValue(env.LOCALCI_RESOLVED_COMMIT, "LOCALCI_RESOLVED_COMMIT");
   if (expectedCommit !== commitSha || resolvedCommit !== commitSha) throw new Error("LocalCI expected, resolved, and candidate commit identities must match exactly");
   if (requireValue(env.LOCALCI_OBSERVED_CHECKOUT_SHA, "LOCALCI_OBSERVED_CHECKOUT_SHA") !== commitSha) throw new Error("LocalCI observed checkout SHA must match the candidate commit exactly");
-  if (requireValue(env.LOCALCI_OBSERVED_REPOSITORY, "LOCALCI_OBSERVED_REPOSITORY") !== "andresslacson1989/jarvis-project") throw new Error("LocalCI observed repository identity is not approved");
+  if (![/^https:\/\/github\.com\/andresslacson1989\/jarvis-project\.git$/, /^git@github\.com:andresslacson1989\/jarvis-project\.git$/].some((pattern) => pattern.test(requireValue(env.LOCALCI_OBSERVED_REPOSITORY, "LOCALCI_OBSERVED_REPOSITORY")))) throw new Error("LocalCI observed repository remote is not approved");
   if (requireValue(env.LOCALCI_OBSERVED_REF, "LOCALCI_OBSERVED_REF") !== env.LOCALCI_REQUESTED_REF) throw new Error("LocalCI observed ref must match the requested ref exactly");
+  if (requireValue(env.LOCALCI_SERVER_RESOLVED_REPOSITORY, "LOCALCI_SERVER_RESOLVED_REPOSITORY") !== "andresslacson1989/jarvis-project") throw new Error("LocalCI server-resolved repository identity is not approved");
+  if (requireValue(env.LOCALCI_SERVER_RESOLVED_REF, "LOCALCI_SERVER_RESOLVED_REF") !== env.LOCALCI_REQUESTED_REF) throw new Error("LocalCI server-resolved ref must match the requested ref exactly");
+  requireValue(env.LOCALCI_RESOLUTION_ATTESTATION_ID, "LOCALCI_RESOLUTION_ATTESTATION_ID");
   const requestedRef = requirePattern(env.LOCALCI_REQUESTED_REF, "LOCALCI_REQUESTED_REF", /^refs\/heads\/[A-Za-z0-9._\/-]+$/);
   const queuedAt = requireValue(env.LOCALCI_QUEUED_AT, "LOCALCI_QUEUED_AT");
   const startedAt = requireValue(env.LOCALCI_STARTED_AT, "LOCALCI_STARTED_AT");
@@ -205,13 +208,24 @@ export function buildLocalCiExecutionEvidence({ env, versions, contractSuiteVers
     }),
     requestedRevision: Object.freeze({
       ref: requestedRef,
+      requestedCommit: env.LOCALCI_REQUESTED_COMMIT || null,
       expectedCommit,
       resolvedCommit,
     }),
     observedCheckout: Object.freeze({
-      repository: env.LOCALCI_OBSERVED_REPOSITORY,
+      remote: env.LOCALCI_OBSERVED_REPOSITORY,
       ref: env.LOCALCI_OBSERVED_REF,
       sha: env.LOCALCI_OBSERVED_CHECKOUT_SHA,
+    }),
+    serverResolution: Object.freeze({
+      repository: env.LOCALCI_SERVER_RESOLVED_REPOSITORY,
+      ref: env.LOCALCI_SERVER_RESOLVED_REF,
+      commit: resolvedCommit,
+      attestationId: env.LOCALCI_RESOLUTION_ATTESTATION_ID,
+    }),
+    submission: Object.freeze({
+      pipelineProfile: requirePattern(env.LOCALCI_PIPELINE_PROFILE, "LOCALCI_PIPELINE_PROFILE", /^tauri2418$/),
+      idempotencyKey: requirePattern(env.LOCALCI_IDEMPOTENCY_KEY, "LOCALCI_IDEMPOTENCY_KEY", /^[A-Za-z0-9._:-]{1,128}$/),
     }),
     timestamps: Object.freeze({
       queuedAt,

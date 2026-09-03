@@ -30,10 +30,13 @@ const fallbackProfile = Object.freeze({
       pipelineProfile: "tauri2418",
       repositoryPipeline: ".localci/ci.sh",
       qualificationStatus: "QUALIFIED",
+      submissionContract: { pipelineProfile: "tauri2418", fullRefRequired: true, requestedCommitOptional: true, idempotencyKeyRequired: true, serverResolutionAttestationRequired: true },
       qualificationEvidence: {
         authority: { type: "LOCALCI", instanceIdentity: "CT107", jobId: "job-1", pipelineIdentity: "static-ci", pipelineVersion: "tauri2418-windows-v1" },
-        requestedRevision: { ref: "refs/heads/codex/example", expectedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2", resolvedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2" },
-        observedCheckout: { sha: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2", repository: "andresslacson1989/jarvis-project", ref: "refs/heads/codex/example" },
+        requestedRevision: { ref: "refs/heads/codex/example", requestedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2", expectedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2", resolvedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2" },
+        observedCheckout: { sha: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2", remote: "https://github.com/andresslacson1989/jarvis-project.git", ref: "refs/heads/codex/example" },
+        serverResolution: { repository: "andresslacson1989/jarvis-project", ref: "refs/heads/codex/example", commit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2", attestationId: "resolution-1" },
+        submission: { pipelineProfile: "tauri2418", idempotencyKey: "manual-test-unique-001" },
         timestamps: { queuedAt: "2026-09-04T00:00:00Z", startedAt: "2026-09-04T00:00:01Z", finishedAt: "2026-09-04T00:01:00Z" },
         gateResults: GATES.map((gate) => ({ gate, status: "PASSED" })),
         runner: { os: "Windows", arch: "X64" },
@@ -167,6 +170,12 @@ test("LocalCI worker qualification rejects Linux/WSL spoofing and accepts native
   assert.match(workerScript, /attested_arch.*X64/);
   assert.match(workerScript, /MINGW\|MSYS\|CYGWIN/);
   assert.doesNotMatch(workerScript, /Windows_NT:\*\|/);
+});
+
+test("LocalCI submission contract cannot omit replay or server-resolution controls", () => {
+  const profile = clone(fallbackProfile);
+  profile.mandatoryCi.selectedAuthority.submissionContract.idempotencyKeyRequired = false;
+  assert.ok(codes(profile).includes("GOVERNANCE_LOCALCI_SUBMISSION_CONTRACT"));
 });
 
 test("operational governance documentation cannot claim LocalCI qualification while profile is VERIFYING", () => {
