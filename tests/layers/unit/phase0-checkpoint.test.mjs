@@ -249,6 +249,14 @@ test("current checkpoint evidence cannot remain VERIFIED while LocalCI is VERIFY
   assert.ok(result.includes("PHASE0_CURRENT_EVIDENCE_STALE"));
 });
 
+test("stale Phase-0 candidate evidence fails closed", () => {
+  assert.ok(codes({
+    currentCandidateSha: "b".repeat(40),
+    evidenceCandidateSha: "a".repeat(40),
+    matrixCandidateSha: "a".repeat(40),
+  }).includes("PHASE0_CANDIDATE_MISMATCH"));
+});
+
 test("missing child evidence fails checkpoint", () => {
   const existingPaths = new Set(allEvidencePaths);
   existingPaths.delete(profile.requiredEvidencePaths.at(-1));

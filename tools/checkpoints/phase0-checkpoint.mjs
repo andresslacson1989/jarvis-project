@@ -1,5 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -91,6 +92,9 @@ export function validatePhase0Snapshot({
   existingPaths = new Set(),
   currentEvidenceStatus = null,
   governanceQualificationStatus = null,
+  currentCandidateSha = null,
+  evidenceCandidateSha = null,
+  matrixCandidateSha = null,
 }) {
   const violations = [];
 
@@ -408,6 +412,12 @@ export function validatePhase0Snapshot({
     }
   }
 
+  if (currentCandidateSha !== null || evidenceCandidateSha !== null || matrixCandidateSha !== null) {
+    if (!/^[0-9a-f]{40}$/.test(String(currentCandidateSha ?? "")) || evidenceCandidateSha !== currentCandidateSha || matrixCandidateSha !== currentCandidateSha) {
+      violations.push(violation("PHASE0_CANDIDATE_MISMATCH", "docs/implementation/evidence/0.CP-phase0-checkpoint.md", "current matrix and checkpoint evidence candidate must match the checked-out HEAD exactly"));
+    }
+  }
+
   for (const path of profile.requiredEvidencePaths ?? []) {
     if (!existingPaths.has(path)) {
       violations.push(
@@ -509,6 +519,9 @@ export async function checkPhase0(rootDir) {
     existingPaths,
     currentEvidenceStatus: checkpointEvidence.match(/^\*\*(VERIFIED|VERIFYING)\b/m)?.[1] ?? null,
     governanceQualificationStatus: governanceProfile?.mandatoryCi?.selectedAuthority?.qualificationStatus ?? null,
+    currentCandidateSha: execFileSync("git", ["rev-parse", "HEAD"], { cwd: rootDir, encoding: "utf8" }).trim(),
+    evidenceCandidateSha: checkpointEvidence.match(/currentCandidateSha:\s*([0-9a-f]{40})/)?.[1] ?? null,
+    matrixCandidateSha: matrix.match(/Current candidate under audit:\*{0,2}\s*`([0-9a-f]{40})`/)?.[1] ?? null,
   });
 }
 
