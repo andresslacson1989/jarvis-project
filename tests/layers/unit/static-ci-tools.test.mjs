@@ -40,6 +40,17 @@ test("format checker accepts clean LF text and rejects deterministic hygiene vio
   }
 });
 
+test("format checker excludes preserved Tauri runtime artifacts but not adjacent source", async () => {
+  const root = await tempRepo({
+    "apps/desktop/src-tauri/gen/generated.json": "{\r\n}\r\n",
+    "apps/desktop/src-tauri/resources/generated.txt": "generated\r\n",
+    "apps/desktop/src-tauri/src/main.rs": "fn main() {}\n",
+  });
+  assert.deepEqual((await checkFormat(root)).violations, []);
+  await writeFile(resolve(root, "apps/desktop/src-tauri/src/main.rs"), "fn main() {}\r\n");
+  assert.ok(codes(await checkFormat(root)).includes("FORMAT_CRLF"));
+});
+
 test("schema checker rejects malformed, duplicate, escaping, and unresolved schema references", async () => {
   const valid = await tempRepo({
     "packages/schemas/src/a.schema.json": JSON.stringify({ $schema: "https://json-schema.org/draft/2020-12/schema", $id: "urn:test:a", type: "object" }) + "\n",

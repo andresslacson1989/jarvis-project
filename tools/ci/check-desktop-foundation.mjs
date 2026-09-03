@@ -182,7 +182,7 @@ export function evaluateDesktopFoundation(snapshot) {
   if (config && typeof config === "object") {
     add(violations, config.build?.beforeBuildCommand === "pnpm build:web", "DESKTOP_TAURI_BEFORE_BUILD_COMMAND_MISSING", "apps/desktop/src-tauri/tauri.conf.json", "production Tauri build must invoke the real Vite renderer build through beforeBuildCommand");
     add(violations, config.build?.frontendDist === "../dist", "DESKTOP_FRONTEND_DIST_NOT_LOCAL", "apps/desktop/src-tauri/tauri.conf.json", "production frontendDist must be ../dist");
-    add(violations, config.build?.devUrl === "http://localhost:5173", "DESKTOP_DEV_URL_UNEXPECTED", "apps/desktop/src-tauri/tauri.conf.json", "development URL must remain fixed localhost:5173");
+    add(violations, config.build?.devUrl === "http://127.0.0.1:5173", "DESKTOP_DEV_URL_UNEXPECTED", "apps/desktop/src-tauri/tauri.conf.json", "development URL must remain fixed to the qualified 127.0.0.1:5173 loopback origin");
   }
   if (typeof snapshot.indexHtml === "string") {
     add(violations, !/<script\b[^>]*\bsrc=["']https?:\/\//i.test(snapshot.indexHtml), "DESKTOP_REMOTE_SCRIPT", "apps/desktop/index.html", "remote executable scripts are prohibited");

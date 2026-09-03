@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { GATES } from "./generate-evidence.mjs";
 
 const EXPECTED_REPOSITORY = "andresslacson1989/jarvis-project";
 const EXPECTED_BRANCH = "master";
@@ -58,7 +59,7 @@ export function validateRepositoryGovernanceProfile(profile, workflowText, local
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
     return [violation("GOVERNANCE_PROFILE_INVALID", "profile must be an object")];
   }
-  if (profile.schemaVersion !== 2) violations.push(violation("GOVERNANCE_PROFILE_VERSION", "schemaVersion must equal 2"));
+  if (profile.schemaVersion !== 3) violations.push(violation("GOVERNANCE_PROFILE_VERSION", "schemaVersion must equal 3"));
   if (profile.provider !== "GITHUB") violations.push(violation("GOVERNANCE_PROVIDER", "provider must be GITHUB"));
   if (profile.repository !== EXPECTED_REPOSITORY) violations.push(violation("GOVERNANCE_REPOSITORY", `repository must be ${EXPECTED_REPOSITORY}`));
   if (profile.authoritativeBranch !== EXPECTED_BRANCH) violations.push(violation("GOVERNANCE_AUTHORITATIVE_BRANCH", `authoritativeBranch must be ${EXPECTED_BRANCH}`));
@@ -68,7 +69,7 @@ export function validateRepositoryGovernanceProfile(profile, workflowText, local
     violations.push(violation("GOVERNANCE_CI_AUTHORITY_SET", "eligibleAuthorityTypes must be exactly GITHUB_ACTIONS and LOCALCI"));
   }
   for (const control of REQUIRED_COMMON_CI_CONTROLS) {
-    if (mandatoryCi.commonControls?.[control] !== true) violations.push(violation("GOVERNANCE_COMMON_CI_CONTROL_DISABLED", `${control} must be true`));
+    if (mandatoryCi.commonRequirements?.[control] !== "REQUIRED") violations.push(violation("GOVERNANCE_COMMON_CI_REQUIREMENT_MISSING", `${control} must be REQUIRED`));
   }
   const selected = mandatoryCi.selectedAuthority ?? {};
   if (!ELIGIBLE_CI_AUTHORITIES.includes(selected.type)) violations.push(violation("GOVERNANCE_CI_AUTHORITY_INVALID", "selected authority must be GITHUB_ACTIONS or LOCALCI"));
@@ -80,12 +81,22 @@ export function validateRepositoryGovernanceProfile(profile, workflowText, local
     if (selected.instanceIdentity !== "CT107" || selected.pipelineProfile !== "tauri2418" || selected.repositoryPipeline !== ".localci/ci.sh") {
       violations.push(violation("GOVERNANCE_LOCALCI_IDENTITY", "selected LocalCI identity/profile/pipeline must match the qualified profile"));
     }
-    if (!String(localCiScript).includes("set -Eeuo pipefail")) violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_MISSING", "qualified LocalCI repository pipeline must fail closed"));
-    for (const control of REQUIRED_LOCALCI_CONTROLS) {
-      if (mandatoryCi.localCiControls?.[control] !== true) violations.push(violation("GOVERNANCE_LOCALCI_CONTROL_DISABLED", `${control} must be true`));
+    const localCiText = String(localCiScript);
+    if (!localCiText.includes("set -Eeuo pipefail")) violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_MISSING", "qualified LocalCI repository pipeline must fail closed"));
+    const declaredGates = [...localCiText.matchAll(/^run_gate\s+([a-z0-9-]+)\s+/gm)].map((match) => match[1]).filter((gate) => gate !== "static-ci-evidence");
+    if (JSON.stringify(declaredGates) !== JSON.stringify(GATES)) {
+      violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_INCOMPLETE", "LocalCI pipeline must declare every mandatory gate exactly once and in canonical order"));
     }
-    const evidence = selected.latestEvidence ?? {};
-    if (!/^[0-9a-f]{40}$/.test(String(evidence.resolvedCommit ?? "")) || evidence.status !== "SUCCEEDED" || !String(evidence.jobId ?? "")) {
+    for (const marker of ["LOCALCI_EXPECTED_COMMIT", "LOCALCI_RESOLVED_COMMIT", "LOCALCI_JOB_ID", "native Windows worker", "JARVIS_CI_GATE_RESULTS_PATH"]) {
+      if (!localCiText.includes(marker)) violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_METADATA_MISSING", `LocalCI pipeline is missing ${marker}`));
+    }
+    for (const control of REQUIRED_LOCALCI_CONTROLS) {
+      if (mandatoryCi.localCiRequirements?.[control] !== "REQUIRED") violations.push(violation("GOVERNANCE_LOCALCI_REQUIREMENT_MISSING", `${control} must be REQUIRED`));
+    }
+    const evidence = selected.qualificationEvidence ?? {};
+    const timestamps = [evidence.queuedAt, evidence.startedAt, evidence.finishedAt];
+    const evidenceGates = Array.isArray(evidence.gateResults) ? evidence.gateResults.map((item) => item?.gate) : [];
+    if (evidence.authorityType !== "LOCALCI" || evidence.instanceIdentity !== selected.instanceIdentity || evidence.pipelineIdentity !== EXPECTED_CI || !String(evidence.pipelineVersion ?? "") || !String(evidence.requestedRef ?? "").startsWith("refs/") || !/^[0-9a-f]{40}$/.test(String(evidence.expectedCommit ?? "")) || evidence.expectedCommit !== evidence.resolvedCommit || evidence.terminalStatus !== "SUCCEEDED" || !String(evidence.jobId ?? "") || timestamps.some((value) => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value ?? ""))) || JSON.stringify(evidenceGates) !== JSON.stringify(GATES) || evidence.gateResults?.some((item) => item?.status !== "PASSED") || !/^[0-9a-f]{64}$/.test(String(evidence.logs?.sha256 ?? "")) || !String(evidence.logs?.exportIdentity ?? "") || !/^[0-9a-f]{64}$/.test(String(evidence.artifacts?.indexSha256 ?? "")) || !String(evidence.artifacts?.exportIdentity ?? "") || evidence.cancellationRecovery?.status !== "PASSED" || !String(evidence.cancellationRecovery?.evidenceIdentity ?? "")) {
       violations.push(violation("GOVERNANCE_LOCALCI_EVIDENCE_INVALID", "LocalCI qualification requires successful exact-SHA job evidence"));
     }
   }

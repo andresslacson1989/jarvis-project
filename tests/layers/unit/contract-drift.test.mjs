@@ -115,7 +115,7 @@ async function manifestFixture() {
   let index = 1;
   for (const [key, path, label] of componentPaths) {
     await mkdir(dirname(resolve(dir, path)), { recursive: true });
-    await writeFile(resolve(dir, path), `# Component\n**${label}:** ${canonical.contractComponentRevisions[key]}\n`);
+    await writeFile(resolve(dir, path), `# Component\n**${label}:** ${canonical.contractComponentRevisions[key]}\n\n**END — COMPONENT v${canonical.contractComponentRevisions[key]}**\n`);
     rows.push(`| ${index} | \`${path}\` | ${canonical.contractComponentRevisions[key]} | role |`);
     index += 1;
   }
@@ -138,6 +138,27 @@ test("manifest revision/header drift is rejected", async () => {
   await writeFile(manifestPath, text.replace("| 3 | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | 1.0.4 |", "| 3 | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | 9.9.9 |"));
   const result = await validateContractManifest(dir);
   assert.ok(result.violations.some((item) => item.code === "MANIFEST_COMPONENT_REVISION_DRIFT"));
+});
+
+test("manifest component footer drift is rejected", async () => {
+  const dir = await manifestFixture();
+  const componentPath = resolve(dir, "docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md");
+  const text = await readFile(componentPath, "utf8");
+  await writeFile(componentPath, text.replace("END — COMPONENT v1.0.6", "END — COMPONENT v1.0.5"));
+  const result = await validateContractManifest(dir);
+  assert.ok(result.violations.some((item) => item.code === "MANIFEST_COMPONENT_FOOTER_DRIFT"));
+});
+
+test("active matrix reference suite, paths, and non-status role are enforced", async () => {
+  const dir = await manifestFixture();
+  const referencePath = resolve(dir, "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md");
+  await mkdir(dirname(referencePath), { recursive: true });
+  await writeFile(referencePath, "**Contract suite:** JARVIS v1.0.6\n`docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`\n`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`\n");
+  const result = await validateContractManifest(dir);
+  const codes = result.violations.map((item) => item.code);
+  assert.ok(codes.includes("MANIFEST_REFERENCE_SUITE_DRIFT"));
+  assert.ok(codes.includes("MANIFEST_REFERENCE_PATH_DRIFT"));
+  assert.ok(codes.includes("MANIFEST_REFERENCE_ROLE_DRIFT"));
 });
 
 test("generated artifacts are deterministic and stale bytes fail closed", async () => {

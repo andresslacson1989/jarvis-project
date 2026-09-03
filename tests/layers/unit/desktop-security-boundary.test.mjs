@@ -36,6 +36,25 @@ test("desktop security boundary rejects unexpected CSP origins", async () => {
   assert.ok(validateDesktopSecurity({ config, capability, nativeSource, externalLinkSource }).includes("DESKTOP_SECURITY_DEV_CSP_MISSING"));
 });
 
+test("desktop security boundary binds Tauri devUrl to the native debug origin", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { resolve } = await import("node:path");
+  const root = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
+  const config = JSON.parse(await readFile(resolve(root, "apps/desktop/src-tauri/tauri.conf.json"), "utf8"));
+  const capability = JSON.parse(await readFile(resolve(root, "apps/desktop/src-tauri/capabilities/main-local-ui.json"), "utf8"));
+  const nativeSource = await readFile(resolve(root, "apps/desktop/src-tauri/src/main.rs"), "utf8");
+  const externalLinkSource = await readFile(resolve(root, "apps/desktop/src/external-link.ts"), "utf8");
+
+  for (const devUrl of ["http://localhost:5173", "http://127.0.0.1:9999", "https://127.0.0.1:5173"]) {
+    const mutated = structuredClone(config);
+    mutated.build.devUrl = devUrl;
+    assert.ok(validateDesktopSecurity({ config: mutated, capability, nativeSource, externalLinkSource }).includes("DESKTOP_SECURITY_DEV_ORIGIN_MISMATCH"));
+  }
+
+  const mutatedNativeSource = nativeSource.replace('url.host_str() == Some("127.0.0.1")', 'url.host_str() == Some("localhost")');
+  assert.ok(validateDesktopSecurity({ config, capability, nativeSource: mutatedNativeSource, externalLinkSource }).includes("DESKTOP_SECURITY_DEBUG_ORIGIN_BOUNDARY_MISSING"));
+});
+
 test("desktop security boundary rejects an unexpected bundled-app port", async () => {
   const { readFile } = await import("node:fs/promises");
   const { resolve } = await import("node:path");

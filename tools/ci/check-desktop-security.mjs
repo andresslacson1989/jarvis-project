@@ -27,6 +27,9 @@ export function validateDesktopSecurity({ config, capability, nativeSource, exte
   if (development.duplicate || !exactSources(development, "default-src", ["'self'"]) || !exactSources(development, "connect-src", ["'self'", "http://127.0.0.1:5173"]) || !exactSources(development, "script-src", ["'self'"])) {
     violations.push("DESKTOP_SECURITY_DEV_CSP_MISSING");
   }
+  if (config?.build?.devUrl !== "http://127.0.0.1:5173") {
+    violations.push("DESKTOP_SECURITY_DEV_ORIGIN_MISMATCH");
+  }
   if (config?.app?.windows?.length !== 0) {
     violations.push("DESKTOP_SECURITY_WINDOW_CONFIG_NOT_NATIVE_CONTROLLED");
   }
@@ -46,7 +49,7 @@ export function validateDesktopSecurity({ config, capability, nativeSource, exte
   if (!externalLinkSource.includes("@tauri-apps/plugin-opener") || !externalLinkSource.includes("new URL") || !externalLinkSource.includes("url.username") || !externalLinkSource.includes("url.password")) {
     violations.push("DESKTOP_SECURITY_EXTERNAL_LINK_BOUNDARY_MISSING");
   }
-  if (!nativeSource.includes("url.port() == Some(5173)")) violations.push("DESKTOP_SECURITY_DEBUG_PORT_BOUNDARY_MISSING");
+  if (!nativeSource.includes('url.host_str() == Some("127.0.0.1")') || !nativeSource.includes("url.port() == Some(5173)")) violations.push("DESKTOP_SECURITY_DEBUG_ORIGIN_BOUNDARY_MISSING");
   return violations;
 }
 

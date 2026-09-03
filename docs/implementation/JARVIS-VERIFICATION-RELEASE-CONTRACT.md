@@ -28,7 +28,7 @@ RELEASE CANDIDATE
 PRODUCTION
 ```
 
-Only a release satisfying every mandatory v1.0.6 gate for the active Release Profile may be labeled `PRODUCTION`/`Production Complete`.
+Only a release satisfying every mandatory v1.0.7-suite gate for the active Release Profile may be labeled `PRODUCTION`/`Production Complete`.
 
 Qualification SHALL bind to one source commit, contract manifest, Release Profile, PlatformFamily/RuntimeRole/backend profile, exact protocol/schema versions, and exact signed installer/update artifacts.
 
@@ -740,4 +740,4 @@ The production question is:
 
 ---
 
-**END — JARVIS VERIFICATION, QUALIFICATION & RELEASE CONTRACT v1.0.5**
+**END — JARVIS VERIFICATION, QUALIFICATION & RELEASE CONTRACT v1.0.6**

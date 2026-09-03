@@ -417,7 +417,7 @@ These are Windows V1 qualification requirements. Future Linux voice support must
 
 Wake word may remain disabled/unqualified and is not required for V1.
 
-Before broad feature implementation proceeds beyond the early platform/persistence foundation, the v1.0.6 Implementation Plan SHALL run an early real-hardware feasibility spike for candidate STT/VAD/TTS/AEC/barge-in/device/resource/licensing behavior. Passing that spike is evidence of stack feasibility, not final Voice Production Complete.
+Before broad feature implementation proceeds beyond the early platform/persistence foundation, the v1.0.7 Implementation Plan SHALL run an early real-hardware feasibility spike for candidate STT/VAD/TTS/AEC/barge-in/device/resource/licensing behavior. Passing that spike is evidence of stack feasibility, not final Voice Production Complete.
 
 ---
 
@@ -644,4 +644,4 @@ Documentation completion alone never satisfies this gate.
 
 ---
 
-**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.6**
+**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.7**

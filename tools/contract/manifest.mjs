@@ -42,6 +42,10 @@ export function componentHeaderRevision(text) {
   return head.match(/\*\*(?:Contract Suite Version|Profile Version|Contract Version|Version):\*\*\s*([0-9]+\.[0-9]+\.[0-9]+)/)?.[1] ?? null;
 }
 
+export function componentFooterRevision(text) {
+  return [...text.matchAll(/\*\*END[^\n]*v([0-9]+\.[0-9]+\.[0-9]+)\*\*/g)].at(-1)?.[1] ?? null;
+}
+
 export async function validateContractManifest(rootDir) {
   const violations = [];
   const { values: canonical } = await readCanonical(rootDir);
@@ -81,6 +85,10 @@ export async function validateContractManifest(rootDir) {
     if (headerRevision !== expectedRevision) {
       violations.push(violation("MANIFEST_COMPONENT_HEADER_DRIFT", row.path, `expected internal revision ${expectedRevision}, got ${headerRevision ?? "<missing>"}`));
     }
+    const footerRevision = componentFooterRevision(content);
+    if (footerRevision !== expectedRevision) {
+      violations.push(violation("MANIFEST_COMPONENT_FOOTER_DRIFT", row.path, `expected END marker revision ${expectedRevision}, got ${footerRevision ?? "<missing>"}`));
+    }
     components.push({ index: row.index, key, path: row.path, revision: row.revision });
   }
 
@@ -91,6 +99,21 @@ export async function validateContractManifest(rootDir) {
   const releaseRow = components.find((item) => item.key === "releaseProfile");
   if (releaseRow?.revision !== canonical.releaseProfileVersion) {
     violations.push(violation("MANIFEST_RELEASE_PROFILE_VERSION", MANIFEST_PATH, `release profile must be ${canonical.releaseProfileVersion}`));
+  }
+
+  const referencePath = "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md";
+  const referenceAbsolute = resolve(rootDir, referencePath);
+  if (existsSync(referenceAbsolute)) {
+    const reference = await readFile(referenceAbsolute, "utf8");
+    if (!reference.includes(`**Contract suite:** JARVIS v${canonical.contractSuiteVersion}`)) {
+      violations.push(violation("MANIFEST_REFERENCE_SUITE_DRIFT", referencePath, `reference matrix must identify suite ${canonical.contractSuiteVersion}`));
+    }
+    if (!reference.includes(`docs/JARVIS-CONTRACT-MANIFEST-v${canonical.contractSuiteVersion}.md`) || !reference.includes(`docs/JARVIS-IMPLEMENTATION-CONTRACT-v${canonical.contractSuiteVersion}.md`)) {
+      violations.push(violation("MANIFEST_REFERENCE_PATH_DRIFT", referencePath, "reference matrix must point to the active manifest and implementation contract"));
+    }
+    if (!reference.includes("Current status and execution authority exist only in `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md`")) {
+      violations.push(violation("MANIFEST_REFERENCE_ROLE_DRIFT", referencePath, "reference matrix must deny current status authority"));
+    }
   }
 
   return { canonical, components: components.sort((a, b) => a.index - b.index), violations };

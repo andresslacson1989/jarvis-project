@@ -1,6 +1,6 @@
 # JARVIS Production Implementation Plan
 
-**Status:** Authoritative dependency/sequencing plan for v1.0.6  
+**Status:** Authoritative dependency/sequencing plan for v1.0.7
 **Version:** 1.0.7
 **Date:** August 12, 2026  
 **Release target:** `docs/JARVIS-V1-RELEASE-PROFILE.md`
@@ -715,7 +715,7 @@ Full Windows local + portable restore drills pass; generated recovery secret alo
 
 # 21. PHASE 19 — WINDOWS V1 PRODUCTION QUALIFICATION
 
-Run the full v1.0.6 active contract suite on exact signed Windows FULL_HOST Release Candidate artifacts:
+Run the full v1.0.7 active contract suite on exact signed Windows FULL_HOST Release Candidate artifacts:
 
 - contract manifest / Release Profile;
 - authoritative repository/CI governance evidence for the verified hosting capability;
@@ -749,7 +749,7 @@ Linux runtime and Android companion tests are explicitly outside this V1 qualifi
 
 ## Exit
 
-Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys and all active v1.0.6 specialized security/governance-contract gates pass; rollback/recovery verified; Production Complete evidence references exact Windows artifacts/source/profile/contract/platform/trust identity.
+Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys and all active v1.0.7 specialized security/governance-contract gates pass; rollback/recovery verified; Production Complete evidence references exact Windows artifacts/source/profile/contract/platform/trust identity.
 
 ---
 
@@ -862,4 +862,4 @@ Only final checkpoint is Production Complete.
 
 ---
 
-**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.6**
+**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.7**

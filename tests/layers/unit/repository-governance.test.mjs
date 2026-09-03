@@ -1,12 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   validateGovernanceContractTexts,
   validateRepositoryGovernanceProfile,
 } from "../../../tools/ci/check-repository-governance.mjs";
+import { GATES } from "../../../tools/ci/generate-evidence.mjs";
+
+const qualifiedLocalCiScript = readFileSync(new URL("../../../.localci/ci.sh", import.meta.url), "utf8");
 
 const fallbackProfile = Object.freeze({
-  schemaVersion: 2,
+  schemaVersion: 3,
   governanceMode: "COMPENSATING_CONTROLS",
   provider: "GITHUB",
   repository: "andresslacson1989/jarvis-project",
@@ -26,33 +30,46 @@ const fallbackProfile = Object.freeze({
       pipelineProfile: "tauri2418",
       repositoryPipeline: ".localci/ci.sh",
       qualificationStatus: "QUALIFIED",
-      latestEvidence: {
+      qualificationEvidence: {
+        authorityType: "LOCALCI",
+        instanceIdentity: "CT107",
         jobId: "job-1",
+        pipelineIdentity: "static-ci",
+        pipelineVersion: "tauri2418-windows-v1",
+        requestedRef: "refs/heads/codex/example",
+        expectedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2",
         resolvedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2",
-        status: "SUCCEEDED",
+        queuedAt: "2026-09-04T00:00:00Z",
+        startedAt: "2026-09-04T00:00:01Z",
+        finishedAt: "2026-09-04T00:01:00Z",
+        gateResults: GATES.map((gate) => ({ gate, status: "PASSED" })),
+        terminalStatus: "SUCCEEDED",
+        logs: { sha256: "a".repeat(64), exportIdentity: "logs-export-1" },
+        artifacts: { indexSha256: "b".repeat(64), exportIdentity: "artifacts-export-1" },
+        cancellationRecovery: { status: "PASSED", evidenceIdentity: "cancel-recovery-1" },
       },
     },
-    commonControls: {
-      exactResolvedCommitRequired: true,
-      completePipelineRequired: true,
-      pinnedFrozenInputs: true,
-      leastPrivilegeAuthentication: true,
-      isolatedExecution: true,
-      controlPlaneSecretsExcluded: true,
-      timeoutsCancellationCleanup: true,
-      idempotentSubmission: true,
-      durableAuditableEvidence: true,
+    commonRequirements: {
+      exactResolvedCommitRequired: "REQUIRED",
+      completePipelineRequired: "REQUIRED",
+      pinnedFrozenInputs: "REQUIRED",
+      leastPrivilegeAuthentication: "REQUIRED",
+      isolatedExecution: "REQUIRED",
+      controlPlaneSecretsExcluded: "REQUIRED",
+      timeoutsCancellationCleanup: "REQUIRED",
+      idempotentSubmission: "REQUIRED",
+      durableAuditableEvidence: "REQUIRED",
     },
-    localCiControls: {
-      authenticatedTls: true,
-      nonAdministratorApiClient: true,
-      repositoryProfileRefAllowlist: true,
-      serverSideRevisionResolution: true,
-      rootlessJobIsolation: true,
-      arbitraryExecutionSurfacesDenied: true,
-      controlledUpgradeAndClock: true,
-      evidenceRetentionExport: true,
-      cancellationRecoveryTested: true,
+    localCiRequirements: {
+      authenticatedTls: "REQUIRED",
+      nonAdministratorApiClient: "REQUIRED",
+      repositoryProfileRefAllowlist: "REQUIRED",
+      serverSideRevisionResolution: "REQUIRED",
+      rootlessJobIsolation: "REQUIRED",
+      arbitraryExecutionSurfacesDenied: "REQUIRED",
+      controlledUpgradeAndClock: "REQUIRED",
+      evidenceRetentionExport: "REQUIRED",
+      cancellationRecoveryTested: "REQUIRED",
     },
   },
   controls: {
@@ -71,7 +88,7 @@ function clone(value) {
   return structuredClone(value);
 }
 
-function codes(profile, workflow = "jobs:\n  static-ci:\n    name: static-ci\n", localCiScript = "#!/bin/sh\nset -Eeuo pipefail\n") {
+function codes(profile, workflow = "jobs:\n  static-ci:\n    name: static-ci\n", localCiScript = qualifiedLocalCiScript) {
   return validateRepositoryGovernanceProfile(profile, workflow, localCiScript).map((item) => item.code);
 }
 
@@ -94,8 +111,8 @@ for (const [name, mutate, expected] of [
   ["required CI context cannot drift", (p) => { p.mandatoryCi.pipelineIdentity = "something-else"; }, "GOVERNANCE_REQUIRED_CI_CONTEXT"],
   ["eligible authority set cannot drift", (p) => { p.mandatoryCi.eligibleAuthorityTypes = ["LOCALCI"]; }, "GOVERNANCE_CI_AUTHORITY_SET"],
   ["selected authority must be qualified", (p) => { p.mandatoryCi.selectedAuthority.qualificationStatus = "DEMO"; }, "GOVERNANCE_CI_AUTHORITY_UNQUALIFIED"],
-  ["LocalCI exact-SHA evidence is mandatory", (p) => { p.mandatoryCi.selectedAuthority.latestEvidence.resolvedCommit = "bad"; }, "GOVERNANCE_LOCALCI_EVIDENCE_INVALID"],
-  ["LocalCI isolation controls cannot be disabled", (p) => { p.mandatoryCi.localCiControls.rootlessJobIsolation = false; }, "GOVERNANCE_LOCALCI_CONTROL_DISABLED"],
+  ["LocalCI exact-SHA evidence is mandatory", (p) => { p.mandatoryCi.selectedAuthority.qualificationEvidence.resolvedCommit = "bad"; }, "GOVERNANCE_LOCALCI_EVIDENCE_INVALID"],
+  ["LocalCI isolation requirements cannot be weakened", (p) => { p.mandatoryCi.localCiRequirements.rootlessJobIsolation = "OPTIONAL"; }, "GOVERNANCE_LOCALCI_REQUIREMENT_MISSING"],
 ]) {
   test(name, () => {
     const profile = clone(fallbackProfile);
@@ -119,6 +136,13 @@ test("qualified LocalCI does not require a GitHub Actions workflow result", () =
 
 test("LocalCI repository pipeline must fail closed", () => {
   assert.ok(codes(clone(fallbackProfile), undefined, "#!/bin/sh\necho unsafe\n").includes("GOVERNANCE_LOCALCI_PIPELINE_MISSING"));
+});
+
+test("LocalCI repository pipeline rejects omission of every mandatory gate", () => {
+  for (const gate of GATES) {
+    const mutated = qualifiedLocalCiScript.replace(new RegExp(`^run_gate ${gate.replaceAll("-", "\\-")} .*$`, "m"), "");
+    assert.ok(codes(clone(fallbackProfile), undefined, mutated).includes("GOVERNANCE_LOCALCI_PIPELINE_INCOMPLETE"), `omitting ${gate} must fail closed`);
+  }
 });
 
 test("server-enforced mode requires all effective server controls", () => {

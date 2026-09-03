@@ -43,12 +43,17 @@ const ROOT_TEXT_FILES = new Set([
   "tsconfig.build.json",
   "tsconfig.json",
 ]);
+const GENERATED_RUNTIME_PREFIXES = Object.freeze([
+  "apps/desktop/src-tauri/gen/",
+  "apps/desktop/src-tauri/resources/",
+]);
 
 export async function checkFormat(rootDir) {
   const decoder = new TextDecoder("utf-8", { fatal: true });
   const files = await collectFiles(rootDir, {
     include: (file) => {
       const path = relativePath(rootDir, file);
+      if (GENERATED_RUNTIME_PREFIXES.some((prefix) => path.startsWith(prefix))) return false;
       const inControlledRoot = CONTROLLED_ROOTS.some((root) => path === root || path.startsWith(`${root}/`));
       return (inControlledRoot && TEXT_EXTENSIONS.has(extname(file))) || ROOT_TEXT_FILES.has(path);
     },

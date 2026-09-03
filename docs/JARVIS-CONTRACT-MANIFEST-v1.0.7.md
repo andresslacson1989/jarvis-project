@@ -42,9 +42,9 @@ Component revisions are explicit; a suite-version change does not require rewrit
 
 ## 2.1 Inherited component headers
 
-Several unchanged component revisions retain historical header text naming their earlier parent suite. Their inclusion in the current suite is governed exclusively by this manifest and the v1.0.6 top-level contract. Those historical header references do not make superseded top-level contracts current and do not create an overlay.
+Several unchanged component revisions retain historical header text naming their earlier parent suite. Their inclusion in the current suite is governed exclusively by this manifest and the v1.0.7 top-level contract. Those historical header references do not make superseded top-level contracts current and do not create an overlay.
 
-The specialized security contracts remain cumulative specializations of compatible broad rules in the inherited Data/Security/Operations components. The v1.0.5 security closure remains fully active. The v1.0.6 Verification and Implementation Plan revisions add the repository-governance capability closure required by ADR-074. Release Profile 1.0.6 and Coding Standards 1.0.5 synchronize their repository-governance gates and invariants with that already-active rule. This synchronization is a contract-coherence repair, not a new repository-governance semantic. These current component rules are part of one suite, not ADR overrides.
+The specialized security contracts remain cumulative specializations of compatible broad rules in the inherited Data/Security/Operations components. The v1.0.5 security closure remains fully active. Verification 1.0.6 contains the repository-governance capability closure introduced by ADR-074 and the CI-authority closure introduced by ADR-076. Implementation Plan 1.0.7, Release Profile 1.0.7, and Coding Standards 1.0.6 synchronize their active gates with those rules. These current component rules are part of one suite, not ADR overrides.
 
 ---
 
@@ -56,7 +56,7 @@ ADR-073 closes the backup cryptographic format/recovery-factor strength, project
 
 ADR-074 makes repository-governance qualification hosting-capability-aware: server-side protection remains mandatory when the hosting plan exposes it, while an explicitly verified unavailable hosting capability may use auditable compensating integration controls without becoming a paid-plan prerequisite or being misrepresented as protected.
 
-ADR-075 repairs the normative-suite synchronization omission left by ADR-074 by advancing only the Release Profile and Coding Standards component revisions and aligning their stale protected-`master` absolutes with the already-active capability-aware rule. JARVIS v1.0.6 suite semantics remain unchanged.
+ADR-075 repairs the normative-suite synchronization omission left by ADR-074 by advancing only the Release Profile and Coding Standards component revisions and aligning their stale protected-`master` absolutes with the already-active capability-aware rule. ADR-076 then changes the current suite meaning by qualifying LocalCI as an equal alternative CI authority.
 
 ADR-076 makes qualified GitHub Actions and qualified LocalCI equal alternative CI authorities. It replaces vendor identity as the source of authority with common exact-SHA, complete-pipeline, least-privilege, isolation, recovery, and durable-evidence requirements plus authority-specific qualification.
 
@@ -112,7 +112,7 @@ SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding post-V1 prod
 
 Phase 0 SHALL establish machine-readable canonical repeated security/profile/capability values and CI drift checks where practical.
 
-Repository server-side protection SHALL be activated when available, but an unavailable paid/host-gated protection feature is not itself a JARVIS production prerequisite when the v1.0.6 compensating-governance qualification passes.
+Repository server-side protection SHALL be activated when available, but an unavailable paid/host-gated protection feature is not itself a JARVIS production prerequisite when the v1.0.7 compensating-governance qualification passes.
 
 ---
 

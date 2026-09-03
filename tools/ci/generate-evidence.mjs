@@ -1,10 +1,11 @@
-import { appendFile, readFile } from "node:fs/promises";
+import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain } from "./lib.mjs";
 
-const GATES = Object.freeze([
+export const GATES = Object.freeze([
+  "dependencies-frozen",
   "toolchain-exact",
   "format-hygiene",
   "schema-integrity",
@@ -17,15 +18,24 @@ const GATES = Object.freeze([
   "license-provenance",
   "typescript-strict",
   "typescript-build",
+  "core-build",
+  "desktop-ui-build",
+  "desktop-foundation-contract",
+  "desktop-security-contract",
   "architecture-enforcement",
   "normal-tests",
   "dependency-vulnerability-high-plus",
+  "cargo-audit-install",
+  "cargo-audit-version",
   "rust-dependency-vulnerability-rustsec",
+  "rustsec-audit-json",
+  "cargo-metadata-windows",
   "rustsec-informational-warning-review",
   "rustfmt",
   "rust-clippy-warnings-as-errors",
   "rust-host-build",
   "rust-windows-target-build",
+  "windows-tauri-production-build",
   "phase0-section-checkpoint",
 ]);
 
@@ -122,6 +132,63 @@ export function buildCiEvidence({
   });
 }
 
+export function parseLocalCiGateResults(text) {
+  const results = String(text).split(/\r?\n/).filter(Boolean).map((line, index) => {
+    let value;
+    try {
+      value = JSON.parse(line);
+    } catch {
+      throw new Error(`LocalCI gate result line ${index + 1} is not valid JSON`);
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value) || !GATES.includes(value.gate) || value.exitCode !== 0 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value.startedAt) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value.finishedAt)) {
+      throw new Error(`LocalCI gate result line ${index + 1} is invalid or not successful`);
+    }
+    return Object.freeze({ gate: value.gate, startedAt: value.startedAt, finishedAt: value.finishedAt, exitCode: 0 });
+  });
+  if (JSON.stringify(results.map(({ gate }) => gate)) !== JSON.stringify(GATES)) {
+    throw new Error("LocalCI gate results must contain every mandatory gate exactly once and in canonical order");
+  }
+  return Object.freeze(results);
+}
+
+export function buildLocalCiExecutionEvidence({ env, versions, contractSuiteVersion, governanceMode, gateResults }) {
+  const commitSha = resolveCandidateSha(env);
+  if (contractSuiteVersion !== "1.0.7") throw new Error(`contractSuiteVersion evidence mismatch: expected 1.0.7, got ${contractSuiteVersion ?? "<missing>"}`);
+  if (!GOVERNANCE_MODES.has(governanceMode)) throw new Error(`invalid governanceMode ${governanceMode ?? "<missing>"}`);
+  const expectedCommit = requireValue(env.LOCALCI_EXPECTED_COMMIT, "LOCALCI_EXPECTED_COMMIT");
+  const resolvedCommit = requireValue(env.LOCALCI_RESOLVED_COMMIT, "LOCALCI_RESOLVED_COMMIT");
+  if (expectedCommit !== commitSha || resolvedCommit !== commitSha) throw new Error("LocalCI expected, resolved, and candidate commit identities must match exactly");
+  const verifiedGates = Array.isArray(gateResults) ? gateResults : parseLocalCiGateResults(gateResults);
+  return Object.freeze({
+    schemaVersion: 3,
+    scope: "PHASE_0_STATIC_CI",
+    checkpoint: "0.CP",
+    status: "GATES_PASS_PENDING_AUTHORITY_FINALIZATION",
+    contractSuiteVersion,
+    governanceMode,
+    authority: Object.freeze({
+      type: "LOCALCI",
+      instanceIdentity: requireValue(env.LOCALCI_INSTANCE_ID, "LOCALCI_INSTANCE_ID"),
+      jobId: requireValue(env.LOCALCI_JOB_ID, "LOCALCI_JOB_ID"),
+      pipelineIdentity: requireValue(env.LOCALCI_PIPELINE_ID, "LOCALCI_PIPELINE_ID"),
+      pipelineVersion: requireValue(env.LOCALCI_PIPELINE_VERSION, "LOCALCI_PIPELINE_VERSION"),
+    }),
+    requestedRevision: Object.freeze({
+      ref: requireValue(env.LOCALCI_REQUESTED_REF, "LOCALCI_REQUESTED_REF"),
+      expectedCommit,
+      resolvedCommit,
+    }),
+    timestamps: Object.freeze({
+      queuedAt: requireValue(env.LOCALCI_QUEUED_AT, "LOCALCI_QUEUED_AT"),
+      startedAt: requireValue(env.LOCALCI_STARTED_AT, "LOCALCI_STARTED_AT"),
+    }),
+    runner: Object.freeze({ os: requireValue(env.LOCALCI_RUNNER_OS, "LOCALCI_RUNNER_OS"), arch: requireValue(env.LOCALCI_RUNNER_ARCH, "LOCALCI_RUNNER_ARCH") }),
+    toolchain: Object.freeze({ ...versions }),
+    gateResults: verifiedGates,
+    finalizationRequirement: "LOCALCI_CONTROL_PLANE_MUST_APPEND_TERMINAL_STATUS_FINISHED_AT_LOG_AND_ARTIFACT_HASHES_RETENTION_EXPORT_AND_CANCELLATION_RECOVERY_EVIDENCE",
+  });
+}
+
 function runVersion(command, args, parser = (value) => value.trim()) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
@@ -198,14 +265,27 @@ if (isMain(import.meta.url)) {
 
   await assertCanonicalVersions(rootDir, versions);
 
-  const evidence = buildCiEvidence({
-    env: process.env,
-    versions,
-    contractSuiteVersion: canonicalValues.contractSuiteVersion,
-    governanceMode: governanceProfile.governanceMode,
-  });
+  const localCi = process.env.JARVIS_CI_AUTHORITY === "LOCALCI";
+  const evidence = localCi
+    ? buildLocalCiExecutionEvidence({
+      env: process.env,
+      versions,
+      contractSuiteVersion: canonicalValues.contractSuiteVersion,
+      governanceMode: governanceProfile.governanceMode,
+      gateResults: parseLocalCiGateResults(await readFile(requireValue(process.env.JARVIS_CI_GATE_RESULTS_PATH, "JARVIS_CI_GATE_RESULTS_PATH"), "utf8")),
+    })
+    : buildCiEvidence({
+      env: process.env,
+      versions,
+      contractSuiteVersion: canonicalValues.contractSuiteVersion,
+      governanceMode: governanceProfile.governanceMode,
+    });
   const json = JSON.stringify(evidence);
   console.log(`[ci-evidence] ${json}`);
+
+  if (localCi) {
+    await writeFile(resolve(rootDir, "reports", "localci-execution-attestation.json"), `${JSON.stringify(evidence, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
+  }
 
   if (process.env.GITHUB_STEP_SUMMARY) {
     await appendFile(
