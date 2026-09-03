@@ -121,6 +121,16 @@ test("LocalCI execution evidence binds server identities and every measured gate
   assert.equal(evidence.status, "GATES_PASS_PENDING_AUTHORITY_FINALIZATION");
 });
 
+test("LocalCI evidence rejects a candidate identity that differs from the resolved checkout", () => {
+  assert.throws(() => buildLocalCiExecutionEvidence({
+    env: localCiEnv({ JARVIS_CANDIDATE_SHA: syntheticMergeSha }),
+    versions,
+    contractSuiteVersion: "1.0.7",
+    governanceMode: "COMPENSATING_CONTROLS",
+    gateResults: localCiGateText(),
+  }), /must match exactly/);
+});
+
 test("LocalCI replay identity is stable and distinct idempotency keys are not conflated", () => {
   const args = {
     env: localCiEnv(),
