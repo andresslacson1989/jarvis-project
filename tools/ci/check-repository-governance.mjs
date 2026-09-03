@@ -73,7 +73,7 @@ export function validateRepositoryGovernanceProfile(profile, workflowText, local
   }
   const selected = mandatoryCi.selectedAuthority ?? {};
   if (!ELIGIBLE_CI_AUTHORITIES.includes(selected.type)) violations.push(violation("GOVERNANCE_CI_AUTHORITY_INVALID", "selected authority must be GITHUB_ACTIONS or LOCALCI"));
-  if (selected.qualificationStatus !== "QUALIFIED") violations.push(violation("GOVERNANCE_CI_AUTHORITY_UNQUALIFIED", "selected authority must be QUALIFIED"));
+  if (!["QUALIFIED", "VERIFYING"].includes(selected.qualificationStatus)) violations.push(violation("GOVERNANCE_CI_AUTHORITY_STATUS_INVALID", "selected authority status must be QUALIFIED or VERIFYING"));
   if (selected.type === "GITHUB_ACTIONS" && !workflowHasStaticCi(String(workflowText ?? ""))) {
     violations.push(violation("GOVERNANCE_CI_WORKFLOW_MISMATCH", "selected GitHub Actions workflow must expose job id/name static-ci"));
   }
@@ -94,9 +94,12 @@ export function validateRepositoryGovernanceProfile(profile, workflowText, local
       if (mandatoryCi.localCiRequirements?.[control] !== "REQUIRED") violations.push(violation("GOVERNANCE_LOCALCI_REQUIREMENT_MISSING", `${control} must be REQUIRED`));
     }
     const evidence = selected.qualificationEvidence ?? {};
+    if (selected.qualificationStatus === "VERIFYING") {
+      if (!selected.lastObservedRun || !Array.isArray(selected.qualificationBlockers) || selected.qualificationBlockers.length === 0) violations.push(violation("GOVERNANCE_LOCALCI_QUALIFICATION_STATE_INVALID", "VERIFYING LocalCI authority must record an observed run and explicit blockers"));
+    }
     const timestamps = [evidence.queuedAt, evidence.startedAt, evidence.finishedAt];
     const evidenceGates = Array.isArray(evidence.gateResults) ? evidence.gateResults.map((item) => item?.gate) : [];
-    if (evidence.authorityType !== "LOCALCI" || evidence.instanceIdentity !== selected.instanceIdentity || evidence.pipelineIdentity !== EXPECTED_CI || !String(evidence.pipelineVersion ?? "") || !String(evidence.requestedRef ?? "").startsWith("refs/") || !/^[0-9a-f]{40}$/.test(String(evidence.expectedCommit ?? "")) || evidence.expectedCommit !== evidence.resolvedCommit || evidence.terminalStatus !== "SUCCEEDED" || !String(evidence.jobId ?? "") || timestamps.some((value) => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value ?? ""))) || JSON.stringify(evidenceGates) !== JSON.stringify(GATES) || evidence.gateResults?.some((item) => item?.status !== "PASSED") || !/^[0-9a-f]{64}$/.test(String(evidence.logs?.sha256 ?? "")) || !String(evidence.logs?.exportIdentity ?? "") || !/^[0-9a-f]{64}$/.test(String(evidence.artifacts?.indexSha256 ?? "")) || !String(evidence.artifacts?.exportIdentity ?? "") || evidence.cancellationRecovery?.status !== "PASSED" || !String(evidence.cancellationRecovery?.evidenceIdentity ?? "")) {
+    if (selected.qualificationStatus === "QUALIFIED" && (evidence.authorityType !== "LOCALCI" || evidence.instanceIdentity !== selected.instanceIdentity || evidence.pipelineIdentity !== EXPECTED_CI || !String(evidence.pipelineVersion ?? "") || !String(evidence.requestedRef ?? "").startsWith("refs/") || !/^[0-9a-f]{40}$/.test(String(evidence.expectedCommit ?? "")) || evidence.expectedCommit !== evidence.resolvedCommit || evidence.terminalStatus !== "SUCCEEDED" || !String(evidence.jobId ?? "") || timestamps.some((value) => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value ?? ""))) || JSON.stringify(evidenceGates) !== JSON.stringify(GATES) || evidence.gateResults?.some((item) => item?.status !== "PASSED") || !/^[0-9a-f]{64}$/.test(String(evidence.logs?.sha256 ?? "")) || !String(evidence.logs?.exportIdentity ?? "") || !/^[0-9a-f]{64}$/.test(String(evidence.artifacts?.indexSha256 ?? "")) || !String(evidence.artifacts?.exportIdentity ?? "") || evidence.cancellationRecovery?.status !== "PASSED" || !String(evidence.cancellationRecovery?.evidenceIdentity ?? ""))) {
       violations.push(violation("GOVERNANCE_LOCALCI_EVIDENCE_INVALID", "LocalCI qualification requires successful exact-SHA job evidence"));
     }
   }

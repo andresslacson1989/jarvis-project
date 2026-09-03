@@ -110,7 +110,7 @@ for (const [name, mutate, expected] of [
   ["server protection must become mandatory when available", (p) => { p.serverModeRequiredWhenAvailable = false; }, "GOVERNANCE_SERVER_MODE_REENABLE_REQUIRED"],
   ["required CI context cannot drift", (p) => { p.mandatoryCi.pipelineIdentity = "something-else"; }, "GOVERNANCE_REQUIRED_CI_CONTEXT"],
   ["eligible authority set cannot drift", (p) => { p.mandatoryCi.eligibleAuthorityTypes = ["LOCALCI"]; }, "GOVERNANCE_CI_AUTHORITY_SET"],
-  ["selected authority must be qualified", (p) => { p.mandatoryCi.selectedAuthority.qualificationStatus = "DEMO"; }, "GOVERNANCE_CI_AUTHORITY_UNQUALIFIED"],
+  ["selected authority status must be valid", (p) => { p.mandatoryCi.selectedAuthority.qualificationStatus = "DEMO"; }, "GOVERNANCE_CI_AUTHORITY_STATUS_INVALID"],
   ["LocalCI exact-SHA evidence is mandatory", (p) => { p.mandatoryCi.selectedAuthority.qualificationEvidence.resolvedCommit = "bad"; }, "GOVERNANCE_LOCALCI_EVIDENCE_INVALID"],
   ["LocalCI isolation requirements cannot be weakened", (p) => { p.mandatoryCi.localCiRequirements.rootlessJobIsolation = "OPTIONAL"; }, "GOVERNANCE_LOCALCI_REQUIREMENT_MISSING"],
 ]) {
@@ -132,6 +132,16 @@ test("workflow must expose the exact static-ci check identity", () => {
 
 test("qualified LocalCI does not require a GitHub Actions workflow result", () => {
   assert.deepEqual(codes(clone(fallbackProfile), "jobs:\n  build:\n    name: build\n"), []);
+});
+
+test("LocalCI VERIFYING state is accepted only with explicit blockers and is not qualification", () => {
+  const profile = clone(fallbackProfile);
+  profile.mandatoryCi.selectedAuthority.qualificationStatus = "VERIFYING";
+  profile.mandatoryCi.selectedAuthority.lastObservedRun = { jobId: "job-1", status: "SUCCEEDED" };
+  profile.mandatoryCi.selectedAuthority.qualificationBlockers = ["WINDOWS_WORKER_REQUIRED"];
+  assert.deepEqual(codes(profile), []);
+  delete profile.mandatoryCi.selectedAuthority.qualificationBlockers;
+  assert.ok(codes(profile).includes("GOVERNANCE_LOCALCI_QUALIFICATION_STATE_INVALID"));
 });
 
 test("LocalCI repository pipeline must fail closed", () => {
