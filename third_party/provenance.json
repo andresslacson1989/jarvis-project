@@ -5000,6 +5000,436 @@
       "role": "DESKTOP_BUILD_TEST",
       "packaged": false,
       "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-broadcast",
+      "version": "0.7.2",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/smol-rs/async-broadcast",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-channel",
+      "version": "2.5.0",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/async-channel",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-executor",
+      "version": "1.14.0",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/async-executor",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-io",
+      "version": "2.6.0",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/async-io",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-lock",
+      "version": "3.4.2",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/async-lock",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-process",
+      "version": "2.5.0",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/async-process",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-recursion",
+      "version": "1.1.1",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/dcchut/async-recursion",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-signal",
+      "version": "0.2.14",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/async-signal",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-task",
+      "version": "4.7.1",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/async-task",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "async-trait",
+      "version": "0.1.92",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/dtolnay/async-trait",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "blocking",
+      "version": "1.6.2",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/blocking",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "concurrent-queue",
+      "version": "2.5.0",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/concurrent-queue",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "endi",
+      "version": "1.1.1",
+      "license": "MIT",
+      "source": "https://github.com/zeenix/endi",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "enumflags2",
+      "version": "0.7.12",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/meithecatte/enumflags2",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "enumflags2_derive",
+      "version": "0.7.12",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/meithecatte/enumflags2",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "errno",
+      "version": "0.3.14",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/lambda-fairy/rust-errno",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "event-listener",
+      "version": "5.4.2",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/event-listener",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "event-listener-strategy",
+      "version": "0.5.4",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/event-listener-strategy",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "futures-lite",
+      "version": "2.6.1",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/futures-lite",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "hermit-abi",
+      "version": "0.5.2",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/hermit-os/hermit-rs",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "is-docker",
+      "version": "0.2.0",
+      "license": "MIT",
+      "source": "https://github.com/TheLarkInn/is-docker",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "is-wsl",
+      "version": "0.4.0",
+      "license": "MIT",
+      "source": "https://github.com/TheLarkInn/is-wsl",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "linux-raw-sys",
+      "version": "0.12.1",
+      "license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+      "source": "https://github.com/sunfishcode/linux-raw-sys",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "open",
+      "version": "5.4.1",
+      "license": "MIT",
+      "source": "https://github.com/Byron/open-rs",
+      "role": "DESKTOP_NATIVE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "ordered-stream",
+      "version": "0.2.0",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/danieldg/ordered-stream",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "parking",
+      "version": "2.2.1",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/parking",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "piper",
+      "version": "0.2.5",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/smol-rs/piper",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "polling",
+      "version": "3.11.0",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/smol-rs/polling",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "rustix",
+      "version": "1.1.4",
+      "license": "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+      "source": "https://github.com/bytecodealliance/rustix",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "signal-hook-registry",
+      "version": "1.4.8",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/vorner/signal-hook",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "tauri-plugin",
+      "version": "2.6.3",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/tauri-apps/tauri",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "tauri-plugin-opener",
+      "version": "2.5.4",
+      "license": "Apache-2.0 OR MIT",
+      "source": "https://github.com/tauri-apps/plugins-workspace",
+      "role": "DESKTOP_NATIVE_RUNTIME",
+      "packaged": true,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "tempfile",
+      "version": "3.27.0",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/Stebalien/tempfile",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "tracing-attributes",
+      "version": "0.1.31",
+      "license": "MIT",
+      "source": "https://github.com/tokio-rs/tracing",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "uds_windows",
+      "version": "1.2.1",
+      "license": "MIT",
+      "source": "https://github.com/haraldh/rust_uds_windows",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zbus",
+      "version": "5.19.0",
+      "license": "MIT",
+      "source": "https://github.com/z-galaxy/zbus/",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zbus_macros",
+      "version": "5.19.0",
+      "license": "MIT",
+      "source": "https://github.com/z-galaxy/zbus/",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zbus_names",
+      "version": "4.3.4",
+      "license": "MIT",
+      "source": "https://github.com/z-galaxy/zbus/",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zcheapstr",
+      "version": "1.1.0",
+      "license": "MIT",
+      "source": "https://github.com/z-galaxy/zcheapstr/",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zvariant",
+      "version": "5.15.0",
+      "license": "MIT",
+      "source": "https://github.com/z-galaxy/zbus/",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zvariant_derive",
+      "version": "5.15.0",
+      "license": "MIT",
+      "source": "https://github.com/z-galaxy/zbus/",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "cargo",
+      "name": "zvariant_utils",
+      "version": "4.2.0",
+      "license": "MIT",
+      "source": "https://github.com/z-galaxy/zbus/",
+      "role": "DESKTOP_NATIVE_BUILD",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@tauri-apps/plugin-opener",
+      "version": "2.5.4",
+      "license": "MIT OR Apache-2.0",
+      "source": "https://github.com/tauri-apps/plugins-workspace",
+      "role": "DESKTOP_BUILD_TEST",
+      "packaged": false,
+      "reviewStatus": "APPROVED"
     }
   ],
   "ciActions": [

@@ -504,6 +504,49 @@ This file records the repository-reviewed dependency, toolchain, and CI/bootstra
 | npm:tslib | 2.8.1 | DESKTOP_BUILD_TEST | 0BSD | https://github.com/Microsoft/tslib |
 | npm:typescript | 6.0.3 | BUILD_TEST | Apache-2.0 | https://github.com/microsoft/TypeScript |
 | npm:vite | 8.1.5 | DESKTOP_BUILD_TEST | MIT | https://github.com/vitejs/vite |
+| cargo:async-broadcast | 0.7.2 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/smol-rs/async-broadcast |
+| cargo:async-channel | 2.5.0 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/async-channel |
+| cargo:async-executor | 1.14.0 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/async-executor |
+| cargo:async-io | 2.6.0 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/async-io |
+| cargo:async-lock | 3.4.2 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/async-lock |
+| cargo:async-process | 2.5.0 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/async-process |
+| cargo:async-recursion | 1.1.1 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/dcchut/async-recursion |
+| cargo:async-signal | 0.2.14 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/async-signal |
+| cargo:async-task | 4.7.1 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/async-task |
+| cargo:async-trait | 0.1.92 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/dtolnay/async-trait |
+| cargo:blocking | 1.6.2 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/blocking |
+| cargo:concurrent-queue | 2.5.0 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/concurrent-queue |
+| cargo:endi | 1.1.1 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/zeenix/endi |
+| cargo:enumflags2 | 0.7.12 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/meithecatte/enumflags2 |
+| cargo:enumflags2_derive | 0.7.12 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/meithecatte/enumflags2 |
+| cargo:errno | 0.3.14 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/lambda-fairy/rust-errno |
+| cargo:event-listener | 5.4.2 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/event-listener |
+| cargo:event-listener-strategy | 0.5.4 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/event-listener-strategy |
+| cargo:futures-lite | 2.6.1 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/futures-lite |
+| cargo:hermit-abi | 0.5.2 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/hermit-os/hermit-rs |
+| cargo:is-docker | 0.2.0 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/TheLarkInn/is-docker |
+| cargo:is-wsl | 0.4.0 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/TheLarkInn/is-wsl |
+| cargo:linux-raw-sys | 0.12.1 | DESKTOP_NATIVE_BUILD | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/sunfishcode/linux-raw-sys |
+| cargo:open | 5.4.1 | DESKTOP_NATIVE_RUNTIME | MIT | https://github.com/Byron/open-rs |
+| cargo:ordered-stream | 0.2.0 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/danieldg/ordered-stream |
+| cargo:parking | 2.2.1 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/parking |
+| cargo:piper | 0.2.5 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/smol-rs/piper |
+| cargo:polling | 3.11.0 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/smol-rs/polling |
+| cargo:rustix | 1.1.4 | DESKTOP_NATIVE_BUILD | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/bytecodealliance/rustix |
+| cargo:signal-hook-registry | 1.4.8 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/vorner/signal-hook |
+| cargo:tauri-plugin | 2.6.3 | DESKTOP_NATIVE_BUILD | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
+| cargo:tauri-plugin-opener | 2.5.4 | DESKTOP_NATIVE_RUNTIME | Apache-2.0 OR MIT | https://github.com/tauri-apps/plugins-workspace |
+| cargo:tempfile | 3.27.0 | DESKTOP_NATIVE_BUILD | MIT OR Apache-2.0 | https://github.com/Stebalien/tempfile |
+| cargo:tracing-attributes | 0.1.31 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/tokio-rs/tracing |
+| cargo:uds_windows | 1.2.1 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/haraldh/rust_uds_windows |
+| cargo:zbus | 5.19.0 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/z-galaxy/zbus/ |
+| cargo:zbus_macros | 5.19.0 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/z-galaxy/zbus/ |
+| cargo:zbus_names | 4.3.4 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/z-galaxy/zbus/ |
+| cargo:zcheapstr | 1.1.0 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/z-galaxy/zcheapstr/ |
+| cargo:zvariant | 5.15.0 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/z-galaxy/zbus/ |
+| cargo:zvariant_derive | 5.15.0 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/z-galaxy/zbus/ |
+| cargo:zvariant_utils | 4.2.0 | DESKTOP_NATIVE_BUILD | MIT | https://github.com/z-galaxy/zbus/ |
+| npm:@tauri-apps/plugin-opener | 2.5.4 | DESKTOP_BUILD_TEST | MIT OR Apache-2.0 | https://github.com/tauri-apps/plugins-workspace |
 | toolchain:Tauri | 2.11.5 | DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED | Apache-2.0 OR MIT | https://github.com/tauri-apps/tauri |
 | toolchain:Node.js | 24.18.0 | BUILD_RUNTIME | MIT | https://github.com/nodejs/node |
 | toolchain:pnpm | 11.21.0 | BUILD_TOOL | MIT | https://github.com/pnpm/pnpm |
