@@ -229,7 +229,7 @@ test("CI evidence is Phase-0 scoped, commit-bound, and requires every aggregate 
       rust: "1.97.1",
       cargo: "1.97.1",
     },
-    contractSuiteVersion: "1.0.6",
+    contractSuiteVersion: "1.0.7",
     governanceMode: "COMPENSATING_CONTROLS",
   });
 
@@ -237,7 +237,7 @@ test("CI evidence is Phase-0 scoped, commit-bound, and requires every aggregate 
   assert.equal(evidence.scope, "PHASE_0_STATIC_CI");
   assert.equal(evidence.checkpoint, "0.CP");
   assert.equal(evidence.status, "PASS");
-  assert.equal(evidence.contractSuiteVersion, "1.0.6");
+  assert.equal(evidence.contractSuiteVersion, "1.0.7");
   assert.equal(evidence.governanceMode, "COMPENSATING_CONTROLS");
   assert.equal(evidence.commitSha, "a".repeat(40));
   assert.equal(evidence.runId, "123");

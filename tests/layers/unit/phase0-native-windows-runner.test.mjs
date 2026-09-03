@@ -24,7 +24,7 @@ async function loadPhase0Snapshot() {
     readFile(
       resolve(
         root,
-        "packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json",
+        "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
       ),
       "utf8",
     ).then(JSON.parse),

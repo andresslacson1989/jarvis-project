@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "governanceMode": "COMPENSATING_CONTROLS",
   "provider": "GITHUB",
   "repository": "andresslacson1989/jarvis-project",
@@ -12,7 +12,48 @@
     "observedHttpStatus": 403,
     "observedMessage": "Upgrade to GitHub Pro or make this repository public to enable this feature."
   },
-  "mandatoryCiContext": "static-ci",
+  "mandatoryCi": {
+    "pipelineIdentity": "static-ci",
+    "eligibleAuthorityTypes": [
+      "GITHUB_ACTIONS",
+      "LOCALCI"
+    ],
+    "selectedAuthority": {
+      "type": "LOCALCI",
+      "instanceIdentity": "CT107",
+      "pipelineProfile": "smoke",
+      "repositoryPipeline": ".localci/ci.sh",
+      "qualificationScope": "JARVIS_REPOSITORY_CI",
+      "qualificationStatus": "QUALIFIED",
+      "latestEvidence": {
+        "jobId": "01m1jq9bw8zs2xecaknn7y2nrg",
+        "resolvedCommit": "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2",
+        "status": "SUCCEEDED"
+      }
+    },
+    "commonControls": {
+      "exactResolvedCommitRequired": true,
+      "completePipelineRequired": true,
+      "pinnedFrozenInputs": true,
+      "leastPrivilegeAuthentication": true,
+      "isolatedExecution": true,
+      "controlPlaneSecretsExcluded": true,
+      "timeoutsCancellationCleanup": true,
+      "idempotentSubmission": true,
+      "durableAuditableEvidence": true
+    },
+    "localCiControls": {
+      "authenticatedTls": true,
+      "nonAdministratorApiClient": true,
+      "repositoryProfileRefAllowlist": true,
+      "serverSideRevisionResolution": true,
+      "rootlessJobIsolation": true,
+      "arbitraryExecutionSurfacesDenied": true,
+      "controlledUpgradeAndClock": true,
+      "evidenceRetentionExport": true,
+      "cancellationRecoveryTested": true
+    }
+  },
   "controls": {
     "temporaryImplementationBranches": true,
     "candidateCiRequired": true,

@@ -28,14 +28,16 @@ function assertCapabilityAwareGovernance(text, label) {
   assert.match(text, /non-force/i, `${label} must prohibit force integration`);
   assert.match(text, /post-integration/i, `${label} must require post-integration verification`);
   assert.match(text, /not (?:server-)?protected|not protected/i, `${label} must preserve truthful unprotected-branch reporting`);
+  assert.match(text, /GITHUB_ACTIONS/, `${label} must name qualified GitHub Actions authority`);
+  assert.match(text, /LOCALCI/, `${label} must name qualified LocalCI authority`);
 }
 
 test("Release Profile repository-governance gate matches the active hosting-capability-aware rule", () => {
   const profile = read("docs/JARVIS-V1-RELEASE-PROFILE.md");
   const governance = section(profile, "# 17. REPOSITORY GOVERNANCE GATE", "# 18. PRODUCTION-COMPLETE GATE");
 
-  assert.match(profile, /\*\*Profile Version:\*\*\s*1\.0\.6\b/);
-  assert.match(profile, /\*\*Governing contract:\*\*\s*`docs\/JARVIS-IMPLEMENTATION-CONTRACT-v1\.0\.6\.md`/);
+  assert.match(profile, /\*\*Profile Version:\*\*\s*1\.0\.7\b/);
+  assert.match(profile, /\*\*Governing contract:\*\*\s*`docs\/JARVIS-IMPLEMENTATION-CONTRACT-v1\.0\.7\.md`/);
   assertCapabilityAwareGovernance(governance, "Release Profile §17");
 });
 
@@ -43,7 +45,7 @@ test("Coding Standards CI gate matches the active hosting-capability-aware rule"
   const standards = read("docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md");
   const governance = section(standards, "# 28. STATIC / CI GATES", "# 29. DEPENDENCIES AND THIRD-PARTY ASSETS");
 
-  assert.match(standards, /\*\*Normative Appendix to:\*\*\s*`docs\/JARVIS-IMPLEMENTATION-CONTRACT-v1\.0\.6\.md`/);
-  assert.match(standards, /\*\*Version:\*\*\s*1\.0\.5\b/);
+  assert.match(standards, /\*\*Normative Appendix to:\*\*\s*`docs\/JARVIS-IMPLEMENTATION-CONTRACT-v1\.0\.7\.md`/);
+  assert.match(standards, /\*\*Version:\*\*\s*1\.0\.6\b/);
   assertCapabilityAwareGovernance(governance, "Coding Standards §28");
 });

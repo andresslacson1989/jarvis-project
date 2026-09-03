@@ -124,10 +124,10 @@ function phase0Codes(workflow) {
     workflow,
     packageJson: { scripts: { "phase0:check": "node tools/checkpoints/phase0-checkpoint.mjs" } },
     canonicalValues: {
-      contractSuiteVersion: "1.0.6",
+      contractSuiteVersion: "1.0.7",
       v1RuntimeTarget: { platform: "WINDOWS", runtimeRole: "FULL_HOST", architecture: "x64" },
     },
-    matrix: "| Contract suite | JARVIS v1.0.6 |\n| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFIED** | — |\n",
+    matrix: "| Contract suite | JARVIS v1.0.7 |\n| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFIED** | — |\n",
     linuxSourcePaths: [],
     androidSourcePaths: [],
     existingPaths: new Set(profile.requiredEvidencePaths),

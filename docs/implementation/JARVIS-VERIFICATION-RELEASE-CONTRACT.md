@@ -1,7 +1,7 @@
 # JARVIS Verification, Qualification & Release Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`  
-**Version:** 1.0.5  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md`
+**Version:** 1.0.6
 **Date:** August 12, 2026
 
 ---
@@ -14,7 +14,7 @@ Code existence, model self-report, documentation completion, one happy-path demo
 
 Production is verified behavior under normal success, ambiguity, interruption, crash, stale state, provider setup/repair, provider outage, adversarial input, target race, recovery, update, resource pressure, accessibility modes, adaptive layouts, platform-capability failure, and real release packaging.
 
-V1 production qualification is for a **Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the active v1.0.6 contract suite.
+V1 production qualification is for a **Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the active v1.0.7 contract suite.
 
 ---
 
@@ -628,6 +628,14 @@ If the hosting provider/account does not expose server-side branch protection/ru
 The compensating mode SHALL NOT waive CI, authorize force-push implementation workflow, create broad bypass, or allow a paid hosting feature to become a hidden JARVIS product prerequisite.
 
 Implementation workflow SHOULD require pull-request review once coding work begins. Qualification SHALL also confirm there is no second long-lived authoritative contract/implementation branch.
+
+The designated CI authority type SHALL be `GITHUB_ACTIONS` or `LOCALCI`. They are equal alternatives after qualification: either one complete passing result may satisfy the candidate or post-integration CI gate without also running the other. Evidence SHALL identify the selected authority, authority instance, job/run, pipeline identity, requested revision, server-resolved exact commit, per-gate results, timestamps, logs/artifact identities or hashes, and terminal status.
+
+Common qualification SHALL test exact-SHA mismatch rejection, unapproved repository/profile/ref rejection, malformed or duplicate submission handling, timeout/cancellation/cleanup, failed-step aggregate failure, credential non-exposure, prohibited host/control-plane access, evidence integrity/retention, and recovery after runner/control-plane interruption.
+
+GitHub Actions qualification SHALL additionally prove immutable action pins, least-privilege permissions, approved workflow/job identity, and live exact-candidate run evidence. LocalCI qualification SHALL additionally prove authenticated TLS, non-administrator least-privilege API clients, repository/profile/ref allowlists, server-side revision resolution, rootless isolation, denial of arbitrary clone URLs/commands/images/mounts/paths/devices/networks, controlled upgrades and clock integrity, and tested evidence export/retention. A demo or materially changed instance remains unqualified until these gates pass.
+
+Disabling GitHub Actions while qualified LocalCI is selected does not waive CI. If no qualified authority completes the whole mandatory pipeline, qualification fails.
 
 ---
 

@@ -102,12 +102,12 @@ export function validatePhase0Snapshot({
     ];
   }
 
-  if (profile.contractSuiteVersion !== "1.0.6") {
+  if (profile.contractSuiteVersion !== "1.0.7") {
     violations.push(
       violation(
         "PHASE0_CONTRACT_SUITE",
         "tools/checkpoints/phase0-checkpoint-profile.json",
-        "contractSuiteVersion must be 1.0.6",
+        "contractSuiteVersion must be 1.0.7",
       ),
     );
   }
@@ -347,7 +347,7 @@ export function validatePhase0Snapshot({
 
   const target = canonicalValues?.v1RuntimeTarget ?? {};
   if (
-    canonicalValues?.contractSuiteVersion !== "1.0.6" ||
+    canonicalValues?.contractSuiteVersion !== "1.0.7" ||
     target.platform !== "WINDOWS" ||
     target.runtimeRole !== "FULL_HOST" ||
     target.architecture !== "x64"
@@ -355,8 +355,8 @@ export function validatePhase0Snapshot({
     violations.push(
       violation(
         "PHASE0_RUNTIME_TARGET",
-        "packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json",
-        "V1 target must be JARVIS 1.0.6 WINDOWS/FULL_HOST/x64",
+        "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
+        "V1 target must be JARVIS 1.0.7 WINDOWS/FULL_HOST/x64",
       ),
     );
   }
@@ -371,12 +371,12 @@ export function validatePhase0Snapshot({
     );
   }
 
-  if (!String(matrix).includes("| Contract suite | JARVIS v1.0.6 |")) {
+  if (!String(matrix).includes("| Contract suite | JARVIS v1.0.7 |")) {
     violations.push(
       violation(
         "PHASE0_MATRIX_SUITE_DRIFT",
         "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md",
-        "live matrix must identify JARVIS v1.0.6",
+        "live matrix must identify JARVIS v1.0.7",
       ),
     );
   }
@@ -463,7 +463,7 @@ export async function checkPhase0(rootDir) {
       readFile(
         resolve(
           rootDir,
-          "packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json",
+          "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
         ),
         "utf8",
       ).then(JSON.parse),

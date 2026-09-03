@@ -1,9 +1,9 @@
 # JARVIS V1 Production Release Profile
 
-**Profile Version:** 1.0.6  
+**Profile Version:** 1.0.7
 **Status:** Canonical production-support target  
 **Date:** August 18, 2026  
-**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`
+**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md`
 
 ---
 
@@ -13,7 +13,7 @@ The architecture describes what JARVIS may support over time. This Release Profi
 
 A capability that exists only in an ADR, experimental code, historical contract, or unqualified module/platform is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after full qualification.
 
-V1 is intentionally **Windows-only as a production FULL_HOST release**. The v1.0.6 contract suite preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden.
+V1 is intentionally **Windows-only as a production FULL_HOST release**. The v1.0.7 contract suite preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden.
 
 ---
 
@@ -594,6 +594,8 @@ If server-side protection/rulesets are unavailable because of a verified hosting
 A pull-request requirement is strongly preferred once implementation changes begin. No second long-lived branch becomes an alternate source of truth.
 
 Phase 0 SHALL also create machine-readable canonical profile/capability definitions and CI drift checks for repeated normative constants/matrices where practical.
+
+The mandatory `static-ci` pipeline result MAY come from either a qualified `GITHUB_ACTIONS` authority or a qualified `LOCALCI` authority. The two authority types are equal alternatives; one complete exact-candidate result is sufficient, but partial results cannot be combined. Qualification SHALL prove the common exact-SHA, complete-pipeline, pinned-input, least-privilege, isolation, timeout/cancellation, idempotency, durable-evidence, and audit requirements in Implementation Contract §28 plus the selected authority's specific requirements. GitHub Actions need not remain enabled while qualified LocalCI is selected. An unqualified, demo, stale, or materially changed LocalCI instance does not satisfy this gate.
 
 ---
 

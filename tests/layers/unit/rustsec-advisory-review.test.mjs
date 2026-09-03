@@ -223,7 +223,7 @@ test("Phase-0 PASS evidence requires the RustSec warning review gate", () => {
       buildCiEvidence({
         env: common,
         versions,
-        contractSuiteVersion: "1.0.6",
+        contractSuiteVersion: "1.0.7",
         governanceMode: "COMPENSATING_CONTROLS",
       }),
     /JARVIS_RUSTSEC_REVIEW_PASSED/,
@@ -232,7 +232,7 @@ test("Phase-0 PASS evidence requires the RustSec warning review gate", () => {
   const evidence = buildCiEvidence({
     env: { ...common, JARVIS_RUSTSEC_REVIEW_PASSED: "1" },
     versions,
-    contractSuiteVersion: "1.0.6",
+    contractSuiteVersion: "1.0.7",
     governanceMode: "COMPENSATING_CONTROLS",
   });
   assert.ok(evidence.gates.includes("rustsec-informational-warning-review"));

@@ -1,9 +1,10 @@
 # Authoritative `master` Repository Governance
 
-**Contract suite:** JARVIS v1.0.6  
-**Decision:** ADR-074  
+**Contract suite:** JARVIS v1.0.7
+**Decisions:** ADR-074, ADR-076
 **Authoritative branch:** `master`  
-**Mandatory CI context:** `static-ci`
+**Mandatory CI pipeline:** `static-ci`
+**Selected CI authority:** `LOCALCI` (qualified JARVIS repository-CI scope)
 
 This document is an operational implementation aid for the repository-governance requirements in the active top-level contract §28, Verification Contract §33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
@@ -38,7 +39,7 @@ OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED
 While server-side protection is unavailable, normal implementation integration SHALL satisfy every control below:
 
 1. Perform implementation work on a temporary implementation branch rather than routine direct implementation writes to `master`.
-2. Require the exact `static-ci` context to pass for the exact candidate commit before authoritative integration.
+2. Require the complete `static-ci` pipeline to pass for the exact candidate commit on either qualified `GITHUB_ACTIONS` or qualified `LOCALCI`; the selected authority and evidence identity must be recorded.
 3. Re-fetch the live `master` tip immediately before integration.
 4. If `master` moved unexpectedly, stop the integration attempt, inspect/reconcile the intervening change, rebuild/reverify the candidate as required, and do not overwrite the new tip.
 5. Integrate only with a non-force operation. Force-push/ref rewriting is not an accepted implementation workflow.
@@ -53,7 +54,7 @@ The normal algorithm is:
 ```text
 fetch live master M0
 → verify candidate C is based on/reconciled with M0
-→ require static-ci success for exact C
+→ require qualified-authority static-ci success for exact C
 → fetch live master again as M1
 → if M1 != M0: abort/reconcile/reverify
 → integrate C using non-force update / reviewed merge path
@@ -115,10 +116,12 @@ pnpm contract:check
 pnpm test
 ```
 
-The authoritative CI job name remains exactly:
+The authoritative CI pipeline identity remains exactly:
 
 ```text
 static-ci
 ```
+
+The current selected authority is LocalCI. GitHub Actions and LocalCI are equal alternatives only after authority-specific qualification; neither is required to run in addition to a complete pass from the other. The current machine-readable profile records the selected LocalCI instance, profile, repository script, qualification scope, and latest exact-SHA evidence. A material instance, pipeline, isolation, authentication, or evidence-control change requires requalification.
 
 Final Phase-0 evidence SHALL also record the observed live `master` protection state, the hosting limitation evidence, exact candidate/source commit, exact CI run, selected governance mode, residual risk, and the post-integration verification result when authoritative integration occurs.

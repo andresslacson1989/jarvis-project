@@ -1,6 +1,6 @@
 # JARVIS Implementation Execution Matrix — Live Control Board
 
-**Document role:** Non-normative live execution/status control board for the JARVIS v1.0.6 implementation.
+**Document role:** Non-normative live execution/status control board for the JARVIS v1.0.7 implementation.
 
 ## Matrix split
 
@@ -22,7 +22,7 @@ The two files together are one non-normative implementation matrix. They are not
 | Active section | `SECTION 1` — Windows Tauri Host / Mission Control Foundation / Application-Owned Core |
 | Active subsection | `1.2` — Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security |
 | Next eligible subsection | `1.2` |
-| Contract suite | JARVIS v1.0.6 |
+| Contract suite | JARVIS v1.0.7 |
 | Authoritative implementation sequence | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` |
 | Reference plan | `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` |
 | Production Complete | **NO** |
@@ -55,7 +55,7 @@ The two files together are one non-normative implementation matrix. They are not
 |---|---|---|---|---:|---|---|
 | **SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core** | **IN PROGRESS** | 0.CP | `Phase 1`; checkpoint: Windows Desktop Trust + Mission Control Foundation Ready | — | `1.1` is VERIFIED; `1.2` is the next eligible subsection. Later Section 1 work remains unstarted. | Section 1.1 final literal candidate `1233a927280d992aa06caaac62b851aa17cfba23` passed exact-head run `32206232450`, independent review PASS / Contract Accuracy 10/10, controlled integration as `a3fb91066f2083eefe01a9b8d1465b0c6565ae7c`, and exact authoritative-master Static CI run `32224016237`; see `docs/implementation/evidence/1.1-tauri-react-desktop-foundation.md` |
 | ↳ **1.1** Tauri 2 + React desktop workspace with bundled-local authoritative WebView | **VERIFIED** | 0.CP | PLAN §3; RT §§2–5; RP §3; UI §8 | 10 CA / 9 scoped | None within `1.1` scope. | Final literal candidate `1233a927280d992aa06caaac62b851aa17cfba23`; candidate Static CI `32206232450` (`windows-tauri-build` `95929945045`, `static-ci` `95932334724`) PASS; focused supplemental independent review PASS with Contract Accuracy exactly 10/10; non-force integration `a3fb91066f2083eefe01a9b8d1465b0c6565ae7c`; authoritative master Static CI `32224016237` (`windows-tauri-build` `95979941486`, `static-ci` `95982983591`) PASS on exact `refs/heads/master`; see `docs/implementation/evidence/1.1-tauri-react-desktop-foundation.md` |
-| ↳ **1.2** Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security | **VERIFYING** | 1.1 | PLAN §3; IC §6; RT §5; SEC §20; CS §25; VR §12 | — | Implementation candidate approved independently; exact-SHA CI and controlled post-integration verification remain required | Implementation candidate `f9842cf`; independent audit APPROVE; prior implementation/evidence commits `5db16f3`, `d247325`, `b0f0920`, `941ff44`, and documentation-only reconciliation commits `b693fcc`, `5b3a669`, `445ac68`, `2372e06`, `44f6e8e` do not change the candidate convention. Exact CSP origin and duplicate-directive validation, exact `http://tauri.localhost` production origin with no port, port-bound debug navigation, denied new windows, production devtools denial, parsed bounded HTTP(S) opener, and full-renderer inert-content checks are implemented. Full local normal profile (21 files), focused security tests (4/4), typecheck/build, architecture, desktop foundation/security, Rust format/test, Windows-target Cargo check, production Tauri build, visual inspection of the rebuilt executable, and diff check pass. Untracked generated `gen/` and `resources/` directories are explicitly excluded from tracked candidate evidence. GitHub run `32352208816` could not start because GitHub reported failed account payments/spending limit. Detailed handoff: `docs/implementation/evidence/1.2-tauri-security-boundary.md`; exact-SHA CI and controlled integration remain pending |
+| ↳ **1.2** Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security | **VERIFYING** | 1.1 | PLAN §3; IC §6; RT §5; SEC §20; CS §25; VR §12 | — | Qualified-authority exact-SHA CI passed for the pre-amendment implementation/provenance candidate; v1.0.7 amendment audit and controlled integration/post-integration verification remain required | Original implementation candidate `f9842cf` received independent APPROVE. LocalCI job `01m1jq9bw8zs2xecaknn7y2nrg` passed the complete repository pipeline with `resolved_commit=5b862c6bf6b45becdf7ef0cb56eb903f865e05e2`. ADR-076 and the v1.0.7 synchronized contract amendment make qualified LocalCI and GitHub Actions equal alternative authorities, but the amendment candidate itself still requires exact-SHA CI and independent audit before integration. Section 1.2 remains `VERIFYING`; Section 1.3 is not eligible. |
 
 ## Future-section status summary
 

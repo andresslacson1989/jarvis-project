@@ -35,7 +35,7 @@ test("CI evidence binds to the explicitly verified candidate SHA instead of pull
   const evidence = buildCiEvidence({
     env: env(),
     versions,
-    contractSuiteVersion: "1.0.6",
+    contractSuiteVersion: "1.0.7",
     governanceMode: "COMPENSATING_CONTROLS",
   });
 
@@ -48,7 +48,7 @@ test("CI evidence fails closed when the verified candidate SHA is absent or malf
     () => buildCiEvidence({
       env: env({ JARVIS_CANDIDATE_SHA: "" }),
       versions,
-      contractSuiteVersion: "1.0.6",
+      contractSuiteVersion: "1.0.7",
       governanceMode: "COMPENSATING_CONTROLS",
     }),
     /JARVIS_CANDIDATE_SHA/,
@@ -58,7 +58,7 @@ test("CI evidence fails closed when the verified candidate SHA is absent or malf
     () => buildCiEvidence({
       env: env({ JARVIS_CANDIDATE_SHA: "not-a-sha" }),
       versions,
-      contractSuiteVersion: "1.0.6",
+      contractSuiteVersion: "1.0.7",
       governanceMode: "COMPENSATING_CONTROLS",
     }),
     /JARVIS_CANDIDATE_SHA/,

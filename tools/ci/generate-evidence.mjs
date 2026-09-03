@@ -91,9 +91,9 @@ export function buildCiEvidence({
       "JARVIS_RUSTSEC_REVIEW_PASSED=1 is required for PASS evidence",
     );
   }
-  if (contractSuiteVersion !== "1.0.6") {
+  if (contractSuiteVersion !== "1.0.7") {
     throw new Error(
-      `contractSuiteVersion evidence mismatch: expected 1.0.6, got ${contractSuiteVersion ?? "<missing>"}`,
+      `contractSuiteVersion evidence mismatch: expected 1.0.7, got ${contractSuiteVersion ?? "<missing>"}`,
     );
   }
   if (!GOVERNANCE_MODES.has(governanceMode)) {
@@ -183,7 +183,7 @@ if (isMain(import.meta.url)) {
     readFile(
       resolve(
         rootDir,
-        "packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json",
+        "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
       ),
       "utf8",
     ).then(JSON.parse),

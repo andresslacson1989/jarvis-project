@@ -3,10 +3,10 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const CANONICAL_VALUES_PATH = "packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json";
-export const MANIFEST_PATH = "docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md";
-export const GENERATED_JSON_PATH = "generated/contract/jarvis-v1.0.6.contract-values.generated.json";
-export const GENERATED_TS_PATH = "generated/contract/jarvis-v1.0.6.contract-values.generated.ts";
+export const CANONICAL_VALUES_PATH = "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json";
+export const MANIFEST_PATH = "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md";
+export const GENERATED_JSON_PATH = "generated/contract/jarvis-v1.0.7.contract-values.generated.json";
+export const GENERATED_TS_PATH = "generated/contract/jarvis-v1.0.7.contract-values.generated.ts";
 
 export function sha256Hex(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -46,7 +46,7 @@ export function extractFenceAfter(text, marker) {
   const start = text.indexOf(marker);
   if (start < 0) return null;
   const tail = text.slice(start + marker.length);
-  const match = tail.match(/```(?:[A-Za-z0-9_-]+)?\n([\s\S]*?)```/);
+  const match = tail.match(/```(?:[A-Za-z0-9_-]+)?\r?\n([\s\S]*?)```/);
   return match?.[1] ?? null;
 }
 

@@ -1,7 +1,7 @@
 # JARVIS Production Coding Standards Contract
 
-**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`  
-**Version:** 1.0.5  
+**Normative Appendix to:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md`
+**Version:** 1.0.6
 **Date:** August 18, 2026
 
 ---
@@ -627,6 +627,10 @@ dependency/vulnerability scan
 license/provenance checks for packaged dependencies/assets
 stale generated-code detection
 ```
+
+The mandatory pipeline SHALL be executable without weakening its gate set by either qualified authority type: `GITHUB_ACTIONS` or `LOCALCI`. Authority adapters MAY differ, but the repository-owned checks, exact candidate SHA, pinned/frozen inputs, aggregate fail-closed semantics, and evidence fields SHALL remain semantically equivalent. One qualified authority's complete pass is sufficient; two partial runs are not.
+
+GitHub Actions workflows SHALL retain immutable action pins and least-privilege permissions while selected. LocalCI pipelines SHALL use a repository-owned script/profile, authenticated allowlisted submission, server-side commit resolution, isolated rootless execution, and no arbitrary command/image/mount/path/device/network authority. CI control-plane credentials SHALL never enter job containers. Material authority or pipeline changes require requalification.
 
 CI SHALL detect direct imports of Windows native implementations from shared Core/domain/policy/protocol packages where practical.
 

@@ -12,15 +12,15 @@ The JARVIS contract is protected at the highest instruction level. No human or A
 
 Before creating or continuing implementation work, re-fetch live `master` and base the work from that tip. Temporary feature/review branches MAY exist while a change is in progress, but they SHALL NOT become parallel sources of truth.
 
-Repository governance SHALL follow active contract §28 and Verification §33. When the hosting provider/account exposes server-side branch protection or rulesets for the authoritative repository, `master` SHALL use them with mandatory CI, force-push/deletion prevention, and narrowly controlled/auditable bypass. When that server-side capability is unavailable because of a verified hosting plan/platform limitation, the v1.0.6 `COMPENSATING_CONTROLS` mode MAY be used: temporary implementation branches, exact candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. The fallback SHALL NOT be used if server-side protection becomes available and SHALL NOT be represented as equivalent hard prevention of an out-of-band administrator force push or deletion.
+Repository governance SHALL follow active contract §28 and Verification §33. When the hosting provider/account exposes server-side branch protection or rulesets for the authoritative repository, `master` SHALL use them with mandatory CI, force-push/deletion prevention, and narrowly controlled/auditable bypass. When that server-side capability is unavailable because of a verified hosting plan/platform limitation, the v1.0.7 `COMPENSATING_CONTROLS` mode MAY be used: temporary implementation branches, exact candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. Mandatory CI MAY be supplied by either a qualified `GITHUB_ACTIONS` authority or qualified `LOCALCI` authority under ADR-076 and the active contracts; neither vendor name nor an ordinary local test run grants authority. The fallback SHALL NOT be used if server-side protection becomes available and SHALL NOT be represented as equivalent hard prevention of an out-of-band administrator force push or deletion.
 
 ## Source of truth
 
 Before implementation or architecture work, read:
 
 1. `README.md`
-2. `docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`
-3. `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`
+2. `docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md`
+3. `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md`
 4. `docs/JARVIS-V1-RELEASE-PROFILE.md`
 5. `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md`
 6. `docs/implementation/JARVIS-RUNTIME-CONTRACT.md`
@@ -37,7 +37,7 @@ Before implementation or architecture work, read:
 17. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
 18. relevant ADRs only when rationale/history is needed.
 
-The **v1.0.6 manifest defines the current component revision set**. ADRs do not form a second overlay.
+The **v1.0.7 manifest defines the current component revision set**. ADRs do not form a second overlay.
 
 ## Platform/runtime-role boundary
 

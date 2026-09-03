@@ -1,7 +1,7 @@
 # JARVIS Production Implementation Plan
 
 **Status:** Authoritative dependency/sequencing plan for v1.0.6  
-**Version:** 1.0.6  
+**Version:** 1.0.7
 **Date:** August 12, 2026  
 **Release target:** `docs/JARVIS-V1-RELEASE-PROFILE.md`
 
@@ -64,7 +64,8 @@ The v1.0.5 security closures remain cross-cutting: backup-format cryptography is
 - secret/dependency/license scan;
 - root `AGENTS.md`;
 - current contract manifest validation in CI;
-- authoritative-`master` governance profile: server-side GitHub ruleset/branch protection when the hosting capability exists, otherwise the v1.0.6 verified compensating-control mode;
+- authoritative-`master` governance profile: server-side GitHub ruleset/branch protection when the hosting capability exists, otherwise the v1.0.7 verified compensating-control mode;
+- provider-neutral mandatory CI authority profile selecting either a qualified `GITHUB_ACTIONS` authority or qualified `LOCALCI` authority with exact-SHA, complete-pipeline, least-privilege, isolation, cancellation/recovery, and durable-evidence qualification;
 - machine-readable canonical definitions or generated equivalents for repeated contract values including KDF profiles, backup format profile identifiers/limits, platform/runtime enums, GitHub/Proxmox capability matrices, provider setup states, and security/release constants where practical;
 - CI checks that compare generated/machine-readable definitions against the normative profile and fail on semantic drift.
 
@@ -116,6 +117,7 @@ In either mode:
 - pull-request review is strongly preferred for implementation changes;
 - no second long-lived authoritative branch exists;
 - mandatory CI is never waived as a substitute for hosting limitations.
+- either qualified `GITHUB_ACTIONS` or qualified `LOCALCI` MAY independently supply the complete mandatory CI result; both are not required, partial results are not composable, and the selected authority/instance/pipeline identity is recorded;
 
 ## Exit
 

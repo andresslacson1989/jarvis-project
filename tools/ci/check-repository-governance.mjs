@@ -5,6 +5,29 @@ import { fileURLToPath } from "node:url";
 const EXPECTED_REPOSITORY = "andresslacson1989/jarvis-project";
 const EXPECTED_BRANCH = "master";
 const EXPECTED_CI = "static-ci";
+const ELIGIBLE_CI_AUTHORITIES = Object.freeze(["GITHUB_ACTIONS", "LOCALCI"]);
+const REQUIRED_COMMON_CI_CONTROLS = Object.freeze([
+  "exactResolvedCommitRequired",
+  "completePipelineRequired",
+  "pinnedFrozenInputs",
+  "leastPrivilegeAuthentication",
+  "isolatedExecution",
+  "controlPlaneSecretsExcluded",
+  "timeoutsCancellationCleanup",
+  "idempotentSubmission",
+  "durableAuditableEvidence",
+]);
+const REQUIRED_LOCALCI_CONTROLS = Object.freeze([
+  "authenticatedTls",
+  "nonAdministratorApiClient",
+  "repositoryProfileRefAllowlist",
+  "serverSideRevisionResolution",
+  "rootlessJobIsolation",
+  "arbitraryExecutionSurfacesDenied",
+  "controlledUpgradeAndClock",
+  "evidenceRetentionExport",
+  "cancellationRecoveryTested",
+]);
 const EXPECTED_RESIDUAL_RISK = "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED";
 const REQUIRED_COMPENSATING_CONTROLS = Object.freeze([
   "temporaryImplementationBranches",
@@ -30,17 +53,42 @@ function workflowHasStaticCi(workflowText) {
   return /^\s{2}static-ci:\s*$/m.test(workflowText) && /^\s{4}name:\s*static-ci\s*$/m.test(workflowText);
 }
 
-export function validateRepositoryGovernanceProfile(profile, workflowText) {
+export function validateRepositoryGovernanceProfile(profile, workflowText, localCiScript = "") {
   const violations = [];
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
     return [violation("GOVERNANCE_PROFILE_INVALID", "profile must be an object")];
   }
-  if (profile.schemaVersion !== 1) violations.push(violation("GOVERNANCE_PROFILE_VERSION", "schemaVersion must equal 1"));
+  if (profile.schemaVersion !== 2) violations.push(violation("GOVERNANCE_PROFILE_VERSION", "schemaVersion must equal 2"));
   if (profile.provider !== "GITHUB") violations.push(violation("GOVERNANCE_PROVIDER", "provider must be GITHUB"));
   if (profile.repository !== EXPECTED_REPOSITORY) violations.push(violation("GOVERNANCE_REPOSITORY", `repository must be ${EXPECTED_REPOSITORY}`));
   if (profile.authoritativeBranch !== EXPECTED_BRANCH) violations.push(violation("GOVERNANCE_AUTHORITATIVE_BRANCH", `authoritativeBranch must be ${EXPECTED_BRANCH}`));
-  if (profile.mandatoryCiContext !== EXPECTED_CI) violations.push(violation("GOVERNANCE_REQUIRED_CI_CONTEXT", `mandatoryCiContext must be ${EXPECTED_CI}`));
-  if (!workflowHasStaticCi(String(workflowText ?? ""))) violations.push(violation("GOVERNANCE_CI_WORKFLOW_MISMATCH", "workflow must expose job id/name static-ci"));
+  const mandatoryCi = profile.mandatoryCi ?? {};
+  if (mandatoryCi.pipelineIdentity !== EXPECTED_CI) violations.push(violation("GOVERNANCE_REQUIRED_CI_CONTEXT", `mandatoryCi.pipelineIdentity must be ${EXPECTED_CI}`));
+  if (JSON.stringify(mandatoryCi.eligibleAuthorityTypes) !== JSON.stringify(ELIGIBLE_CI_AUTHORITIES)) {
+    violations.push(violation("GOVERNANCE_CI_AUTHORITY_SET", "eligibleAuthorityTypes must be exactly GITHUB_ACTIONS and LOCALCI"));
+  }
+  for (const control of REQUIRED_COMMON_CI_CONTROLS) {
+    if (mandatoryCi.commonControls?.[control] !== true) violations.push(violation("GOVERNANCE_COMMON_CI_CONTROL_DISABLED", `${control} must be true`));
+  }
+  const selected = mandatoryCi.selectedAuthority ?? {};
+  if (!ELIGIBLE_CI_AUTHORITIES.includes(selected.type)) violations.push(violation("GOVERNANCE_CI_AUTHORITY_INVALID", "selected authority must be GITHUB_ACTIONS or LOCALCI"));
+  if (selected.qualificationStatus !== "QUALIFIED") violations.push(violation("GOVERNANCE_CI_AUTHORITY_UNQUALIFIED", "selected authority must be QUALIFIED"));
+  if (selected.type === "GITHUB_ACTIONS" && !workflowHasStaticCi(String(workflowText ?? ""))) {
+    violations.push(violation("GOVERNANCE_CI_WORKFLOW_MISMATCH", "selected GitHub Actions workflow must expose job id/name static-ci"));
+  }
+  if (selected.type === "LOCALCI") {
+    if (selected.instanceIdentity !== "CT107" || selected.pipelineProfile !== "smoke" || selected.repositoryPipeline !== ".localci/ci.sh") {
+      violations.push(violation("GOVERNANCE_LOCALCI_IDENTITY", "selected LocalCI identity/profile/pipeline must match the qualified profile"));
+    }
+    if (!String(localCiScript).includes("set -Eeuo pipefail")) violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_MISSING", "qualified LocalCI repository pipeline must fail closed"));
+    for (const control of REQUIRED_LOCALCI_CONTROLS) {
+      if (mandatoryCi.localCiControls?.[control] !== true) violations.push(violation("GOVERNANCE_LOCALCI_CONTROL_DISABLED", `${control} must be true`));
+    }
+    const evidence = selected.latestEvidence ?? {};
+    if (!/^[0-9a-f]{40}$/.test(String(evidence.resolvedCommit ?? "")) || evidence.status !== "SUCCEEDED" || !String(evidence.jobId ?? "")) {
+      violations.push(violation("GOVERNANCE_LOCALCI_EVIDENCE_INVALID", "LocalCI qualification requires successful exact-SHA job evidence"));
+    }
+  }
   if (profile.serverModeRequiredWhenAvailable !== true) violations.push(violation("GOVERNANCE_SERVER_MODE_REENABLE_REQUIRED", "server mode must become mandatory when hosting capability becomes available"));
 
   const server = profile.serverSideProtection ?? {};
@@ -75,28 +123,30 @@ export function validateGovernanceContractTexts(implementationContract, verifica
     if (!hasCompensatingGovernance) violations.push(violation("GOVERNANCE_CONTRACT_MODE_MISSING", `${name} must define compensating governance semantics`));
     if (!contractText.includes("server-side branch protection") && !contractText.includes("server-side protection")) violations.push(violation("GOVERNANCE_SERVER_REQUIREMENT_MISSING", `${name} must retain server-side protection when available`));
     if (!contractText.includes("non-force")) violations.push(violation("GOVERNANCE_NON_FORCE_REQUIREMENT_MISSING", `${name} must require non-force integration in fallback mode`));
+    if (!contractText.includes("GITHUB_ACTIONS") || !contractText.includes("LOCALCI")) violations.push(violation("GOVERNANCE_CI_AUTHORITY_EQUIVALENCE_MISSING", `${name} must define both qualified CI authority types`));
   }
   return violations;
 }
 
 async function main() {
   const root = fileURLToPath(new URL("../..", import.meta.url));
-  const [profileRaw, workflow, implementationContract, verificationContract] = await Promise.all([
+  const [profileRaw, workflow, implementationContract, verificationContract, localCiScript] = await Promise.all([
     readFile(resolve(root, "docs/implementation/governance/repository-governance-profile.json"), "utf8"),
     readFile(resolve(root, ".github/workflows/static-ci.yml"), "utf8"),
-    readFile(resolve(root, "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md"), "utf8"),
+    readFile(resolve(root, "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md"), "utf8"),
     readFile(resolve(root, "docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md"), "utf8"),
+    readFile(resolve(root, ".localci/ci.sh"), "utf8"),
   ]);
   const profile = JSON.parse(profileRaw);
   const violations = [
-    ...validateRepositoryGovernanceProfile(profile, workflow),
+    ...validateRepositoryGovernanceProfile(profile, workflow, localCiScript),
     ...validateGovernanceContractTexts(implementationContract, verificationContract),
   ];
   if (violations.length > 0) {
     for (const item of violations) console.error(`[repository-governance] ${item.code}: ${item.detail}`);
     process.exit(1);
   }
-  console.log(`[repository-governance] PASS mode=${profile.governanceMode} required_ci=${profile.mandatoryCiContext}`);
+  console.log(`[repository-governance] PASS mode=${profile.governanceMode} required_ci=${profile.mandatoryCi.pipelineIdentity} authority=${profile.mandatoryCi.selectedAuthority.type}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

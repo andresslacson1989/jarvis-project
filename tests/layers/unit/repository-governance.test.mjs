@@ -6,7 +6,7 @@ import {
 } from "../../../tools/ci/check-repository-governance.mjs";
 
 const fallbackProfile = Object.freeze({
-  schemaVersion: 1,
+  schemaVersion: 2,
   governanceMode: "COMPENSATING_CONTROLS",
   provider: "GITHUB",
   repository: "andresslacson1989/jarvis-project",
@@ -17,7 +17,44 @@ const fallbackProfile = Object.freeze({
     reason: "HOSTING_PLAN_LIMITATION",
     observedHttpStatus: 403,
   },
-  mandatoryCiContext: "static-ci",
+  mandatoryCi: {
+    pipelineIdentity: "static-ci",
+    eligibleAuthorityTypes: ["GITHUB_ACTIONS", "LOCALCI"],
+    selectedAuthority: {
+      type: "LOCALCI",
+      instanceIdentity: "CT107",
+      pipelineProfile: "smoke",
+      repositoryPipeline: ".localci/ci.sh",
+      qualificationStatus: "QUALIFIED",
+      latestEvidence: {
+        jobId: "job-1",
+        resolvedCommit: "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2",
+        status: "SUCCEEDED",
+      },
+    },
+    commonControls: {
+      exactResolvedCommitRequired: true,
+      completePipelineRequired: true,
+      pinnedFrozenInputs: true,
+      leastPrivilegeAuthentication: true,
+      isolatedExecution: true,
+      controlPlaneSecretsExcluded: true,
+      timeoutsCancellationCleanup: true,
+      idempotentSubmission: true,
+      durableAuditableEvidence: true,
+    },
+    localCiControls: {
+      authenticatedTls: true,
+      nonAdministratorApiClient: true,
+      repositoryProfileRefAllowlist: true,
+      serverSideRevisionResolution: true,
+      rootlessJobIsolation: true,
+      arbitraryExecutionSurfacesDenied: true,
+      controlledUpgradeAndClock: true,
+      evidenceRetentionExport: true,
+      cancellationRecoveryTested: true,
+    },
+  },
   controls: {
     temporaryImplementationBranches: true,
     candidateCiRequired: true,
@@ -34,8 +71,8 @@ function clone(value) {
   return structuredClone(value);
 }
 
-function codes(profile, workflow = "jobs:\n  static-ci:\n    name: static-ci\n") {
-  return validateRepositoryGovernanceProfile(profile, workflow).map((item) => item.code);
+function codes(profile, workflow = "jobs:\n  static-ci:\n    name: static-ci\n", localCiScript = "#!/bin/sh\nset -Eeuo pipefail\n") {
+  return validateRepositoryGovernanceProfile(profile, workflow, localCiScript).map((item) => item.code);
 }
 
 test("0.13 compensating governance profile is accepted only for unavailable server protection", () => {
@@ -54,7 +91,11 @@ for (const [name, mutate, expected] of [
   ["post-integration verification cannot be disabled", (p) => { p.controls.postIntegrationVerification = false; }, "GOVERNANCE_COMPENSATING_CONTROL_DISABLED"],
   ["residual risk cannot be hidden", (p) => { p.residualRisk = "NONE"; }, "GOVERNANCE_RESIDUAL_RISK_REQUIRED"],
   ["server protection must become mandatory when available", (p) => { p.serverModeRequiredWhenAvailable = false; }, "GOVERNANCE_SERVER_MODE_REENABLE_REQUIRED"],
-  ["required CI context cannot drift", (p) => { p.mandatoryCiContext = "something-else"; }, "GOVERNANCE_REQUIRED_CI_CONTEXT"],
+  ["required CI context cannot drift", (p) => { p.mandatoryCi.pipelineIdentity = "something-else"; }, "GOVERNANCE_REQUIRED_CI_CONTEXT"],
+  ["eligible authority set cannot drift", (p) => { p.mandatoryCi.eligibleAuthorityTypes = ["LOCALCI"]; }, "GOVERNANCE_CI_AUTHORITY_SET"],
+  ["selected authority must be qualified", (p) => { p.mandatoryCi.selectedAuthority.qualificationStatus = "DEMO"; }, "GOVERNANCE_CI_AUTHORITY_UNQUALIFIED"],
+  ["LocalCI exact-SHA evidence is mandatory", (p) => { p.mandatoryCi.selectedAuthority.latestEvidence.resolvedCommit = "bad"; }, "GOVERNANCE_LOCALCI_EVIDENCE_INVALID"],
+  ["LocalCI isolation controls cannot be disabled", (p) => { p.mandatoryCi.localCiControls.rootlessJobIsolation = false; }, "GOVERNANCE_LOCALCI_CONTROL_DISABLED"],
 ]) {
   test(name, () => {
     const profile = clone(fallbackProfile);
@@ -64,7 +105,20 @@ for (const [name, mutate, expected] of [
 }
 
 test("workflow must expose the exact static-ci check identity", () => {
-  assert.ok(codes(clone(fallbackProfile), "jobs:\n  build:\n    name: build\n").includes("GOVERNANCE_CI_WORKFLOW_MISMATCH"));
+  const profile = clone(fallbackProfile);
+  profile.mandatoryCi.selectedAuthority = {
+    type: "GITHUB_ACTIONS",
+    qualificationStatus: "QUALIFIED",
+  };
+  assert.ok(codes(profile, "jobs:\n  build:\n    name: build\n").includes("GOVERNANCE_CI_WORKFLOW_MISMATCH"));
+});
+
+test("qualified LocalCI does not require a GitHub Actions workflow result", () => {
+  assert.deepEqual(codes(clone(fallbackProfile), "jobs:\n  build:\n    name: build\n"), []);
+});
+
+test("LocalCI repository pipeline must fail closed", () => {
+  assert.ok(codes(clone(fallbackProfile), undefined, "#!/bin/sh\necho unsafe\n").includes("GOVERNANCE_LOCALCI_PIPELINE_MISSING"));
 });
 
 test("server-enforced mode requires all effective server controls", () => {
@@ -85,15 +139,17 @@ test("server-enforced mode requires all effective server controls", () => {
   assert.ok(codes(profile).includes("GOVERNANCE_SERVER_CONTROL_MISSING"));
 });
 
-test("contract text validation accepts the v1.0.6 compensating-governance wording without an internal profile token", () => {
+test("contract text validation accepts compensating governance with equal qualified CI authorities", () => {
   const implementationContract = `
     When the hosting provider/account does not expose server-side branch protection/rulesets
     because of a plan limitation, normal implementation integration SHALL instead use
     compensating governance and uses non-force integration/ref updates only.
+    GITHUB_ACTIONS and LOCALCI are qualified equal alternatives.
   `;
   const verificationContract = `
     If server-side branch protection/rulesets are unavailable, the gate MAY pass in
     COMPENSATING_CONTROLS mode and authoritative integration uses a non-force update only.
+    GITHUB_ACTIONS and LOCALCI are qualified equal alternatives.
   `;
   assert.deepEqual(validateGovernanceContractTexts(implementationContract, verificationContract), []);
 });

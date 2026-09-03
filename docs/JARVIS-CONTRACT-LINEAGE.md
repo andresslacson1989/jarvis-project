@@ -1,9 +1,9 @@
 # JARVIS Contract Lineage and Authority
 
-**Current contract suite:** v1.0.6  
+**Current contract suite:** v1.0.7
 **Current authoritative branch:** `master`  
-**Current manifest:** `docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`  
-**Date:** 2026-08-18
+**Current manifest:** `docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md`
+**Date:** 2026-09-03
 
 ## Purpose
 
@@ -13,7 +13,7 @@ This file removes ambiguity about which JARVIS documents and decisions are curre
 
 `master` is the only authoritative/latest repository branch.
 
-The canonical decision history includes accepted ADR-054 through ADR-068, v1.0.2 consolidation in ADR-069, UI identity/adaptive Mission Control in ADR-070, v1.0.3 production hardening in ADR-071, the Windows/Linux platform/runtime-role boundary in ADR-072, the pre-implementation security/sequence closure in ADR-073, hosting-capability-aware repository governance in ADR-074, and the v1.0.6 repository-governance component-coherence repair in ADR-075.
+The canonical decision history includes accepted ADR-054 through ADR-068, v1.0.2 consolidation in ADR-069, UI identity/adaptive Mission Control in ADR-070, v1.0.3 production hardening in ADR-071, the Windows/Linux platform/runtime-role boundary in ADR-072, the pre-implementation security/sequence closure in ADR-073, hosting-capability-aware repository governance in ADR-074, the v1.0.6 repository-governance component-coherence repair in ADR-075, and qualified CI authority equivalence in ADR-076.
 
 ADR identifiers in this lineage are unique. Duplicate ADR identifiers from deleted historical review branches are non-canonical.
 
@@ -37,6 +37,8 @@ v1.0.5 — backup/policy/supply-chain security closure + delivery sequencing (AD
 v1.0.6 — hosting-capability-aware repository governance (ADR-074)
         ↓
 ADR-075 — v1.0.6 component-coherence repair; no suite semantic change
+        ↓
+v1.0.7 — qualified GitHub Actions / LocalCI authority equivalence (ADR-076)
 ```
 
 v1.0.4 did not make Linux a V1 release target. It made Linux an explicit future `FULL_HOST` target and required implementation to preserve the platform capability boundaries needed to reach it without weakening Windows V1.
@@ -46,6 +48,8 @@ v1.0.5 does not redesign the core architecture or reduce V1 scope. It freezes th
 v1.0.6 does not change V1 platform, runtime, provider, integration, UI, backup, voice, or product capability scope. It changes only repository-governance qualification so a hosting feature unavailable because of the repository plan does not become a hidden paid prerequisite, while stronger server-side enforcement remains mandatory whenever the hosting capability exists.
 
 ADR-075 does not introduce another v1.0.6 semantic change. It synchronizes Release Profile 1.0.6 and Coding Standards 1.0.5 with the hosting-capability-aware repository-governance rule already established by ADR-074 and already normative in the v1.0.6 top-level/Verification/Implementation Plan components.
+
+v1.0.7 makes qualified GitHub Actions and qualified LocalCI equal alternative authorities. It does not permit ordinary local tests, partial cross-authority aggregation, or unqualified LocalCI instances to satisfy mandatory CI.
 
 ## v1.0.5 closure retained by v1.0.6
 
@@ -63,7 +67,7 @@ ADR-073 and the inherited v1.0.5 security closure establish:
 - Phase-0 machine-readable repeated contract values/CI drift checks where practical;
 - exact-build/fix evidence rather than raw numeric SQLite version comparison as production qualification.
 
-These rules remain current normative behavior in v1.0.6. ADR-073 explains why and is not required as an implementation overlay.
+These rules remain current normative behavior in v1.0.7. ADR-073 explains why and is not required as an implementation overlay.
 
 ## v1.0.6 repository-governance closure
 
@@ -78,9 +82,19 @@ ADR-074 establishes:
 
 ADR-075 repairs the stale Release Profile/Coding Standards wording so those components express the same rule. It does not relax or add to the safeguards above.
 
+## v1.0.7 qualified CI authority closure
+
+ADR-076 establishes:
+
+- `GITHUB_ACTIONS` and `LOCALCI` are equal eligible authority types after qualification;
+- either may independently supply one complete mandatory exact-SHA result;
+- common exact-source, complete-pipeline, least-privilege, isolation, recovery, and durable-evidence gates apply to both;
+- authority-specific controls remain mandatory;
+- GitHub Actions may be disabled while qualified LocalCI is selected without waiving CI.
+
 ## Current normative model
 
-`docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md` is the authoritative index and records the exact component-revision set.
+`docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md` is the authoritative index and records the exact component-revision set.
 
 Some unchanged earlier component revisions remain current because their normative behavior did not change. The manifest explicitly identifies them; earlier suite top-level contracts are not current merely because an inherited component's historical header names an earlier parent.
 
