@@ -421,7 +421,7 @@ export function validatePhase0Snapshot({
     const candidateShapeValid = /^[0-9a-f]{40}$/.test(String(candidateSha ?? ""));
     const checkoutShapeValid = /^[0-9a-f]{40}$/.test(String(checkoutSha ?? ""));
     const recordsPresent = evidenceCandidateSha !== null || matrixCandidateSha !== null;
-    const recordsMatch = explicitCandidateSha !== null || !recordsPresent || (evidenceCandidateSha === candidateSha && matrixCandidateSha === candidateSha);
+    const recordsMatch = !recordsPresent || (evidenceCandidateSha === candidateSha && matrixCandidateSha === candidateSha);
     let checkoutRelationshipValid = true;
     if (explicitCandidateSha !== null) {
       checkoutRelationshipValid = checkoutSha === explicitCandidateSha;

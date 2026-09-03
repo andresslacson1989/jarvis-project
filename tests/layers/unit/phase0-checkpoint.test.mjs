@@ -264,7 +264,7 @@ test("checked-in Phase-0 records are coherent without self-referential HEAD bind
   assert.deepEqual(await checkPhase0(process.cwd()), []);
 });
 
-test("the real evidence revision passes implicit mode and explicit current-checkout mode", async () => {
+test("the real evidence revision passes implicit mode", async () => {
   const previous = process.env.JARVIS_CANDIDATE_SHA;
   try {
     delete process.env.JARVIS_CANDIDATE_SHA;
@@ -275,6 +275,16 @@ test("the real evidence revision passes implicit mode and explicit current-check
     if (previous === undefined) delete process.env.JARVIS_CANDIDATE_SHA;
     else process.env.JARVIS_CANDIDATE_SHA = previous;
   }
+});
+
+test("explicit candidate mode rejects present-but-mismatched records", () => {
+  assert.ok(codes({
+    currentCandidateSha: "a".repeat(40),
+    evidenceCandidateSha: "a".repeat(40),
+    matrixCandidateSha: "a".repeat(40),
+    checkedOutSha: "b".repeat(40),
+    explicitCandidateSha: "b".repeat(40),
+  }).includes("PHASE0_CANDIDATE_MISMATCH"));
 });
 
 test("candidate mode does not accept an evidence revision as the exact implementation checkout", async () => {
