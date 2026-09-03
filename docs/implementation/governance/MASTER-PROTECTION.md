@@ -122,6 +122,6 @@ The authoritative CI pipeline identity remains exactly:
 static-ci
 ```
 
-The current selected authority is LocalCI. GitHub Actions and LocalCI are equal alternatives only after authority-specific qualification; neither is required to run in addition to a complete pass from the other. The current machine-readable profile records the selected LocalCI instance, profile, repository script, qualification scope, and latest exact-SHA evidence. A material instance, pipeline, isolation, authentication, or evidence-control change requires requalification.
+The current selected authority is LocalCI. GitHub Actions and LocalCI are equal alternatives only after authority-specific qualification; neither is required to run in addition to a complete pass from the other. The current machine-readable profile selects CT107's `tauri2418` profile and `.localci/ci.sh`; LocalCI job `01m1kcwwthcagkcnd2trznn8hf` passed with `expected_commit=resolved_commit=c1015606a984bc93fc92cede725dab9ad20b9ba9`. A material instance, pipeline, isolation, authentication, or evidence-control change requires requalification.
 
 Final Phase-0 evidence SHALL also record the observed live `master` protection state, the hosting limitation evidence, exact candidate/source commit, exact CI run, selected governance mode, residual risk, and the post-integration verification result when authoritative integration occurs.

@@ -77,7 +77,7 @@ export function validateRepositoryGovernanceProfile(profile, workflowText, local
     violations.push(violation("GOVERNANCE_CI_WORKFLOW_MISMATCH", "selected GitHub Actions workflow must expose job id/name static-ci"));
   }
   if (selected.type === "LOCALCI") {
-    if (selected.instanceIdentity !== "CT107" || selected.pipelineProfile !== "smoke" || selected.repositoryPipeline !== ".localci/ci.sh") {
+    if (selected.instanceIdentity !== "CT107" || selected.pipelineProfile !== "tauri2418" || selected.repositoryPipeline !== ".localci/ci.sh") {
       violations.push(violation("GOVERNANCE_LOCALCI_IDENTITY", "selected LocalCI identity/profile/pipeline must match the qualified profile"));
     }
     if (!String(localCiScript).includes("set -Eeuo pipefail")) violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_MISSING", "qualified LocalCI repository pipeline must fail closed"));

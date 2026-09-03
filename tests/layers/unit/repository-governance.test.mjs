@@ -23,7 +23,7 @@ const fallbackProfile = Object.freeze({
     selectedAuthority: {
       type: "LOCALCI",
       instanceIdentity: "CT107",
-      pipelineProfile: "smoke",
+      pipelineProfile: "tauri2418",
       repositoryPipeline: ".localci/ci.sh",
       qualificationStatus: "QUALIFIED",
       latestEvidence: {

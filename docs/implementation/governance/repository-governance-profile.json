@@ -21,13 +21,13 @@
     "selectedAuthority": {
       "type": "LOCALCI",
       "instanceIdentity": "CT107",
-      "pipelineProfile": "smoke",
+      "pipelineProfile": "tauri2418",
       "repositoryPipeline": ".localci/ci.sh",
       "qualificationScope": "JARVIS_REPOSITORY_CI",
       "qualificationStatus": "QUALIFIED",
       "latestEvidence": {
-        "jobId": "01m1jq9bw8zs2xecaknn7y2nrg",
-        "resolvedCommit": "5b862c6bf6b45becdf7ef0cb56eb903f865e05e2",
+        "jobId": "01m1kcwwthcagkcnd2trznn8hf",
+        "resolvedCommit": "c1015606a984bc93fc92cede725dab9ad20b9ba9",
         "status": "SUCCEEDED"
       }
     },
