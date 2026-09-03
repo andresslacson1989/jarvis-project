@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  checkPhase0,
   validatePhase0Snapshot,
 } from "../../../tools/checkpoints/phase0-checkpoint.mjs";
 import profile from "../../../tools/checkpoints/phase0-checkpoint-profile.json" with {
@@ -254,6 +255,20 @@ test("stale Phase-0 candidate evidence fails closed", () => {
     currentCandidateSha: "b".repeat(40),
     evidenceCandidateSha: "a".repeat(40),
     matrixCandidateSha: "a".repeat(40),
+  }).includes("PHASE0_CANDIDATE_MISMATCH"));
+});
+
+test("checked-in Phase-0 records are coherent without self-referential HEAD binding", async () => {
+  assert.deepEqual(await checkPhase0(process.cwd()), []);
+});
+
+test("candidate CI requires the checked-out SHA to equal the explicit candidate", () => {
+  assert.ok(codes({
+    currentCandidateSha: "a".repeat(40),
+    evidenceCandidateSha: "a".repeat(40),
+    matrixCandidateSha: "a".repeat(40),
+    checkedOutSha: "b".repeat(40),
+    explicitCandidateSha: "a".repeat(40),
   }).includes("PHASE0_CANDIDATE_MISMATCH"));
 });
 

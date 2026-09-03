@@ -93,6 +93,9 @@ export function validatePhase0Snapshot({
   currentEvidenceStatus = null,
   governanceQualificationStatus = null,
   currentCandidateSha = null,
+  checkedOutSha = null,
+  explicitCandidateSha = null,
+  candidateIsAncestor = null,
   evidenceCandidateSha = null,
   matrixCandidateSha = null,
 }) {
@@ -413,8 +416,19 @@ export function validatePhase0Snapshot({
   }
 
   if (currentCandidateSha !== null || evidenceCandidateSha !== null || matrixCandidateSha !== null) {
-    if (!/^[0-9a-f]{40}$/.test(String(currentCandidateSha ?? "")) || evidenceCandidateSha !== currentCandidateSha || matrixCandidateSha !== currentCandidateSha) {
-      violations.push(violation("PHASE0_CANDIDATE_MISMATCH", "docs/implementation/evidence/0.CP-phase0-checkpoint.md", "current matrix and checkpoint evidence candidate must match the checked-out HEAD exactly"));
+    const candidateSha = explicitCandidateSha ?? currentCandidateSha;
+    const checkoutSha = checkedOutSha ?? currentCandidateSha;
+    const candidateShapeValid = /^[0-9a-f]{40}$/.test(String(candidateSha ?? ""));
+    const checkoutShapeValid = /^[0-9a-f]{40}$/.test(String(checkoutSha ?? ""));
+    const recordsMatch = evidenceCandidateSha === candidateSha && matrixCandidateSha === candidateSha;
+    let checkoutRelationshipValid = true;
+    if (explicitCandidateSha !== null) {
+      checkoutRelationshipValid = checkoutSha === explicitCandidateSha;
+    } else if (candidateIsAncestor !== null) {
+      checkoutRelationshipValid = candidateIsAncestor === true;
+    }
+    if (!candidateShapeValid || !checkoutShapeValid || !recordsMatch || !checkoutRelationshipValid) {
+      violations.push(violation("PHASE0_CANDIDATE_MISMATCH", "docs/implementation/evidence/0.CP-phase0-checkpoint.md", "current matrix and checkpoint evidence candidate must match the resolved implementation candidate; candidate CI must check out that exact SHA"));
     }
   }
 
@@ -507,6 +521,19 @@ export async function checkPhase0(rootDir) {
   const existingPaths = new Set(
     [...relevantPaths].filter((path) => existsSync(resolve(rootDir, path))),
   );
+  const checkedOutSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: rootDir, encoding: "utf8" }).trim();
+  const evidenceCandidateSha = checkpointEvidence.match(/implementationCandidateSha:\s*([0-9a-f]{40})/)?.[1] ?? null;
+  const explicitCandidateSha = process.env.JARVIS_CANDIDATE_SHA || null;
+  const candidateForRelationship = explicitCandidateSha ?? evidenceCandidateSha;
+  let candidateIsAncestor = null;
+  if (candidateForRelationship && /^[0-9a-f]{40}$/.test(candidateForRelationship)) {
+    try {
+      execFileSync("git", ["merge-base", "--is-ancestor", candidateForRelationship, checkedOutSha], { cwd: rootDir, stdio: "ignore" });
+      candidateIsAncestor = true;
+    } catch {
+      candidateIsAncestor = false;
+    }
+  }
 
   return validatePhase0Snapshot({
     profile,
@@ -519,9 +546,12 @@ export async function checkPhase0(rootDir) {
     existingPaths,
     currentEvidenceStatus: checkpointEvidence.match(/^\*\*(VERIFIED|VERIFYING)\b/m)?.[1] ?? null,
     governanceQualificationStatus: governanceProfile?.mandatoryCi?.selectedAuthority?.qualificationStatus ?? null,
-    currentCandidateSha: execFileSync("git", ["rev-parse", "HEAD"], { cwd: rootDir, encoding: "utf8" }).trim(),
-    evidenceCandidateSha: checkpointEvidence.match(/currentCandidateSha:\s*([0-9a-f]{40})/)?.[1] ?? null,
-    matrixCandidateSha: matrix.match(/Current candidate under audit:\*{0,2}\s*`([0-9a-f]{40})`/)?.[1] ?? null,
+    checkedOutSha,
+    evidenceCandidateSha,
+    matrixCandidateSha: matrix.match(/Implementation candidate under audit:\*{0,2}\s*`([0-9a-f]{40})`/)?.[1] ?? null,
+    explicitCandidateSha,
+    candidateIsAncestor,
+    currentCandidateSha: evidenceCandidateSha,
   });
 }
 
