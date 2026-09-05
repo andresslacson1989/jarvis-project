@@ -129,12 +129,12 @@ The documentation-only reconciliation revision `1f99f53c10ce0d406429f9888c763e27
 The earlier permitted non-force integration advanced `master` to
 `cae911e2bb88e046ae84828bc98a5b484da401d1`; run `33944300852` (Windows
 `101247490538`, static `101249233556`) remains historical and superseded.
-The current documentation/evidence revision then advanced `master` non-force
-from that live tip to `d07de60d63d8e57f74c365df3725425a3b0484c5`. Immediate
-re-fetch confirmed the authoritative tip. Current post-integration run
-`33947552009` passed on exact `refs/heads/master` with Windows job
-`101256290304` and static job `101257942637`, completing at
-`2026-09-05T06:06:37Z`. It published no artifacts (`artifact_count=0`);
+The current documentation/evidence revision advanced `master` non-force to
+`2cfcca9f2f7ee0faf334223b659e94ab410f5acd`. Immediate re-fetch confirmed the
+authoritative tip. Current post-integration run `33950976184` passed on exact
+`refs/heads/master` with Windows job `101265550867` and static job
+`101267451179`, completing at `2026-09-05T07:24:22Z`. It published no artifacts
+(`artifact_count=0`);
 offline Cosign/transparency-log verification is not claimed.
 
 The owner-authorized, one-run CT107 testing exception is recorded at
