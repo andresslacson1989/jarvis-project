@@ -4,7 +4,7 @@
 **Decisions:** ADR-074, ADR-076
 **Authoritative branch:** `master`  
 **Mandatory CI pipeline:** `static-ci`
-**Selected CI authority:** `GITHUB_ACTIONS` (VERIFYING; exact candidate rerun pending)
+**Selected CI authority:** `GITHUB_ACTIONS` (QUALIFIED; exact candidate run `33934840029` passed)
 
 This document is an operational implementation aid for the repository-governance requirements in the active top-level contract §28, Verification Contract §33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
@@ -122,7 +122,7 @@ The authoritative CI pipeline identity remains exactly:
 static-ci
 ```
 
-The intended selected authority is now GitHub Actions. GitHub Actions and LocalCI are equal alternatives only after authority-specific qualification; neither is required to run in addition to a complete pass from the other. The current machine-readable profile selects the immutable `static-ci` workflow/job and truthfully records GitHub Actions as `VERIFYING`: run `33818720345` checked out candidate `16dfb4ecfb7015b9480ef5068f6c4149f5cc4837`, passed the Windows Tauri build, and failed closed on the Node dependency vulnerability gate. The dependency repair is locally verified, but a fresh exact-candidate GitHub run is still required before `QUALIFIED`.
+The intended selected authority is GitHub Actions. GitHub Actions and LocalCI are equal alternatives only after authority-specific qualification; neither is required to run in addition to a complete pass from the other. The machine-readable profile selects the immutable `static-ci` workflow/job and records GitHub Actions as `QUALIFIED` from run `33934840029` for candidate `052902bfc52e676910d287e13fbf8a026915efe0`. The Windows Tauri job `101220622635` and static job `101222623099` both completed successfully. The pull-request merge ref is metadata context only: checkout logs show the explicit candidate SHA was fetched and checked out, and the independent `git rev-parse HEAD` check matched it exactly. The generated Phase 0 evidence was `status=PASS` and included the complete named gate set. The earlier failed run `33818720345` remains historical negative evidence only.
 
 The owner-authorized, one-run CT107 testing exception is recorded at
 `docs/implementation/governance/LOCALCI-CT107-QUALIFICATION-EXCEPTION-2026-09-04.md`.

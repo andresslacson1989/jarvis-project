@@ -23,19 +23,31 @@
       "workflow": ".github/workflows/static-ci.yml",
       "job": "static-ci",
       "qualificationScope": "JARVIS_REPOSITORY_CI",
-      "qualificationStatus": "VERIFYING",
+      "qualificationStatus": "QUALIFIED",
       "lastObservedRun": {
-        "runId": "33818720345",
-        "candidateSha": "16dfb4ecfb7015b9480ef5068f6c4149f5cc4837",
-        "status": "FAILED_NODE_AUDIT_VULNERABILITY",
+        "runId": "33934840029",
+        "runAttempt": "1",
+        "candidateSha": "052902bfc52e676910d287e13fbf8a026915efe0",
+        "status": "SUCCESS",
+        "event": "pull_request",
+        "headBranch": "codex/section1-2-tauri-security",
+        "ref": "refs/pull/11/merge",
+        "startedAt": "2026-09-05T01:00:59Z",
+        "finishedAt": "2026-09-05T01:30:56Z",
         "workflow": ".github/workflows/static-ci.yml",
         "job": "static-ci",
+        "windowsJobId": "101220622635",
+        "staticCiJobId": "101222623099",
         "windowsTauriBuild": "PASSED",
-        "nodeAudit": "FAILED_FAST_URI_AND_AJV_ADVISORIES"
+        "staticCi": "PASSED",
+        "exactCheckout": "PASSED",
+        "runner": {
+          "os": "Windows",
+          "arch": "X64"
+        },
+        "evidence": "PHASE_0_STATIC_CI status=PASS; exact checkout and git rev-parse HEAD matched candidateSha"
       },
-      "qualificationBlockers": [
-        "EXACT_CANDIDATE_GITHUB_ACTIONS_RUN_PENDING_AFTER_DEPENDENCY_REPAIR"
-      ]
+      "qualificationBlockers": []
     },
     "commonRequirements": {
       "exactResolvedCommitRequired": "REQUIRED",
