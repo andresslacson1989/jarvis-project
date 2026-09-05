@@ -27,7 +27,7 @@ The two files together are one non-normative implementation matrix. They are not
 | Reference plan | `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` |
 | Production Complete | **NO** |
 
-**Implementation candidate under audit:** `052902bfc52e676910d287e13fbf8a026915efe0`
+**Implementation candidate under audit:** `EXTERNAL_ATTESTATION_REQUIRED`
 
 ## Live implementation matrix
 
