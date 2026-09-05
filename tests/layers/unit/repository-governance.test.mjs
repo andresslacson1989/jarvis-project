@@ -180,7 +180,7 @@ test("LocalCI submission contract cannot omit replay or server-resolution contro
 
 test("operational governance documentation cannot claim LocalCI qualification while profile is VERIFYING", () => {
   const document = readFileSync(new URL("../../../docs/implementation/governance/MASTER-PROTECTION.md", import.meta.url), "utf8");
-  assert.match(document, /Selected CI authority:\*\* `LOCALCI` \(VERIFYING; not yet qualified\)/);
+  assert.match(document, /Selected CI authority:\*\* `GITHUB_ACTIONS` \(VERIFYING; exact candidate rerun pending\)/);
   assert.doesNotMatch(document, /Selected CI authority:\*\* `LOCALCI` \(qualified JARVIS repository-CI scope\)/);
   assert.match(document, /v1\.0\.7 exception/);
 });

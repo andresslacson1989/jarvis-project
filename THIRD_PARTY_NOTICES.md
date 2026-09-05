@@ -470,11 +470,11 @@ This file records the repository-reviewed dependency, toolchain, and CI/bootstra
 | npm:@types/react-dom | 19.2.3 | DESKTOP_BUILD_TEST | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | npm:@types/react | 19.2.17 | DESKTOP_BUILD_TEST | MIT | https://github.com/DefinitelyTyped/DefinitelyTyped |
 | npm:@vitejs/plugin-react | 6.0.3 | DESKTOP_BUILD_TEST | MIT | https://github.com/vitejs/vite-plugin-react |
-| npm:ajv | 8.17.1 | SCHEMA_VALIDATION | MIT | https://github.com/ajv-validator/ajv |
+| npm:ajv | 8.18.0 | SCHEMA_VALIDATION | MIT | https://github.com/ajv-validator/ajv |
 | npm:csstype | 3.2.3 | DESKTOP_BUILD_TEST | MIT | https://github.com/frenic/csstype |
 | npm:detect-libc | 2.1.2 | DESKTOP_BUILD_TEST | Apache-2.0 | https://github.com/lovell/detect-libc |
 | npm:fast-deep-equal | 3.1.3 | SCHEMA_VALIDATION | MIT | https://github.com/epoberezkin/fast-deep-equal |
-| npm:fast-uri | 3.1.5 | SCHEMA_VALIDATION | BSD-3-Clause | https://github.com/fast-uri/fast-uri |
+| npm:fast-uri | 3.1.6 | SCHEMA_VALIDATION | BSD-3-Clause | https://github.com/fast-uri/fast-uri |
 | npm:fdir | 6.5.0 | DESKTOP_BUILD_TEST | MIT | https://github.com/thecodrr/fdir |
 | npm:fsevents | 2.3.3 | DESKTOP_BUILD_TEST | MIT | https://github.com/fsevents/fsevents |
 | npm:json-schema-traverse | 1.0.0 | SCHEMA_VALIDATION | MIT | https://github.com/epoberezkin/json-schema-traverse |

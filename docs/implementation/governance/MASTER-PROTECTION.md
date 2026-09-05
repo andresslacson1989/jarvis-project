@@ -4,7 +4,7 @@
 **Decisions:** ADR-074, ADR-076
 **Authoritative branch:** `master`  
 **Mandatory CI pipeline:** `static-ci`
-**Selected CI authority:** `LOCALCI` (VERIFYING; not yet qualified)
+**Selected CI authority:** `GITHUB_ACTIONS` (VERIFYING; exact candidate rerun pending)
 
 This document is an operational implementation aid for the repository-governance requirements in the active top-level contract §28, Verification Contract §33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
@@ -122,7 +122,7 @@ The authoritative CI pipeline identity remains exactly:
 static-ci
 ```
 
-The intended selected authority is LocalCI. GitHub Actions and LocalCI are equal alternatives only after authority-specific qualification; neither is required to run in addition to a complete pass from the other. The current machine-readable profile selects CT107's `tauri2418` profile and `.localci/ci.sh`, but truthfully records LocalCI as `VERIFYING`: job `01m1kcwwthcagkcnd2trznn8hf` resolved its requested SHA and terminated successfully, yet its former pipeline omitted mandatory gates and lacked native Windows and complete control-plane evidence. It is not accepted qualification evidence. A native Windows LocalCI worker, immutable metadata injection, terminal evidence finalization, a complete exact-SHA pass, and re-audit are required before `QUALIFIED`.
+The intended selected authority is now GitHub Actions. GitHub Actions and LocalCI are equal alternatives only after authority-specific qualification; neither is required to run in addition to a complete pass from the other. The current machine-readable profile selects the immutable `static-ci` workflow/job and truthfully records GitHub Actions as `VERIFYING`: run `33818720345` checked out candidate `16dfb4ecfb7015b9480ef5068f6c4149f5cc4837`, passed the Windows Tauri build, and failed closed on the Node dependency vulnerability gate. The dependency repair is locally verified, but a fresh exact-candidate GitHub run is still required before `QUALIFIED`.
 
 The owner-authorized, one-run CT107 testing exception is recorded at
 `docs/implementation/governance/LOCALCI-CT107-QUALIFICATION-EXCEPTION-2026-09-04.md`.

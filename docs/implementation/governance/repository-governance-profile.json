@@ -19,44 +19,22 @@
       "LOCALCI"
     ],
     "selectedAuthority": {
-      "type": "LOCALCI",
-      "instanceIdentity": "CT107",
-      "pipelineProfile": "tauri2418",
-      "repositoryPipeline": ".localci/ci.sh",
+      "type": "GITHUB_ACTIONS",
+      "workflow": ".github/workflows/static-ci.yml",
+      "job": "static-ci",
       "qualificationScope": "JARVIS_REPOSITORY_CI",
-      "qualificationException": {
-        "record": "docs/implementation/governance/LOCALCI-CT107-QUALIFICATION-EXCEPTION-2026-09-04.md",
-        "id": "JARVIS-CT107-QUAL-EXCEPTION-2026-09-04-v1",
-        "scope": "ONE_BOUNDED_NON_MUTATING_CT107_QUALIFICATION_RUN",
-        "candidateSha": "0fc861fca5e8d5d382176fce143607af61ee994c",
-        "allowedOperationalActions": ["TLS_VERIFY", "AUTHENTICATED_JOB_SUBMIT", "JOB_OBSERVE", "JOB_CANCEL_RECOVERY", "CT_STOP_START_IF_REQUIRED_FOR_RECOVERY_HEALTH"],
-        "forbiddenActions": ["SETUP_CHANGE", "CONFIGURATION_CHANGE", "REGISTRATION_CHANGE", "INSTALLATION", "DESTRUCTIVE_ACTION", "UNRELATED_RESOURCE_CHANGE"],
-        "expires": "TERMINAL_RESULT_OR_ABORT_OR_CONTROL_PLANE_TIMEOUT"
-      },
-      "submissionContract": {
-        "pipelineProfile": "tauri2418",
-        "fullRefRequired": true,
-        "requestedCommitOptional": true,
-        "idempotencyKeyRequired": true,
-        "serverResolutionAttestationRequired": true
-      },
       "qualificationStatus": "VERIFYING",
       "lastObservedRun": {
-        "jobId": "01m1kcwwthcagkcnd2trznn8hf",
-        "requestedCommit": "c1015606a984bc93fc92cede725dab9ad20b9ba9",
-        "resolvedCommit": "c1015606a984bc93fc92cede725dab9ad20b9ba9",
-        "status": "SUCCEEDED",
-        "queuedAt": "2026-09-04T02:26:41Z",
-        "startedAt": "2026-09-04T02:26:49Z",
-        "finishedAt": "2026-09-04T02:29:34Z",
-        "logsSha256": "3fd0f503e60bfaeedd1aa0f7020a860e8bccb9a4ee8a376c0b417468fde3d8b6",
-        "artifactIndexSha256": "073ee3222042615682579688291d01f9ed39163f6797b130501f67c0ca8b8978",
-        "qualificationDisposition": "REJECTED_INCOMPLETE_PIPELINE"
+        "runId": "33818720345",
+        "candidateSha": "16dfb4ecfb7015b9480ef5068f6c4149f5cc4837",
+        "status": "FAILED_NODE_AUDIT_VULNERABILITY",
+        "workflow": ".github/workflows/static-ci.yml",
+        "job": "static-ci",
+        "windowsTauriBuild": "PASSED",
+        "nodeAudit": "FAILED_FAST_URI_AND_AJV_ADVISORIES"
       },
       "qualificationBlockers": [
-        "NATIVE_WINDOWS_LOCALCI_WORKER_UNAVAILABLE",
-        "IMMUTABLE_LOCALCI_JOB_METADATA_NOT_INJECTED",
-        "CONTROL_PLANE_FINAL_EVIDENCE_EXPORT_UNAVAILABLE"
+        "EXACT_CANDIDATE_GITHUB_ACTIONS_RUN_PENDING_AFTER_DEPENDENCY_REPAIR"
       ]
     },
     "commonRequirements": {

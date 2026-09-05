@@ -19,6 +19,8 @@ blockExoticSubdeps: true
 strictPeerDependencies: true
 strictDepBuilds: true
 allowBuilds: {}
+overrides:
+  fast-uri: 3.1.6
 verifyDepsBeforeRun: error
 saveExact: true
 autoInstallPeers: false

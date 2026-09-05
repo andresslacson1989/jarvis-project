@@ -4664,7 +4664,7 @@
     {
       "ecosystem": "npm",
       "name": "ajv",
-      "version": "8.17.1",
+      "version": "8.18.0",
       "license": "MIT",
       "source": "https://github.com/ajv-validator/ajv",
       "role": "SCHEMA_VALIDATION",
@@ -4704,7 +4704,7 @@
     {
       "ecosystem": "npm",
       "name": "fast-uri",
-      "version": "3.1.5",
+      "version": "3.1.6",
       "license": "BSD-3-Clause",
       "source": "https://github.com/fast-uri/fast-uri",
       "role": "SCHEMA_VALIDATION",
