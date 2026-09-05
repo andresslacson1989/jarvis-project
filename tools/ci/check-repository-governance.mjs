@@ -31,6 +31,10 @@ const REQUIRED_LOCALCI_CONTROLS = Object.freeze([
   "cancellationRecoveryTested",
 ]);
 const EXPECTED_RESIDUAL_RISK = "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED";
+const SUPERSEDED_AUTHORITATIVE_MASTER = Object.freeze({
+  commitSha: "cae911e2bb88e046ae84828bc98a5b484da401d1",
+  runId: "33944300852",
+});
 const REQUIRED_COMPENSATING_CONTROLS = Object.freeze([
   "temporaryImplementationBranches",
   "candidateCiRequired",
@@ -109,6 +113,24 @@ export function validateRepositoryGovernanceProfile(profile, workflowText, local
     const evidenceGates = Array.isArray(evidence.gateResults) ? evidence.gateResults.map((item) => item?.gate) : [];
     if (selected.qualificationStatus === "QUALIFIED" && (evidence.authority?.type !== "LOCALCI" || evidence.authority.instanceIdentity !== selected.instanceIdentity || evidence.authority.pipelineIdentity !== EXPECTED_CI || !String(evidence.authority.pipelineVersion ?? "") || evidence.submission?.pipelineProfile !== selected.pipelineProfile || !/^[A-Za-z0-9._:-]{1,128}$/.test(String(evidence.submission?.idempotencyKey ?? "")) || !/^refs\/heads\/[A-Za-z0-9._\/-]+$/.test(String(evidence.requestedRevision?.ref ?? "")) || !/^[0-9a-f]{40}$/.test(String(evidence.requestedRevision?.expectedCommit ?? "")) || (evidence.requestedRevision.requestedCommit !== null && evidence.requestedRevision.requestedCommit !== evidence.requestedRevision.expectedCommit) || evidence.requestedRevision.expectedCommit !== evidence.requestedRevision.resolvedCommit || evidence.serverResolution?.repository !== EXPECTED_REPOSITORY || evidence.serverResolution?.ref !== evidence.requestedRevision.ref || evidence.serverResolution?.commit !== evidence.requestedRevision.resolvedCommit || !String(evidence.serverResolution?.attestationId ?? "") || evidence.terminalStatus !== "SUCCEEDED" || !String(evidence.authority.jobId ?? "") || timestamps.some((value) => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value ?? ""))) || new Date(evidence.timestamps?.queuedAt).getTime() > new Date(evidence.timestamps?.startedAt).getTime() || new Date(evidence.timestamps?.startedAt).getTime() > new Date(evidence.timestamps?.finishedAt).getTime() || evidence.runner?.os !== "Windows" || evidence.runner?.arch !== "X64" || evidence.observedCheckout?.sha !== evidence.requestedRevision.expectedCommit || !/^(https:\/\/github\.com\/andresslacson1989\/jarvis-project\.git|git@github\.com:andresslacson1989\/jarvis-project\.git)$/.test(String(evidence.observedCheckout?.remote ?? "")) || evidence.observedCheckout?.ref !== evidence.requestedRevision.ref || JSON.stringify(evidenceGates) !== JSON.stringify(GATES) || evidence.gateResults?.some((item) => item?.status !== "PASSED") || !/^[0-9a-f]{64}$/.test(String(evidence.logs?.sha256 ?? "")) || !String(evidence.logs?.exportIdentity ?? "") || !/^[0-9a-f]{64}$/.test(String(evidence.artifacts?.indexSha256 ?? "")) || !String(evidence.artifacts?.exportIdentity ?? "") || evidence.cancellationRecovery?.status !== "PASSED" || !String(evidence.cancellationRecovery?.evidenceIdentity ?? ""))) {
       violations.push(violation("GOVERNANCE_LOCALCI_EVIDENCE_INVALID", "LocalCI qualification requires successful exact-SHA job evidence"));
+    }
+  }
+  if (selected.type === "GITHUB_ACTIONS") {
+    const authoritative = selected.authoritativeMasterVerification;
+    const validShape = authoritative &&
+      /^[0-9a-f]{40}$/.test(String(authoritative.commitSha ?? "")) &&
+      /^[0-9]+$/.test(String(authoritative.runId ?? "")) &&
+      authoritative.status === "SUCCESS" &&
+      authoritative.ref === "refs/heads/master" &&
+      /^[0-9]+$/.test(String(authoritative.windowsJobId ?? "")) &&
+      /^[0-9]+$/.test(String(authoritative.staticCiJobId ?? "")) &&
+      Number.isInteger(authoritative.artifactCount) &&
+      authoritative.artifactCount >= 0 &&
+      authoritative.cosignTransparencyLogVerification === "NOT_CLAIMED_OFFLINE";
+    if (!validShape) {
+      violations.push(violation("GOVERNANCE_AUTHORITATIVE_MASTER_EVIDENCE_INVALID", "qualified GitHub Actions authority must record a complete current exact-master verification identity"));
+    } else if (authoritative.commitSha === SUPERSEDED_AUTHORITATIVE_MASTER.commitSha && authoritative.runId === SUPERSEDED_AUTHORITATIVE_MASTER.runId) {
+      violations.push(violation("GOVERNANCE_AUTHORITATIVE_MASTER_EVIDENCE_STALE", "authoritative master evidence must not retain the superseded cae911e/33944300852 identity"));
     }
   }
   if (profile.serverModeRequiredWhenAvailable !== true) violations.push(violation("GOVERNANCE_SERVER_MODE_REENABLE_REQUIRED", "server mode must become mandatory when hosting capability becomes available"));

@@ -126,7 +126,16 @@ The intended selected authority is GitHub Actions. GitHub Actions and LocalCI ar
 
 The documentation-only reconciliation revision `1f99f53c10ce0d406429f9888c763e27359260ee` is also retained as negative evidence: run `33936789279` failed in the static job `101228227719` with `PHASE0_CANDIDATE_MISMATCH`. Its cause was a machine-bound `implementationCandidateSha`/matrix binding added to documentation while CI supplied the current revision through `JARVIS_CANDIDATE_SHA`; no implementation bytes were changed. The corrective documentation revision `a077dfdacd80f7ef5ef48d64f5cc61cec4fae70d` removed that self-referential binding and passed consistency run `33938490684` (Windows `101231030877`, static `101232608613`).
 
-The permitted non-force integration advanced `master` from `69d4378d68796fe192fb4b0230d0c56a3853262c` to `cae911e2bb88e046ae84828bc98a5b484da401d1`. Immediate re-fetch confirmed the authoritative tip, and post-integration run `33944300852` passed on exact `refs/heads/master` with Windows job `101247490538` and static job `101249233556`. The run published no artifacts (`artifact_count=0`); offline Cosign/transparency-log verification is not claimed.
+The earlier permitted non-force integration advanced `master` to
+`cae911e2bb88e046ae84828bc98a5b484da401d1`; run `33944300852` (Windows
+`101247490538`, static `101249233556`) remains historical and superseded.
+The current documentation/evidence revision then advanced `master` non-force
+from that live tip to `d07de60d63d8e57f74c365df3725425a3b0484c5`. Immediate
+re-fetch confirmed the authoritative tip. Current post-integration run
+`33947552009` passed on exact `refs/heads/master` with Windows job
+`101256290304` and static job `101257942637`, completing at
+`2026-09-05T06:06:37Z`. It published no artifacts (`artifact_count=0`);
+offline Cosign/transparency-log verification is not claimed.
 
 The owner-authorized, one-run CT107 testing exception is recorded at
 `docs/implementation/governance/LOCALCI-CT107-QUALIFICATION-EXCEPTION-2026-09-04.md`.

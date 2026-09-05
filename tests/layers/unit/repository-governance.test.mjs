@@ -127,6 +127,38 @@ test("workflow must expose the exact static-ci check identity", () => {
   assert.ok(codes(profile, "jobs:\n  build:\n    name: build\n").includes("GOVERNANCE_CI_WORKFLOW_MISMATCH"));
 });
 
+test("current GitHub authority record keeps candidate, evidence revision, and authoritative master identities distinct", () => {
+  const profile = JSON.parse(readFileSync(new URL("../../../docs/implementation/governance/repository-governance-profile.json", import.meta.url), "utf8"));
+  const selected = profile.mandatoryCi.selectedAuthority;
+  assert.equal(selected.type, "GITHUB_ACTIONS");
+  assert.notEqual(selected.lastObservedRun.candidateSha, selected.authoritativeMasterVerification.commitSha);
+  assert.notEqual(selected.evidenceRevisionValidation.commitSha, selected.authoritativeMasterVerification.commitSha);
+  assert.notEqual(selected.authoritativeMasterVerification.commitSha, "cae911e2bb88e046ae84828bc98a5b484da401d1");
+  assert.notEqual(selected.authoritativeMasterVerification.runId, "33944300852");
+});
+
+test("stale authoritative master identity fails closed", () => {
+  const profile = JSON.parse(readFileSync(new URL("../../../docs/implementation/governance/repository-governance-profile.json", import.meta.url), "utf8"));
+  profile.mandatoryCi.selectedAuthority.authoritativeMasterVerification.commitSha = "cae911e2bb88e046ae84828bc98a5b484da401d1";
+  profile.mandatoryCi.selectedAuthority.authoritativeMasterVerification.runId = "33944300852";
+  assert.ok(codes(profile).includes("GOVERNANCE_AUTHORITATIVE_MASTER_EVIDENCE_STALE"));
+});
+
+test("durable current evidence names the profile's authoritative master identity", () => {
+  const profile = JSON.parse(readFileSync(new URL("../../../docs/implementation/governance/repository-governance-profile.json", import.meta.url), "utf8"));
+  const authoritative = profile.mandatoryCi.selectedAuthority.authoritativeMasterVerification;
+  const evidenceDocuments = [
+    "../../../docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md",
+    "../../../docs/implementation/evidence/0.CP-phase0-checkpoint.md",
+    "../../../docs/implementation/evidence/1.2-tauri-security-boundary.md",
+    "../../../docs/implementation/governance/MASTER-PROTECTION.md",
+  ].map((path) => readFileSync(new URL(path, import.meta.url), "utf8"));
+  for (const document of evidenceDocuments) {
+    assert.match(document, new RegExp(authoritative.commitSha));
+    assert.match(document, new RegExp(authoritative.runId));
+  }
+});
+
 test("qualified LocalCI does not require a GitHub Actions workflow result", () => {
   assert.deepEqual(codes(clone(fallbackProfile), "jobs:\n  build:\n    name: build\n"), []);
 });

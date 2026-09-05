@@ -57,12 +57,12 @@
         "purpose": "GOVERNANCE_EVIDENCE_REVISION_CONSISTENCY"
       },
       "authoritativeMasterVerification": {
-        "commitSha": "cae911e2bb88e046ae84828bc98a5b484da401d1",
-        "runId": "33944300852",
+        "commitSha": "d07de60d63d8e57f74c365df3725425a3b0484c5",
+        "runId": "33947552009",
         "status": "SUCCESS",
         "ref": "refs/heads/master",
-        "windowsJobId": "101247490538",
-        "staticCiJobId": "101249233556",
+        "windowsJobId": "101256290304",
+        "staticCiJobId": "101257942637",
         "artifactCount": 0,
         "cosignTransparencyLogVerification": "NOT_CLAIMED_OFFLINE"
       }
