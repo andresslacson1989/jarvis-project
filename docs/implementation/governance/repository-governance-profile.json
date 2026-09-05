@@ -47,7 +47,15 @@
         },
         "evidence": "PHASE_0_STATIC_CI status=PASS; exact checkout and git rev-parse HEAD matched candidateSha"
       },
-      "qualificationBlockers": []
+      "qualificationBlockers": [],
+      "evidenceRevisionValidation": {
+        "commitSha": "a077dfdacd80f7ef5ef48d64f5cc61cec4fae70d",
+        "runId": "33938490684",
+        "status": "SUCCESS",
+        "windowsJobId": "101231030877",
+        "staticCiJobId": "101232608613",
+        "purpose": "GOVERNANCE_EVIDENCE_REVISION_CONSISTENCY"
+      }
     },
     "commonRequirements": {
       "exactResolvedCommitRequired": "REQUIRED",
