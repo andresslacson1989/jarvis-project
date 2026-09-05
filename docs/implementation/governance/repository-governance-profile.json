@@ -55,6 +55,16 @@
         "windowsJobId": "101231030877",
         "staticCiJobId": "101232608613",
         "purpose": "GOVERNANCE_EVIDENCE_REVISION_CONSISTENCY"
+      },
+      "authoritativeMasterVerification": {
+        "commitSha": "cae911e2bb88e046ae84828bc98a5b484da401d1",
+        "runId": "33944300852",
+        "status": "SUCCESS",
+        "ref": "refs/heads/master",
+        "windowsJobId": "101247490538",
+        "staticCiJobId": "101249233556",
+        "artifactCount": 0,
+        "cosignTransparencyLogVerification": "NOT_CLAIMED_OFFLINE"
       }
     },
     "commonRequirements": {
