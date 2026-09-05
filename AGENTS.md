@@ -173,6 +173,7 @@ Do not:
 
 - Work on a temporary feature branch/worktree rather than directly on `master` unless explicitly instructed otherwise, always from current live `master`.
 - Re-fetch `master` and working tip before writes when concurrent changes may exist.
+- Publish repository changes to the GitHub `origin` remote first; verify the GitHub update and exact commit/ref, then mirror the same commit/ref to the GitLab remote. Never publish to GitLab before the corresponding GitHub publication. This ordering is a repository workflow rule only and does not grant GitLab CI authority or override the active contract.
 - Preserve valid concurrent work.
 - Keep commits scoped/reviewable.
 - Contract/schema changes include compatibility/migration implications.
