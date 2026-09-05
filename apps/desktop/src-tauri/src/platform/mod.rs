@@ -4,8 +4,6 @@ use std::fmt;
 
 pub use windows::WindowsHostRegistration;
 
-const WINDOWS_REGISTRATION_COUNT: usize = 1;
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PlatformHostRequest<'a> {
     pub platform: &'a str,
@@ -27,7 +25,7 @@ impl PlatformHostRequest<'_> {
 
 // Non-registered states are explicit test seams for fail-closed behavior; the
 // production path supplies the one static Registered state.
-#[allow(dead_code)]
+#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackendRegistrationState {
     Registered,
@@ -39,8 +37,10 @@ pub enum BackendRegistrationState {
 
 // These variants are target-specific: unsupported-target builds construct
 // them while the qualified Windows build must retain their explicit failure
-// semantics without producing dead-code warnings.
-#[allow(dead_code)]
+// semantics without producing dead-code warnings. The non-test allowance is
+// limited to the production binary because the remaining variants are
+// exercised by the injected failure tests and unsupported-target seams.
+#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HostStartupError {
     UnsupportedTarget,
@@ -124,12 +124,6 @@ pub fn select_windows_host(
     }
     if request.backend_profile_id != windows::WINDOWS_V1_BACKEND_PROFILE_ID {
         return Err(HostStartupError::InvalidBackendProfile);
-    }
-
-    match WINDOWS_REGISTRATION_COUNT {
-        0 => return Err(HostStartupError::BackendMissing),
-        1 => {}
-        _ => return Err(HostStartupError::ConflictingRegistration),
     }
 
     match registration_state {

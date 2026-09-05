@@ -35,6 +35,10 @@ test("Rust host projection cannot drift from canonical platform identity", async
     resolve(root, "apps", "desktop", "src-tauri", "src", "platform", "windows.rs"),
     "utf8",
   );
+  const rustPlatform = await readFile(
+    resolve(root, "apps", "desktop", "src-tauri", "src", "platform", "mod.rs"),
+    "utf8",
+  );
   const rustMain = await readFile(
     resolve(root, "apps", "desktop", "src-tauri", "src", "main.rs"),
     "utf8",
@@ -62,11 +66,53 @@ test("Rust host projection cannot drift from canonical platform identity", async
   assert.equal(rustValue("WINDOWS_V1_ARCHITECTURE"), target.architecture);
   assert.equal(rustValue("WINDOWS_V1_BACKEND_PROFILE_ID"), profileMatches[0][1]);
   assert.match(rustWindows, /UnavailableUnqualified/);
-  assert.equal((rustWindows.match(/pub const fn registration\s*\(/g) ?? []).length, 1);
+  assert.equal(
+    (rustWindows.match(
+      /(?:pub\s+)?const\s+fn\s+\w+\s*\(\)\s*->\s*WindowsHostRegistration/g,
+    ) ?? []).length,
+    1,
+  );
+  assert.equal(
+    (rustWindows.match(/^\s*WindowsHostRegistration\s*\{\s*identity\s*:/gm) ?? []).length,
+    1,
+  );
+  assert.equal(
+    (rustWindows.match(/^\s*identity:\s*WindowsHostIdentity\s*\{\s*platform\s*:/gm) ?? []).length,
+    1,
+  );
+  assert.doesNotMatch(rustPlatform, /WINDOWS_REGISTRATION_COUNT/);
   assert.match(rustMain, /fn main\(\)\s*->\s*std::process::ExitCode/);
   const selectionIndex = rustMain.indexOf("select_windows_host");
   const builderIndex = rustMain.indexOf("tauri::Builder::default()");
   assert.ok(selectionIndex >= 0, "Rust host selection call is required");
   assert.ok(builderIndex < 0 || selectionIndex < builderIndex, "host selection must precede Tauri construction");
   assert.doesNotMatch(rustWindows, /HashMap|BTreeMap|Vec\s*</);
+});
+
+test("unsupported compiled targets remain explicitly fail-closed", async () => {
+  const rustPlatform = await readFile(
+    resolve(root, "apps", "desktop", "src-tauri", "src", "platform", "mod.rs"),
+    "utf8",
+  );
+  const rustMain = await readFile(
+    resolve(root, "apps", "desktop", "src-tauri", "src", "main.rs"),
+    "utf8",
+  );
+
+  assert.match(
+    rustPlatform,
+    /#\[cfg\(not\(target_os = "windows"\)\)\]\s*\{[\s\S]*?return Err\(HostStartupError::UnsupportedTarget\)/,
+  );
+  assert.match(
+    rustPlatform,
+    /#\[cfg\(all\(target_os = "windows", not\(target_arch = "x86_64"\)\)\)\]\s*\{[\s\S]*?return Err\(HostStartupError::UnsupportedArchitecture\)/,
+  );
+  assert.match(
+    rustMain,
+    /#\[cfg\(not\(target_os = "windows"\)\)\]\s*fn run_tauri_host[\s\S]*?Err\(HostStartupError::UnsupportedTarget\)/,
+  );
+  assert.match(
+    rustMain,
+    /#\[cfg\(all\(target_os = "windows", not\(target_arch = "x86_64"\)\)\)\]\s*fn run_tauri_host[\s\S]*?Err\(HostStartupError::UnsupportedArchitecture\)/,
+  );
 });

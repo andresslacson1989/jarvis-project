@@ -89,7 +89,10 @@ mod tests {
     use super::{allows_authoritative_navigation, finish, start_with_runner};
     use crate::platform::{
         BackendRegistrationState, HostStartupError, PlatformHostRequest,
-        windows::{WINDOWS_V1_ARCHITECTURE, WINDOWS_V1_BACKEND_PROFILE_ID},
+        windows::{
+            WINDOWS_V1_ARCHITECTURE, WINDOWS_V1_BACKEND_PROFILE_ID, WINDOWS_V1_PLATFORM,
+            WINDOWS_V1_RUNTIME_ROLE,
+        },
     };
 
     #[test]
@@ -131,36 +134,130 @@ mod tests {
     }
 
     #[test]
-    fn startup_failure_returns_non_success_with_bounded_diagnostic() {
-        let error = HostStartupError::BackendUnavailable;
-        assert_eq!(finish(Err(error)), std::process::ExitCode::from(1));
-        assert!(error.diagnostic().len() <= 128);
-        assert!(
-            error
-                .diagnostic()
-                .chars()
-                .all(|character| !character.is_control())
-        );
+    fn every_startup_failure_returns_non_success_with_bounded_diagnostic() {
+        let errors = [
+            HostStartupError::UnsupportedTarget,
+            HostStartupError::UnsupportedArchitecture,
+            HostStartupError::InvalidPlatform,
+            HostStartupError::InvalidRuntimeRole,
+            HostStartupError::InvalidArchitecture,
+            HostStartupError::InvalidBackendProfile,
+            HostStartupError::BackendMissing,
+            HostStartupError::BackendUnavailable,
+            HostStartupError::BackendUnqualified,
+            HostStartupError::ConflictingRegistration,
+            HostStartupError::TauriRuntimeFailed,
+        ];
+
+        for error in errors {
+            assert_eq!(finish(Err(error)), std::process::ExitCode::from(1));
+            assert!(error.diagnostic().len() <= 128);
+            assert!(
+                error
+                    .diagnostic()
+                    .chars()
+                    .all(|character| !character.is_control())
+            );
+        }
     }
 
     #[test]
-    fn failed_validation_cannot_invoke_the_tauri_runner() {
+    fn selection_failures_cannot_invoke_the_tauri_runner() {
+        fn assert_runner_not_invoked(
+            request: PlatformHostRequest<'_>,
+            registration_state: BackendRegistrationState,
+            expected: HostStartupError,
+        ) {
+            let invoked = std::cell::Cell::new(false);
+            let result = start_with_runner(request, registration_state, |_| {
+                invoked.set(true);
+                Ok(())
+            });
+
+            assert_eq!(result, Err(expected));
+            assert!(!invoked.get());
+        }
+
+        let valid_request = PlatformHostRequest::windows_v1();
+        for (registration_state, expected) in [
+            (
+                BackendRegistrationState::Missing,
+                HostStartupError::BackendMissing,
+            ),
+            (
+                BackendRegistrationState::Unavailable,
+                HostStartupError::BackendUnavailable,
+            ),
+            (
+                BackendRegistrationState::Unqualified,
+                HostStartupError::BackendUnqualified,
+            ),
+            (
+                BackendRegistrationState::Conflicting,
+                HostStartupError::ConflictingRegistration,
+            ),
+        ] {
+            assert_runner_not_invoked(valid_request, registration_state, expected);
+        }
+
+        let identity_mismatch_cases = [
+            (
+                PlatformHostRequest {
+                    platform: "LINUX",
+                    runtime_role: "FULL_HOST",
+                    architecture: WINDOWS_V1_ARCHITECTURE,
+                    backend_profile_id: WINDOWS_V1_BACKEND_PROFILE_ID,
+                },
+                HostStartupError::InvalidPlatform,
+            ),
+            (
+                PlatformHostRequest {
+                    platform: WINDOWS_V1_PLATFORM,
+                    runtime_role: "COMPANION",
+                    architecture: WINDOWS_V1_ARCHITECTURE,
+                    backend_profile_id: WINDOWS_V1_BACKEND_PROFILE_ID,
+                },
+                HostStartupError::InvalidRuntimeRole,
+            ),
+            (
+                PlatformHostRequest {
+                    platform: WINDOWS_V1_PLATFORM,
+                    runtime_role: WINDOWS_V1_RUNTIME_ROLE,
+                    architecture: "arm64",
+                    backend_profile_id: WINDOWS_V1_BACKEND_PROFILE_ID,
+                },
+                HostStartupError::InvalidArchitecture,
+            ),
+            (
+                PlatformHostRequest {
+                    platform: WINDOWS_V1_PLATFORM,
+                    runtime_role: WINDOWS_V1_RUNTIME_ROLE,
+                    architecture: WINDOWS_V1_ARCHITECTURE,
+                    backend_profile_id: "wrong-profile",
+                },
+                HostStartupError::InvalidBackendProfile,
+            ),
+        ];
+
+        for (request, expected) in identity_mismatch_cases {
+            assert_runner_not_invoked(request, BackendRegistrationState::Registered, expected);
+        }
+    }
+
+    #[test]
+    fn runner_failure_returns_non_success_without_success_leakage() {
         let invoked = std::cell::Cell::new(false);
         let result = start_with_runner(
-            PlatformHostRequest {
-                platform: "LINUX",
-                runtime_role: "FULL_HOST",
-                architecture: WINDOWS_V1_ARCHITECTURE,
-                backend_profile_id: WINDOWS_V1_BACKEND_PROFILE_ID,
-            },
+            PlatformHostRequest::windows_v1(),
             BackendRegistrationState::Registered,
             |_| {
                 invoked.set(true);
-                Ok(())
+                Err(HostStartupError::TauriRuntimeFailed)
             },
         );
 
-        assert_eq!(result, Err(HostStartupError::InvalidPlatform));
-        assert!(!invoked.get());
+        assert_eq!(result, Err(HostStartupError::TauriRuntimeFailed));
+        assert!(invoked.get());
+        assert_eq!(finish(result), std::process::ExitCode::from(1));
     }
 }

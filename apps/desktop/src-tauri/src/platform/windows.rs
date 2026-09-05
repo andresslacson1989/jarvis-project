@@ -22,7 +22,10 @@ pub struct WindowsHostRegistration {
     capability_bindings: CapabilityBindingsState,
 }
 
-#[allow(dead_code)]
+// These accessors are consumed by composition tests and diagnostics; the
+// qualified production path passes the registration through without reading
+// its fields, so only non-test builds need this narrow allowance.
+#[cfg_attr(not(test), allow(dead_code))]
 impl WindowsHostRegistration {
     pub const fn identity(&self) -> WindowsHostIdentity {
         self.identity
