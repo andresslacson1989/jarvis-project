@@ -472,6 +472,101 @@ fn windows_worker_shutdown_quarantine_is_bounded_and_recoverable() {
 }
 
 #[test]
+fn windows_inflight_worker_failure_reconciles_after_join() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
+    let _guard = qualification_lock().lock().expect("qualification lock");
+    let test_root = create_fixture();
+    set_test_environment(
+        &test_root,
+        "windows_inflight_worker_failure_reconciles_after_join",
+        &test_root.join("unused.ready"),
+    );
+
+    let owner = acquire_owner(Role::Normal);
+    let callback_started = Arc::new(AtomicBool::new(false));
+    let callback_unblock = Arc::new(AtomicBool::new(false));
+    let callback_finished = Arc::new(AtomicBool::new(false));
+    let callback_started_for_worker = Arc::clone(&callback_started);
+    let callback_unblock_for_worker = Arc::clone(&callback_unblock);
+    let callback_finished_for_worker = Arc::clone(&callback_finished);
+    let worker = owner
+        .start_activation_worker(move |request| {
+            let presentation = match request.begin_presentation() {
+                Ok(ActivationStart::Started(presentation)) => presentation,
+                Ok(ActivationStart::Cancelled | ActivationStart::Stale) => {
+                    return ActivationCallbackResult::NotStarted;
+                }
+                Err(_) => return ActivationCallbackResult::Uncertain,
+            };
+            callback_started_for_worker.store(true, Ordering::Release);
+            while !callback_unblock_for_worker.load(Ordering::Acquire) {
+                thread::sleep(Duration::from_millis(5));
+            }
+            drop(presentation);
+            callback_finished_for_worker.store(true, Ordering::Release);
+            ActivationCallbackResult::Uncertain
+        })
+        .expect("worker must start before in-flight failure qualification");
+    owner.mark_ready().expect("owner must be ready");
+
+    let mut activation = spawn_child_process("second");
+    let started = std::time::Instant::now();
+    while !callback_started.load(Ordering::Acquire) {
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "qualification callback did not enter its in-flight phase"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    // Dropping the public worker handle cannot detach a callback that is still
+    // running. It leaves an owner-scoped quarantine until the callback exits.
+    drop(worker);
+    assert!(
+        owner
+            .start_activation_worker(|_| ActivationCallbackResult::Uncertain)
+            .expect_err("a live quarantined worker must block restart")
+            .kind
+            == NativeErrorKind::ActivationUncertain
+    );
+    callback_unblock.store(true, Ordering::Release);
+    let recovery_started = std::time::Instant::now();
+    let restarted_worker = loop {
+        match owner.start_activation_worker(|_| ActivationCallbackResult::Uncertain) {
+            Ok(worker) => break worker,
+            Err(error) if error.kind == NativeErrorKind::ActivationUncertain => {
+                assert!(
+                    recovery_started.elapsed() < Duration::from_secs(2),
+                    "in-flight worker failure did not reach a bounded joined state"
+                );
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => panic!("unexpected worker recovery error: {error:?}"),
+        }
+    };
+    assert!(callback_finished.load(Ordering::Acquire));
+    owner
+        .mark_ready()
+        .expect("reconciled uncertainty must permit a fresh readiness transition");
+    assert_eq!(
+        activation
+            .wait()
+            .expect("in-flight activation requester must exit")
+            .code(),
+        Some(5),
+        "the failed in-flight request must not be reported as acknowledged"
+    );
+
+    drop(restarted_worker);
+    drop(owner);
+    clear_test_environment();
+    fs::remove_dir_all(test_root).expect("in-flight failure fixture must be removed");
+}
+
+#[test]
 fn windows_state_unlock_uncertainty_is_reported_and_recoverable() {
     let _guard = qualification_lock().lock().expect("qualification lock");
     let test_root = create_fixture();

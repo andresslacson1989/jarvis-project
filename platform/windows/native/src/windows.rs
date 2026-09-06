@@ -2009,8 +2009,17 @@ fn mark_worker_failed(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
     let result = inner.state.transact(|record| {
         validate_owner_record(inner, record)?;
         record.readiness = 0;
-        if record.state == STATE_ACKNOWLEDGED {
-            clear_request(record);
+        match record.state {
+            STATE_ACKNOWLEDGED => clear_request(record),
+            STATE_PENDING => {
+                // The worker has failed, but its thread may not have been
+                // joined yet. Preserve the exact request as an explicit
+                // recoverable uncertainty; reconciliation clears it only
+                // after the failed worker is reaped.
+                record.status = STATUS_UNCERTAIN;
+            }
+            STATE_IDLE => {}
+            _ => return Err(native_failure(NativeErrorKind::StateCorrupt)),
         }
         Ok(())
     });
@@ -2024,6 +2033,9 @@ fn reconcile_inflight(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
     let snapshot = inner.state.read_snapshot()?;
     match snapshot.state {
         STATE_ACKNOWLEDGED => reset_pending_if_current(inner, snapshot.request_generation)?,
+        STATE_PENDING if snapshot.status == STATUS_UNCERTAIN => {
+            reset_pending_if_current(inner, snapshot.request_generation)?
+        }
         STATE_PENDING => return Err(native_failure(NativeErrorKind::ActivationUncertain)),
         STATE_IDLE => {}
         _ => return Err(native_failure(NativeErrorKind::StateCorrupt)),
