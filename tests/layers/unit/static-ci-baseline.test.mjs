@@ -45,6 +45,23 @@ test("static CI workflow is least-privileged and uses immutable action SHAs", { 
   assert.match(workflow, /cargo audit --file Cargo\.lock --target-os windows --target-arch x86_64/);
   assert.match(workflow, /cargo clippy[^\n]*-D warnings/);
   assert.match(workflow, /rustup toolchain install 1\.97\.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc/);
+  const nativeGateMarker = "- name: Windows native process qualification";
+  const nativeGateStart = workflow.indexOf(nativeGateMarker);
+  assert.notEqual(nativeGateStart, -1, "expected the native Windows qualification gate");
+  const nativeGateEnd = workflow.indexOf("\n      - name:", nativeGateStart + nativeGateMarker.length);
+  const nativeGate = workflow.slice(
+    nativeGateStart,
+    nativeGateEnd === -1 ? workflow.length : nativeGateEnd,
+  );
+  assert.match(
+    nativeGate,
+    /run: cargo test --locked -p jarvis-windows-native --features test-support --test windows_process_qualification -- --test-threads=1/,
+  );
+  assert.doesNotMatch(nativeGate, /continue-on-error:\s*true/);
+  assert.ok(
+    workflow.indexOf("- name: Desktop Tauri production build") < nativeGateStart,
+    "native qualification must follow the production Tauri build",
+  );
 });
 
 test("package scripts expose every static CI gate", () => {

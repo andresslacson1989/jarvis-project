@@ -53,6 +53,7 @@ pub enum HostStartupError {
     BackendUnavailable,
     BackendUnqualified,
     ConflictingRegistration,
+    NativeFoundationFailed,
     TauriRuntimeFailed,
 }
 
@@ -76,6 +77,9 @@ impl HostStartupError {
             Self::BackendUnqualified => "JARVIS desktop host unavailable: backend unqualified",
             Self::ConflictingRegistration => {
                 "JARVIS desktop host unavailable: conflicting registration"
+            }
+            Self::NativeFoundationFailed => {
+                "JARVIS desktop host unavailable: native ownership foundation failed"
             }
             Self::TauriRuntimeFailed => "JARVIS desktop host unavailable: runtime start failed",
         }

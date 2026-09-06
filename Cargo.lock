@@ -1688,6 +1688,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 name = "jarvis-desktop"
 version = "0.0.0"
 dependencies = [
+ "jarvis-windows-native",
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
@@ -1696,6 +1697,15 @@ dependencies = [
 [[package]]
 name = "jarvis-toolchain-smoke"
 version = "0.0.0"
+
+[[package]]
+name = "jarvis-windows-native"
+version = "0.0.0"
+dependencies = [
+ "getrandom 0.3.4",
+ "sha2",
+ "windows-sys 0.61.2",
+]
 
 [[package]]
 name = "javascriptcore-rs"

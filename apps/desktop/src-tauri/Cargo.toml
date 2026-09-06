@@ -11,6 +11,7 @@ tauri-build = "=2.6.3"
 [dependencies]
 tauri = { version = "=2.11.5", default-features = false }
 tauri-plugin-opener = "=2.5.4"
+jarvis-windows-native = { path = "../../../platform/windows/native" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 tauri = { version = "=2.11.5", default-features = false, features = ["wry"] }

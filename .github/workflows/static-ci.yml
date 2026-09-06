@@ -73,6 +73,10 @@ jobs:
         working-directory: apps/desktop
         run: pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci
 
+      - name: Windows native process qualification
+        shell: pwsh
+        run: cargo test --locked -p jarvis-windows-native --features test-support --test windows_process_qualification -- --test-threads=1
+
   static-ci:
     name: static-ci
     needs: windows-tauri-build
