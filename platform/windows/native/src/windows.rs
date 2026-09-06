@@ -1,6 +1,6 @@
 use std::{
     sync::{
-        Arc, Mutex, OnceLock,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
         mpsc::{SyncSender, sync_channel},
     },
@@ -51,6 +51,7 @@ const SHUTDOWN_DEADLINE: Duration = Duration::from_millis(1_000);
 const ARBITRATION_ACTIVE: u8 = 0;
 const ARBITRATION_RELEASED: u8 = 1;
 const ARBITRATION_UNCERTAIN: u8 = 2;
+const ARBITRATION_DEFERRED: u8 = 3;
 
 enum ArbitrationCommand {
     Wait(u32, SyncSender<Result<MutexWaitResult, NativeError>>),
@@ -197,6 +198,15 @@ impl ArbitrationLease {
         result
     }
 
+    fn defer_release(&self) {
+        let _ = self.terminal.compare_exchange(
+            ARBITRATION_ACTIVE,
+            ARBITRATION_DEFERRED,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        );
+    }
+
     fn send_command(&self, command: ArbitrationCommand) -> Result<(), NativeError> {
         let sender = self
             .command
@@ -236,10 +246,18 @@ impl ArbitrationLease {
 
 impl Drop for ArbitrationLease {
     fn drop(&mut self) {
-        if self.terminal.load(Ordering::Acquire) == ARBITRATION_ACTIVE {
-            let _ = self.release();
-        } else {
-            let _ = self.join_terminal_thread();
+        match self.terminal.load(Ordering::Acquire) {
+            ARBITRATION_ACTIVE => {
+                let _ = self.release();
+            }
+            ARBITRATION_RELEASED | ARBITRATION_UNCERTAIN | ARBITRATION_DEFERRED => {
+                let _ = self.join_terminal_thread();
+            }
+            _ => {
+                // Unknown lifecycle state is fail-closed: retire the command
+                // thread without attempting an implicit mutex release.
+                let _ = self.join_terminal_thread();
+            }
         }
     }
 }
@@ -249,17 +267,6 @@ struct WorkerControl {
     generation: u64,
     thread: Mutex<Option<JoinHandle<()>>>,
     exited: AtomicBool,
-}
-
-static QUARANTINED_WORKERS: OnceLock<Mutex<Vec<Arc<WorkerControl>>>> = OnceLock::new();
-
-fn quarantine_worker(control: Arc<WorkerControl>) {
-    if let Ok(mut quarantined) = QUARANTINED_WORKERS
-        .get_or_init(|| Mutex::new(Vec::new()))
-        .lock()
-    {
-        quarantined.push(control);
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -298,6 +305,7 @@ struct OwnerInner {
     role: Role,
     pending: Mutex<Option<(u64, Instant, bool)>>,
     worker: Mutex<Option<Arc<WorkerControl>>>,
+    quarantined_worker: Mutex<Option<Arc<WorkerControl>>>,
     presentation_gate: Mutex<()>,
     active_presentations: AtomicUsize,
     worker_generation: AtomicU64,
@@ -322,6 +330,7 @@ pub struct OwnerLease {
 #[derive(Clone, Debug)]
 pub struct OwnerController {
     inner: Arc<OwnerInner>,
+    arbitration: Arc<ArbitrationLease>,
 }
 
 #[derive(Debug)]
@@ -731,6 +740,7 @@ fn acquire_owner(
                         role,
                         pending: Mutex::new(None),
                         worker: Mutex::new(None),
+                        quarantined_worker: Mutex::new(None),
                         presentation_gate: Mutex::new(()),
                         active_presentations: AtomicUsize::new(0),
                         worker_generation: AtomicU64::new(0),
@@ -855,6 +865,7 @@ impl OwnerLease {
     pub fn controller(&self) -> OwnerController {
         OwnerController {
             inner: Arc::clone(&self.inner),
+            arbitration: Arc::clone(&self.arbitration),
         }
     }
 
@@ -865,26 +876,31 @@ impl OwnerLease {
         let worker_result = stop_worker(&self.inner);
         let state_result = shutdown_state(&self.inner);
         if let Err(error) = worker_result {
-            self.inner.authority_released.store(true, Ordering::Release);
-            return Err(error);
+            return self.defer_release_after_failure(error);
         }
         if let Err(error) = state_result {
-            self.inner.authority_released.store(true, Ordering::Release);
-            return Err(error);
+            return self.defer_release_after_failure(error);
         }
         if let Err(error) = self.inner.close_resources() {
-            self.inner.authority_released.store(true, Ordering::Release);
-            return Err(error);
+            return self.defer_release_after_failure(error);
         }
         #[cfg(feature = "test-support")]
         wait_before_arbitration_release_for_test();
         if let Err(error) = self.arbitration.release() {
             self.inner.authority_released.store(true, Ordering::Release);
+            self.released = true;
             return Err(error);
         }
         self.inner.authority_released.store(true, Ordering::Release);
         self.released = true;
         Ok(())
+    }
+
+    fn defer_release_after_failure(&mut self, error: NativeError) -> Result<(), NativeError> {
+        self.arbitration.defer_release();
+        self.inner.authority_released.store(true, Ordering::Release);
+        self.released = true;
+        Err(error)
     }
 
     pub fn mark_ready(&self) -> Result<(), NativeError> {
@@ -928,6 +944,24 @@ impl Drop for OwnerLease {
 }
 
 impl OwnerController {
+    /// Completes a shutdown whose bounded first attempt returned uncertainty.
+    ///
+    /// The controller is intentionally the only recovery capability retained
+    /// after a failed owner release. It may join an exited quarantined worker,
+    /// close owner resources, and release deferred arbitration; it never
+    /// restores readiness or normal authority.
+    pub fn recover_after_shutdown(&self) -> Result<(), NativeError> {
+        if !self.inner.shutting_down.load(Ordering::Acquire) {
+            return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
+        }
+        reap_worker_if_exited(&self.inner)?;
+        shutdown_state(&self.inner)?;
+        self.inner.close_resources()?;
+        self.arbitration.release()?;
+        self.inner.authority_released.store(true, Ordering::Release);
+        Ok(())
+    }
+
     pub fn mark_ready(&self) -> Result<(), NativeError> {
         if self.inner.shutting_down.load(Ordering::Acquire)
             || self.inner.authority_released.load(Ordering::Acquire)
@@ -981,6 +1015,15 @@ impl OwnerController {
         {
             return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
         }
+        if self.inner.worker_cleanup_failed.load(Ordering::Acquire)
+            || self.inner.worker_failed.load(Ordering::Acquire)
+        {
+            reap_worker_if_exited(&self.inner)?;
+            reconcile_inflight(&self.inner)?;
+            self.inner
+                .worker_cleanup_failed
+                .store(false, Ordering::Release);
+        }
         if self
             .inner
             .worker
@@ -989,14 +1032,6 @@ impl OwnerController {
             .is_some()
         {
             return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
-        }
-        if self.inner.worker_cleanup_failed.load(Ordering::Acquire)
-            || self.inner.worker_failed.load(Ordering::Acquire)
-        {
-            reconcile_inflight(&self.inner)?;
-            self.inner
-                .worker_cleanup_failed
-                .store(false, Ordering::Release);
         }
         self.inner.stopping.store(false, Ordering::Release);
         self.inner.worker_failed.store(false, Ordering::Release);
@@ -1115,7 +1150,7 @@ impl Drop for ActivationWorker {
             self.inner
                 .worker_cleanup_failed
                 .store(true, Ordering::Release);
-            quarantine_worker(Arc::clone(&self.control));
+            let _ = quarantine_worker(&self.inner, Arc::clone(&self.control));
         }
     }
 }
@@ -1168,6 +1203,73 @@ fn clear_worker_if_current(inner: &Arc<OwnerInner>, control: &Arc<WorkerControl>
     }
 }
 
+fn quarantine_worker(
+    inner: &Arc<OwnerInner>,
+    control: Arc<WorkerControl>,
+) -> Result<(), NativeError> {
+    let mut quarantined = inner
+        .quarantined_worker
+        .lock()
+        .map_err(|_| native_failure(NativeErrorKind::ActivationUncertain))?;
+    match quarantined.as_ref() {
+        None => {
+            *quarantined = Some(control);
+            Ok(())
+        }
+        Some(existing) if Arc::ptr_eq(existing, &control) => Ok(()),
+        Some(_) => Err(native_failure(NativeErrorKind::ActivationUncertain)),
+    }
+}
+
+fn reap_worker_if_exited(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
+    let control = {
+        let worker = inner
+            .worker
+            .lock()
+            .map_err(|_| native_failure(NativeErrorKind::ActivationUncertain))?;
+        if let Some(control) = worker.as_ref() {
+            Some(Arc::clone(control))
+        } else {
+            drop(worker);
+            inner
+                .quarantined_worker
+                .lock()
+                .map_err(|_| native_failure(NativeErrorKind::ActivationUncertain))?
+                .as_ref()
+                .map(Arc::clone)
+        }
+    };
+    let Some(control) = control else {
+        return Ok(());
+    };
+    if !control.exited.load(Ordering::Acquire) {
+        return Err(native_failure(NativeErrorKind::ActivationUncertain));
+    }
+    control
+        .thread
+        .lock()
+        .map_err(|_| native_failure(NativeErrorKind::ActivationUncertain))?
+        .take()
+        .map(|thread| {
+            thread
+                .join()
+                .map_err(|_| native_failure(NativeErrorKind::ActivationUncertain))
+        })
+        .transpose()?;
+    clear_worker_if_current(inner, &control);
+    let mut quarantined = inner
+        .quarantined_worker
+        .lock()
+        .map_err(|_| native_failure(NativeErrorKind::ActivationUncertain))?;
+    if quarantined
+        .as_ref()
+        .is_some_and(|current| Arc::ptr_eq(current, &control))
+    {
+        *quarantined = None;
+    }
+    Ok(())
+}
+
 fn stop_worker_control(
     inner: &Arc<OwnerInner>,
     control: &Arc<WorkerControl>,
@@ -1194,16 +1296,20 @@ fn stop_worker_control(
         || inner.active_presentations.load(Ordering::Acquire) != 0
     {
         inner.worker_failed.store(true, Ordering::Release);
-        quarantine_worker(Arc::clone(control));
-        return Err(native_failure(NativeErrorKind::ActivationUncertain));
+        let quarantine_result = quarantine_worker(inner, Arc::clone(control));
+        return Err(quarantine_result
+            .err()
+            .unwrap_or_else(|| native_failure(NativeErrorKind::ActivationUncertain)));
     }
     while !control.exited.load(Ordering::Acquire) && Instant::now() < deadline {
         thread::sleep(Duration::from_millis(5));
     }
     if !control.exited.load(Ordering::Acquire) {
         inner.worker_failed.store(true, Ordering::Release);
-        quarantine_worker(Arc::clone(control));
-        return Err(native_failure(NativeErrorKind::ActivationUncertain));
+        let quarantine_result = quarantine_worker(inner, Arc::clone(control));
+        return Err(quarantine_result
+            .err()
+            .unwrap_or_else(|| native_failure(NativeErrorKind::ActivationUncertain)));
     }
     let mut thread = control
         .thread
@@ -1406,8 +1512,10 @@ fn acquire_second_launch(
 
 #[cfg(feature = "test-support")]
 fn signal_recovery_waiter_barrier() {
-    if std::env::var("JARVIS_NATIVE_QUALIFICATION_CHILD").as_deref() == Ok("recovery-waiter")
-        && let Ok(path) = std::env::var("JARVIS_NATIVE_QUALIFICATION_READY_FILE")
+    if matches!(
+        std::env::var("JARVIS_NATIVE_QUALIFICATION_CHILD").as_deref(),
+        Ok("recovery-waiter") | Ok("recovery-waiter-retry")
+    ) && let Ok(path) = std::env::var("JARVIS_NATIVE_QUALIFICATION_READY_FILE")
     {
         let _ = std::fs::write(path, b"opened-existing-mutex");
     }

@@ -347,6 +347,131 @@ fn windows_owner_release_is_safe_when_lease_moves_threads() {
 }
 
 #[test]
+fn windows_worker_shutdown_quarantine_is_bounded_and_recoverable() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
+    let _guard = qualification_lock().lock().expect("qualification lock");
+    let test_root = create_fixture();
+    let ready_file = test_root.join("quarantine-recovery.ready");
+    set_test_environment(
+        &test_root,
+        "windows_worker_shutdown_quarantine_is_bounded_and_recoverable",
+        &ready_file,
+    );
+
+    let mut owner = acquire_owner(Role::Normal);
+    let callback_started = Arc::new(AtomicBool::new(false));
+    let callback_unblock = Arc::new(AtomicBool::new(false));
+    let callback_started_for_worker = Arc::clone(&callback_started);
+    let callback_unblock_for_worker = Arc::clone(&callback_unblock);
+    let worker = owner
+        .start_activation_worker(move |request| {
+            let presentation = match request.begin_presentation() {
+                Ok(ActivationStart::Started(presentation)) => presentation,
+                Ok(ActivationStart::Cancelled | ActivationStart::Stale) => {
+                    return ActivationCallbackResult::NotStarted;
+                }
+                Err(_) => return ActivationCallbackResult::Uncertain,
+            };
+            callback_started_for_worker.store(true, Ordering::Release);
+            while !callback_unblock_for_worker.load(Ordering::Acquire) {
+                thread::sleep(Duration::from_millis(5));
+            }
+            if presentation
+                .complete(ActivationCallbackResult::Handled)
+                .is_ok()
+            {
+                ActivationCallbackResult::Handled
+            } else {
+                ActivationCallbackResult::Uncertain
+            }
+        })
+        .expect("worker must start before quarantine qualification");
+    owner.mark_ready().expect("owner must be ready");
+
+    let mut activation = spawn_child_process("second");
+    let started = std::time::Instant::now();
+    while !callback_started.load(Ordering::Acquire) {
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "qualification callback did not enter its bounded blocking phase"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    let controller = owner.controller();
+    let release_thread = thread::spawn(move || owner.release());
+    let release_error = release_thread
+        .join()
+        .expect("owner release thread must join")
+        .expect_err("a live callback must keep shutdown uncertain");
+    assert_eq!(release_error.kind, NativeErrorKind::ActivationUncertain);
+    assert_eq!(
+        controller
+            .mark_ready()
+            .expect_err("shutdown failure must not restore readiness")
+            .kind,
+        NativeErrorKind::InvalidRuntimeState
+    );
+
+    let mut waiter = spawn_child_process("recovery-waiter-retry");
+    wait_for_marker(&ready_file);
+    assert!(
+        waiter
+            .try_wait()
+            .expect("recovery waiter status must be readable")
+            .is_none(),
+        "the owner-scoped deferred arbitration must remain held before recovery"
+    );
+
+    callback_unblock.store(true, Ordering::Release);
+    let recovery_started = std::time::Instant::now();
+    loop {
+        match controller.recover_after_shutdown() {
+            Ok(()) => break,
+            Err(error) if error.kind == NativeErrorKind::ActivationUncertain => {
+                assert!(
+                    recovery_started.elapsed() < Duration::from_secs(2),
+                    "quarantined worker did not become reapable within the bounded recovery window"
+                );
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => panic!("unexpected shutdown recovery error: {error:?}"),
+        }
+    }
+    assert!(
+        waiter
+            .wait_with_output()
+            .expect("recovery waiter must exit after explicit recovery")
+            .status
+            .success(),
+        "a fresh owner must acquire only after the deferred arbitration is explicitly released"
+    );
+    assert_eq!(
+        activation
+            .wait()
+            .expect("activation requester must exit")
+            .code(),
+        Some(5),
+        "the in-flight request must remain uncertain during failed owner shutdown"
+    );
+    assert_eq!(
+        controller
+            .mark_ready()
+            .expect_err("recovery must not restore the old controller's authority")
+            .kind,
+        NativeErrorKind::InvalidRuntimeState
+    );
+
+    drop(worker);
+    drop(controller);
+    clear_test_environment();
+    fs::remove_dir_all(test_root).expect("quarantine fixture must be removed");
+}
+
+#[test]
 fn windows_state_unlock_uncertainty_is_reported_and_recoverable() {
     let _guard = qualification_lock().lock().expect("qualification lock");
     let test_root = create_fixture();
@@ -656,6 +781,19 @@ fn run_child(mode: &str) {
             Ok(Acquisition::SecondLaunch(_)) => process::exit(6),
             Err(_) => process::exit(7),
         },
+        "recovery-waiter-retry" => {
+            let deadline = std::time::Instant::now() + Duration::from_secs(4);
+            loop {
+                match acquire(Role::Normal) {
+                    Ok(Acquisition::Owner(_owner)) => process::exit(0),
+                    Ok(Acquisition::SecondLaunch(_)) => process::exit(6),
+                    Err(_) if std::time::Instant::now() < deadline => {
+                        thread::sleep(Duration::from_millis(25));
+                    }
+                    Err(_) => process::exit(7),
+                }
+            }
+        }
         "owner-crash" => match acquire(Role::Normal) {
             Ok(Acquisition::Owner(_owner)) => process::exit(0),
             Ok(Acquisition::SecondLaunch(_)) => process::exit(8),
