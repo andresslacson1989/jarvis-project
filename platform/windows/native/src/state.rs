@@ -21,7 +21,7 @@ use windows_sys::Win32::{
 use super::{
     NativeError, NativeErrorKind, OWNER_STATE_SCHEMA_VERSION,
     handles::{OwnedHandle, StateLock, last_error, native_failure, wide},
-    identity::FileIdentity,
+    identity::{self, FileIdentity},
     security::ExplicitSecurity,
 };
 
@@ -189,6 +189,7 @@ impl StateRecord {
                     || state.ack_generation != 0
                     || state.request_pid == 0
                     || state.request_start_filetime == 0
+                    || state.request_session == 0
                     || state.request_sid_hash == [0; 32]))
             || (state.state == STATE_ACKNOWLEDGED
                 && (state.status != STATUS_HANDLED
@@ -196,6 +197,7 @@ impl StateRecord {
                     || state.ack_generation != state.request_generation
                     || state.request_pid == 0
                     || state.request_start_filetime == 0
+                    || state.request_session == 0
                     || state.request_sid_hash == [0; 32]))
         {
             return Ok(None);
@@ -216,15 +218,15 @@ impl StateFile {
         sid: &str,
         initial: StateRecord,
     ) -> Result<Self, NativeError> {
-        let path = wide(
-            path.to_str()
-                .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?,
-        );
+        let path_text = path
+            .to_str()
+            .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+        let path_wide = wide(path_text);
         // SAFETY: the path and security descriptor remain valid for the
         // synchronous CreateFileW call.
         let raw = unsafe {
             CreateFileW(
-                path.as_ptr(),
+                path_wide.as_ptr(),
                 GENERIC_READ
                     | GENERIC_WRITE
                     | windows_sys::Win32::Storage::FileSystem::DELETE
@@ -239,23 +241,31 @@ impl StateFile {
         let handle = OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?;
         let state = Self { handle };
         state.validate_regular_file()?;
-        security.validate_handle(&state.handle, sid)?;
+        security.validate_handle(
+            &state.handle,
+            sid,
+            windows_sys::Win32::Security::Authorization::SE_FILE_OBJECT,
+        )?;
         state.set_length()?;
         state.write_initial(initial)?;
         Ok(state)
     }
 
-    pub(super) fn open_client(path: &std::path::Path) -> Result<Self, NativeError> {
-        let path = wide(
-            path.to_str()
-                .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?,
-        );
+    pub(super) fn open_client(
+        path: &std::path::Path,
+        security: &ExplicitSecurity,
+        sid: &str,
+    ) -> Result<Self, NativeError> {
+        let path_text = path
+            .to_str()
+            .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+        let path_wide = wide(path_text);
         // SAFETY: the path remains valid for this synchronous call. Client
         // access intentionally omits DELETE and uses the exact approved share
         // mode so the owner can retain DELETE_ON_CLOSE.
         let raw = unsafe {
             CreateFileW(
-                path.as_ptr(),
+                path_wide.as_ptr(),
                 GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE,
                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                 ptr::null(),
@@ -268,6 +278,12 @@ impl StateFile {
             handle: OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?,
         };
         state.validate_regular_file()?;
+        identity::validate_file_handle(&state.handle, path)?;
+        security.validate_handle(
+            &state.handle,
+            sid,
+            windows_sys::Win32::Security::Authorization::SE_FILE_OBJECT,
+        )?;
         Ok(state)
     }
 
@@ -609,7 +625,10 @@ mod tests {
         pending.request_generation = 2;
         pending.request_pid = 7;
         pending.request_start_filetime = 8;
+        pending.request_session = 0;
         pending.request_sid_hash = [3; 32];
+        assert_eq!(StateRecord::decode(&pending.encode(true)).unwrap(), None);
+        pending.request_session = 3;
         assert_eq!(
             StateRecord::decode(&pending.encode(true)).unwrap(),
             Some(pending)
@@ -631,7 +650,13 @@ mod tests {
         acknowledged.status = STATUS_HANDLED;
         acknowledged.request_pid = 7;
         acknowledged.request_start_filetime = 8;
+        acknowledged.request_session = 0;
         acknowledged.request_sid_hash = [3; 32];
+        assert_eq!(
+            StateRecord::decode(&acknowledged.encode(true)).unwrap(),
+            None
+        );
+        acknowledged.request_session = 3;
         assert_eq!(
             StateRecord::decode(&acknowledged.encode(true)).unwrap(),
             Some(acknowledged)

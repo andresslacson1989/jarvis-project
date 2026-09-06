@@ -2,6 +2,8 @@ pub mod windows;
 
 use std::fmt;
 
+use jarvis_windows_native::NativeErrorKind;
+
 pub use windows::WindowsHostRegistration;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -53,7 +55,7 @@ pub enum HostStartupError {
     BackendUnavailable,
     BackendUnqualified,
     ConflictingRegistration,
-    NativeFoundationFailed,
+    NativeFailure(NativeErrorKind),
     TauriRuntimeFailed,
 }
 
@@ -78,9 +80,36 @@ impl HostStartupError {
             Self::ConflictingRegistration => {
                 "JARVIS desktop host unavailable: conflicting registration"
             }
-            Self::NativeFoundationFailed => {
-                "JARVIS desktop host unavailable: native ownership foundation failed"
-            }
+            Self::NativeFailure(kind) => match kind {
+                NativeErrorKind::NotReady => {
+                    "JARVIS desktop host unavailable: native authority is not ready"
+                }
+                NativeErrorKind::OwnerOtherSession => {
+                    "JARVIS desktop host unavailable: native authority belongs to another session"
+                }
+                NativeErrorKind::MaintenanceHeld => {
+                    "JARVIS desktop host unavailable: maintenance authority is held"
+                }
+                NativeErrorKind::NormalHeld => {
+                    "JARVIS desktop host unavailable: normal authority is held"
+                }
+                NativeErrorKind::ActivationUnacknowledged => {
+                    "JARVIS desktop host unavailable: activation was not acknowledged"
+                }
+                NativeErrorKind::ActivationUnavailable => {
+                    "JARVIS desktop host unavailable: activation failed"
+                }
+                NativeErrorKind::ActivationUncertain => {
+                    "JARVIS desktop host unavailable: activation outcome is uncertain"
+                }
+                NativeErrorKind::StateCorrupt => {
+                    "JARVIS desktop host unavailable: native state is corrupt"
+                }
+                NativeErrorKind::ArbitrationUnavailable => {
+                    "JARVIS desktop host unavailable: native arbitration failed"
+                }
+                _ => "JARVIS desktop host unavailable: native foundation failed",
+            },
             Self::TauriRuntimeFailed => "JARVIS desktop host unavailable: runtime start failed",
         }
     }

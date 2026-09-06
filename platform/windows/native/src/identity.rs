@@ -1,14 +1,14 @@
 use std::path::{Path, PathBuf};
 
 use windows_sys::Win32::{
-    Foundation::{HANDLE, HWND},
     Storage::FileSystem::{
         BY_HANDLE_FILE_INFORMATION, CreateDirectoryW, CreateFileW, FILE_ATTRIBUTE_DIRECTORY,
         FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
         FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE, GetFileInformationByHandle,
-        GetFinalPathNameByHandleW, OPEN_EXISTING, READ_CONTROL, SYNCHRONIZE, WRITE_DAC,
+        GetFinalPathNameByHandleW, OPEN_EXISTING, READ_CONTROL, SYNCHRONIZE,
     },
-    UI::Shell::{CSIDL_LOCAL_APPDATA, SHGetFolderPathW},
+    System::Com::CoTaskMemFree,
+    UI::Shell::{FOLDERID_LocalAppData, SHGetKnownFolderPath},
 };
 
 use super::{
@@ -40,29 +40,45 @@ pub(super) fn local_app_data() -> Result<PathBuf, NativeError> {
         return Ok(path);
     }
 
-    let mut buffer = [0u16; 512];
-    // SAFETY: the output buffer is writable and its capacity is explicitly
-    // supplied by the fixed-size stack allocation.
+    let mut allocated = std::ptr::null_mut();
+    // SAFETY: the known-folder identifier is static and Windows writes one
+    // CoTaskMemAlloc-owned UTF-16 path pointer.
     let result = unsafe {
-        SHGetFolderPathW(
-            0 as HWND,
-            CSIDL_LOCAL_APPDATA as i32,
-            0 as HANDLE,
+        SHGetKnownFolderPath(
+            &FOLDERID_LocalAppData,
             0,
-            buffer.as_mut_ptr(),
+            std::ptr::null_mut(),
+            &mut allocated,
         )
     };
-    if result < 0 {
+    if result < 0 || allocated.is_null() {
+        if !allocated.is_null() {
+            // SAFETY: the pointer is owned by the known-folder API.
+            unsafe { CoTaskMemFree(allocated.cast()) };
+        }
         return Err(native_failure(NativeErrorKind::LocalAppDataUnavailable));
     }
 
-    let length = buffer.iter().position(|value| *value == 0).unwrap_or(0);
-    if length == 0 {
-        return Err(native_failure(NativeErrorKind::InvalidPath));
-    }
-    let path = String::from_utf16(&buffer[..length])
-        .map(PathBuf::from)
-        .map_err(|_| native_failure(NativeErrorKind::InvalidPath))?;
+    // SAFETY: the API returned a non-null CoTaskMem-owned UTF-16 buffer;
+    // the scan is bounded before any dereference and the buffer is released
+    // exactly once after conversion.
+    let path = unsafe {
+        let mut length = 0usize;
+        while length <= 32768 && *allocated.add(length) != 0 {
+            length += 1;
+        }
+        let result = if length == 0 || length > 32768 {
+            Err(native_failure(NativeErrorKind::InvalidPath))
+        } else {
+            String::from_utf16(std::slice::from_raw_parts(allocated, length))
+                .map(PathBuf::from)
+                .map_err(|_| native_failure(NativeErrorKind::InvalidPath))
+        };
+        // SAFETY: SHGetKnownFolderPath returns memory owned by the COM task
+        // allocator, including on a malformed/overlong result.
+        CoTaskMemFree(allocated.cast());
+        result?
+    };
     validate_absolute_local_path(&path)?;
     Ok(path)
 }
@@ -99,28 +115,30 @@ pub(super) fn identity(handle: &OwnedHandle) -> Result<FileIdentity, NativeError
 
 pub(super) fn open_directory(
     path: &Path,
-    security: Option<&ExplicitSecurity>,
+    _security: Option<&ExplicitSecurity>,
 ) -> Result<OwnedHandle, NativeError> {
     validate_absolute_local_path(path)?;
-    let path = path
+    let path_text = path
         .to_str()
         .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
-    let path = wide(path);
+    let path_wide = wide(path_text);
     // SAFETY: the path and optional security descriptor are NUL-terminated and
     // live for the complete synchronous call.
     let raw = unsafe {
         CreateFileW(
-            path.as_ptr(),
-            FILE_READ_ATTRIBUTES | READ_CONTROL | SYNCHRONIZE | WRITE_DAC,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
-            security.map_or(std::ptr::null(), ExplicitSecurity::as_ptr),
+            path_wide.as_ptr(),
+            FILE_READ_ATTRIBUTES | READ_CONTROL | SYNCHRONIZE,
+            FILE_SHARE_READ
+                | FILE_SHARE_WRITE
+                | windows_sys::Win32::Storage::FileSystem::FILE_SHARE_DELETE,
+            std::ptr::null(),
             OPEN_EXISTING,
             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
             std::ptr::null_mut(),
         )
     };
     let handle = OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?;
-    validate_directory_handle(&handle, path.as_ptr())?;
+    validate_directory_handle(&handle, path)?;
     Ok(handle)
 }
 
@@ -141,24 +159,40 @@ pub(super) fn create_or_open_directory(
         return Err(native_failure(NativeErrorKind::StateUnavailable));
     }
     let handle = open_directory(path, None)?;
-    security.apply_to_handle(
+    security.validate_handle(
         &handle,
+        sid,
         windows_sys::Win32::Security::Authorization::SE_FILE_OBJECT,
     )?;
-    security.validate_handle(&handle, sid)?;
     Ok(handle)
 }
 
 fn validate_directory_handle(
     handle: &OwnedHandle,
-    expected_path: *const u16,
+    expected_path: &Path,
+) -> Result<(), NativeError> {
+    validate_fixed_handle(handle, expected_path, true)
+}
+
+pub(super) fn validate_file_handle(
+    handle: &OwnedHandle,
+    expected_path: &Path,
+) -> Result<(), NativeError> {
+    validate_fixed_handle(handle, expected_path, false)
+}
+
+fn validate_fixed_handle(
+    handle: &OwnedHandle,
+    expected_path: &Path,
+    expected_directory: bool,
 ) -> Result<(), NativeError> {
     let mut info = BY_HANDLE_FILE_INFORMATION::default();
     // SAFETY: the handle is valid and the output structure is writable.
     if unsafe { GetFileInformationByHandle(handle.raw(), &mut info) } == 0 {
         return Err(native_failure(NativeErrorKind::StateUnavailable));
     }
-    if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0
+    let is_directory = (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    if is_directory != expected_directory
         || (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0
     {
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
@@ -183,16 +217,10 @@ fn validate_directory_handle(
     if actual.starts_with("\\\\?\\UNC\\") {
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
-    // SAFETY: expected_path points to the NUL-terminated buffer created by
-    // `wide` for this synchronous validation call.
-    let expected = unsafe {
-        let mut length = 0usize;
-        while *expected_path.add(length) != 0 {
-            length += 1;
-        }
-        String::from_utf16(std::slice::from_raw_parts(expected_path, length))
-            .map_err(|_| native_failure(NativeErrorKind::InvalidPath))?
-    };
+    let expected = expected_path
+        .to_str()
+        .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+    let expected = expected.to_owned();
     let expected = if expected.starts_with("\\\\?\\") {
         expected
     } else {

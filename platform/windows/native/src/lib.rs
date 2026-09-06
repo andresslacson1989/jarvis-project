@@ -67,7 +67,11 @@ pub enum NativeErrorKind {
     ArbitrationUnavailable,
     ObjectCollision,
     AlreadyOwned,
+    MaintenanceHeld,
+    NormalHeld,
     ActivationUnavailable,
+    ActivationUncertain,
+    ActivationUnacknowledged,
     OwnerOtherSession,
     StateCorrupt,
     StateUnavailable,
@@ -101,9 +105,15 @@ impl std::fmt::Display for NativeError {
             NativeErrorKind::ArbitrationUnavailable => "single-instance arbitration is unavailable",
             NativeErrorKind::ObjectCollision => "single-instance object collision detected",
             NativeErrorKind::AlreadyOwned => "single-instance authority is already owned",
+            NativeErrorKind::MaintenanceHeld => "JARVIS maintenance authority is already held",
+            NativeErrorKind::NormalHeld => "JARVIS normal authority is already held",
             NativeErrorKind::ActivationUnavailable => {
                 "existing JARVIS authority could not be activated"
             }
+            NativeErrorKind::ActivationUncertain => {
+                "JARVIS activation outcome is uncertain and requires reconciliation"
+            }
+            NativeErrorKind::ActivationUnacknowledged => "JARVIS activation was not acknowledged",
             NativeErrorKind::OwnerOtherSession => {
                 "existing JARVIS authority belongs to another session"
             }

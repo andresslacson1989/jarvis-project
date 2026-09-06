@@ -56,12 +56,20 @@ impl PreparedLayout {
 
         let root_path = self.local_app_data.join(ROOT_NAME);
         let root = identity::open_directory(&root_path, None)?;
-        security.validate_handle(&root, sid)?;
+        security.validate_handle(
+            &root,
+            sid,
+            windows_sys::Win32::Security::Authorization::SE_FILE_OBJECT,
+        )?;
         let root_identity = identity::identity(&root)?;
         let mut children = Vec::with_capacity(REQUIRED_DATA_DIRECTORIES.len());
         for name in REQUIRED_DATA_DIRECTORIES {
             let child = identity::open_directory(&root_path.join(name), None)?;
-            security.validate_handle(&child, sid)?;
+            security.validate_handle(
+                &child,
+                sid,
+                windows_sys::Win32::Security::Authorization::SE_FILE_OBJECT,
+            )?;
             children.push(child);
         }
 

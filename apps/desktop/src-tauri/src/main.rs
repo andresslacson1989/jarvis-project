@@ -7,6 +7,8 @@ use platform::{
     select_windows_host, validate_compiled_target,
 };
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+use std::{sync::mpsc::sync_channel, time::Duration};
+#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 use tauri::Manager;
 
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
@@ -59,13 +61,31 @@ fn start_with_runner(
     run_host(host)
 }
 
+fn map_native_error(error: jarvis_windows_native::NativeError) -> HostStartupError {
+    HostStartupError::NativeFailure(error.kind)
+}
+
+fn require_acknowledged_activation(
+    result: jarvis_windows_native::SecondLaunch,
+) -> Result<(), HostStartupError> {
+    if result.acknowledged {
+        Ok(())
+    } else {
+        Err(HostStartupError::NativeFailure(
+            jarvis_windows_native::NativeErrorKind::ActivationUnacknowledged,
+        ))
+    }
+}
+
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError> {
     let owner = match jarvis_windows_native::acquire(jarvis_windows_native::Role::Normal)
-        .map_err(|_| HostStartupError::NativeFoundationFailed)?
+        .map_err(map_native_error)?
     {
         jarvis_windows_native::Acquisition::Owner(owner) => owner,
-        jarvis_windows_native::Acquisition::SecondLaunch(_) => return Ok(()),
+        jarvis_windows_native::Acquisition::SecondLaunch(result) => {
+            return require_acknowledged_activation(result);
+        }
     };
 
     tauri::Builder::default()
@@ -86,7 +106,20 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
             let activation_window = main_window.clone();
             let activation_worker = owner
                 .start_activation_worker(move |_request| {
-                    activation_window.show().is_ok() && activation_window.set_focus().is_ok()
+                    let window = activation_window.clone();
+                    let (sender, receiver) = sync_channel(1);
+                    if activation_window
+                        .run_on_main_thread(move || {
+                            let presented = window.show().is_ok() && window.set_focus().is_ok();
+                            let _ = sender.send(presented);
+                        })
+                        .is_err()
+                    {
+                        return false;
+                    }
+                    receiver
+                        .recv_timeout(Duration::from_millis(250))
+                        .unwrap_or(false)
                 })
                 .map_err(|_| {
                     tauri::Error::Setup(
@@ -125,7 +158,10 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
 
 #[cfg(test)]
 mod tests {
-    use super::{allows_authoritative_navigation, finish, start_with_runner};
+    use super::{
+        allows_authoritative_navigation, finish, map_native_error, require_acknowledged_activation,
+        start_with_runner,
+    };
     use crate::platform::{
         BackendRegistrationState, HostStartupError, PlatformHostRequest,
         windows::{
@@ -185,7 +221,9 @@ mod tests {
             HostStartupError::BackendUnavailable,
             HostStartupError::BackendUnqualified,
             HostStartupError::ConflictingRegistration,
-            HostStartupError::NativeFoundationFailed,
+            HostStartupError::NativeFailure(
+                jarvis_windows_native::NativeErrorKind::ArbitrationUnavailable,
+            ),
             HostStartupError::TauriRuntimeFailed,
         ];
 
@@ -299,5 +337,40 @@ mod tests {
         assert_eq!(result, Err(HostStartupError::TauriRuntimeFailed));
         assert!(invoked.get());
         assert_eq!(finish(result), std::process::ExitCode::from(1));
+    }
+
+    #[test]
+    fn second_launch_success_requires_verified_acknowledgement() {
+        assert_eq!(
+            require_acknowledged_activation(jarvis_windows_native::SecondLaunch {
+                acknowledged: true,
+            }),
+            Ok(())
+        );
+        assert_eq!(
+            require_acknowledged_activation(jarvis_windows_native::SecondLaunch {
+                acknowledged: false,
+            }),
+            Err(HostStartupError::NativeFailure(
+                jarvis_windows_native::NativeErrorKind::ActivationUnacknowledged,
+            ))
+        );
+    }
+
+    #[test]
+    fn native_startup_failures_remain_typed_at_the_host_boundary() {
+        for kind in [
+            jarvis_windows_native::NativeErrorKind::NotReady,
+            jarvis_windows_native::NativeErrorKind::OwnerOtherSession,
+            jarvis_windows_native::NativeErrorKind::MaintenanceHeld,
+            jarvis_windows_native::NativeErrorKind::NormalHeld,
+            jarvis_windows_native::NativeErrorKind::StateCorrupt,
+            jarvis_windows_native::NativeErrorKind::ActivationUncertain,
+        ] {
+            let mapped = map_native_error(jarvis_windows_native::NativeError { kind });
+            assert_eq!(mapped, HostStartupError::NativeFailure(kind));
+            assert!(!mapped.diagnostic().is_empty());
+            assert_eq!(mapped.exit_code(), std::process::ExitCode::from(1));
+        }
     }
 }

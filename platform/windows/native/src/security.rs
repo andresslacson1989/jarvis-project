@@ -1,23 +1,44 @@
 use std::{ptr, slice};
 
 use windows_sys::Win32::{
-    Foundation::{GENERIC_ALL, HLOCAL},
+    Foundation::HLOCAL,
     Security::Authorization::{
         ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW,
-        ConvertStringSidToSidW, GetSecurityInfo, SE_FILE_OBJECT, SetSecurityInfo,
+        ConvertStringSidToSidW, GetSecurityInfo, SetSecurityInfo,
     },
     Security::{
-        ACCESS_ALLOWED_ACE, ACL_SIZE_INFORMATION, AclSizeInformation, DACL_SECURITY_INFORMATION,
-        EqualSid, GetAce, GetAclInformation, GetSecurityDescriptorControl,
+        ACE_HEADER, ACL, ACL_SIZE_INFORMATION, AclSizeInformation, DACL_SECURITY_INFORMATION,
+        EqualSid, GetAce, GetAclInformation, GetLengthSid, GetSecurityDescriptorControl,
         GetSecurityDescriptorDacl, OBJECT_SECURITY_INFORMATION,
         PROTECTED_DACL_SECURITY_INFORMATION, SE_DACL_PROTECTED, SECURITY_ATTRIBUTES, TOKEN_QUERY,
         TOKEN_USER, TokenUser,
     },
-    Storage::FileSystem::FILE_ALL_ACCESS,
-    System::Threading::{GetCurrentProcess, OpenProcessToken},
+    Storage::FileSystem::{
+        DELETE, FILE_ADD_FILE, FILE_ADD_SUBDIRECTORY, FILE_DELETE_CHILD, FILE_GENERIC_READ,
+        FILE_GENERIC_WRITE, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_READ_EA,
+        FILE_WRITE_ATTRIBUTES, FILE_WRITE_EA, READ_CONTROL, SYNCHRONIZE,
+    },
+    System::Threading::{
+        EVENT_MODIFY_STATE, GetCurrentProcess, MUTEX_MODIFY_STATE, OpenProcessToken,
+    },
 };
 
 const ACCESS_ALLOWED_ACE_TYPE: u8 = 0;
+
+pub(super) const DIRECTORY_ACCESS_MASK: u32 = FILE_LIST_DIRECTORY
+    | FILE_ADD_FILE
+    | FILE_ADD_SUBDIRECTORY
+    | FILE_READ_EA
+    | FILE_WRITE_EA
+    | FILE_READ_ATTRIBUTES
+    | FILE_WRITE_ATTRIBUTES
+    | FILE_DELETE_CHILD
+    | READ_CONTROL
+    | SYNCHRONIZE;
+pub(super) const STATE_ACCESS_MASK: u32 =
+    FILE_GENERIC_READ | FILE_GENERIC_WRITE | DELETE | SYNCHRONIZE;
+pub(super) const MUTEX_ACCESS_MASK: u32 = MUTEX_MODIFY_STATE | READ_CONTROL | SYNCHRONIZE;
+pub(super) const EVENT_ACCESS_MASK: u32 = EVENT_MODIFY_STATE | SYNCHRONIZE;
 
 use super::{
     NativeError, NativeErrorKind,
@@ -30,12 +51,13 @@ pub(super) struct ExplicitSecurity {
     descriptor: windows_sys::Win32::Security::PSECURITY_DESCRIPTOR,
     dacl: *mut windows_sys::Win32::Security::ACL,
     attrs: SECURITY_ATTRIBUTES,
+    access_mask: u32,
     _sddl: Vec<u16>,
 }
 
 impl ExplicitSecurity {
-    pub(super) fn for_sid(sid: &str) -> Result<Self, NativeError> {
-        let sddl = wide(&format!("D:P(A;;GA;;;{sid})"));
+    pub(super) fn for_sid(sid: &str, access_mask: u32) -> Result<Self, NativeError> {
+        let sddl = wide(&format!("D:P(A;;0x{access_mask:08x};;;{sid})"));
         let mut descriptor = ptr::null_mut();
         let mut descriptor_size = 0u32;
 
@@ -87,6 +109,7 @@ impl ExplicitSecurity {
             descriptor,
             dacl,
             attrs,
+            access_mask,
             _sddl: sddl,
         })
     }
@@ -126,6 +149,7 @@ impl ExplicitSecurity {
         &self,
         handle: &OwnedHandle,
         sid: &str,
+        object_type: windows_sys::Win32::Security::Authorization::SE_OBJECT_TYPE,
     ) -> Result<(), NativeError> {
         let sid_w = wide(sid);
         let mut expected_sid = ptr::null_mut();
@@ -143,7 +167,7 @@ impl ExplicitSecurity {
         let result = unsafe {
             GetSecurityInfo(
                 handle.raw(),
-                SE_FILE_OBJECT,
+                object_type,
                 DACL_SECURITY_INFORMATION,
                 ptr::null_mut(),
                 ptr::null_mut(),
@@ -184,30 +208,25 @@ impl ExplicitSecurity {
                         AclSizeInformation,
                     )
                 } != 0;
-                if !acl_ok || size.AceCount != 1 {
+                if !acl_ok
+                    || size.AceCount != 1
+                    || size.AclBytesInUse < std::mem::size_of::<ACL>() as u32
+                {
                     false
                 } else {
                     let mut ace = ptr::null_mut();
-                    // SAFETY: the ACL has exactly one entry according to the
-                    // validated ACL_SIZE_INFORMATION.
+                    // SAFETY: GetAce writes one pointer for the validated ACL.
                     let ace_ok = unsafe { GetAce(dacl, 0, &mut ace) } != 0;
                     if !ace_ok || ace.is_null() {
                         false
                     } else {
-                        // SAFETY: the first ACE is at least the fixed
-                        // ACCESS_ALLOWED_ACE header/fields by Windows ACL
-                        // layout; the type and size checks avoid over-read.
-                        let allowed = unsafe { &*(ace.cast::<ACCESS_ALLOWED_ACE>()) };
-                        let sid_start = &allowed.SidStart as *const u32 as *mut std::ffi::c_void;
-                        // SAFETY: the SID pointer is within the validated
-                        // ACCESS_ALLOWED_ACE returned by GetAce.
-                        let equal_sid = unsafe { EqualSid(sid_start, expected_sid) } != 0;
-                        allowed.Header.AceType == ACCESS_ALLOWED_ACE_TYPE
-                            && allowed.Header.AceFlags == 0
-                            && allowed.Header.AceSize as usize
-                                >= std::mem::size_of::<ACCESS_ALLOWED_ACE>()
-                            && (allowed.Mask == GENERIC_ALL || allowed.Mask == FILE_ALL_ACCESS)
-                            && equal_sid
+                        validate_single_ace(
+                            dacl,
+                            size.AclBytesInUse as usize,
+                            ace,
+                            expected_sid,
+                            self.access_mask(),
+                        )
                     }
                 }
             }
@@ -229,6 +248,82 @@ impl ExplicitSecurity {
             Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable))
         }
     }
+
+    fn access_mask(&self) -> u32 {
+        self.access_mask
+    }
+}
+
+fn validate_single_ace(
+    dacl: *mut ACL,
+    acl_bytes_in_use: usize,
+    ace: *mut std::ffi::c_void,
+    expected_sid: *mut std::ffi::c_void,
+    expected_mask: u32,
+) -> bool {
+    let acl_start = dacl.cast::<u8>() as usize;
+    let ace_start = ace.cast::<u8>() as usize;
+    let Some(ace_offset) = ace_start.checked_sub(acl_start) else {
+        return false;
+    };
+    if ace_offset < std::mem::size_of::<ACL>() || ace_offset >= acl_bytes_in_use {
+        return false;
+    }
+    if acl_bytes_in_use - ace_offset < std::mem::size_of::<ACE_HEADER>() {
+        return false;
+    }
+
+    // SAFETY: the bounds check above proves that the fixed ACE header is
+    // within the ACL's reported in-use byte range.
+    let header = unsafe { ptr::read_unaligned(ace.cast::<ACE_HEADER>()) };
+    let ace_size = usize::from(header.AceSize);
+    if header.AceType != ACCESS_ALLOWED_ACE_TYPE
+        || header.AceFlags != 0
+        || ace_size < 12
+        || ace_size > acl_bytes_in_use - ace_offset
+    {
+        return false;
+    }
+
+    // ACCESS_ALLOWED_ACE stores a complete SID at byte eight. Read only its
+    // fixed two-byte header first; the ACE-size check above bounds both bytes.
+    // SAFETY: ace_size is at least the fixed ACCESS_ALLOWED_ACE prefix and the
+    // ACE range is bounded by the ACL's reported in-use bytes.
+    let (sid_revision, subauthority_count) = unsafe {
+        let sid_start = ace.cast::<u8>().add(8);
+        (
+            ptr::read_unaligned(sid_start),
+            ptr::read_unaligned(sid_start.add(1)),
+        )
+    };
+    if sid_revision != 1 || subauthority_count > 15 {
+        return false;
+    }
+    let sid_length = 8usize + (usize::from(subauthority_count) * 4);
+    if sid_length != ace_size - 8 {
+        return false;
+    }
+    // SAFETY: expected_sid came from the successful ConvertStringSidToSidW
+    // call and remains allocated for the complete validation operation.
+    let expected_sid_length = unsafe { GetLengthSid(expected_sid) as usize };
+    if expected_sid_length == 0 || expected_sid_length != sid_length {
+        return false;
+    }
+
+    // ACCESS_ALLOWED_ACE is Header(4), Mask(4), SidStart(4), followed by the
+    // variable-length SID. All reads occur after the complete bounds checks.
+    // SAFETY: the ACE range is fully bounded by the ACL byte count and the SID
+    // pointer is inside that range.
+    let (mask, sid_start) = unsafe {
+        (
+            ptr::read_unaligned(ace.cast::<u8>().add(4).cast::<u32>()),
+            ace.cast::<u8>().add(8).cast::<std::ffi::c_void>(),
+        )
+    };
+    // SAFETY: both SID pointers are within validated ACL/LocalAlloc-backed
+    // storage and the preceding size checks prove a complete SID is present.
+    let equal_sid = unsafe { EqualSid(sid_start, expected_sid) != 0 };
+    equal_sid && mask == expected_mask
 }
 
 impl Drop for ExplicitSecurity {

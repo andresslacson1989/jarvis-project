@@ -1,8 +1,11 @@
 use std::{ffi::OsStr, os::windows::ffi::OsStrExt, ptr::NonNull};
 
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, WIN32_ERROR},
-    System::Threading::ReleaseMutex,
+    Foundation::{
+        CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, WAIT_ABANDONED, WAIT_FAILED,
+        WAIT_OBJECT_0, WAIT_TIMEOUT, WIN32_ERROR,
+    },
+    System::Threading::{ReleaseMutex, WaitForSingleObject},
 };
 
 use super::{NativeError, NativeErrorKind};
@@ -66,9 +69,35 @@ pub(super) struct OwnedMutex {
     owned: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum MutexWaitResult {
+    Acquired,
+    Abandoned,
+    Timeout,
+}
+
 impl OwnedMutex {
     pub(super) fn new(handle: OwnedHandle, owned: bool) -> Self {
         Self { handle, owned }
+    }
+
+    pub(super) fn wait(&mut self, timeout_ms: u32) -> Result<MutexWaitResult, NativeError> {
+        // SAFETY: the mutex handle is owned by this value and remains live for
+        // the synchronous bounded wait.
+        let result = unsafe { WaitForSingleObject(self.handle.raw(), timeout_ms) };
+        match result {
+            WAIT_OBJECT_0 => {
+                self.owned = true;
+                Ok(MutexWaitResult::Acquired)
+            }
+            WAIT_ABANDONED => {
+                self.owned = true;
+                Ok(MutexWaitResult::Abandoned)
+            }
+            WAIT_TIMEOUT => Ok(MutexWaitResult::Timeout),
+            WAIT_FAILED => Err(native_failure(NativeErrorKind::ArbitrationUnavailable)),
+            _ => Err(native_failure(NativeErrorKind::ArbitrationUnavailable)),
+        }
     }
 }
 

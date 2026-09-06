@@ -2,7 +2,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
-        mpsc::{RecvTimeoutError, sync_channel},
+        mpsc::sync_channel,
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -11,24 +11,27 @@ use std::{
 use getrandom::fill as fill_random;
 use sha2::{Digest, Sha256};
 use windows_sys::Win32::{
-    Foundation::{ERROR_ALREADY_EXISTS, WAIT_OBJECT_0, WAIT_TIMEOUT},
+    Foundation::{ERROR_ALREADY_EXISTS, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT},
     Storage::FileSystem::SYNCHRONIZE,
     System::{
         RemoteDesktop::ProcessIdToSessionId,
         Threading::{
             CreateEventW, CreateMutexW, EVENT_MODIFY_STATE, GetCurrentProcess, GetCurrentProcessId,
-            GetProcessTimes, OpenEventW, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, SetEvent,
-            WaitForSingleObject,
+            GetProcessTimes, MUTEX_MODIFY_STATE, OpenEventW, OpenMutexW, OpenProcess,
+            PROCESS_QUERY_LIMITED_INFORMATION, SetEvent, WaitForSingleObject,
         },
     },
 };
 
 use super::{
     ActivationRequest, NativeError, NativeErrorKind, Role, STABLE_OWNER_NAMESPACE, SecondLaunch,
-    handles::{OwnedHandle, OwnedMutex, last_error, native_failure, wide},
+    handles::{MutexWaitResult, OwnedHandle, OwnedMutex, last_error, native_failure, wide},
     identity::FileIdentity,
     layout::{self, PreparedLayout},
-    security::{ExplicitSecurity, current_sid},
+    security::{
+        DIRECTORY_ACCESS_MASK, EVENT_ACCESS_MASK, ExplicitSecurity, MUTEX_ACCESS_MASK,
+        STATE_ACCESS_MASK, current_sid,
+    },
     state::{
         OwnerIdentity, ROLE_MAINTENANCE, ROLE_NORMAL, STATE_ACKNOWLEDGED, STATE_IDLE,
         STATE_PENDING, STATUS_HANDLED, STATUS_NONE, StateFile, StateRecord,
@@ -51,8 +54,9 @@ struct OwnerInner {
     start_filetime: u64,
     sid_hash: [u8; 32],
     role: Role,
-    pending: Mutex<Option<(u64, Instant)>>,
+    pending: Mutex<Option<(u64, Instant, bool)>>,
     stopping: AtomicBool,
+    worker_failed: AtomicBool,
 }
 
 // OwnerInner is shared only by the bounded activation worker and the Tauri
@@ -82,63 +86,222 @@ pub enum Acquisition {
     SecondLaunch(SecondLaunch),
 }
 
+struct SecurityBundle {
+    directory: ExplicitSecurity,
+    state: ExplicitSecurity,
+    event: ExplicitSecurity,
+}
+
+impl SecurityBundle {
+    fn for_sid(sid: &str) -> Result<Self, NativeError> {
+        Ok(Self {
+            directory: ExplicitSecurity::for_sid(sid, DIRECTORY_ACCESS_MASK)?,
+            state: ExplicitSecurity::for_sid(sid, STATE_ACCESS_MASK)?,
+            event: ExplicitSecurity::for_sid(sid, EVENT_ACCESS_MASK)?,
+        })
+    }
+}
+
 pub fn acquire(role: Role) -> Result<Acquisition, NativeError> {
     let prepared = layout::prepare()?;
     let sid = current_sid()?;
     let sid_hash = hash_sid(&sid);
-    let security = ExplicitSecurity::for_sid(&sid)?;
+    let parent_identity = prepared.parent_identity;
+    let mutex_security = ExplicitSecurity::for_sid(&sid, MUTEX_ACCESS_MASK)?;
+    let security = SecurityBundle::for_sid(&sid)?;
     let mutex_name = stable_mutex_name(&sid, prepared.parent_identity);
-    let (mutex, created) = create_mutex(&mutex_name, &security)?;
+    let (mut mutex, created) = create_mutex(&mutex_name, &mutex_security, &sid)?;
     if !created {
-        drop(mutex);
-        return acquire_second_launch(prepared, sid, security, sid_hash, role);
+        match mutex.wait(0)? {
+            MutexWaitResult::Acquired | MutexWaitResult::Abandoned => {
+                return acquire_recovered_owner(
+                    mutex,
+                    prepared,
+                    sid.clone(),
+                    sid_hash,
+                    role,
+                    security,
+                );
+            }
+            MutexWaitResult::Timeout => {}
+        }
+
+        let activation = acquire_second_launch(prepared, &sid, &security, sid_hash, role);
+        match activation {
+            Ok(result) => return Ok(result),
+            Err(original_error) => match mutex.wait(500) {
+                Ok(MutexWaitResult::Acquired | MutexWaitResult::Abandoned) => {
+                    let recovered_prepared = layout::prepare()?;
+                    if recovered_prepared.parent_identity != parent_identity {
+                        return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
+                    }
+                    return acquire_recovered_owner(
+                        mutex,
+                        recovered_prepared,
+                        sid.clone(),
+                        sid_hash,
+                        role,
+                        SecurityBundle::for_sid(&sid)?,
+                    );
+                }
+                Ok(MutexWaitResult::Timeout) => return Err(original_error),
+                Err(_) => return Err(original_error),
+            },
+        }
     }
 
-    let layout = prepared.finish(&security, &sid)?;
-    let pid = current_pid();
-    let session = current_session(pid)?;
-    // SAFETY: GetCurrentProcess returns a valid pseudo-handle with no close
-    // obligation.
-    let start_filetime = process_start_filetime(unsafe { GetCurrentProcess() })?;
-    let role_value = role_value(role);
-    let mut nonce = [0u8; 16];
-    fill_random(&mut nonce)
-        .map_err(|_| native_failure(NativeErrorKind::SecurityBoundaryUnavailable))?;
+    acquire_owner(mutex, prepared, sid, sid_hash, security, role)
+}
 
-    let activation_name = event_name(ACTIVATION_EVENT_PREFIX, nonce);
-    let ack_name = event_name(ACK_EVENT_PREFIX, nonce);
-    let activation_event = create_event(&activation_name, &security)?;
-    let ack_event = create_event(&ack_name, &security)?;
-    let initial = StateRecord::new(
-        role_value,
-        OwnerIdentity {
-            parent: layout.parent_identity,
-            root: layout.root_identity,
-            pid,
-            start_filetime,
-            session,
-            sid_hash,
-            nonce,
-        },
-    );
-    let state = StateFile::create_owner(&layout.state_path, &security, &sid, initial)?;
+fn acquire_owner(
+    mutex: OwnedMutex,
+    mut prepared: PreparedLayout,
+    sid: String,
+    sid_hash: [u8; 32],
+    security: SecurityBundle,
+    role: Role,
+) -> Result<Acquisition, NativeError> {
+    let parent_identity = prepared.parent_identity;
+    let deadline = Instant::now() + Duration::from_millis(500);
 
-    Ok(Acquisition::Owner(OwnerLease {
-        inner: Arc::new(OwnerInner {
-            _mutex: mutex,
-            _layout: layout,
-            state,
-            activation_event,
-            ack_event,
-            session,
-            pid,
-            start_filetime,
-            sid_hash,
-            role,
-            pending: Mutex::new(None),
-            stopping: AtomicBool::new(false),
-        }),
-    }))
+    loop {
+        let layout = prepared.finish(&security.directory, &sid)?;
+        let pid = current_pid();
+        let session = current_session(pid)?;
+        // SAFETY: GetCurrentProcess returns a valid pseudo-handle with no close
+        // obligation.
+        let start_filetime = process_start_filetime(unsafe { GetCurrentProcess() })?;
+        let role_value = role_value(role);
+        let mut nonce = [0u8; 16];
+        fill_random(&mut nonce)
+            .map_err(|_| native_failure(NativeErrorKind::SecurityBoundaryUnavailable))?;
+
+        let activation_name = event_name(ACTIVATION_EVENT_PREFIX, nonce);
+        let ack_name = event_name(ACK_EVENT_PREFIX, nonce);
+        let activation_event = create_event(&activation_name, &security.event)?;
+        let ack_event = create_event(&ack_name, &security.event)?;
+        let initial = StateRecord::new(
+            role_value,
+            OwnerIdentity {
+                parent: layout.parent_identity,
+                root: layout.root_identity,
+                pid,
+                start_filetime,
+                session,
+                sid_hash,
+                nonce,
+            },
+        );
+        match StateFile::create_owner(&layout.state_path, &security.state, &sid, initial) {
+            Ok(state) => {
+                return Ok(Acquisition::Owner(OwnerLease {
+                    inner: Arc::new(OwnerInner {
+                        _mutex: mutex,
+                        _layout: layout,
+                        state,
+                        activation_event,
+                        ack_event,
+                        session,
+                        pid,
+                        start_filetime,
+                        sid_hash,
+                        role,
+                        pending: Mutex::new(None),
+                        stopping: AtomicBool::new(false),
+                        worker_failed: AtomicBool::new(false),
+                    }),
+                }));
+            }
+            Err(error)
+                if error.kind == NativeErrorKind::StateUnavailable && Instant::now() < deadline =>
+            {
+                drop(ack_event);
+                drop(activation_event);
+                drop(layout);
+                sleep_bounded_until(deadline);
+                prepared = layout::prepare()?;
+                if prepared.parent_identity != parent_identity {
+                    return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
+                }
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn acquire_recovered_owner(
+    mutex: OwnedMutex,
+    prepared: PreparedLayout,
+    sid: String,
+    sid_hash: [u8; 32],
+    role: Role,
+    security: SecurityBundle,
+) -> Result<Acquisition, NativeError> {
+    let parent_identity = prepared.parent_identity;
+    validate_recovered_state(
+        prepared,
+        &sid,
+        &security.directory,
+        &security.state,
+        sid_hash,
+    )?;
+    let prepared = layout::prepare()?;
+    if prepared.parent_identity != parent_identity {
+        return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
+    }
+    acquire_owner(mutex, prepared, sid, sid_hash, security, role)
+}
+
+fn validate_recovered_state(
+    prepared: PreparedLayout,
+    sid: &str,
+    directory_security: &ExplicitSecurity,
+    state_security: &ExplicitSecurity,
+    sid_hash: [u8; 32],
+) -> Result<(), NativeError> {
+    let layout = prepared.validate_existing(sid, directory_security)?;
+    let state_path = layout.state_path.clone();
+    let expected_parent = layout.parent_identity;
+    let expected_root = layout.root_identity;
+    drop(layout);
+
+    let started = Instant::now();
+    let mut delay_index = 0usize;
+    loop {
+        match StateFile::open_client(&state_path, state_security, sid) {
+            Ok(state) => {
+                let snapshot = state.read_snapshot()?;
+                if snapshot.parent != expected_parent
+                    || snapshot.sid_hash != sid_hash
+                    || snapshot.root != expected_root
+                {
+                    return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
+                }
+                let owner_alive = process_start_filetime_for_pid(snapshot.pid)
+                    .ok()
+                    .map(|start| start == snapshot.start_filetime)
+                    .unwrap_or(false)
+                    && current_session(snapshot.pid).ok() == Some(snapshot.session);
+                if owner_alive {
+                    return Err(native_failure(NativeErrorKind::ArbitrationUnavailable));
+                }
+                return Ok(());
+            }
+            Err(error)
+                if error.kind == NativeErrorKind::StateUnavailable
+                    && started.elapsed() < Duration::from_millis(500) =>
+            {
+                sleep_bounded(&mut delay_index, started);
+            }
+            Err(error) if error.kind == NativeErrorKind::StateUnavailable => {
+                if !std::fs::symlink_metadata(&state_path).is_ok() {
+                    return Ok(());
+                }
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        }
+    }
 }
 
 impl OwnerLease {
@@ -160,40 +323,52 @@ impl OwnerLease {
         if self.inner.role != Role::Normal {
             return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
         }
+        self.inner.stopping.store(false, Ordering::Release);
+        self.inner.worker_failed.store(false, Ordering::Release);
         let inner = Arc::clone(&self.inner);
         let thread_inner = Arc::clone(&inner);
         let (ready_sender, ready_receiver) = sync_channel(0);
         let thread = thread::Builder::new()
             .name("jarvis-activation-receiver".to_owned())
             .spawn(move || {
-                let _ = ready_sender.send(());
+                let mut initialized = false;
                 while !thread_inner.stopping.load(Ordering::Acquire) {
                     // SAFETY: the event handle is owned by the Arc-held owner
                     // and remains alive until the worker has joined.
                     let result =
                         unsafe { WaitForSingleObject(thread_inner.activation_event.raw(), 250) };
+                    if !initialized {
+                        initialized = true;
+                        let ready = result != WAIT_FAILED;
+                        let _ = ready_sender.send(ready);
+                        if !ready {
+                            mark_worker_failed(&thread_inner);
+                            break;
+                        }
+                    }
                     if thread_inner.stopping.load(Ordering::Acquire) {
                         break;
                     }
                     if result == WAIT_OBJECT_0 || result == WAIT_TIMEOUT {
                         process_pending(&thread_inner, &callback);
                     } else {
+                        mark_worker_failed(&thread_inner);
                         break;
                     }
                 }
             })
             .map_err(|_| native_failure(NativeErrorKind::EventUnavailable))?;
-        if matches!(
-            ready_receiver.recv_timeout(Duration::from_millis(250)),
-            Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected)
-        ) {
-            self.inner.stopping.store(true, Ordering::Release);
-            // SAFETY: SetEvent only wakes the receiver being joined below.
-            unsafe {
-                let _ = SetEvent(self.inner.activation_event.raw());
+        match ready_receiver.recv_timeout(Duration::from_millis(500)) {
+            Ok(true) => {}
+            _ => {
+                self.inner.stopping.store(true, Ordering::Release);
+                // SAFETY: SetEvent only wakes the receiver being joined below.
+                unsafe {
+                    let _ = SetEvent(self.inner.activation_event.raw());
+                }
+                let _ = thread.join();
+                return Err(native_failure(NativeErrorKind::EventUnavailable));
             }
-            let _ = thread.join();
-            return Err(native_failure(NativeErrorKind::EventUnavailable));
         }
         Ok(ActivationWorker {
             inner,
@@ -213,33 +388,41 @@ impl Drop for ActivationWorker {
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
+        mark_worker_failed(&self.inner);
+        reconcile_inflight(&self.inner);
     }
 }
 
 fn acquire_second_launch(
     prepared: PreparedLayout,
-    sid: String,
-    security: ExplicitSecurity,
+    sid: &str,
+    security: &SecurityBundle,
     sid_hash: [u8; 32],
     role: Role,
 ) -> Result<Acquisition, NativeError> {
-    if role != Role::Normal {
-        return Err(native_failure(NativeErrorKind::AlreadyOwned));
-    }
-    let layout = prepared.validate_existing(&sid, &security)?;
-    let state = settle_client_state(&layout.state_path)?;
+    let layout = prepared.validate_existing(sid, &security.directory)?;
+    let state = settle_client_state(&layout.state_path, &security.state, sid)?;
     let current_pid = current_pid();
     let current_session = current_session(current_pid)?;
     // SAFETY: GetCurrentProcess returns a valid pseudo-handle with no close
     // obligation.
     let current_start = process_start_filetime(unsafe { GetCurrentProcess() })?;
     let snapshot = state.read_snapshot()?;
-    if snapshot.role != ROLE_NORMAL
-        || snapshot.parent != layout.parent_identity
+    if snapshot.parent != layout.parent_identity
         || snapshot.root != layout.root_identity
         || snapshot.sid_hash != sid_hash
     {
         return Err(native_failure(NativeErrorKind::ObjectCollision));
+    }
+    if snapshot.role != role_value(role) {
+        return Err(native_failure(match snapshot.role {
+            ROLE_MAINTENANCE => NativeErrorKind::MaintenanceHeld,
+            ROLE_NORMAL => NativeErrorKind::NormalHeld,
+            _ => NativeErrorKind::ObjectCollision,
+        }));
+    }
+    if role != Role::Normal {
+        return Err(native_failure(NativeErrorKind::MaintenanceHeld));
     }
     if snapshot.session != current_session {
         return Err(native_failure(NativeErrorKind::OwnerOtherSession));
@@ -274,38 +457,77 @@ fn acquire_second_launch(
 
     let activation_name = event_name(ACTIVATION_EVENT_PREFIX, snapshot.nonce);
     let ack_name = event_name(ACK_EVENT_PREFIX, snapshot.nonce);
-    let activation = open_event(&activation_name, EVENT_MODIFY_STATE)?;
-    let ack = open_event(&ack_name, SYNCHRONIZE)?;
+    let activation = match open_event(&activation_name, EVENT_MODIFY_STATE) {
+        Ok(event) => event,
+        Err(error) => {
+            return Err(activation_failure(&state, request_generation, error.kind));
+        }
+    };
+    let ack = match open_event(&ack_name, SYNCHRONIZE) {
+        Ok(event) => event,
+        Err(error) => {
+            return Err(activation_failure(&state, request_generation, error.kind));
+        }
+    };
     // SAFETY: the existing authority owns the event and the handle remains
     // valid for this bounded signal operation.
     if unsafe { SetEvent(activation.raw()) } == 0 {
-        return Err(native_failure(NativeErrorKind::ActivationUnavailable));
+        return Err(activation_failure(
+            &state,
+            request_generation,
+            NativeErrorKind::ActivationUnavailable,
+        ));
     }
     // SAFETY: the wait is explicitly bounded to the contract's two-second
     // acknowledgement envelope.
     let wait = unsafe { WaitForSingleObject(ack.raw(), 2_000) };
     if wait != WAIT_OBJECT_0 {
-        return Err(native_failure(NativeErrorKind::ActivationUnavailable));
+        return Err(activation_failure(
+            &state,
+            request_generation,
+            if wait == WAIT_TIMEOUT {
+                NativeErrorKind::ActivationUnavailable
+            } else if wait == WAIT_FAILED {
+                NativeErrorKind::ActivationUncertain
+            } else {
+                NativeErrorKind::ActivationUnavailable
+            },
+        ));
     }
-    let acknowledged = state.transact(|record| {
+    match state.transact(|record| {
         if record.state != STATE_ACKNOWLEDGED
             || record.request_generation != request_generation
             || record.ack_generation != request_generation
             || record.status != STATUS_HANDLED
         {
-            return Err(native_failure(NativeErrorKind::ActivationUnavailable));
+            return Err(native_failure(NativeErrorKind::ActivationUncertain));
         }
-        record.state = STATE_IDLE;
-        record.status = STATUS_NONE;
-        record.request_generation = 0;
-        record.ack_generation = 0;
-        record.request_pid = 0;
-        record.request_start_filetime = 0;
-        record.request_session = 0;
-        record.request_sid_hash = [0; 32];
-        Ok(true)
-    })?;
-    Ok(Acquisition::SecondLaunch(SecondLaunch { acknowledged }))
+        clear_request(record);
+        Ok(())
+    }) {
+        Ok(()) => Ok(Acquisition::SecondLaunch(SecondLaunch {
+            acknowledged: true,
+        })),
+        Err(error) => Err(activation_failure(&state, request_generation, error.kind)),
+    }
+}
+
+fn activation_failure(
+    state: &StateFile,
+    request_generation: u64,
+    kind: NativeErrorKind,
+) -> NativeError {
+    match state.transact(|record| {
+        if record.request_generation == request_generation
+            && matches!(record.state, STATE_PENDING | STATE_ACKNOWLEDGED)
+        {
+            clear_request(record);
+        }
+        Ok(())
+    }) {
+        Ok(()) => native_failure(kind),
+        Err(_) => native_failure(NativeErrorKind::ActivationUncertain),
+    }
 }
 
 fn process_pending<F>(inner: &Arc<OwnerInner>, callback: &F)
@@ -316,29 +538,47 @@ where
         Ok(snapshot) => snapshot,
         Err(_) => return,
     };
-    if snapshot.state != STATE_PENDING
-        || snapshot.readiness == 0
-        || snapshot.session != inner.session
-        || snapshot.request_session != inner.session
-        || snapshot.request_sid_hash != inner.sid_hash
-    {
+    if snapshot.state != STATE_PENDING && snapshot.state != STATE_ACKNOWLEDGED {
+        if let Ok(mut pending) = inner.pending.lock() {
+            *pending = None;
+        }
         return;
     }
 
-    let pending_started = {
+    let (pending_started, callback_attempted) = {
         let mut pending = match inner.pending.lock() {
             Ok(pending) => pending,
             Err(_) => return,
         };
         match *pending {
-            Some((generation, started)) if generation == snapshot.request_generation => started,
+            Some((generation, started, attempted)) if generation == snapshot.request_generation => {
+                (started, attempted)
+            }
             _ => {
                 let started = Instant::now();
-                *pending = Some((snapshot.request_generation, started));
-                started
+                *pending = Some((snapshot.request_generation, started, false));
+                (started, false)
             }
         }
     };
+
+    if snapshot.state == STATE_ACKNOWLEDGED {
+        if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
+            reset_pending_if_current(inner, snapshot.request_generation);
+        }
+        return;
+    }
+
+    if snapshot.readiness == 0
+        || snapshot.session != inner.session
+        || snapshot.request_session != inner.session
+        || snapshot.request_sid_hash != inner.sid_hash
+    {
+        if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
+            reset_pending_if_current(inner, snapshot.request_generation);
+        }
+        return;
+    }
 
     if process_start_filetime_for_pid(snapshot.request_pid)
         .map(|start| start == snapshot.request_start_filetime)
@@ -350,9 +590,30 @@ where
         return;
     }
 
-    if callback(ActivationRequest {
-        process_id: snapshot.request_pid,
-    }) {
+    if callback_attempted {
+        if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
+            reset_pending_if_current(inner, snapshot.request_generation);
+        }
+        return;
+    }
+
+    if let Ok(mut pending) = inner.pending.lock()
+        && pending
+            .as_ref()
+            .is_some_and(|(generation, _, _)| *generation == snapshot.request_generation)
+        && let Some((_, _, attempted)) = pending.as_mut()
+    {
+        *attempted = true;
+    }
+
+    let callback_succeeded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        callback(ActivationRequest {
+            process_id: snapshot.request_pid,
+        })
+    }))
+    .unwrap_or(false);
+
+    if callback_succeeded {
         let acknowledged = inner.state.transact(|record| {
             if record.state != STATE_PENDING
                 || record.request_generation != snapshot.request_generation
@@ -373,6 +634,8 @@ where
             if let Ok(mut pending) = inner.pending.lock() {
                 *pending = None;
             }
+        } else if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
+            reset_pending_if_current(inner, snapshot.request_generation);
         }
     } else if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
         reset_pending_if_current(inner, snapshot.request_generation);
@@ -381,21 +644,51 @@ where
 
 fn reset_pending_if_current(inner: &Arc<OwnerInner>, request_generation: u64) {
     let _ = inner.state.transact(|record| {
-        if record.state == STATE_PENDING && record.request_generation == request_generation {
-            record.state = STATE_IDLE;
-            record.status = STATUS_NONE;
-            record.request_generation = 0;
-            record.ack_generation = 0;
-            record.request_pid = 0;
-            record.request_start_filetime = 0;
-            record.request_session = 0;
-            record.request_sid_hash = [0; 32];
+        if record.request_generation == request_generation
+            && matches!(record.state, STATE_PENDING | STATE_ACKNOWLEDGED)
+        {
+            clear_request(record);
         }
         Ok(())
     });
-    if let Ok(mut pending) = inner.pending.lock() {
+    if let Ok(mut pending) = inner.pending.lock()
+        && pending
+            .as_ref()
+            .is_some_and(|(generation, _, _)| *generation == request_generation)
+    {
         *pending = None;
     }
+}
+
+fn mark_worker_failed(inner: &Arc<OwnerInner>) {
+    inner.worker_failed.store(true, Ordering::Release);
+    let _ = inner.state.transact(|record| {
+        validate_owner_record(inner, record)?;
+        record.readiness = 0;
+        if matches!(record.state, STATE_PENDING | STATE_ACKNOWLEDGED) {
+            clear_request(record);
+        }
+        Ok(())
+    });
+}
+
+fn reconcile_inflight(inner: &Arc<OwnerInner>) {
+    if let Ok(snapshot) = inner.state.read_snapshot()
+        && matches!(snapshot.state, STATE_PENDING | STATE_ACKNOWLEDGED)
+    {
+        reset_pending_if_current(inner, snapshot.request_generation);
+    }
+}
+
+fn clear_request(record: &mut StateRecord) {
+    record.state = STATE_IDLE;
+    record.status = STATUS_NONE;
+    record.request_generation = 0;
+    record.ack_generation = 0;
+    record.request_pid = 0;
+    record.request_start_filetime = 0;
+    record.request_session = 0;
+    record.request_sid_hash = [0; 32];
 }
 
 fn validate_owner_record(inner: &OwnerInner, record: &StateRecord) -> Result<(), NativeError> {
@@ -404,6 +697,8 @@ fn validate_owner_record(inner: &OwnerInner, record: &StateRecord) -> Result<(),
         || record.start_filetime != inner.start_filetime
         || record.session != inner.session
         || record.sid_hash != inner.sid_hash
+        || record.parent != inner._layout.parent_identity
+        || record.root != inner._layout.root_identity
     {
         return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
     }
@@ -444,15 +739,45 @@ fn event_name(prefix: &str, nonce: [u8; 16]) -> String {
 fn create_mutex(
     name: &str,
     security: &ExplicitSecurity,
+    sid: &str,
 ) -> Result<(OwnedMutex, bool), NativeError> {
     let name = wide(name);
     // SAFETY: name/security remain valid for the synchronous creator call.
     let raw = unsafe { CreateMutexW(security.as_ptr(), 1, name.as_ptr()) };
+    if raw.is_null() && last_error() == windows_sys::Win32::Foundation::ERROR_ACCESS_DENIED {
+        // CreateMutexW requests the creator's full mutex access when opening
+        // an existing named object. Re-open the existing object with exactly
+        // the rights required by the bounded wait/release protocol instead of
+        // broadening the stable object's DACL.
+        // SAFETY: the name remains valid for the synchronous open call.
+        let reopened = unsafe {
+            OpenMutexW(
+                MUTEX_MODIFY_STATE
+                    | windows_sys::Win32::Storage::FileSystem::READ_CONTROL
+                    | SYNCHRONIZE,
+                0,
+                name.as_ptr(),
+            )
+        };
+        let handle = OwnedHandle::from_raw(reopened, NativeErrorKind::ArbitrationUnavailable)?;
+        security.validate_handle(
+            &handle,
+            sid,
+            windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT,
+        )?;
+        return Ok((OwnedMutex::new(handle, false), false));
+    }
     let handle = OwnedHandle::from_raw(raw, NativeErrorKind::ArbitrationUnavailable)?;
     let created = last_error() != ERROR_ALREADY_EXISTS;
     if created {
         security.apply_to_handle(
             &handle,
+            windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT,
+        )?;
+    } else {
+        security.validate_handle(
+            &handle,
+            sid,
             windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT,
         )?;
     }
@@ -483,11 +808,15 @@ fn open_event(name: &str, access: u32) -> Result<OwnedHandle, NativeError> {
     OwnedHandle::from_raw(raw, NativeErrorKind::EventUnavailable)
 }
 
-fn settle_client_state(path: &std::path::Path) -> Result<StateFile, NativeError> {
+fn settle_client_state(
+    path: &std::path::Path,
+    security: &ExplicitSecurity,
+    sid: &str,
+) -> Result<StateFile, NativeError> {
     let started = Instant::now();
     let mut delay_index = 0usize;
     loop {
-        match StateFile::open_client(path) {
+        match StateFile::open_client(path, security, sid) {
             Ok(state) => match state.read_snapshot() {
                 Ok(_) => return Ok(state),
                 Err(error) if started.elapsed() < Duration::from_millis(500) => {
@@ -527,6 +856,13 @@ fn sleep_bounded(delay_index: &mut usize, started: Instant) {
         *delay_index += 1;
     } else {
         thread::yield_now();
+    }
+}
+
+fn sleep_bounded_until(deadline: Instant) {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if !remaining.is_zero() {
+        thread::sleep(Duration::from_millis(10).min(remaining));
     }
 }
 
