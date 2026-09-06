@@ -35,9 +35,12 @@ Before implementation or architecture work, read:
 15. `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`
 16. `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`
 17. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
-18. relevant ADRs only when rationale/history is needed.
+18. `docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`
+19. relevant ADRs only when rationale/history is needed.
 
 The **v1.0.7 manifest defines the current component revision set**. ADRs do not form a second overlay.
+
+`docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md` is owner-supplied, non-normative execution guidance. It records the current authority decision and implementation loop, but it SHALL NOT override the active v1.0.7 normative suite, manifest, Release Profile, or Verification Contract. The current decision selects GitHub Actions against GitHub `origin/master`; GitLab is mirror-only, and LocalCI is not selected for this lifecycle.
 
 ## Platform/runtime-role boundary
 

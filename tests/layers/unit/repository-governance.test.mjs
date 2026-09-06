@@ -8,6 +8,7 @@ import {
 import { GATES } from "../../../tools/ci/generate-evidence.mjs";
 
 const qualifiedLocalCiScript = readFileSync(new URL("../../../.localci/ci.sh", import.meta.url), "utf8");
+const ownerGoal = readFileSync(new URL("../../../docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md", import.meta.url), "utf8");
 
 const fallbackProfile = Object.freeze({
   schemaVersion: 3,
@@ -135,6 +136,40 @@ test("current GitHub authority record keeps candidate, evidence revision, and au
   assert.notEqual(selected.evidenceRevisionValidation.commitSha, selected.authoritativeMasterVerification.commitSha);
   assert.notEqual(selected.authoritativeMasterVerification.commitSha, "cae911e2bb88e046ae84828bc98a5b484da401d1");
   assert.notEqual(selected.authoritativeMasterVerification.runId, "33944300852");
+});
+
+test("owner execution goal is checked in, referenced, and reconciled with selected authority", () => {
+  const agents = readFileSync(new URL("../../../AGENTS.md", import.meta.url), "utf8");
+  const readme = readFileSync(new URL("../../../README.md", import.meta.url), "utf8");
+  const profile = JSON.parse(readFileSync(new URL("../../../docs/implementation/governance/repository-governance-profile.json", import.meta.url), "utf8"));
+  assert.match(agents, /docs\/implementation\/JARVIS-DEVELOPER-EXECUTION-GOAL\.md/);
+  assert.match(ownerGoal, /JARVIS v1\.0\.7/);
+  assert.match(ownerGoal, /GitHub Actions is the selected and primary CI authority/);
+  assert.match(ownerGoal, /GitLab is mirror-only/);
+  assert.match(ownerGoal, /non-normative execution guidance/);
+  assert.equal(profile.mandatoryCi.selectedAuthority.type, "GITHUB_ACTIONS");
+  assert.match(readme, /current selected authority is GitHub Actions/);
+  assert.match(readme, /GitLab is mirror-only/);
+});
+
+test("documentation cannot promote an ineligible CI authority", () => {
+  const profile = JSON.parse(readFileSync(new URL("../../../docs/implementation/governance/repository-governance-profile.json", import.meta.url), "utf8"));
+  profile.mandatoryCi.selectedAuthority.type = "GITLAB_CI";
+  assert.ok(codes(profile).includes("GOVERNANCE_CI_AUTHORITY_INVALID"));
+});
+
+test("active suite, owner goal, matrix, and evidence identities remain coherent", () => {
+  const manifest = readFileSync(new URL("../../../docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md", import.meta.url), "utf8");
+  const matrix = readFileSync(new URL("../../../docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md", import.meta.url), "utf8");
+  const evidence = readFileSync(new URL("../../../docs/implementation/evidence/1.4-single-instance-ownership.md", import.meta.url), "utf8");
+  const evidenceCandidate = evidence.match(/Correction candidate: `([0-9a-f]{40})`/)?.[1];
+  const matrixCandidate = matrix.match(/Section 1\.4 correction candidate `([0-9a-f]{40})`/)?.[1];
+  assert.ok(evidenceCandidate);
+  assert.equal(matrixCandidate, evidenceCandidate);
+  assert.match(manifest, /JARVIS Contract Manifest v1\.0\.7/);
+  assert.match(ownerGoal, /active v1\.0\.7 contract suite/);
+  assert.match(matrix, /Contract suite \| JARVIS v1\.0\.7/);
+  assert.match(evidence, /active v1\.0\.7 contract suite/);
 });
 
 test("stale authoritative master identity fails closed", () => {

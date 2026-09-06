@@ -8,6 +8,8 @@
 
 This document is an operational implementation aid for the repository-governance requirements in the active top-level contract §28, Verification Contract §33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
+The owner-supplied execution decision in `docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md` selects GitHub Actions for the current lifecycle against GitHub `origin/master`. GitLab is mirror-only; LocalCI remains an eligible v1.0.7 alternative but is not selected or qualified for this lifecycle. This operational statement cannot promote an ineligible or unqualified authority.
+
 ## Current effective mode
 
 The current repository governance mode is:

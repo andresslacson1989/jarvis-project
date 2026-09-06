@@ -264,6 +264,15 @@ test("checked-in Phase-0 records are coherent without self-referential HEAD bind
   assert.deepEqual(await checkPhase0(process.cwd()), []);
 });
 
+test("Phase 0 checkout contains the referenced owner authority decision", () => {
+  const agents = readFileSync("AGENTS.md", "utf8");
+  const goal = readFileSync("docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md", "utf8");
+  assert.match(agents, /docs\/implementation\/JARVIS-DEVELOPER-EXECUTION-GOAL\.md/);
+  assert.match(goal, /GitHub Actions is the selected and primary CI authority/);
+  assert.match(goal, /GitLab is mirror-only/);
+  assert.match(goal, /LocalCI remains an eligible alternative authority/);
+});
+
 test("the real evidence revision passes implicit mode", async () => {
   const previous = process.env.JARVIS_CANDIDATE_SHA;
   try {

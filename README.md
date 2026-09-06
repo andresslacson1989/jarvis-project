@@ -36,6 +36,8 @@ Read the active suite in this order:
 14. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — central Definition of Done and Windows V1 release qualification; all specialized mandatory verification rules in the active v1.0.7 contracts are cumulative.
 15. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria, including hosting-capability-aware repository governance and the early voice feasibility spike. It does not authorize implementation to begin by itself.
 
+The owner-supplied execution loop and current authority decision are recorded in [`docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`](docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md). It is non-normative: v1.0.7 contracts remain authoritative. The current selected authority is GitHub Actions against GitHub `origin/master`; GitLab is mirror-only, and LocalCI is unselected for this lifecycle.
+
 Canonical vector brand assets live under [`assets/brand/`](assets/brand/).
 
 Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. [`docs/JARVIS-CONTRACT-LINEAGE.md`](docs/JARVIS-CONTRACT-LINEAGE.md) explains historical contract evolution.
@@ -85,6 +87,8 @@ v1.0.7 makes CI authority vendor-neutral without weakening the gate:
 - common qualification requires complete repository-owned pipeline execution, pinned inputs, least privilege, isolation, cancellation/recovery, and durable audit evidence;
 - authority-specific gates remain mandatory, and demo, stale, unknown, or materially changed LocalCI instances are not automatically trusted;
 - GitHub Actions may be disabled while qualified LocalCI is selected without treating CI as skipped.
+
+For the current lifecycle, the selected authority is GitHub Actions. The v1.0.7 LocalCI alternative remains contract-eligible but is not selected or qualified for this candidate; GitLab is mirror-only and cannot satisfy mandatory CI.
 
 ## No overlay interpretation
 

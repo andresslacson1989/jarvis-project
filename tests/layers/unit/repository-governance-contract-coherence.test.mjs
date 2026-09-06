@@ -49,3 +49,13 @@ test("Coding Standards CI gate matches the active hosting-capability-aware rule"
   assert.match(standards, /\*\*Version:\*\*\s*1\.0\.6\b/);
   assertCapabilityAwareGovernance(governance, "Coding Standards §28");
 });
+
+test("owner execution goal is non-normative and agrees with the active authority identity", () => {
+  const goal = read("docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md");
+  const agents = read("AGENTS.md");
+  assert.match(goal, /non-normative execution guidance/);
+  assert.match(goal, /GitHub `origin\/master`/);
+  assert.match(goal, /GitHub Actions is the selected and primary CI authority/);
+  assert.match(goal, /GitLab is mirror-only/);
+  assert.match(agents, /JARVIS-DEVELOPER-EXECUTION-GOAL\.md/);
+});
