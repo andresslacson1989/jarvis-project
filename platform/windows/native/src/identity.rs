@@ -36,7 +36,14 @@ pub(super) fn local_app_data() -> Result<PathBuf, NativeError> {
     #[cfg(feature = "test-support")]
     if let Some(path) = std::env::var_os("JARVIS_NATIVE_TEST_LOCALAPPDATA") {
         let path = PathBuf::from(path);
-        validate_absolute_local_path(&path)?;
+        if let Err(error) = validate_absolute_local_path(&path) {
+            record_test_failure!(
+                "identity.test_local_app_data",
+                "validate_absolute_local_path",
+                0,
+            );
+            return Err(error);
+        }
         return Ok(path);
     }
 
@@ -51,7 +58,13 @@ pub(super) fn local_app_data() -> Result<PathBuf, NativeError> {
             &mut allocated,
         )
     };
+    let _native_error = result as u32;
     if result < 0 || allocated.is_null() {
+        record_test_failure!(
+            "identity.local_app_data",
+            "SHGetKnownFolderPath",
+            _native_error,
+        );
         if !allocated.is_null() {
             // SAFETY: the pointer is owned by the known-folder API.
             unsafe { CoTaskMemFree(allocated.cast()) };
@@ -146,6 +159,10 @@ pub(super) fn open_directory(
             std::ptr::null_mut(),
         )
     };
+    let _native_error = last_error();
+    if raw.is_null() || raw == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+        record_test_failure!("identity.open_directory", "CreateFileW", _native_error,);
+    }
     let handle = OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?;
     validate_directory_handle(&handle, path)?;
     Ok(handle)
@@ -165,6 +182,11 @@ pub(super) fn create_or_open_directory(
     let created = unsafe { CreateDirectoryW(path_wide.as_ptr(), security.as_ptr()) };
     let create_error = last_error();
     if created == 0 && create_error != windows_sys::Win32::Foundation::ERROR_ALREADY_EXISTS {
+        record_test_failure!(
+            "identity.create_directory",
+            "CreateDirectoryW",
+            create_error,
+        );
         return Err(native_failure(NativeErrorKind::StateUnavailable));
     }
     let handle = open_directory(path, None)?;
@@ -216,13 +238,25 @@ fn validate_fixed_handle(
 ) -> Result<(), NativeError> {
     let mut info = BY_HANDLE_FILE_INFORMATION::default();
     // SAFETY: the handle is valid and the output structure is writable.
-    if unsafe { GetFileInformationByHandle(handle.raw(), &mut info) } == 0 {
+    let info_ok = unsafe { GetFileInformationByHandle(handle.raw(), &mut info) };
+    let _info_error = last_error();
+    if info_ok == 0 {
+        record_test_failure!(
+            "identity.validate_file_information",
+            "GetFileInformationByHandle",
+            _info_error,
+        );
         return Err(native_failure(NativeErrorKind::StateUnavailable));
     }
     let is_directory = (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
     if is_directory != expected_directory
         || (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0
     {
+        record_test_failure!(
+            "identity.validate_file_attributes",
+            "GetFileInformationByHandle",
+            0,
+        );
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
 
@@ -237,12 +271,23 @@ fn validate_fixed_handle(
             0,
         )
     };
+    let _path_error = last_error();
     if length == 0 || length >= final_path.len() as u32 {
+        record_test_failure!(
+            "identity.validate_final_path",
+            "GetFinalPathNameByHandleW",
+            _path_error,
+        );
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
     let actual = String::from_utf16(&final_path[..length as usize])
         .map_err(|_| native_failure(NativeErrorKind::SecurityBoundaryUnavailable))?;
     if actual.starts_with("\\\\?\\UNC\\") {
+        record_test_failure!(
+            "identity.validate_final_path",
+            "GetFinalPathNameByHandleW",
+            0,
+        );
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
     let expected = expected_path
@@ -258,6 +303,11 @@ fn validate_fixed_handle(
         .trim_end_matches('\\')
         .eq_ignore_ascii_case(expected.trim_end_matches('\\'))
     {
+        record_test_failure!(
+            "identity.validate_final_path",
+            "GetFinalPathNameByHandleW",
+            0,
+        );
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
     Ok(())

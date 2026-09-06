@@ -244,9 +244,10 @@ impl StateFile {
         expected_root: FileIdentity,
         initial: StateRecord,
     ) -> Result<Self, NativeError> {
-        let path_text = path
-            .to_str()
-            .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+        let path_text = path.to_str().ok_or_else(|| {
+            record_test_failure!("state.create_owner_path", "Path::to_str", 0);
+            native_failure(NativeErrorKind::InvalidPath)
+        })?;
         let path_wide = wide(path_text);
         // SAFETY: the path and security descriptor remain valid for the
         // synchronous CreateFileW call.
@@ -264,6 +265,10 @@ impl StateFile {
                 ptr::null_mut(),
             )
         };
+        let _native_error = last_error();
+        if raw.is_null() || raw == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+            record_test_failure!("state.create_owner_file", "CreateFileW", _native_error);
+        }
         let handle = OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?;
         let state = Self {
             handle,
@@ -289,9 +294,10 @@ impl StateFile {
         expected_parent: FileIdentity,
         expected_root: FileIdentity,
     ) -> Result<Self, NativeError> {
-        let path_text = path
-            .to_str()
-            .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+        let path_text = path.to_str().ok_or_else(|| {
+            record_test_failure!("state.open_client_path", "Path::to_str", 0);
+            native_failure(NativeErrorKind::InvalidPath)
+        })?;
         let path_wide = wide(path_text);
         // SAFETY: the path remains valid for this synchronous call. Client
         // access intentionally omits DELETE and uses the exact approved share
@@ -307,6 +313,10 @@ impl StateFile {
                 ptr::null_mut(),
             )
         };
+        let _native_error = last_error();
+        if raw.is_null() || raw == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+            record_test_failure!("state.open_client_file", "CreateFileW", _native_error);
+        }
         let state = Self {
             handle: OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?,
             lock_cleanup_failed: AtomicBool::new(false),
@@ -352,12 +362,24 @@ impl StateFile {
         self.ensure_open()?;
         let mut info = BY_HANDLE_FILE_INFORMATION::default();
         // SAFETY: the owned handle is valid and the output structure is writable.
-        if unsafe { GetFileInformationByHandle(self.handle.raw(), &mut info) } == 0 {
+        let info_ok = unsafe { GetFileInformationByHandle(self.handle.raw(), &mut info) };
+        let _info_error = last_error();
+        if info_ok == 0 {
+            record_test_failure!(
+                "state.validate_file_information",
+                "GetFileInformationByHandle",
+                _info_error,
+            );
             return Err(native_failure(NativeErrorKind::StateUnavailable));
         }
         if (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0
             || (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0
         {
+            record_test_failure!(
+                "state.validate_regular_file",
+                "GetFileInformationByHandle",
+                0,
+            );
             return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
         }
         Ok(())

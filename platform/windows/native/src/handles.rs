@@ -5,6 +5,9 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+#[cfg(feature = "test-support")]
+use std::sync::{Mutex, OnceLock};
+
 use windows_sys::Win32::{
     Foundation::{
         CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, WAIT_ABANDONED, WAIT_FAILED,
@@ -29,6 +32,60 @@ pub(super) fn last_error() -> WIN32_ERROR {
 
 pub(super) fn native_failure(kind: NativeErrorKind) -> NativeError {
     NativeError { kind }
+}
+
+#[cfg(feature = "test-support")]
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TestDiagnostic {
+    stage: &'static str,
+    api: &'static str,
+    win32_error: u32,
+}
+
+#[cfg(feature = "test-support")]
+static TEST_DIAGNOSTIC: OnceLock<Mutex<Option<TestDiagnostic>>> = OnceLock::new();
+
+#[cfg(feature = "test-support")]
+fn test_diagnostic_store() -> &'static Mutex<Option<TestDiagnostic>> {
+    TEST_DIAGNOSTIC.get_or_init(|| Mutex::new(None))
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn clear_test_diagnostic() {
+    let mut diagnostic = match test_diagnostic_store().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    *diagnostic = None;
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn record_test_failure(stage: &'static str, api: &'static str, win32_error: u32) {
+    let mut diagnostic = match test_diagnostic_store().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if diagnostic.is_none() {
+        *diagnostic = Some(TestDiagnostic {
+            stage,
+            api,
+            win32_error,
+        });
+    }
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn test_diagnostic() -> Option<String> {
+    let diagnostic = match test_diagnostic_store().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    diagnostic.map(|value| {
+        format!(
+            "stage={};api={};win32_error={}",
+            value.stage, value.api, value.win32_error
+        )
+    })
 }
 
 #[cfg(feature = "test-support")]
@@ -209,6 +266,7 @@ impl OwnedMutex {
                 timeout_ms,
             )
         };
+        let _native_error = last_error();
         match result {
             WAIT_OBJECT_0 => {
                 self.owned = true;
@@ -219,8 +277,14 @@ impl OwnedMutex {
                 Ok(MutexWaitResult::Abandoned)
             }
             WAIT_TIMEOUT => Ok(MutexWaitResult::Timeout),
-            WAIT_FAILED => Err(native_failure(NativeErrorKind::ArbitrationUnavailable)),
-            _ => Err(native_failure(NativeErrorKind::ArbitrationUnavailable)),
+            WAIT_FAILED => {
+                record_test_failure!("handles.mutex_wait", "WaitForSingleObject", _native_error,);
+                Err(native_failure(NativeErrorKind::ArbitrationUnavailable))
+            }
+            _ => {
+                record_test_failure!("handles.mutex_wait", "WaitForSingleObject", _native_error,);
+                Err(native_failure(NativeErrorKind::ArbitrationUnavailable))
+            }
         }
     }
 
@@ -234,15 +298,17 @@ impl OwnedMutex {
         }
         // SAFETY: the arbitration thread owns the mutex for the complete
         // synchronous release operation.
-        if unsafe {
+        let released = unsafe {
             ReleaseMutex(
                 self.handle
                     .as_ref()
                     .expect("owned mutex handle must remain present")
                     .raw(),
             )
-        } == 0
-        {
+        };
+        if released == 0 {
+            let _native_error = last_error();
+            record_test_failure!("handles.mutex_release", "ReleaseMutex", _native_error,);
             return Err(native_failure(NativeErrorKind::ArbitrationReleaseUncertain));
         }
         self.owned = false;

@@ -2,9 +2,11 @@
 
 use std::{
     env, fs,
+    panic::{self, AssertUnwindSafe},
+    path::{Path, PathBuf},
     process::{self, Child, Command, ExitStatus},
     sync::{
-        Arc, Barrier, Mutex, OnceLock,
+        Arc, Barrier, Mutex, MutexGuard, OnceLock,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
@@ -21,7 +23,61 @@ const TEST_NAME_ENV: &str = "JARVIS_NATIVE_QUALIFICATION_TEST";
 const READY_FILE_ENV: &str = "JARVIS_NATIVE_QUALIFICATION_READY_FILE";
 const DEFAULT_TEST_NAME: &str = "windows_owner_second_launch_and_crash_recovery_qualification";
 
-static QUALIFICATION_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+static QUALIFICATION_LOCK: OnceLock<QualificationMutex> = OnceLock::new();
+static QUALIFICATION_FIXTURES: OnceLock<Mutex<Vec<PathBuf>>> = OnceLock::new();
+
+struct QualificationMutex(Mutex<()>);
+
+struct QualificationGuard {
+    _guard: MutexGuard<'static, ()>,
+}
+
+impl QualificationMutex {
+    fn lock(&'static self) -> Result<QualificationGuard, ()> {
+        let guard = match self.0.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        Ok(QualificationGuard { _guard: guard })
+    }
+}
+
+impl Drop for QualificationGuard {
+    fn drop(&mut self) {
+        clear_test_environment();
+        cleanup_fixtures();
+    }
+}
+
+#[test]
+fn windows_qualification_failure_recovers_lock_and_reports_root_diagnostic() {
+    let _guard = qualification_lock().lock().expect("qualification lock");
+    set_test_environment(
+        Path::new("relative-test-root"),
+        "windows_qualification_failure_recovers_lock_and_reports_root_diagnostic",
+        Path::new("relative-test-root.ready"),
+    );
+
+    let failure = match acquire(Role::Normal) {
+        Err(error) => error,
+        Ok(_) => panic!("invalid qualification path unexpectedly acquired"),
+    };
+    assert_eq!(failure.kind, NativeErrorKind::InvalidPath);
+    assert_eq!(
+        jarvis_windows_native::test_acquisition_diagnostic().as_deref(),
+        Some("stage=identity.test_local_app_data;api=validate_absolute_local_path;win32_error=0")
+    );
+    drop(_guard);
+
+    let poisoned = panic::catch_unwind(AssertUnwindSafe(|| {
+        let _guard = qualification_lock().lock().expect("qualification lock");
+        panic!("qualification lock poison sentinel");
+    }));
+    assert!(poisoned.is_err());
+    let _recovered = qualification_lock()
+        .lock()
+        .expect("qualification lock must recover after a prior panic");
+}
 
 #[test]
 fn windows_owner_second_launch_and_crash_recovery_qualification() {
@@ -1391,18 +1447,45 @@ fn create_fixture() -> std::path::PathBuf {
         unique_suffix()
     ));
     fs::create_dir_all(&test_root).expect("qualification LocalAppData fixture must be created");
+    let mut fixtures = match qualification_fixtures().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    fixtures.push(test_root.clone());
     test_root
 }
 
-fn qualification_lock() -> &'static Mutex<()> {
-    QUALIFICATION_LOCK.get_or_init(|| Mutex::new(()))
+fn qualification_lock() -> &'static QualificationMutex {
+    QUALIFICATION_LOCK.get_or_init(|| QualificationMutex(Mutex::new(())))
 }
 
-fn set_test_environment(
-    test_root: &std::path::Path,
-    test_name: &str,
-    ready_file: &std::path::Path,
-) {
+fn qualification_fixtures() -> &'static Mutex<Vec<PathBuf>> {
+    QUALIFICATION_FIXTURES.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn cleanup_fixtures() {
+    let fixtures = match qualification_fixtures().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    for path in fixtures.iter() {
+        for _ in 0..5 {
+            if !path.exists() || fs::remove_dir_all(path).is_ok() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+    drop(fixtures);
+    let mut fixtures = match qualification_fixtures().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    fixtures.retain(|path| path.exists());
+}
+
+fn set_test_environment(test_root: &Path, test_name: &str, ready_file: &Path) {
+    jarvis_windows_native::test_clear_acquisition_diagnostic();
     // SAFETY: this qualification process establishes isolated test-only
     // variables before any child process is spawned.
     unsafe {
@@ -1413,6 +1496,7 @@ fn set_test_environment(
 }
 
 fn clear_test_environment() {
+    jarvis_windows_native::test_clear_acquisition_diagnostic();
     // SAFETY: all qualification child processes have exited; only the
     // process-local test variables are removed.
     unsafe {
@@ -1423,10 +1507,15 @@ fn clear_test_environment() {
 }
 
 fn acquire_owner(role: Role) -> jarvis_windows_native::OwnerLease {
-    match acquire(role).expect("qualification owner must acquire") {
-        Acquisition::Owner(owner) => owner,
-        Acquisition::SecondLaunch(_) => {
+    match acquire(role) {
+        Ok(Acquisition::Owner(owner)) => owner,
+        Ok(Acquisition::SecondLaunch(_)) => {
             panic!("qualification unexpectedly found an existing owner")
+        }
+        Err(error) => {
+            let diagnostic = jarvis_windows_native::test_acquisition_diagnostic()
+                .unwrap_or_else(|| "stage=unknown;api=unknown;win32_error=0".to_owned());
+            panic!("qualification owner must acquire: {error:?}; {diagnostic}");
         }
     }
 }

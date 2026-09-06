@@ -8,6 +8,15 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+macro_rules! record_test_failure {
+    ($stage:expr, $api:expr, $error:expr $(,)?) => {{
+        #[cfg(feature = "test-support")]
+        {
+            crate::handles::record_test_failure($stage, $api, $error);
+        }
+    }};
+}
+
 #[cfg(windows)]
 mod handles;
 
@@ -95,6 +104,18 @@ pub fn test_fail_next_mutex_wait() {
 /// Test-only fault injection for the explicit mutex release.
 pub fn test_fail_next_mutex_release() {
     handles::fail_next_mutex_release_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Clears the test-only first-failure diagnostic.
+pub fn test_clear_acquisition_diagnostic() {
+    handles::clear_test_diagnostic();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Returns a bounded, redacted test-only first-failure diagnostic.
+pub fn test_acquisition_diagnostic() -> Option<String> {
+    handles::test_diagnostic()
 }
 
 #[cfg(all(windows, feature = "test-support"))]

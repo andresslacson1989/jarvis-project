@@ -214,11 +214,23 @@ impl ArbitrationLease {
                 #[cfg(feature = "test-support")]
                 ACTIVE_ARBITRATION_THREADS.fetch_sub(1, Ordering::AcqRel);
             })
-            .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))?;
+            .map_err(|_| {
+                record_test_failure!(
+                    "windows.arbitration_thread_start",
+                    "thread::Builder::spawn",
+                    0,
+                );
+                native_failure(NativeErrorKind::ArbitrationUnavailable)
+            })?;
         if ready_receiver
             .recv_timeout(Duration::from_millis(500))
             .is_err()
         {
+            record_test_failure!(
+                "windows.arbitration_thread_ready",
+                "sync_channel.recv_timeout",
+                0,
+            );
             drop(command);
             let _ = thread.join();
             return Err(native_failure(NativeErrorKind::ArbitrationUnavailable));
@@ -235,10 +247,20 @@ impl ArbitrationLease {
             return Err(native_failure(NativeErrorKind::ArbitrationUnavailable));
         }
         let (result_sender, result_receiver) = sync_channel(0);
-        self.send_command(ArbitrationCommand::Wait(timeout_ms, result_sender))?;
+        self.send_command(ArbitrationCommand::Wait(timeout_ms, result_sender))
+            .inspect_err(|_error| {
+                record_test_failure!("windows.arbitration_command_send", "sync_channel.send", 0,);
+            })?;
         result_receiver
             .recv_timeout(Duration::from_millis(u64::from(timeout_ms) + 500))
-            .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))?
+            .map_err(|_| {
+                record_test_failure!(
+                    "windows.arbitration_wait_result",
+                    "sync_channel.recv_timeout",
+                    0,
+                );
+                native_failure(NativeErrorKind::ArbitrationUnavailable)
+            })?
     }
 
     fn release(&self) -> Result<(), NativeError> {
@@ -749,25 +771,49 @@ struct SecurityBundle {
 
 impl SecurityBundle {
     fn for_sid(sid: &str) -> Result<Self, NativeError> {
+        let directory =
+            ExplicitSecurity::for_sid(sid, DIRECTORY_ACCESS_MASK).inspect_err(|_error| {
+                record_test_failure!("windows.security_directory", "ExplicitSecurity::for_sid", 0);
+            })?;
+        let state = ExplicitSecurity::for_sid(sid, STATE_ACCESS_MASK).inspect_err(|_error| {
+            record_test_failure!("windows.security_state", "ExplicitSecurity::for_sid", 0);
+        })?;
+        let event = ExplicitSecurity::for_sid(sid, EVENT_ACCESS_MASK).inspect_err(|_error| {
+            record_test_failure!("windows.security_event", "ExplicitSecurity::for_sid", 0);
+        })?;
         Ok(Self {
-            directory: ExplicitSecurity::for_sid(sid, DIRECTORY_ACCESS_MASK)?,
-            state: ExplicitSecurity::for_sid(sid, STATE_ACCESS_MASK)?,
-            event: ExplicitSecurity::for_sid(sid, EVENT_ACCESS_MASK)?,
+            directory,
+            state,
+            event,
         })
     }
 }
 
 pub fn acquire(role: Role) -> Result<Acquisition, NativeError> {
-    let prepared = layout::prepare()?;
-    let sid = current_sid()?;
+    let prepared = layout::prepare().inspect_err(|_error| {
+        record_test_failure!("windows.acquire_layout_prepare", "layout::prepare", 0);
+    })?;
+    let sid = current_sid().inspect_err(|_error| {
+        record_test_failure!("windows.acquire_current_sid", "current_sid", 0);
+    })?;
     let sid_hash = hash_sid(&sid);
     let parent_identity = prepared.parent_identity;
-    let mutex_security = ExplicitSecurity::for_sid(&sid, MUTEX_ACCESS_MASK)?;
+    let mutex_security =
+        ExplicitSecurity::for_sid(&sid, MUTEX_ACCESS_MASK).inspect_err(|_error| {
+            record_test_failure!("windows.security_mutex", "ExplicitSecurity::for_sid", 0,);
+        })?;
     let security = SecurityBundle::for_sid(&sid)?;
     let mutex_name = stable_mutex_name(&sid, prepared.parent_identity);
-    let (mutex, created) = create_mutex(&mutex_name, &mutex_security, &sid)?;
-    let arbitration = ArbitrationLease::spawn(mutex)?;
-    match arbitration.wait(0)? {
+    let (mutex, created) =
+        create_mutex(&mutex_name, &mutex_security, &sid).inspect_err(|_error| {
+            record_test_failure!("windows.acquire_mutex", "create_mutex", 0);
+        })?;
+    let arbitration = ArbitrationLease::spawn(mutex).inspect_err(|_error| {
+        record_test_failure!("windows.acquire_arbitration", "ArbitrationLease::spawn", 0);
+    })?;
+    match arbitration.wait(0).inspect_err(|_error| {
+        record_test_failure!("windows.acquire_mutex_wait", "ArbitrationLease::wait", 0);
+    })? {
         MutexWaitResult::Acquired => {
             return acquire_owner(
                 Arc::clone(&arbitration),
@@ -776,7 +822,10 @@ pub fn acquire(role: Role) -> Result<Acquisition, NativeError> {
                 sid_hash,
                 security,
                 role,
-            );
+            )
+            .inspect_err(|_error| {
+                record_test_failure!("windows.acquire_owner", "acquire_owner", 0);
+            });
         }
         MutexWaitResult::Abandoned => {
             return acquire_recovered_owner(
@@ -840,21 +889,41 @@ fn acquire_owner(
     let deadline = Instant::now() + Duration::from_millis(500);
 
     loop {
-        let layout = prepared.finish(&security.directory, &sid)?;
+        let layout = prepared
+            .finish(&security.directory, &sid)
+            .inspect_err(|_error| {
+                record_test_failure!("windows.acquire_owner_layout", "PreparedLayout::finish", 0,);
+            })?;
         let pid = current_pid();
-        let session = current_session(pid)?;
+        let session = current_session(pid).inspect_err(|_error| {
+            record_test_failure!("windows.acquire_owner_session", "ProcessIdToSessionId", 0);
+        })?;
         // SAFETY: GetCurrentProcess returns a valid pseudo-handle with no close
         // obligation.
-        let start_filetime = process_start_filetime(unsafe { GetCurrentProcess() })?;
+        let start_filetime =
+            process_start_filetime(unsafe { GetCurrentProcess() }).inspect_err(|_error| {
+                record_test_failure!(
+                    "windows.acquire_owner_process_identity",
+                    "GetProcessTimes",
+                    0,
+                );
+            })?;
         let role_value = role_value(role);
         let mut nonce = [0u8; 16];
-        fill_random(&mut nonce)
-            .map_err(|_| native_failure(NativeErrorKind::SecurityBoundaryUnavailable))?;
+        fill_random(&mut nonce).map_err(|_| {
+            record_test_failure!("windows.acquire_owner_nonce", "getrandom::fill", 0);
+            native_failure(NativeErrorKind::SecurityBoundaryUnavailable)
+        })?;
 
         let activation_name = event_name(ACTIVATION_EVENT_PREFIX, nonce);
         let ack_name = event_name(ACK_EVENT_PREFIX, nonce);
-        let activation_event = create_event(&activation_name, &security.event)?;
-        let ack_event = create_event(&ack_name, &security.event)?;
+        let activation_event =
+            create_event(&activation_name, &security.event).inspect_err(|_error| {
+                record_test_failure!("windows.acquire_owner_activation_event", "create_event", 0);
+            })?;
+        let ack_event = create_event(&ack_name, &security.event).inspect_err(|_error| {
+            record_test_failure!("windows.acquire_owner_ack_event", "create_event", 0);
+        })?;
         let initial = StateRecord::new(
             role_value,
             OwnerIdentity {
@@ -912,16 +981,39 @@ fn acquire_owner(
             Err(error)
                 if error.kind == NativeErrorKind::StateUnavailable && Instant::now() < deadline =>
             {
+                record_test_failure!(
+                    "windows.acquire_owner_state_create_retry",
+                    "StateFile::create_owner",
+                    0,
+                );
                 drop(ack_event);
                 drop(activation_event);
                 drop(layout);
                 sleep_bounded_until(deadline);
-                prepared = layout::prepare()?;
+                prepared = layout::prepare().inspect_err(|_error| {
+                    record_test_failure!(
+                        "windows.acquire_owner_layout_reprepare",
+                        "layout::prepare",
+                        0,
+                    );
+                })?;
                 if prepared.parent_identity != parent_identity {
+                    record_test_failure!(
+                        "windows.acquire_owner_parent_identity",
+                        "FileIdentity::compare",
+                        0,
+                    );
                     return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
                 }
             }
-            Err(error) => return Err(error),
+            Err(error) => {
+                record_test_failure!(
+                    "windows.acquire_owner_state_create",
+                    "StateFile::create_owner",
+                    0,
+                );
+                return Err(error);
+            }
         }
     }
 }
@@ -2394,7 +2486,8 @@ fn create_mutex(
     // The dedicated arbitration thread performs every wait and release so
     // mutex ownership never becomes thread-affine state in OwnerInner.
     let raw = unsafe { CreateMutexW(security.as_ptr(), 0, name.as_ptr()) };
-    if raw.is_null() && last_error() == windows_sys::Win32::Foundation::ERROR_ACCESS_DENIED {
+    let create_error = last_error();
+    if raw.is_null() && create_error == windows_sys::Win32::Foundation::ERROR_ACCESS_DENIED {
         // CreateMutexW requests the creator's full mutex access when opening
         // an existing named object. Re-open the existing object with exactly
         // the rights required by the bounded wait/release protocol instead of
@@ -2409,6 +2502,10 @@ fn create_mutex(
                 name.as_ptr(),
             )
         };
+        let _reopen_error = last_error();
+        if reopened.is_null() {
+            record_test_failure!("windows.open_mutex", "OpenMutexW", _reopen_error);
+        }
         let handle = OwnedHandle::from_raw(reopened, NativeErrorKind::ArbitrationUnavailable)?;
         security.validate_handle(
             &handle,
@@ -2417,8 +2514,11 @@ fn create_mutex(
         )?;
         return Ok((OwnedMutex::new(handle), false));
     }
+    if raw.is_null() {
+        record_test_failure!("windows.create_mutex", "CreateMutexW", create_error);
+    }
     let handle = OwnedHandle::from_raw(raw, NativeErrorKind::ArbitrationUnavailable)?;
-    let created = last_error() != ERROR_ALREADY_EXISTS;
+    let created = create_error != ERROR_ALREADY_EXISTS;
     if created {
         security.apply_to_handle(
             &handle,
@@ -2438,9 +2538,18 @@ fn create_event(name: &str, security: &ExplicitSecurity) -> Result<OwnedHandle, 
     let name = wide(name);
     // SAFETY: the event name/security remain valid for the synchronous call.
     let raw = unsafe { CreateEventW(security.as_ptr(), 0, 0, name.as_ptr()) };
-    let existing = last_error() == ERROR_ALREADY_EXISTS;
+    let create_error = last_error();
+    let existing = create_error == ERROR_ALREADY_EXISTS;
+    if raw.is_null() {
+        record_test_failure!("windows.create_event", "CreateEventW", create_error);
+    }
     let handle = OwnedHandle::from_raw(raw, NativeErrorKind::EventUnavailable)?;
     if existing {
+        record_test_failure!(
+            "windows.create_event_collision",
+            "CreateEventW",
+            create_error
+        );
         drop(handle);
         return Err(native_failure(NativeErrorKind::ObjectCollision));
     }
@@ -2455,6 +2564,10 @@ fn open_event(name: &str, access: u32) -> Result<OwnedHandle, NativeError> {
     let name = wide(name);
     // SAFETY: the NUL-terminated name remains valid for the synchronous call.
     let raw = unsafe { OpenEventW(access, 0, name.as_ptr()) };
+    let _native_error = last_error();
+    if raw.is_null() {
+        record_test_failure!("windows.open_event", "OpenEventW", _native_error);
+    }
     OwnedHandle::from_raw(raw, NativeErrorKind::EventUnavailable)
 }
 
@@ -2526,7 +2639,14 @@ fn current_pid() -> u32 {
 fn current_session(pid: u32) -> Result<u32, NativeError> {
     let mut session = 0u32;
     // SAFETY: the output pointer is valid for one session ID.
-    if unsafe { ProcessIdToSessionId(pid, &mut session) } == 0 {
+    let result = unsafe { ProcessIdToSessionId(pid, &mut session) };
+    let _native_error = last_error();
+    if result == 0 {
+        record_test_failure!(
+            "windows.process_session",
+            "ProcessIdToSessionId",
+            _native_error,
+        );
         return Err(native_failure(NativeErrorKind::OwnerOtherSession));
     }
     Ok(session)
@@ -2541,7 +2661,15 @@ fn process_start_filetime(
     let mut user = windows_sys::Win32::Foundation::FILETIME::default();
     // SAFETY: all FILETIME outputs are valid and the process handle is either
     // the current-process pseudo-handle or an owned query handle.
-    if unsafe { GetProcessTimes(process, &mut creation, &mut exit, &mut kernel, &mut user) } == 0 {
+    let result =
+        unsafe { GetProcessTimes(process, &mut creation, &mut exit, &mut kernel, &mut user) };
+    let _native_error = last_error();
+    if result == 0 {
+        record_test_failure!(
+            "windows.process_start_time",
+            "GetProcessTimes",
+            _native_error
+        );
         return Err(native_failure(NativeErrorKind::StateUnavailable));
     }
     Ok((u64::from(creation.dwHighDateTime) << 32) | u64::from(creation.dwLowDateTime))
@@ -2554,8 +2682,12 @@ fn process_liveness(pid: u32, expected_start: u64, expected_session: u32) -> Pro
     // SAFETY: OpenProcess is called with the minimum query right needed for
     // identity validation and a non-inheritable handle.
     let raw = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    let _native_error = last_error();
     if raw.is_null() {
-        return if last_error() == ERROR_INVALID_PARAMETER {
+        if _native_error != ERROR_INVALID_PARAMETER {
+            record_test_failure!("windows.open_process", "OpenProcess", _native_error);
+        }
+        return if _native_error == ERROR_INVALID_PARAMETER {
             ProcessLiveness::Dead
         } else {
             ProcessLiveness::Unknown

@@ -49,6 +49,11 @@ impl PreparedLayout {
         let current_parent = identity::open_directory(&self.local_app_data, None)?;
         let current_identity = identity::identity(&current_parent)?;
         if current_identity != self.parent_identity {
+            record_test_failure!(
+                "layout.validate_parent_identity",
+                "FileIdentity::compare",
+                0,
+            );
             return Err(NativeError {
                 kind: NativeErrorKind::SecurityBoundaryUnavailable,
             });
@@ -93,6 +98,7 @@ impl PreparedLayout {
         let current_parent = identity::open_directory(&self.local_app_data, None)?;
         let current_identity = identity::identity(&current_parent)?;
         if current_identity != self.parent_identity {
+            record_test_failure!("layout.finish_parent_identity", "FileIdentity::compare", 0);
             return Err(NativeError {
                 kind: NativeErrorKind::SecurityBoundaryUnavailable,
             });
