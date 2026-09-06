@@ -1066,6 +1066,199 @@ fn windows_stale_generation_cannot_signal_or_mutate_new_request() {
     fs::remove_dir_all(test_root).expect("stale-generation fixture must be removed");
 }
 
+#[derive(Clone, Copy, Debug)]
+enum CancelReleaseBarrier {
+    AfterPreflight,
+    BeforeAcknowledgement,
+}
+
+#[test]
+fn windows_cancel_serializes_with_release_before_state_and_ack_boundaries() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
+    let _guard = qualification_lock().lock().expect("qualification lock");
+
+    for (_case_name, barrier) in [
+        (
+            "windows_cancel_release_after_preflight",
+            CancelReleaseBarrier::AfterPreflight,
+        ),
+        (
+            "windows_cancel_release_before_ack",
+            CancelReleaseBarrier::BeforeAcknowledgement,
+        ),
+    ] {
+        let test_root = create_fixture();
+        set_test_environment(
+            &test_root,
+            "windows_cancel_serializes_with_release_before_state_and_ack_boundaries",
+            &test_root.join("unused.ready"),
+        );
+
+        let mut owner = acquire_owner(Role::Normal);
+        let request_slot = Arc::new(Mutex::new(None));
+        let callback_started = Arc::new(AtomicBool::new(false));
+        let callback_unblock = Arc::new(AtomicBool::new(false));
+        let request_slot_for_worker = Arc::clone(&request_slot);
+        let callback_started_for_worker = Arc::clone(&callback_started);
+        let callback_unblock_for_worker = Arc::clone(&callback_unblock);
+        let worker = owner
+            .start_activation_worker(move |request| {
+                *request_slot_for_worker
+                    .lock()
+                    .expect("cancellation request slot must remain usable") = Some(request);
+                callback_started_for_worker.store(true, Ordering::Release);
+                while !callback_unblock_for_worker.load(Ordering::Acquire) {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                ActivationCallbackResult::NotStarted
+            })
+            .expect("worker must start before cancellation/release qualification");
+        owner.mark_ready().expect("owner must be ready");
+
+        let mut activation = spawn_child_process("second");
+        let callback_wait_started = std::time::Instant::now();
+        while !callback_started.load(Ordering::Acquire) {
+            if let Some(status) = activation
+                .try_wait()
+                .expect("activation status must be readable")
+            {
+                panic!(
+                    "cancellation callback did not expose its request; requester exited: {status:?}"
+                );
+            }
+            assert!(
+                callback_wait_started.elapsed() < Duration::from_secs(2),
+                "cancellation callback did not expose its request"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
+        let request = request_slot
+            .lock()
+            .expect("cancellation request slot must remain usable")
+            .clone()
+            .expect("the callback must retain the exact activation request");
+
+        match barrier {
+            CancelReleaseBarrier::AfterPreflight => {
+                jarvis_windows_native::test_hold_cancel_after_preflight();
+            }
+            CancelReleaseBarrier::BeforeAcknowledgement => {
+                jarvis_windows_native::test_hold_cancel_before_ack();
+            }
+        }
+
+        let cancel_thread = thread::spawn(move || request.cancel());
+        match barrier {
+            CancelReleaseBarrier::AfterPreflight => wait_for_flag_fn(
+                jarvis_windows_native::test_cancel_after_preflight_barrier_reached,
+                "cancellation did not reach its post-preflight barrier",
+            ),
+            CancelReleaseBarrier::BeforeAcknowledgement => wait_for_flag_fn(
+                jarvis_windows_native::test_cancel_before_ack_barrier_reached,
+                "cancellation did not reach its pre-acknowledgement barrier",
+            ),
+        }
+
+        let release_started = Arc::new(AtomicBool::new(false));
+        let release_finished = Arc::new(AtomicBool::new(false));
+        let release_started_for_thread = Arc::clone(&release_started);
+        let release_finished_for_thread = Arc::clone(&release_finished);
+        let release_thread = thread::spawn(move || {
+            release_started_for_thread.store(true, Ordering::Release);
+            let result = owner.release();
+            release_finished_for_thread.store(true, Ordering::Release);
+            result
+        });
+        wait_for_flag(&release_started, "release thread did not start");
+        thread::sleep(Duration::from_millis(100));
+        assert!(
+            !release_finished.load(Ordering::Acquire),
+            "release must remain behind the cancellation presentation gate"
+        );
+        assert!(
+            activation
+                .try_wait()
+                .expect("activation status must be readable")
+                .is_none(),
+            "the requester must not observe acknowledgement while cancellation is paused"
+        );
+
+        match barrier {
+            CancelReleaseBarrier::AfterPreflight => {
+                jarvis_windows_native::test_continue_cancel_after_preflight();
+            }
+            CancelReleaseBarrier::BeforeAcknowledgement => {
+                jarvis_windows_native::test_continue_cancel_before_ack();
+            }
+        }
+        assert_eq!(
+            cancel_thread
+                .join()
+                .expect("cancellation thread must not panic"),
+            ActivationCancellation::Cancelled
+        );
+        assert_eq!(
+            activation
+                .wait()
+                .expect("cancelled activation requester must exit")
+                .code(),
+            Some(5),
+            "a cancellation must not be reported as an acknowledged activation"
+        );
+        callback_unblock.store(true, Ordering::Release);
+        assert!(
+            release_thread
+                .join()
+                .expect("release thread must not panic")
+                .is_ok(),
+            "release must complete after cancellation leaves the presentation gate"
+        );
+
+        let stale_request = request_slot
+            .lock()
+            .expect("cancellation request slot must remain usable")
+            .take()
+            .expect("the stale request must remain available for closed-resource testing");
+        assert_eq!(
+            stale_request.cancel(),
+            ActivationCancellation::Uncertain,
+            "a retained request must fail closed after its owner resources close"
+        );
+
+        drop(worker);
+        let fresh_owner = acquire_owner(Role::Normal);
+        let fresh_worker = fresh_owner
+            .start_activation_worker(|request| {
+                let presentation = match request.begin_presentation() {
+                    Ok(ActivationStart::Started(presentation)) => presentation,
+                    Ok(ActivationStart::Cancelled | ActivationStart::Stale) => {
+                        return ActivationCallbackResult::NotStarted;
+                    }
+                    Err(_) => return ActivationCallbackResult::Uncertain,
+                };
+                let result = ActivationCallbackResult::Handled;
+                let _ = presentation.complete(result);
+                result
+            })
+            .expect("a fresh owner must start after serialized release");
+        fresh_owner
+            .mark_ready()
+            .expect("fresh owner must become ready after serialized release");
+        assert!(
+            spawn_child("second").success(),
+            "a fresh owner must not be affected by a retained stale request"
+        );
+        drop(fresh_worker);
+        drop(fresh_owner);
+
+        clear_test_environment();
+        fs::remove_dir_all(test_root).expect("cancellation/release fixture must be removed");
+    }
+}
+
 #[test]
 fn windows_event_signal_failure_is_typed_and_recovers_closed() {
     if let Ok(mode) = env::var(CHILD_ENV) {
@@ -1356,6 +1549,22 @@ fn wait_for_marker(path: &std::path::Path) {
             started.elapsed() < Duration::from_secs(2),
             "qualification child did not reach its bounded wait marker"
         );
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn wait_for_flag(flag: &AtomicBool, description: &str) {
+    let started = std::time::Instant::now();
+    while !flag.load(Ordering::Acquire) {
+        assert!(started.elapsed() < Duration::from_secs(2), "{description}");
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn wait_for_flag_fn(mut flag: impl FnMut() -> bool, description: &str) {
+    let started = std::time::Instant::now();
+    while !flag() {
+        assert!(started.elapsed() < Duration::from_secs(2), "{description}");
         thread::sleep(Duration::from_millis(10));
     }
 }

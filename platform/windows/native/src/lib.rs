@@ -129,6 +129,42 @@ pub fn test_panic_next_worker_after_callback() {
     windows::panic_next_worker_after_callback_for_test();
 }
 
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only barrier after cancellation preflight and before state mutation.
+pub fn test_hold_cancel_after_preflight() {
+    windows::hold_cancel_after_preflight_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only observation of the cancellation preflight barrier.
+pub fn test_cancel_after_preflight_barrier_reached() -> bool {
+    windows::cancel_after_preflight_barrier_reached_for_test()
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only continuation of the cancellation preflight barrier.
+pub fn test_continue_cancel_after_preflight() {
+    windows::continue_cancel_after_preflight_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only barrier after cancellation state mutation and before acknowledgement.
+pub fn test_hold_cancel_before_ack() {
+    windows::hold_cancel_before_ack_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only observation of the cancellation acknowledgement barrier.
+pub fn test_cancel_before_ack_barrier_reached() -> bool {
+    windows::cancel_before_ack_barrier_reached_for_test()
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only continuation of the cancellation acknowledgement barrier.
+pub fn test_continue_cancel_before_ack() {
+    windows::continue_cancel_before_ack_for_test();
+}
+
 /// The startup operation competing for the one stable authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Role {

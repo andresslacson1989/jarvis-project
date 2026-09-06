@@ -293,6 +293,10 @@ impl<'a> StateLock<'a> {
 impl Drop for StateLock<'_> {
     fn drop(&mut self) {
         if !self.released {
+            if self.handle.is_closed() {
+                self.cleanup_failed.store(true, Ordering::Release);
+                return;
+            }
             // SAFETY: the lock is owned by this process and the range is the
             // one-byte state lock used by the bounded state protocol.
             unsafe {

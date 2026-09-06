@@ -83,6 +83,18 @@ static ARBITRATION_RELEASE_BARRIER_REACHED: AtomicBool = AtomicBool::new(false);
 static PANIC_AFTER_CALLBACK: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "test-support")]
+static HOLD_CANCEL_AFTER_PREFLIGHT: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
+static CANCEL_AFTER_PREFLIGHT_BARRIER_REACHED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
+static HOLD_CANCEL_BEFORE_ACK: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
+static CANCEL_BEFORE_ACK_BARRIER_REACHED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
 pub(crate) fn active_arbitration_threads_for_test() -> usize {
     ACTIVE_ARBITRATION_THREADS.load(Ordering::Acquire)
 }
@@ -109,6 +121,38 @@ pub(crate) fn panic_next_worker_after_callback_for_test() {
 }
 
 #[cfg(feature = "test-support")]
+pub(crate) fn hold_cancel_after_preflight_for_test() {
+    CANCEL_AFTER_PREFLIGHT_BARRIER_REACHED.store(false, Ordering::Release);
+    HOLD_CANCEL_AFTER_PREFLIGHT.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn cancel_after_preflight_barrier_reached_for_test() -> bool {
+    CANCEL_AFTER_PREFLIGHT_BARRIER_REACHED.load(Ordering::Acquire)
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn continue_cancel_after_preflight_for_test() {
+    HOLD_CANCEL_AFTER_PREFLIGHT.store(false, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn hold_cancel_before_ack_for_test() {
+    CANCEL_BEFORE_ACK_BARRIER_REACHED.store(false, Ordering::Release);
+    HOLD_CANCEL_BEFORE_ACK.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn cancel_before_ack_barrier_reached_for_test() -> bool {
+    CANCEL_BEFORE_ACK_BARRIER_REACHED.load(Ordering::Acquire)
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn continue_cancel_before_ack_for_test() {
+    HOLD_CANCEL_BEFORE_ACK.store(false, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
 fn wait_before_arbitration_release_for_test() {
     if HOLD_BEFORE_ARBITRATION_RELEASE.load(Ordering::Acquire) {
         ARBITRATION_RELEASE_BARRIER_REACHED.store(true, Ordering::Release);
@@ -116,6 +160,28 @@ fn wait_before_arbitration_release_for_test() {
             thread::sleep(Duration::from_millis(1));
         }
         ARBITRATION_RELEASE_BARRIER_REACHED.store(false, Ordering::Release);
+    }
+}
+
+#[cfg(feature = "test-support")]
+fn wait_cancel_after_preflight_for_test() {
+    if HOLD_CANCEL_AFTER_PREFLIGHT.load(Ordering::Acquire) {
+        CANCEL_AFTER_PREFLIGHT_BARRIER_REACHED.store(true, Ordering::Release);
+        while HOLD_CANCEL_AFTER_PREFLIGHT.load(Ordering::Acquire) {
+            thread::sleep(Duration::from_millis(1));
+        }
+        CANCEL_AFTER_PREFLIGHT_BARRIER_REACHED.store(false, Ordering::Release);
+    }
+}
+
+#[cfg(feature = "test-support")]
+fn wait_cancel_before_ack_for_test() {
+    if HOLD_CANCEL_BEFORE_ACK.load(Ordering::Acquire) {
+        CANCEL_BEFORE_ACK_BARRIER_REACHED.store(true, Ordering::Release);
+        while HOLD_CANCEL_BEFORE_ACK.load(Ordering::Acquire) {
+            thread::sleep(Duration::from_millis(1));
+        }
+        CANCEL_BEFORE_ACK_BARRIER_REACHED.store(false, Ordering::Release);
     }
 }
 
@@ -504,12 +570,24 @@ impl ActivationRequestContext {
     }
 
     pub(crate) fn cancel(&self) -> ActivationCancellation {
+        // The presentation gate is the operation boundary shared with
+        // shutdown. Cancellation acquires it before reading lifecycle flags
+        // and retains it through state mutation and acknowledgement signal.
+        // It intentionally does not acquire lifecycle_gate: callbacks may
+        // retain a request, while release orders lifecycle_gate before this
+        // presentation boundary.
+        let _presentation_gate = match self.inner.presentation_gate.lock() {
+            Ok(gate) => gate,
+            Err(_) => return ActivationCancellation::Uncertain,
+        };
         if self.inner.shutting_down.load(Ordering::Acquire)
             || self.inner.authority_released.load(Ordering::Acquire)
             || self.inner.resources_closed.load(Ordering::Acquire)
         {
             return ActivationCancellation::Uncertain;
         }
+        #[cfg(feature = "test-support")]
+        wait_cancel_after_preflight_for_test();
         let outcome = self.inner.state.transact(|record| {
             if record.request_generation != self.generation {
                 return Ok(CancelOutcome::Stale);
@@ -538,16 +616,20 @@ impl ActivationRequestContext {
             }
         });
         match outcome {
-            Ok(CancelOutcome::Cancelled) => match signal_ack(&self.inner) {
-                Ok(()) => ActivationCancellation::Cancelled,
-                Err(_) => {
-                    self.inner.worker_failed.store(true, Ordering::Release);
-                    self.inner
-                        .worker_cleanup_failed
-                        .store(true, Ordering::Release);
-                    ActivationCancellation::Uncertain
+            Ok(CancelOutcome::Cancelled) => {
+                #[cfg(feature = "test-support")]
+                wait_cancel_before_ack_for_test();
+                match signal_ack(&self.inner) {
+                    Ok(()) => ActivationCancellation::Cancelled,
+                    Err(_) => {
+                        self.inner.worker_failed.store(true, Ordering::Release);
+                        self.inner
+                            .worker_cleanup_failed
+                            .store(true, Ordering::Release);
+                        ActivationCancellation::Uncertain
+                    }
                 }
-            },
+            }
             Ok(CancelOutcome::AlreadyCancelled) => ActivationCancellation::Cancelled,
             Ok(CancelOutcome::InFlight) => ActivationCancellation::InFlight,
             Ok(CancelOutcome::Stale) => ActivationCancellation::Stale,
@@ -1324,6 +1406,11 @@ impl Drop for ActivationWorker {
 }
 
 fn stop_worker(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
+    // Lock order is lifecycle_gate -> presentation_gate for owner shutdown.
+    // Cancellation acquires presentation_gate only, so it cannot deadlock a
+    // callback-capable path with the owner lifecycle gate. Setting
+    // shutting_down while holding presentation_gate prevents a queued
+    // cancellation from reaching state/event handles after shutdown starts.
     let signal_result = {
         let _gate = inner
             .presentation_gate
@@ -1349,7 +1436,7 @@ fn stop_worker(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
 }
 
 fn signal_activation(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
-    if inner.resources_closed.load(Ordering::Acquire) {
+    if inner.resources_closed.load(Ordering::Acquire) || inner.activation_event.is_closed() {
         return Err(native_failure(NativeErrorKind::EventUnavailable));
     }
     // SAFETY: the activation handle is owned by the current authority and is
@@ -2217,13 +2304,16 @@ fn reconcile_inflight(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
 }
 
 fn signal_ack(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
-    if inner.resources_closed.load(Ordering::Acquire) {
+    if inner.resources_closed.load(Ordering::Acquire) || inner.ack_event.is_closed() {
         return Err(native_failure(NativeErrorKind::EventUnavailable));
     }
     signal_external_ack(&inner.ack_event)
 }
 
 fn signal_external_ack(ack_event: &OwnedHandle) -> Result<(), NativeError> {
+    if ack_event.is_closed() {
+        return Err(native_failure(NativeErrorKind::EventUnavailable));
+    }
     #[cfg(feature = "test-support")]
     if crate::handles::FAIL_NEXT_EVENT_SIGNAL.swap(false, Ordering::AcqRel) {
         return Err(native_failure(NativeErrorKind::EventUnavailable));

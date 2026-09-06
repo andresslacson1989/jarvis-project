@@ -340,7 +340,16 @@ impl StateFile {
         self.handle.retain_on_drop();
     }
 
+    fn ensure_open(&self) -> Result<(), NativeError> {
+        if self.handle.is_closed() {
+            Err(native_failure(NativeErrorKind::StateUnavailable))
+        } else {
+            Ok(())
+        }
+    }
+
     fn validate_regular_file(&self) -> Result<(), NativeError> {
+        self.ensure_open()?;
         let mut info = BY_HANDLE_FILE_INFORMATION::default();
         // SAFETY: the owned handle is valid and the output structure is writable.
         if unsafe { GetFileInformationByHandle(self.handle.raw(), &mut info) } == 0 {
@@ -358,6 +367,7 @@ impl StateFile {
     where
         F: FnOnce(&mut StateRecord) -> Result<T, NativeError>,
     {
+        self.ensure_open()?;
         let lock = self.lock()?;
         let operation = (|| {
             let current = self.read_locked()?;
@@ -379,6 +389,7 @@ impl StateFile {
     }
 
     pub(super) fn read_snapshot(&self) -> Result<StateRecord, NativeError> {
+        self.ensure_open()?;
         let lock = self.lock()?;
         let operation = self.read_locked();
         let release = lock.release();
@@ -390,6 +401,7 @@ impl StateFile {
     }
 
     fn set_length(&self) -> Result<(), NativeError> {
+        self.ensure_open()?;
         let mut position = 0i64;
         // SAFETY: the handle is valid; this moves the synchronous file pointer
         // to the fixed end of the state file.
@@ -425,6 +437,7 @@ impl StateFile {
     }
 
     fn read_locked(&self) -> Result<StateRecord, NativeError> {
+        self.ensure_open()?;
         let mut bytes = [0u8; FILE_SIZE];
         let mut size = 0i64;
         // SAFETY: the handle is valid and the output size pointer is writable.
@@ -458,6 +471,7 @@ impl StateFile {
     }
 
     fn write_next(&self, next: &StateRecord, previous_generation: u64) -> Result<(), NativeError> {
+        self.ensure_open()?;
         let mut bytes = [0u8; FILE_SIZE];
         self.read_at(0, &mut bytes)?;
         let first_generation = StateRecord::decode(&bytes[HEADER_SIZE..HEADER_SIZE + SLOT_SIZE])?
@@ -483,6 +497,7 @@ impl StateFile {
     }
 
     fn lock(&self) -> Result<StateLock<'_>, NativeError> {
+        self.ensure_open()?;
         if self.lock_cleanup_failed.load(Ordering::Acquire) {
             return Err(native_failure(NativeErrorKind::LockUncertain));
         }
@@ -521,6 +536,7 @@ impl StateFile {
     }
 
     fn read_at(&self, offset: i64, buffer: &mut [u8]) -> Result<(), NativeError> {
+        self.ensure_open()?;
         self.seek(offset)?;
         let mut read = 0u32;
         // SAFETY: buffer is writable for its exact length and this is a
@@ -541,6 +557,7 @@ impl StateFile {
     }
 
     fn write_at(&self, offset: i64, buffer: &[u8]) -> Result<(), NativeError> {
+        self.ensure_open()?;
         self.seek(offset)?;
         let mut written = 0u32;
         // SAFETY: buffer is readable for its exact length and this is a
@@ -561,6 +578,7 @@ impl StateFile {
     }
 
     fn seek(&self, offset: i64) -> Result<(), NativeError> {
+        self.ensure_open()?;
         let mut position = 0i64;
         // SAFETY: the handle is valid and the output position pointer is
         // writable.
@@ -573,6 +591,7 @@ impl StateFile {
     }
 
     fn flush(&self) -> Result<(), NativeError> {
+        self.ensure_open()?;
         // SAFETY: the handle is valid and opened for synchronous write-through
         // access.
         if unsafe { FlushFileBuffers(self.handle.raw()) } == 0 {
@@ -595,6 +614,10 @@ impl StateLock<'_> {
         let injected_pre_call_failure = false;
         #[cfg(not(feature = "test-support"))]
         let injected_failure = false;
+        if self.handle.is_closed() {
+            self.mark_cleanup_failed();
+            return Err(native_failure(NativeErrorKind::LockUncertain));
+        }
         if injected_pre_call_failure {
             self.mark_cleanup_failed();
             return Err(native_failure(NativeErrorKind::LockUncertain));
