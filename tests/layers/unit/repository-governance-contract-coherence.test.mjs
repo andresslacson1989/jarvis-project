@@ -59,3 +59,14 @@ test("owner execution goal is non-normative and agrees with the active authority
   assert.match(goal, /GitLab is mirror-only/);
   assert.match(agents, /JARVIS-DEVELOPER-EXECUTION-GOAL\.md/);
 });
+
+test("owner execution goal names the auditor loop and truthful continuation checkpoints", () => {
+  const goal = read("docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md");
+  assert.match(goal, /Repeat the following seventeen steps/);
+  assert.match(goal, /codex:\/\/threads\/01a066d6-1a98-7260-8ce3-d8e8c2c07968/);
+  assert.match(goal, /matrix as the implementation plan/);
+  assert.match(goal, /highly detailed next-step plan/);
+  assert.match(goal, /truthful statuses/);
+  assert.match(goal, /LocalCI may become authoritative only after/);
+  assert.match(goal, /Production Complete/);
+});

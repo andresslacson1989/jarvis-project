@@ -152,6 +152,28 @@ test("owner execution goal is checked in, referenced, and reconciled with select
   assert.match(readme, /GitLab is mirror-only/);
 });
 
+test("owner execution goal preserves the complete auditor-gated seventeen-step matrix loop", () => {
+  const loopStart = ownerGoal.indexOf("## Mandatory subsection loop");
+  const loopEnd = ownerGoal.indexOf("## Authority, integration, and LocalCI rules");
+  assert.ok(loopStart >= 0);
+  assert.ok(loopEnd > loopStart);
+  const loop = ownerGoal.slice(loopStart, loopEnd);
+  const stepNumbers = [...loop.matchAll(/^([0-9]+)\. \*\*/gm)].map((match) => Number(match[1]));
+  assert.deepEqual(stepNumbers, Array.from({ length: 17 }, (_, index) => index + 1));
+  assert.match(loop, /Use the matrix as the implementation plan/);
+  assert.match(loop, /dependencies, its section checkpoint, its current status, its current score, its weakest gap/);
+  assert.match(loop, /file-by-file change boundary/);
+  assert.match(loop, /codex:\/\/threads\/01a066d6-1a98-7260-8ce3-d8e8c2c07968/);
+  assert.match(loop, /highly detailed planned goal with sections, checkpoints, acceptance criteria, and file-by-file instructions/);
+  assert.match(loop, /Do not begin or continue subsection implementation until the auditor has responded/);
+  assert.match(loop, /APPROVED.*NEXT PASS/);
+  assert.match(ownerGoal, /Original goal/);
+  assert.match(ownerGoal, /Completed \/ found/);
+  assert.match(ownerGoal, /Key decisions/);
+  assert.match(ownerGoal, /Remaining/);
+  assert.match(ownerGoal, /Production Complete/);
+});
+
 test("documentation cannot promote an ineligible CI authority", () => {
   const profile = JSON.parse(readFileSync(new URL("../../../docs/implementation/governance/repository-governance-profile.json", import.meta.url), "utf8"));
   profile.mandatoryCi.selectedAuthority.type = "GITLAB_CI";
