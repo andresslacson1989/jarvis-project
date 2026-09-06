@@ -1,0 +1,31 @@
+JARVIS Section 1.4 authoritative GitHub Actions failure evidence
+
+run_id=34038915030
+windows_job_id=101501975861
+head_branch=impl/section1-4-candidate
+head_sha=abe637a6b174f84ad15e05fff98b7bb0afa297de
+event=push
+workflow=Static CI
+terminal_status=completed
+terminal_conclusion=failure
+
+This is a bounded, redacted excerpt of the Windows native process qualification
+job. It contains no credentials, SID values, handles, tokens, or secret material.
+
+--- sanitized log excerpt ---
+Windows native process qualification
+cargo test --locked -p jarvis-windows-native --features test-support --test windows_process_qualification -- --test-threads=1
+running 17 tests
+test windows_activation_timeout_reconciles_late_success_without_duplicate_callback ... FAILED
+thread 'windows_activation_timeout_reconciles_late_success_without_duplicate_callback' panicked at platform\\windows\\native\\tests\\windows_process_qualification.rs:1426:25:
+qualification owner must acquire: NativeError { kind: SecurityBoundaryUnavailable }
+
+test windows_cancel_serializes_with_release_before_state_and_ack_boundaries ... FAILED
+thread 'windows_cancel_serializes_with_release_before_state_and_ack_boundaries' panicked at platform\\windows\\native\\tests\\windows_process_qualification.rs:1081:46:
+qualification lock: PoisonError { .. }
+
+[remaining qualification tests reported the same shared-lock PoisonError cascade]
+test result: FAILED. 0 passed; 17 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+error: test failed, to rerun pass `-p jarvis-windows-native --test windows_process_qualification`
+Error: Process completed with exit code 1.
+--- end sanitized log excerpt ---
