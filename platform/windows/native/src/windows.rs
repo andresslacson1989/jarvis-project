@@ -68,8 +68,41 @@ struct ArbitrationLease {
 static ACTIVE_ARBITRATION_THREADS: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(feature = "test-support")]
+static HOLD_BEFORE_ARBITRATION_RELEASE: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
+static ARBITRATION_RELEASE_BARRIER_REACHED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
 pub(crate) fn active_arbitration_threads_for_test() -> usize {
     ACTIVE_ARBITRATION_THREADS.load(Ordering::Acquire)
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn hold_before_arbitration_release_for_test() {
+    ARBITRATION_RELEASE_BARRIER_REACHED.store(false, Ordering::Release);
+    HOLD_BEFORE_ARBITRATION_RELEASE.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn arbitration_release_barrier_reached_for_test() -> bool {
+    ARBITRATION_RELEASE_BARRIER_REACHED.load(Ordering::Acquire)
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn continue_arbitration_release_for_test() {
+    HOLD_BEFORE_ARBITRATION_RELEASE.store(false, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+fn wait_before_arbitration_release_for_test() {
+    if HOLD_BEFORE_ARBITRATION_RELEASE.load(Ordering::Acquire) {
+        ARBITRATION_RELEASE_BARRIER_REACHED.store(true, Ordering::Release);
+        while HOLD_BEFORE_ARBITRATION_RELEASE.load(Ordering::Acquire) {
+            thread::sleep(Duration::from_millis(1));
+        }
+        ARBITRATION_RELEASE_BARRIER_REACHED.store(false, Ordering::Release);
+    }
 }
 
 impl ArbitrationLease {
@@ -276,6 +309,7 @@ struct OwnerInner {
     worker_failed: AtomicBool,
     worker_cleanup_failed: AtomicBool,
     callback_active: AtomicBool,
+    resources_closed: AtomicBool,
 }
 
 #[derive(Debug)]
@@ -333,6 +367,7 @@ impl ActivationRequestContext {
         if self.inner.shutting_down.load(Ordering::Acquire)
             || self.inner.authority_released.load(Ordering::Acquire)
             || self.inner.worker_cleanup_failed.load(Ordering::Acquire)
+            || self.inner.resources_closed.load(Ordering::Acquire)
         {
             return Err(native_failure(NativeErrorKind::ActivationUncertain));
         }
@@ -402,6 +437,7 @@ impl ActivationRequestContext {
     pub(crate) fn cancel(&self) -> ActivationCancellation {
         if self.inner.shutting_down.load(Ordering::Acquire)
             || self.inner.authority_released.load(Ordering::Acquire)
+            || self.inner.resources_closed.load(Ordering::Acquire)
         {
             return ActivationCancellation::Uncertain;
         }
@@ -469,6 +505,7 @@ impl ActivationPresentation {
     fn complete_inner(&self, result: ActivationCallbackResult) -> Result<(), NativeError> {
         if self.inner.shutting_down.load(Ordering::Acquire)
             || self.inner.authority_released.load(Ordering::Acquire)
+            || self.inner.resources_closed.load(Ordering::Acquire)
         {
             return Err(native_failure(NativeErrorKind::ActivationUncertain));
         }
@@ -705,6 +742,7 @@ fn acquire_owner(
                         worker_failed: AtomicBool::new(false),
                         worker_cleanup_failed: AtomicBool::new(false),
                         callback_active: AtomicBool::new(false),
+                        resources_closed: AtomicBool::new(false),
                     }),
                     arbitration,
                     released: false,
@@ -834,6 +872,12 @@ impl OwnerLease {
             self.inner.authority_released.store(true, Ordering::Release);
             return Err(error);
         }
+        if let Err(error) = self.inner.close_resources() {
+            self.inner.authority_released.store(true, Ordering::Release);
+            return Err(error);
+        }
+        #[cfg(feature = "test-support")]
+        wait_before_arbitration_release_for_test();
         if let Err(error) = self.arbitration.release() {
             self.inner.authority_released.store(true, Ordering::Release);
             return Err(error);
@@ -855,6 +899,28 @@ impl OwnerLease {
     }
 }
 
+impl OwnerInner {
+    fn close_resources(&self) -> Result<(), NativeError> {
+        if self.resources_closed.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        let state_result = self.state.close();
+        let activation_result = self
+            .activation_event
+            .close()
+            .map_err(|_| native_failure(NativeErrorKind::EventUnavailable));
+        let ack_result = self
+            .ack_event
+            .close()
+            .map_err(|_| native_failure(NativeErrorKind::EventUnavailable));
+        state_result?;
+        activation_result?;
+        ack_result?;
+        self.resources_closed.store(true, Ordering::Release);
+        Ok(())
+    }
+}
+
 impl Drop for OwnerLease {
     fn drop(&mut self) {
         let _ = self.release();
@@ -866,6 +932,7 @@ impl OwnerController {
         if self.inner.shutting_down.load(Ordering::Acquire)
             || self.inner.authority_released.load(Ordering::Acquire)
             || self.inner.worker_cleanup_failed.load(Ordering::Acquire)
+            || self.inner.resources_closed.load(Ordering::Acquire)
         {
             return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
         }
@@ -909,7 +976,9 @@ impl OwnerController {
         if self.inner.role != Role::Normal {
             return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
         }
-        if self.inner.shutting_down.load(Ordering::Acquire) {
+        if self.inner.shutting_down.load(Ordering::Acquire)
+            || self.inner.resources_closed.load(Ordering::Acquire)
+        {
             return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
         }
         if self
@@ -1077,6 +1146,9 @@ fn stop_worker(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
 }
 
 fn signal_activation(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
+    if inner.resources_closed.load(Ordering::Acquire) {
+        return Err(native_failure(NativeErrorKind::EventUnavailable));
+    }
     // SAFETY: the activation handle is owned by the current authority and is
     // valid until the worker has been joined.
     if unsafe { SetEvent(inner.activation_event.raw()) } == 0 {
@@ -1615,6 +1687,7 @@ where
         || inner.worker_alive_generation.load(Ordering::Acquire) != generation
         || inner.worker_ready_generation.load(Ordering::Acquire) != generation
         || inner.worker_cleanup_failed.load(Ordering::Acquire)
+        || inner.resources_closed.load(Ordering::Acquire)
     {
         return;
     }
@@ -1851,6 +1924,9 @@ fn reconcile_inflight(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
 }
 
 fn signal_ack(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
+    if inner.resources_closed.load(Ordering::Acquire) {
+        return Err(native_failure(NativeErrorKind::EventUnavailable));
+    }
     signal_external_ack(&inner.ack_event)
 }
 

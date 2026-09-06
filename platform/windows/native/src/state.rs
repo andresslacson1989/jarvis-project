@@ -322,6 +322,12 @@ impl StateFile {
         Ok(state)
     }
 
+    pub(super) fn close(&self) -> Result<(), NativeError> {
+        self.handle
+            .close()
+            .map_err(|_| native_failure(NativeErrorKind::StateUnavailable))
+    }
+
     fn validate_regular_file(&self) -> Result<(), NativeError> {
         let mut info = BY_HANDLE_FILE_INFORMATION::default();
         // SAFETY: the owned handle is valid and the output structure is writable.

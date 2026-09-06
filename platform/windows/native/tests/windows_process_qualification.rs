@@ -290,20 +290,57 @@ fn windows_activation_timeout_reconciles_late_success_without_duplicate_callback
 
 #[test]
 fn windows_owner_release_is_safe_when_lease_moves_threads() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
     let _guard = qualification_lock().lock().expect("qualification lock");
     let test_root = create_fixture();
+    let ready_file = test_root.join("close-before-release.ready");
     set_test_environment(
         &test_root,
         "windows_owner_release_is_safe_when_lease_moves_threads",
-        &test_root.join("unused.ready"),
+        &ready_file,
     );
 
-    let owner = acquire_owner(Role::Normal);
-    thread::spawn(move || drop(owner))
-        .join()
-        .expect("moved owner lease must drop cleanly");
-    let reacquired = acquire_owner(Role::Normal);
-    drop(reacquired);
+    let mut owner = acquire_owner(Role::Normal);
+    let worker = owner
+        .start_activation_worker(|_| ActivationCallbackResult::Uncertain)
+        .expect("owner worker must start before close-order qualification");
+    owner
+        .mark_ready()
+        .expect("owner must be ready before close-order qualification");
+    let retained_controller = owner.controller();
+    jarvis_windows_native::test_hold_before_arbitration_release();
+    let release_thread = thread::spawn(move || owner.release());
+    wait_for_arbitration_release_barrier();
+
+    let waiter = spawn_child_process("recovery-waiter");
+    wait_for_marker(&ready_file);
+    jarvis_windows_native::test_continue_arbitration_release();
+    assert!(
+        release_thread
+            .join()
+            .expect("owner release thread must join")
+            .is_ok(),
+        "owner must close persistence/IPC before releasing arbitration"
+    );
+    assert!(
+        waiter
+            .wait_with_output()
+            .expect("recovery waiter must exit")
+            .status
+            .success(),
+        "fresh owner must recover after the close-before-release lifecycle"
+    );
+    assert_eq!(
+        retained_controller
+            .mark_ready()
+            .expect_err("retained controller must fail closed after resource closure")
+            .kind,
+        NativeErrorKind::InvalidRuntimeState
+    );
+    drop(worker);
 
     clear_test_environment();
     fs::remove_dir_all(test_root).expect("moved-owner fixture must be removed");
@@ -679,6 +716,17 @@ fn wait_for_marker(path: &std::path::Path) {
         assert!(
             started.elapsed() < Duration::from_secs(2),
             "qualification child did not reach its bounded wait marker"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn wait_for_arbitration_release_barrier() {
+    let started = std::time::Instant::now();
+    while !jarvis_windows_native::test_arbitration_release_barrier_reached() {
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "owner release did not close resources before arbitration barrier"
         );
         thread::sleep(Duration::from_millis(10));
     }

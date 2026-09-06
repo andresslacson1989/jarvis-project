@@ -64,18 +64,38 @@ pub(crate) fn fail_next_mutex_release_for_test() {
 }
 
 #[derive(Debug)]
-pub(super) struct OwnedHandle(NonNull<std::ffi::c_void>);
+pub(super) struct OwnedHandle {
+    raw: NonNull<std::ffi::c_void>,
+    closed: AtomicBool,
+}
 
 impl OwnedHandle {
     pub(super) fn from_raw(raw: HANDLE, kind: NativeErrorKind) -> Result<Self, NativeError> {
         NonNull::new(raw)
             .filter(|_| raw != INVALID_HANDLE_VALUE)
-            .map(Self)
+            .map(|raw| Self {
+                raw,
+                closed: AtomicBool::new(false),
+            })
             .ok_or_else(|| native_failure(kind))
     }
 
     pub(super) fn raw(&self) -> HANDLE {
-        self.0.as_ptr()
+        self.raw.as_ptr()
+    }
+
+    pub(super) fn close(&self) -> Result<(), ()> {
+        if self.closed.swap(true, Ordering::AcqRel) {
+            return Ok(());
+        }
+        // SAFETY: the handle was accepted from a successful Win32 creator and
+        // this method is the sole explicit close path.
+        if unsafe { CloseHandle(self.raw()) } == 0 {
+            self.closed.store(false, Ordering::Release);
+            Err(())
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -92,11 +112,7 @@ unsafe impl Sync for OwnedHandle {}
 
 impl Drop for OwnedHandle {
     fn drop(&mut self) {
-        // SAFETY: the handle was accepted from a successful Win32 creator and
-        // is closed exactly once here.
-        unsafe {
-            let _ = CloseHandle(self.raw());
-        }
+        let _ = self.close();
     }
 }
 

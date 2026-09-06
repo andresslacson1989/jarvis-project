@@ -79,6 +79,25 @@ pub fn test_active_arbitration_threads() -> usize {
     windows::active_arbitration_threads_for_test()
 }
 
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only barrier placed after owner persistence/IPC closure and before
+/// instance-mutex release.
+pub fn test_hold_before_arbitration_release() {
+    windows::hold_before_arbitration_release_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only observation of the close-before-release barrier.
+pub fn test_arbitration_release_barrier_reached() -> bool {
+    windows::arbitration_release_barrier_reached_for_test()
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only continuation of the close-before-release barrier.
+pub fn test_continue_arbitration_release() {
+    windows::continue_arbitration_release_for_test();
+}
+
 /// The startup operation competing for the one stable authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Role {
