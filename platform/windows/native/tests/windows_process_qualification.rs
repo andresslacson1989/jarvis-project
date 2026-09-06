@@ -507,6 +507,10 @@ fn windows_mutex_wait_failure_is_reported_without_claiming_ownership() {
 
 #[test]
 fn windows_mutex_release_failure_is_uncertain_and_disables_authority() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
     let _guard = qualification_lock().lock().expect("qualification lock");
     let test_root = create_fixture();
     set_test_environment(
@@ -515,23 +519,14 @@ fn windows_mutex_release_failure_is_uncertain_and_disables_authority() {
         &test_root.join("unused.ready"),
     );
 
-    let mut owner = acquire_owner(Role::Normal);
-    jarvis_windows_native::test_fail_next_mutex_release();
+    let failed_owner = spawn_child("mutex-release-failure-owner");
     assert_eq!(
-        owner
-            .release()
-            .expect_err("injected mutex release failure must be surfaced")
-            .kind,
-        NativeErrorKind::ArbitrationReleaseUncertain
+        failed_owner.code(),
+        Some(0),
+        "failed owner must dispose its joined arbitration lifecycle: {failed_owner:?}"
     );
-    assert_eq!(
-        owner
-            .mark_ready()
-            .expect_err("authority must be disabled after uncertain release")
-            .kind,
-        NativeErrorKind::InvalidRuntimeState
-    );
-    drop(owner);
+    let recovered = acquire_owner(Role::Normal);
+    drop(recovered);
 
     clear_test_environment();
     fs::remove_dir_all(test_root).expect("mutex-release fixture must be removed");
@@ -629,6 +624,27 @@ fn run_child(mode: &str) {
             Ok(Acquisition::SecondLaunch(_)) => process::exit(8),
             Err(_) => process::exit(9),
         },
+        "mutex-release-failure-owner" => {
+            let mut owner = acquire_owner(Role::Normal);
+            let worker = owner
+                .start_activation_worker(|_| ActivationCallbackResult::Uncertain)
+                .expect("release-failure owner worker must start");
+            owner
+                .mark_ready()
+                .expect("release-failure owner must become ready");
+            jarvis_windows_native::test_fail_next_mutex_release();
+            let error = owner
+                .release()
+                .expect_err("injected mutex release failure must be surfaced");
+            if error.kind != NativeErrorKind::ArbitrationReleaseUncertain
+                || owner.mark_ready().is_ok()
+                || jarvis_windows_native::test_active_arbitration_threads() != 0
+            {
+                process::exit(30);
+            }
+            drop(worker);
+            process::exit(0);
+        }
         "owner-hold" => match acquire(Role::Normal) {
             Ok(Acquisition::Owner(_owner)) => {
                 thread::sleep(Duration::from_millis(2_000));

@@ -73,6 +73,12 @@ pub fn test_fail_next_mutex_release() {
     handles::fail_next_mutex_release_for_test();
 }
 
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only lifecycle observation for arbitration-thread qualification.
+pub fn test_active_arbitration_threads() -> usize {
+    windows::active_arbitration_threads_for_test()
+}
+
 /// The startup operation competing for the one stable authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Role {

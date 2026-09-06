@@ -46,7 +46,6 @@ const ACTIVATION_EVENT_PREFIX: &str = "Local\\JARVIS-DESKTOP-ACTIVATE-";
 const ACK_EVENT_PREFIX: &str = "Local\\JARVIS-DESKTOP-ACK-";
 const PENDING_HOUSEKEEPING: Duration = Duration::from_secs(2);
 const ACTIVATION_RECONCILIATION: Duration = Duration::from_millis(500);
-const CALLBACK_DEADLINE: Duration = Duration::from_millis(500);
 const SHUTDOWN_DEADLINE: Duration = Duration::from_millis(1_000);
 
 const ARBITRATION_ACTIVE: u8 = 0;
@@ -60,21 +59,28 @@ enum ArbitrationCommand {
 
 #[derive(Debug)]
 struct ArbitrationLease {
-    command: SyncSender<ArbitrationCommand>,
+    command: Mutex<Option<SyncSender<ArbitrationCommand>>>,
     join: Mutex<Option<JoinHandle<()>>>,
-    thread_exited: Arc<AtomicBool>,
     terminal: AtomicU8,
+}
+
+#[cfg(feature = "test-support")]
+static ACTIVE_ARBITRATION_THREADS: AtomicUsize = AtomicUsize::new(0);
+
+#[cfg(feature = "test-support")]
+pub(crate) fn active_arbitration_threads_for_test() -> usize {
+    ACTIVE_ARBITRATION_THREADS.load(Ordering::Acquire)
 }
 
 impl ArbitrationLease {
     fn spawn(mut mutex: OwnedMutex) -> Result<Arc<Self>, NativeError> {
         let (command, receiver) = sync_channel(1);
         let (ready_sender, ready_receiver) = sync_channel(0);
-        let thread_exited = Arc::new(AtomicBool::new(false));
-        let thread_exited_for_thread = Arc::clone(&thread_exited);
         let thread = thread::Builder::new()
             .name("jarvis-arbitration-owner".to_owned())
             .spawn(move || {
+                #[cfg(feature = "test-support")]
+                ACTIVE_ARBITRATION_THREADS.fetch_add(1, Ordering::AcqRel);
                 let _ = ready_sender.send(());
                 while let Ok(command) = receiver.recv() {
                     match command {
@@ -84,13 +90,16 @@ impl ArbitrationLease {
                         ArbitrationCommand::Release(result_sender) => {
                             let result = mutex.release();
                             let _ = result_sender.send(result);
-                            if mutex_is_released(&mutex) {
-                                break;
-                            }
+                            // Release is terminal even when the native
+                            // operation is uncertain. The caller joins this
+                            // thread before returning uncertainty; it must
+                            // never remain as an untracked authority.
+                            break;
                         }
                     }
                 }
-                thread_exited_for_thread.store(true, Ordering::Release);
+                #[cfg(feature = "test-support")]
+                ACTIVE_ARBITRATION_THREADS.fetch_sub(1, Ordering::AcqRel);
             })
             .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))?;
         if ready_receiver
@@ -102,9 +111,8 @@ impl ArbitrationLease {
             return Err(native_failure(NativeErrorKind::ArbitrationUnavailable));
         }
         Ok(Arc::new(Self {
-            command,
+            command: Mutex::new(Some(command)),
             join: Mutex::new(Some(thread)),
-            thread_exited,
             terminal: AtomicU8::new(ARBITRATION_ACTIVE),
         }))
     }
@@ -114,9 +122,7 @@ impl ArbitrationLease {
             return Err(native_failure(NativeErrorKind::ArbitrationUnavailable));
         }
         let (result_sender, result_receiver) = sync_channel(0);
-        self.command
-            .send(ArbitrationCommand::Wait(timeout_ms, result_sender))
-            .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))?;
+        self.send_command(ArbitrationCommand::Wait(timeout_ms, result_sender))?;
         result_receiver
             .recv_timeout(Duration::from_millis(u64::from(timeout_ms) + 500))
             .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))?
@@ -130,32 +136,25 @@ impl ArbitrationLease {
             }
             _ => {}
         }
-        let result = (|| {
-            let (result_sender, result_receiver) = sync_channel(0);
-            self.command
-                .send(ArbitrationCommand::Release(result_sender))
+        let release_result = (|| {
+            // A one-slot result channel prevents the arbitration thread from
+            // remaining blocked while reporting a native release failure.
+            let (result_sender, result_receiver) = sync_channel(1);
+            self.send_command(ArbitrationCommand::Release(result_sender))
                 .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))?;
             result_receiver
                 .recv_timeout(Duration::from_millis(500))
-                .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))??;
-            let deadline = Instant::now() + CALLBACK_DEADLINE;
-            while !self.thread_exited.load(Ordering::Acquire) {
-                if Instant::now() >= deadline {
-                    return Err(native_failure(NativeErrorKind::ArbitrationReleaseUncertain));
-                }
-                thread::sleep(Duration::from_millis(5));
-            }
-            let mut join = self
-                .join
-                .lock()
-                .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))?;
-            if let Some(thread) = join.take() {
-                thread
-                    .join()
-                    .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))?;
-            }
-            Ok(())
+                .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))?
         })();
+        // The release command is terminal regardless of native success. Join
+        // even on an uncertain native result so no JoinHandle is dropped while
+        // the arbitration thread still owns the lifecycle object.
+        let join_result = self.join_terminal_thread();
+        let result = match (release_result, join_result) {
+            (Ok(()), Ok(())) => Ok(()),
+            (Err(error), Ok(())) => Err(error),
+            (Ok(()), Err(error)) | (Err(_), Err(error)) => Err(error),
+        };
         if result.is_ok() {
             self.terminal.store(ARBITRATION_RELEASED, Ordering::Release);
         } else {
@@ -164,16 +163,50 @@ impl ArbitrationLease {
         }
         result
     }
-}
 
-fn mutex_is_released(mutex: &OwnedMutex) -> bool {
-    !mutex.is_owned()
+    fn send_command(&self, command: ArbitrationCommand) -> Result<(), NativeError> {
+        let sender = self
+            .command
+            .lock()
+            .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))?;
+        sender
+            .as_ref()
+            .ok_or_else(|| native_failure(NativeErrorKind::ArbitrationUnavailable))?
+            .send(command)
+            .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))
+    }
+
+    fn join_terminal_thread(&self) -> Result<(), NativeError> {
+        // Closing the command sender is the fallback retirement signal if the
+        // result channel timed out. The only native wait in this thread is
+        // bounded, so joining here is a deterministic lifecycle operation,
+        // not a detached reaper.
+        let mut command = match self.command.lock() {
+            Ok(command) => command,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        command.take();
+        drop(command);
+
+        let mut join = match self.join.lock() {
+            Ok(join) => join,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if let Some(thread) = join.take() {
+            thread
+                .join()
+                .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))?;
+        }
+        Ok(())
+    }
 }
 
 impl Drop for ArbitrationLease {
     fn drop(&mut self) {
         if self.terminal.load(Ordering::Acquire) == ARBITRATION_ACTIVE {
             let _ = self.release();
+        } else {
+            let _ = self.join_terminal_thread();
         }
     }
 }

@@ -179,10 +179,6 @@ impl OwnedMutex {
         self.owned = false;
         Ok(())
     }
-
-    pub(super) fn is_owned(&self) -> bool {
-        self.owned
-    }
 }
 
 impl Drop for OwnedMutex {
