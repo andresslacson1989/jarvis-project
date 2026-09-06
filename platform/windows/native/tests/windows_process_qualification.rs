@@ -511,6 +511,42 @@ fn windows_state_unlock_uncertainty_is_reported_and_recoverable() {
 }
 
 #[test]
+fn windows_state_unlock_cleanup_failure_remains_fail_closed() {
+    let _guard = qualification_lock().lock().expect("qualification lock");
+    let test_root = create_fixture();
+    set_test_environment(
+        &test_root,
+        "windows_state_unlock_cleanup_failure_remains_fail_closed",
+        &test_root.join("unused.ready"),
+    );
+
+    let owner = acquire_owner(Role::Normal);
+    let worker = owner
+        .start_activation_worker(|_| ActivationCallbackResult::Uncertain)
+        .expect("worker must start before state-lock cleanup qualification");
+    jarvis_windows_native::test_fail_next_state_unlock_before_call();
+    assert_eq!(
+        owner
+            .mark_ready()
+            .expect_err("pre-call unlock failure must be surfaced")
+            .kind,
+        NativeErrorKind::LockUncertain
+    );
+    assert_eq!(
+        owner
+            .mark_ready()
+            .expect_err("the production cleanup-failed latch must fail closed")
+            .kind,
+        NativeErrorKind::LockUncertain
+    );
+
+    drop(worker);
+    drop(owner);
+    clear_test_environment();
+    fs::remove_dir_all(test_root).expect("fail-closed state-lock fixture must be removed");
+}
+
+#[test]
 fn windows_stale_generation_cannot_signal_or_mutate_new_request() {
     if let Ok(mode) = env::var(CHILD_ENV) {
         run_child(&mode);

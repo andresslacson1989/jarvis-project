@@ -574,10 +574,19 @@ impl StateLock<'_> {
     pub(super) fn release(mut self) -> Result<(), NativeError> {
         let mut overlapped = OVERLAPPED::default();
         #[cfg(feature = "test-support")]
+        let injected_pre_call_failure = crate::handles::FAIL_NEXT_STATE_UNLOCK_BEFORE_CALL
+            .swap(false, std::sync::atomic::Ordering::AcqRel);
+        #[cfg(feature = "test-support")]
         let injected_failure =
             crate::handles::FAIL_NEXT_STATE_UNLOCK.swap(false, std::sync::atomic::Ordering::AcqRel);
         #[cfg(not(feature = "test-support"))]
+        let injected_pre_call_failure = false;
+        #[cfg(not(feature = "test-support"))]
         let injected_failure = false;
+        if injected_pre_call_failure {
+            self.mark_cleanup_failed();
+            return Err(native_failure(NativeErrorKind::LockUncertain));
+        }
         // SAFETY: the lock range matches the one-byte region acquired by
         // LockFileEx on the same handle.
         let ok = unsafe { UnlockFileEx(self.handle_raw(), 0, 1, 0, &mut overlapped) };

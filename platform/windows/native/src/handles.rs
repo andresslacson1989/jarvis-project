@@ -35,6 +35,9 @@ pub(super) fn native_failure(kind: NativeErrorKind) -> NativeError {
 pub(crate) static FAIL_NEXT_STATE_UNLOCK: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "test-support")]
+pub(crate) static FAIL_NEXT_STATE_UNLOCK_BEFORE_CALL: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
 pub(crate) static FAIL_NEXT_EVENT_SIGNAL: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "test-support")]
@@ -46,6 +49,11 @@ pub(crate) static FAIL_NEXT_MUTEX_RELEASE: AtomicBool = AtomicBool::new(false);
 #[cfg(feature = "test-support")]
 pub(crate) fn fail_next_state_unlock_for_test() {
     FAIL_NEXT_STATE_UNLOCK.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn fail_next_state_unlock_before_call_for_test() {
+    FAIL_NEXT_STATE_UNLOCK_BEFORE_CALL.store(true, Ordering::Release);
 }
 
 #[cfg(feature = "test-support")]

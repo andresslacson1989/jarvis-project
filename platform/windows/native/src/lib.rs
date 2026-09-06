@@ -56,6 +56,12 @@ pub fn test_fail_next_state_unlock() {
 }
 
 #[cfg(all(windows, feature = "test-support"))]
+/// Test-only fault injection before the native state-lock unlock call.
+pub fn test_fail_next_state_unlock_before_call() {
+    handles::fail_next_state_unlock_before_call_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
 /// Test-only fault injection for activation event signalling.
 pub fn test_fail_next_event_signal() {
     handles::fail_next_event_signal_for_test();
