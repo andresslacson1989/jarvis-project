@@ -1,7 +1,9 @@
-use std::{ffi::OsStr, os::windows::ffi::OsStrExt, ptr::NonNull};
-
-#[cfg(feature = "test-support")]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    ffi::OsStr,
+    os::windows::ffi::OsStrExt,
+    ptr::NonNull,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use windows_sys::Win32::{
     Foundation::{
@@ -33,8 +35,32 @@ pub(super) fn native_failure(kind: NativeErrorKind) -> NativeError {
 pub(crate) static FAIL_NEXT_STATE_UNLOCK: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "test-support")]
+pub(crate) static FAIL_NEXT_EVENT_SIGNAL: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
+pub(crate) static FAIL_NEXT_MUTEX_WAIT: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
+pub(crate) static FAIL_NEXT_MUTEX_RELEASE: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
 pub(crate) fn fail_next_state_unlock_for_test() {
     FAIL_NEXT_STATE_UNLOCK.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn fail_next_event_signal_for_test() {
+    FAIL_NEXT_EVENT_SIGNAL.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn fail_next_mutex_wait_for_test() {
+    FAIL_NEXT_MUTEX_WAIT.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn fail_next_mutex_release_for_test() {
+    FAIL_NEXT_MUTEX_RELEASE.store(true, Ordering::Release);
 }
 
 #[derive(Debug)]
@@ -76,7 +102,7 @@ impl Drop for OwnedHandle {
 
 #[derive(Debug)]
 pub(super) struct OwnedMutex {
-    handle: OwnedHandle,
+    handle: Option<OwnedHandle>,
     owned: bool,
 }
 
@@ -88,14 +114,32 @@ pub(super) enum MutexWaitResult {
 }
 
 impl OwnedMutex {
-    pub(super) fn new(handle: OwnedHandle, owned: bool) -> Self {
-        Self { handle, owned }
+    pub(super) fn new(handle: OwnedHandle) -> Self {
+        Self {
+            handle: Some(handle),
+            // CreateMutexW is deliberately called with bInitialOwner=FALSE.
+            // Ownership becomes true only after this value's arbitration
+            // thread receives WAIT_OBJECT_0 or WAIT_ABANDONED.
+            owned: false,
+        }
     }
 
     pub(super) fn wait(&mut self, timeout_ms: u32) -> Result<MutexWaitResult, NativeError> {
+        #[cfg(feature = "test-support")]
+        if FAIL_NEXT_MUTEX_WAIT.swap(false, Ordering::AcqRel) {
+            return Err(native_failure(NativeErrorKind::ArbitrationUnavailable));
+        }
         // SAFETY: the mutex handle is owned by this value and remains live for
         // the synchronous bounded wait.
-        let result = unsafe { WaitForSingleObject(self.handle.raw(), timeout_ms) };
+        let result = unsafe {
+            WaitForSingleObject(
+                self.handle
+                    .as_ref()
+                    .expect("owned mutex handle must remain present")
+                    .raw(),
+                timeout_ms,
+            )
+        };
         match result {
             WAIT_OBJECT_0 => {
                 self.owned = true;
@@ -115,28 +159,43 @@ impl OwnedMutex {
         if !self.owned {
             return Ok(());
         }
+        #[cfg(feature = "test-support")]
+        if FAIL_NEXT_MUTEX_RELEASE.swap(false, Ordering::AcqRel) {
+            return Err(native_failure(NativeErrorKind::ArbitrationReleaseUncertain));
+        }
         // SAFETY: the arbitration thread owns the mutex for the complete
         // synchronous release operation.
-        if unsafe { ReleaseMutex(self.handle.raw()) } == 0 {
+        if unsafe {
+            ReleaseMutex(
+                self.handle
+                    .as_ref()
+                    .expect("owned mutex handle must remain present")
+                    .raw(),
+            )
+        } == 0
+        {
             return Err(native_failure(NativeErrorKind::ArbitrationReleaseUncertain));
         }
         self.owned = false;
         Ok(())
+    }
+
+    pub(super) fn is_owned(&self) -> bool {
+        self.owned
     }
 }
 
 impl Drop for OwnedMutex {
     fn drop(&mut self) {
         if self.owned {
-            // SAFETY: this mutex was acquired by CreateMutexW with initial
-            // ownership and is released once before the handle closes.
-            if unsafe { ReleaseMutex(self.handle.raw()) } == 0 {
-                // A failed release makes ownership and subsequent recovery
-                // ambiguous. Do not silently close the handle and report a
-                // clean shutdown.
-                std::process::abort();
+            // An unresolved owned mutex must not be released implicitly by a
+            // destructor: closing its handle would let a new process acquire
+            // authority while the old lifecycle is still ambiguous. Leak the
+            // kernel handle on this fail-closed fallback; explicit release is
+            // the only path that clears `owned`.
+            if let Some(handle) = self.handle.take() {
+                std::mem::forget(handle);
             }
-            self.owned = false;
         }
     }
 }
@@ -144,19 +203,25 @@ impl Drop for OwnedMutex {
 #[derive(Debug)]
 pub(super) struct StateLock<'a> {
     pub(super) handle: &'a OwnedHandle,
+    cleanup_failed: &'a AtomicBool,
     released: bool,
 }
 
 impl<'a> StateLock<'a> {
-    pub(super) fn new(handle: &'a OwnedHandle) -> Self {
+    pub(super) fn new(handle: &'a OwnedHandle, cleanup_failed: &'a AtomicBool) -> Self {
         Self {
             handle,
+            cleanup_failed,
             released: false,
         }
     }
 
     pub(super) fn mark_released(&mut self) {
         self.released = true;
+    }
+
+    pub(super) fn mark_cleanup_failed(&self) {
+        self.cleanup_failed.store(true, Ordering::Release);
     }
 }
 
@@ -179,8 +244,11 @@ impl Drop for StateLock<'_> {
                     // All normal paths explicitly release StateLock and can
                     // surface LockUncertain. Reaching this fallback means
                     // cleanup itself is no longer reportable to the caller;
-                    // fail closed instead of swallowing an unlock failure.
-                    std::process::abort();
+                    // Do not claim success or abort the process from a
+                    // destructor. Persist the uncertainty on the StateFile so
+                    // the next operation fails closed instead of silently
+                    // treating the unlock as complete.
+                    self.cleanup_failed.store(true, Ordering::Release);
                 }
             }
         }

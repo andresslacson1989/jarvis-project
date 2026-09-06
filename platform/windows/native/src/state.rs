@@ -1,5 +1,6 @@
 use std::{
     ptr,
+    sync::atomic::{AtomicBool, Ordering},
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -231,6 +232,7 @@ impl StateRecord {
 #[derive(Debug)]
 pub(super) struct StateFile {
     handle: OwnedHandle,
+    lock_cleanup_failed: AtomicBool,
 }
 
 impl StateFile {
@@ -238,6 +240,8 @@ impl StateFile {
         path: &std::path::Path,
         security: &ExplicitSecurity,
         sid: &str,
+        expected_parent: FileIdentity,
+        expected_root: FileIdentity,
         initial: StateRecord,
     ) -> Result<Self, NativeError> {
         let path_text = path
@@ -261,9 +265,13 @@ impl StateFile {
             )
         };
         let handle = OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?;
-        let state = Self { handle };
+        let state = Self {
+            handle,
+            lock_cleanup_failed: AtomicBool::new(false),
+        };
         state.validate_regular_file()?;
         identity::validate_file_handle(&state.handle, path)?;
+        identity::validate_ancestor_identities(path, expected_parent, expected_root)?;
         security.validate_handle(
             &state.handle,
             sid,
@@ -278,6 +286,8 @@ impl StateFile {
         path: &std::path::Path,
         security: &ExplicitSecurity,
         sid: &str,
+        expected_parent: FileIdentity,
+        expected_root: FileIdentity,
     ) -> Result<Self, NativeError> {
         let path_text = path
             .to_str()
@@ -299,9 +309,11 @@ impl StateFile {
         };
         let state = Self {
             handle: OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?,
+            lock_cleanup_failed: AtomicBool::new(false),
         };
         state.validate_regular_file()?;
         identity::validate_file_handle(&state.handle, path)?;
+        identity::validate_ancestor_identities(path, expected_parent, expected_root)?;
         security.validate_handle(
             &state.handle,
             sid,
@@ -453,6 +465,9 @@ impl StateFile {
     }
 
     fn lock(&self) -> Result<StateLock<'_>, NativeError> {
+        if self.lock_cleanup_failed.load(Ordering::Acquire) {
+            return Err(native_failure(NativeErrorKind::LockUncertain));
+        }
         let started = Instant::now();
         for (index, delay) in FIXED_BACKOFF_MS.iter().enumerate() {
             let mut overlapped = OVERLAPPED::default();
@@ -470,7 +485,7 @@ impl StateFile {
                 )
             };
             if ok != 0 {
-                return Ok(StateLock::new(&self.handle));
+                return Ok(StateLock::new(&self.handle, &self.lock_cleanup_failed));
             }
             let error = last_error();
             if error != ERROR_LOCK_VIOLATION && error != ERROR_SHARING_VIOLATION {
@@ -561,7 +576,10 @@ impl StateLock<'_> {
         // LockFileEx on the same handle.
         let ok = unsafe { UnlockFileEx(self.handle_raw(), 0, 1, 0, &mut overlapped) };
         self.mark_released();
-        if ok == 0 || injected_failure {
+        if ok == 0 {
+            self.mark_cleanup_failed();
+            Err(native_failure(NativeErrorKind::LockUncertain))
+        } else if injected_failure {
             Err(native_failure(NativeErrorKind::LockUncertain))
         } else {
             Ok(())

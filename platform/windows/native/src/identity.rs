@@ -190,6 +190,25 @@ pub(super) fn validate_file_handle(
     validate_fixed_handle(handle, expected_path, false)
 }
 
+pub(super) fn validate_ancestor_identities(
+    path: &Path,
+    expected_parent: FileIdentity,
+    expected_root: FileIdentity,
+) -> Result<(), NativeError> {
+    let root_path = path
+        .parent()
+        .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+    let parent_path = root_path
+        .parent()
+        .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+    let parent = open_directory(parent_path, None)?;
+    let root = open_directory(root_path, None)?;
+    if identity(&parent)? != expected_parent || identity(&root)? != expected_root {
+        return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
+    }
+    Ok(())
+}
+
 fn validate_fixed_handle(
     handle: &OwnedHandle,
     expected_path: &Path,

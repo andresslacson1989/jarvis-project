@@ -79,7 +79,7 @@ fn require_acknowledged_activation(
 
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError> {
-    let owner = match jarvis_windows_native::acquire(jarvis_windows_native::Role::Normal)
+    let mut owner = match jarvis_windows_native::acquire(jarvis_windows_native::Role::Normal)
         .map_err(map_native_error)?
     {
         jarvis_windows_native::Acquisition::Owner(owner) => owner,
@@ -134,6 +134,9 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
                                 Ok(jarvis_windows_native::ActivationStart::Cancelled) => {
                                     jarvis_windows_native::ActivationCallbackResult::NotStarted
                                 }
+                                Ok(jarvis_windows_native::ActivationStart::Stale) => {
+                                    jarvis_windows_native::ActivationCallbackResult::NotStarted
+                                }
                                 Err(_) => {
                                     jarvis_windows_native::ActivationCallbackResult::Uncertain
                                 }
@@ -146,6 +149,9 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
                             jarvis_windows_native::ActivationCancellation::Cancelled => {
                                 jarvis_windows_native::ActivationCallbackResult::NotStarted
                             }
+                            jarvis_windows_native::ActivationCancellation::Stale => {
+                                jarvis_windows_native::ActivationCallbackResult::NotStarted
+                            }
                             jarvis_windows_native::ActivationCancellation::InFlight
                             | jarvis_windows_native::ActivationCancellation::Uncertain => {
                                 jarvis_windows_native::ActivationCallbackResult::Uncertain
@@ -156,6 +162,9 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
                         .recv_timeout(Duration::from_millis(250))
                         .unwrap_or_else(|_| match request.cancel() {
                             jarvis_windows_native::ActivationCancellation::Cancelled => {
+                                jarvis_windows_native::ActivationCallbackResult::NotStarted
+                            }
+                            jarvis_windows_native::ActivationCancellation::Stale => {
                                 jarvis_windows_native::ActivationCallbackResult::NotStarted
                             }
                             jarvis_windows_native::ActivationCancellation::InFlight
@@ -188,7 +197,13 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
         .map_err(|_| HostStartupError::TauriRuntimeFailed);
     let release_result = owner.release();
     match (run_result, release_result) {
-        (Err(error), _) => Err(error),
+        (Err(error), Err(release_error)) => {
+            eprintln!(
+                "JARVIS native shutdown did not reach a confirmed terminal state: {release_error}"
+            );
+            Err(error)
+        }
+        (Err(error), Ok(())) => Err(error),
         (Ok(()), Err(error)) => Err(map_native_error(error)),
         (Ok(()), Ok(())) => Ok(()),
     }

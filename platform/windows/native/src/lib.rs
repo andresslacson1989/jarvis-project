@@ -55,6 +55,24 @@ pub fn test_fail_next_state_unlock() {
     handles::fail_next_state_unlock_for_test();
 }
 
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only fault injection for activation event signalling.
+pub fn test_fail_next_event_signal() {
+    handles::fail_next_event_signal_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only fault injection for the bounded mutex wait.
+pub fn test_fail_next_mutex_wait() {
+    handles::fail_next_mutex_wait_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only fault injection for the explicit mutex release.
+pub fn test_fail_next_mutex_release() {
+    handles::fail_next_mutex_release_for_test();
+}
+
 /// The startup operation competing for the one stable authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Role {
@@ -155,6 +173,7 @@ pub enum ActivationCallbackResult {
 pub enum ActivationCancellation {
     Cancelled,
     InFlight,
+    Stale,
     Uncertain,
 }
 
