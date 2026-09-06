@@ -1,5 +1,8 @@
 use std::{ffi::OsStr, os::windows::ffi::OsStrExt, ptr::NonNull};
 
+#[cfg(feature = "test-support")]
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use windows_sys::Win32::{
     Foundation::{
         CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, WAIT_ABANDONED, WAIT_FAILED,
@@ -24,6 +27,14 @@ pub(super) fn last_error() -> WIN32_ERROR {
 
 pub(super) fn native_failure(kind: NativeErrorKind) -> NativeError {
     NativeError { kind }
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) static FAIL_NEXT_STATE_UNLOCK: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
+pub(crate) fn fail_next_state_unlock_for_test() {
+    FAIL_NEXT_STATE_UNLOCK.store(true, Ordering::Release);
 }
 
 #[derive(Debug)]
@@ -99,6 +110,19 @@ impl OwnedMutex {
             _ => Err(native_failure(NativeErrorKind::ArbitrationUnavailable)),
         }
     }
+
+    pub(super) fn release(&mut self) -> Result<(), NativeError> {
+        if !self.owned {
+            return Ok(());
+        }
+        // SAFETY: the arbitration thread owns the mutex for the complete
+        // synchronous release operation.
+        if unsafe { ReleaseMutex(self.handle.raw()) } == 0 {
+            return Err(native_failure(NativeErrorKind::ArbitrationReleaseUncertain));
+        }
+        self.owned = false;
+        Ok(())
+    }
 }
 
 impl Drop for OwnedMutex {
@@ -106,8 +130,11 @@ impl Drop for OwnedMutex {
         if self.owned {
             // SAFETY: this mutex was acquired by CreateMutexW with initial
             // ownership and is released once before the handle closes.
-            unsafe {
-                let _ = ReleaseMutex(self.handle.raw());
+            if unsafe { ReleaseMutex(self.handle.raw()) } == 0 {
+                // A failed release makes ownership and subsequent recovery
+                // ambiguous. Do not silently close the handle and report a
+                // clean shutdown.
+                std::process::abort();
             }
             self.owned = false;
         }
@@ -141,13 +168,20 @@ impl Drop for StateLock<'_> {
             unsafe {
                 let mut overlapped =
                     std::mem::zeroed::<windows_sys::Win32::System::IO::OVERLAPPED>();
-                let _ = windows_sys::Win32::Storage::FileSystem::UnlockFileEx(
+                let ok = windows_sys::Win32::Storage::FileSystem::UnlockFileEx(
                     self.handle.raw(),
                     0,
                     1,
                     0,
                     &mut overlapped,
                 );
+                if ok == 0 {
+                    // All normal paths explicitly release StateLock and can
+                    // surface LockUncertain. Reaching this fallback means
+                    // cleanup itself is no longer reportable to the caller;
+                    // fail closed instead of swallowing an unlock failure.
+                    std::process::abort();
+                }
             }
         }
     }

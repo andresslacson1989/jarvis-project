@@ -63,16 +63,11 @@ pub(super) fn local_app_data() -> Result<PathBuf, NativeError> {
     // the scan is bounded before any dereference and the buffer is released
     // exactly once after conversion.
     let path = unsafe {
-        let mut length = 0usize;
-        while length <= 32768 && *allocated.add(length) != 0 {
-            length += 1;
-        }
-        let result = if length == 0 || length > 32768 {
-            Err(native_failure(NativeErrorKind::InvalidPath))
-        } else {
-            String::from_utf16(std::slice::from_raw_parts(allocated, length))
+        let result = match bounded_utf16_length(allocated) {
+            Some(length) => String::from_utf16(std::slice::from_raw_parts(allocated, length))
                 .map(PathBuf::from)
-                .map_err(|_| native_failure(NativeErrorKind::InvalidPath))
+                .map_err(|_| native_failure(NativeErrorKind::InvalidPath)),
+            None => Err(native_failure(NativeErrorKind::InvalidPath)),
         };
         // SAFETY: SHGetKnownFolderPath returns memory owned by the COM task
         // allocator, including on a malformed/overlong result.
@@ -81,6 +76,20 @@ pub(super) fn local_app_data() -> Result<PathBuf, NativeError> {
     };
     validate_absolute_local_path(&path)?;
     Ok(path)
+}
+
+fn bounded_utf16_length(allocated: *const u16) -> Option<usize> {
+    let mut length = 0usize;
+    while length < 32768 {
+        // SAFETY: the caller supplies the bounded UTF-16 buffer returned by
+        // SHGetKnownFolderPath; no element beyond the fixed scan bound is
+        // dereferenced.
+        if unsafe { *allocated.add(length) } == 0 {
+            return (length > 0).then_some(length);
+        }
+        length += 1;
+    }
+    None
 }
 
 pub(super) fn validate_absolute_local_path(path: &Path) -> Result<(), NativeError> {
@@ -233,4 +242,22 @@ fn validate_fixed_handle(
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::bounded_utf16_length;
+
+    #[test]
+    fn bounded_local_app_data_scan_requires_terminator_inside_limit() {
+        let mut valid = vec![b'A' as u16; 32_768];
+        valid[32_767] = 0;
+        assert_eq!(bounded_utf16_length(valid.as_ptr()), Some(32_767));
+
+        let unterminated = vec![b'A' as u16; 32_769];
+        assert_eq!(bounded_utf16_length(unterminated.as_ptr()), None);
+
+        let empty = [0u16];
+        assert_eq!(bounded_utf16_length(empty.as_ptr()), None);
+    }
 }

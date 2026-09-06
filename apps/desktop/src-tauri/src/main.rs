@@ -13,7 +13,7 @@ use tauri::Manager;
 
 #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 struct HostRuntime {
-    _owner: jarvis_windows_native::OwnerLease,
+    _controller: jarvis_windows_native::OwnerController,
     _activation_worker: jarvis_windows_native::ActivationWorker,
 }
 
@@ -88,7 +88,8 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
         }
     };
 
-    tauri::Builder::default()
+    let controller = owner.controller();
+    let run_result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
             let main_window = tauri::WebviewWindowBuilder::new(
@@ -104,22 +105,64 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
             .build()?;
 
             let activation_window = main_window.clone();
-            let activation_worker = owner
+            let activation_controller = controller.clone();
+            let activation_worker = activation_controller
                 .start_activation_worker(move |_request| {
+                    let request = _request;
+                    let queued_request = request.clone();
                     let window = activation_window.clone();
                     let (sender, receiver) = sync_channel(1);
                     if activation_window
                         .run_on_main_thread(move || {
-                            let presented = window.show().is_ok() && window.set_focus().is_ok();
-                            let _ = sender.send(presented);
+                            let result = match queued_request.begin_presentation() {
+                                Ok(jarvis_windows_native::ActivationStart::Started(
+                                    presentation,
+                                )) => {
+                                    let presented =
+                                        window.show().is_ok() && window.set_focus().is_ok();
+                                    let result = if presented {
+                                        jarvis_windows_native::ActivationCallbackResult::Handled
+                                    } else {
+                                        jarvis_windows_native::ActivationCallbackResult::Uncertain
+                                    };
+                                    if presentation.complete(result).is_err() {
+                                        jarvis_windows_native::ActivationCallbackResult::Uncertain
+                                    } else {
+                                        result
+                                    }
+                                }
+                                Ok(jarvis_windows_native::ActivationStart::Cancelled) => {
+                                    jarvis_windows_native::ActivationCallbackResult::NotStarted
+                                }
+                                Err(_) => {
+                                    jarvis_windows_native::ActivationCallbackResult::Uncertain
+                                }
+                            };
+                            let _ = sender.send(result);
                         })
                         .is_err()
                     {
-                        return false;
+                        return match request.cancel() {
+                            jarvis_windows_native::ActivationCancellation::Cancelled => {
+                                jarvis_windows_native::ActivationCallbackResult::NotStarted
+                            }
+                            jarvis_windows_native::ActivationCancellation::InFlight
+                            | jarvis_windows_native::ActivationCancellation::Uncertain => {
+                                jarvis_windows_native::ActivationCallbackResult::Uncertain
+                            }
+                        };
                     }
                     receiver
                         .recv_timeout(Duration::from_millis(250))
-                        .unwrap_or(false)
+                        .unwrap_or_else(|_| match request.cancel() {
+                            jarvis_windows_native::ActivationCancellation::Cancelled => {
+                                jarvis_windows_native::ActivationCallbackResult::NotStarted
+                            }
+                            jarvis_windows_native::ActivationCancellation::InFlight
+                            | jarvis_windows_native::ActivationCancellation::Uncertain => {
+                                jarvis_windows_native::ActivationCallbackResult::Uncertain
+                            }
+                        })
                 })
                 .map_err(|_| {
                     tauri::Error::Setup(
@@ -128,7 +171,7 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
                             .into(),
                     )
                 })?;
-            owner.mark_ready().map_err(|_| {
+            activation_controller.mark_ready().map_err(|_| {
                 tauri::Error::Setup(
                     (Box::new(std::io::Error::other("native authority not ready"))
                         as Box<dyn std::error::Error>)
@@ -136,13 +179,19 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
                 )
             })?;
             app.manage(HostRuntime {
-                _owner: owner,
+                _controller: activation_controller,
                 _activation_worker: activation_worker,
             });
             Ok(())
         })
         .run(tauri::generate_context!())
-        .map_err(|_| HostStartupError::TauriRuntimeFailed)
+        .map_err(|_| HostStartupError::TauriRuntimeFailed);
+    let release_result = owner.release();
+    match (run_result, release_result) {
+        (Err(error), _) => Err(error),
+        (Ok(()), Err(error)) => Err(map_native_error(error)),
+        (Ok(()), Ok(())) => Ok(()),
+    }
 }
 
 #[cfg(not(target_os = "windows"))]

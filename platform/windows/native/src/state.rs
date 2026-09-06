@@ -32,6 +32,11 @@ pub(super) const STATE_PENDING: u8 = 1;
 pub(super) const STATE_ACKNOWLEDGED: u8 = 2;
 pub(super) const STATUS_NONE: u32 = 0;
 pub(super) const STATUS_HANDLED: u32 = 1;
+pub(super) const STATUS_CALLBACK_QUEUED: u32 = 2;
+pub(super) const STATUS_CALLBACK_RUNNING: u32 = 3;
+pub(super) const STATUS_CANCEL_REQUESTED: u32 = 4;
+pub(super) const STATUS_UNCERTAIN: u32 = 5;
+pub(super) const STATUS_CANCELLED: u32 = 6;
 
 const HEADER_SIZE: usize = 32;
 const SLOT_SIZE: usize = 512;
@@ -171,7 +176,30 @@ impl StateRecord {
             request_sid_hash: array_at::<32>(slot, 148),
             role: slot[110],
         };
+        let owner_identity_invalid = state.parent.volume_serial == 0
+            || state.parent.file_index == 0
+            || state.root.volume_serial == 0
+            || state.root.file_index == 0
+            || state.pid == 0
+            || state.start_filetime == 0
+            || state.session == 0
+            || state.sid_hash == [0; 32]
+            || state.nonce == [0; 16];
+        let request_identity_invalid = state.request_generation == 0
+            || state.request_pid == 0
+            || state.request_start_filetime == 0
+            || state.request_session == 0
+            || state.request_sid_hash == [0; 32];
+        let pending_status_invalid = !matches!(
+            state.status,
+            STATUS_NONE
+                | STATUS_CALLBACK_QUEUED
+                | STATUS_CALLBACK_RUNNING
+                | STATUS_CANCEL_REQUESTED
+                | STATUS_UNCERTAIN
+        );
         if state.generation == 0
+            || owner_identity_invalid
             || !(state.role == ROLE_NORMAL || state.role == ROLE_MAINTENANCE)
             || state.readiness > 1
             || state.state > STATE_ACKNOWLEDGED
@@ -184,21 +212,15 @@ impl StateRecord {
                     || state.request_session != 0
                     || state.request_sid_hash != [0; 32]))
             || (state.state == STATE_PENDING
-                && (state.status != STATUS_NONE
+                && (pending_status_invalid
                     || state.request_generation == 0
                     || state.ack_generation != 0
-                    || state.request_pid == 0
-                    || state.request_start_filetime == 0
-                    || state.request_session == 0
-                    || state.request_sid_hash == [0; 32]))
+                    || request_identity_invalid))
             || (state.state == STATE_ACKNOWLEDGED
-                && (state.status != STATUS_HANDLED
+                && (state.status != STATUS_HANDLED && state.status != STATUS_CANCELLED
                     || state.request_generation == 0
                     || state.ack_generation != state.request_generation
-                    || state.request_pid == 0
-                    || state.request_start_filetime == 0
-                    || state.request_session == 0
-                    || state.request_sid_hash == [0; 32]))
+                    || request_identity_invalid))
         {
             return Ok(None);
         }
@@ -241,6 +263,7 @@ impl StateFile {
         let handle = OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?;
         let state = Self { handle };
         state.validate_regular_file()?;
+        identity::validate_file_handle(&state.handle, path)?;
         security.validate_handle(
             &state.handle,
             sid,
@@ -306,23 +329,34 @@ impl StateFile {
         F: FnOnce(&mut StateRecord) -> Result<T, NativeError>,
     {
         let lock = self.lock()?;
-        let current = self.read_locked()?;
-        let mut next = current;
-        next.generation = current
-            .generation
-            .checked_add(1)
-            .ok_or_else(|| native_failure(NativeErrorKind::StateCorrupt))?;
-        let output = mutate(&mut next)?;
-        self.write_next(&next, current.generation)?;
-        lock.release()?;
-        Ok(output)
+        let operation = (|| {
+            let current = self.read_locked()?;
+            let mut next = current;
+            next.generation = current
+                .generation
+                .checked_add(1)
+                .ok_or_else(|| native_failure(NativeErrorKind::StateCorrupt))?;
+            let output = mutate(&mut next)?;
+            self.write_next(&next, current.generation)?;
+            Ok(output)
+        })();
+        let release = lock.release();
+        match (operation, release) {
+            (Ok(output), Ok(())) => Ok(output),
+            (Err(error), Ok(())) => Err(error),
+            (_, Err(error)) => Err(error),
+        }
     }
 
     pub(super) fn read_snapshot(&self) -> Result<StateRecord, NativeError> {
         let lock = self.lock()?;
-        let record = self.read_locked()?;
-        lock.release()?;
-        Ok(record)
+        let operation = self.read_locked();
+        let release = lock.release();
+        match (operation, release) {
+            (Ok(record), Ok(())) => Ok(record),
+            (Err(error), Ok(())) => Err(error),
+            (_, Err(error)) => Err(error),
+        }
     }
 
     fn set_length(&self) -> Result<(), NativeError> {
@@ -518,11 +552,16 @@ impl StateFile {
 impl StateLock<'_> {
     pub(super) fn release(mut self) -> Result<(), NativeError> {
         let mut overlapped = OVERLAPPED::default();
+        #[cfg(feature = "test-support")]
+        let injected_failure =
+            crate::handles::FAIL_NEXT_STATE_UNLOCK.swap(false, std::sync::atomic::Ordering::AcqRel);
+        #[cfg(not(feature = "test-support"))]
+        let injected_failure = false;
         // SAFETY: the lock range matches the one-byte region acquired by
         // LockFileEx on the same handle.
         let ok = unsafe { UnlockFileEx(self.handle_raw(), 0, 1, 0, &mut overlapped) };
         self.mark_released();
-        if ok == 0 {
+        if ok == 0 || injected_failure {
             Err(native_failure(NativeErrorKind::LockUncertain))
         } else {
             Ok(())
@@ -660,6 +699,62 @@ mod tests {
         assert_eq!(
             StateRecord::decode(&acknowledged.encode(true)).unwrap(),
             Some(acknowledged)
+        );
+    }
+
+    #[test]
+    fn owner_identity_fields_are_required_before_liveness_checks() {
+        let mutations: [fn(&mut StateRecord); 7] = [
+            |value: &mut StateRecord| value.pid = 0,
+            |value: &mut StateRecord| value.start_filetime = 0,
+            |value: &mut StateRecord| value.session = 0,
+            |value: &mut StateRecord| value.sid_hash = [0; 32],
+            |value: &mut StateRecord| value.nonce = [0; 16],
+            |value: &mut StateRecord| value.parent.file_index = 0,
+            |value: &mut StateRecord| value.root.volume_serial = 0,
+        ];
+        for mutate in mutations {
+            let mut invalid = record();
+            mutate(&mut invalid);
+            assert_eq!(StateRecord::decode(&invalid.encode(true)).unwrap(), None);
+        }
+    }
+
+    #[test]
+    fn callback_and_cancellation_statuses_have_closed_transition_sets() {
+        for status in [
+            STATUS_NONE,
+            STATUS_CALLBACK_QUEUED,
+            STATUS_CALLBACK_RUNNING,
+            STATUS_CANCEL_REQUESTED,
+            STATUS_UNCERTAIN,
+        ] {
+            let mut pending = record();
+            pending.state = STATE_PENDING;
+            pending.status = status;
+            pending.request_generation = 2;
+            pending.request_pid = 7;
+            pending.request_start_filetime = 8;
+            pending.request_session = 3;
+            pending.request_sid_hash = [3; 32];
+            assert_eq!(
+                StateRecord::decode(&pending.encode(true)).unwrap(),
+                Some(pending)
+            );
+        }
+
+        let mut cancelled = record();
+        cancelled.state = STATE_ACKNOWLEDGED;
+        cancelled.status = STATUS_CANCELLED;
+        cancelled.request_generation = 4;
+        cancelled.ack_generation = 4;
+        cancelled.request_pid = 7;
+        cancelled.request_start_filetime = 8;
+        cancelled.request_session = 3;
+        cancelled.request_sid_hash = [3; 32];
+        assert_eq!(
+            StateRecord::decode(&cancelled.encode(true)).unwrap(),
+            Some(cancelled)
         );
     }
 }

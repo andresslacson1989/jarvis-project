@@ -49,6 +49,12 @@ pub const REQUIRED_DATA_DIRECTORIES: [&str; 8] = [
     "recovery",
 ];
 
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only fault injection for the state-lock cleanup qualification.
+pub fn test_fail_next_state_unlock() {
+    handles::fail_next_state_unlock_for_test();
+}
+
 /// The startup operation competing for the one stable authority.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Role {
@@ -65,6 +71,7 @@ pub enum NativeErrorKind {
     LocalAppDataUnavailable,
     SecurityBoundaryUnavailable,
     ArbitrationUnavailable,
+    ArbitrationReleaseUncertain,
     ObjectCollision,
     AlreadyOwned,
     MaintenanceHeld,
@@ -103,6 +110,9 @@ impl std::fmt::Display for NativeError {
                 "native foundation could not establish the SID security boundary"
             }
             NativeErrorKind::ArbitrationUnavailable => "single-instance arbitration is unavailable",
+            NativeErrorKind::ArbitrationReleaseUncertain => {
+                "single-instance arbitration release is uncertain"
+            }
             NativeErrorKind::ObjectCollision => "single-instance object collision detected",
             NativeErrorKind::AlreadyOwned => "single-instance authority is already owned",
             NativeErrorKind::MaintenanceHeld => "JARVIS maintenance authority is already held",
@@ -132,10 +142,44 @@ impl std::fmt::Display for NativeError {
 
 impl std::error::Error for NativeError {}
 
-/// A request received by the already-running same-session authority.
+/// The result reported by the bounded activation callback.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ActivationCallbackResult {
+    Handled,
+    NotStarted,
+    Uncertain,
+}
+
+/// The result of cancelling a queued or running activation request.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ActivationCancellation {
+    Cancelled,
+    InFlight,
+    Uncertain,
+}
+
+/// A request received by the already-running same-session authority.
+#[derive(Clone, Debug)]
 pub struct ActivationRequest {
     pub process_id: u32,
+    pub generation: u64,
+    #[cfg(windows)]
+    pub(crate) context: windows::ActivationRequestContext,
+}
+
+#[cfg(windows)]
+impl ActivationRequest {
+    /// Begins native presentation only if the exact generation is still
+    /// queued and has not been cancelled by the requester.
+    pub fn begin_presentation(&self) -> Result<windows::ActivationStart, NativeError> {
+        self.context.begin_presentation()
+    }
+
+    /// Requests cancellation of the exact generation. A running presentation
+    /// remains uncertain until it reports its terminal result.
+    pub fn cancel(&self) -> ActivationCancellation {
+        self.context.cancel()
+    }
 }
 
 /// Result of a second launch. The process that requested activation may exit
@@ -147,7 +191,10 @@ pub struct SecondLaunch {
 
 /// The only successful normal/maintenance acquisition result.
 #[cfg(windows)]
-pub use windows::{Acquisition, ActivationWorker, OwnerLease};
+pub use windows::{
+    Acquisition, ActivationPresentation, ActivationStart, ActivationWorker, OwnerController,
+    OwnerLease,
+};
 
 #[cfg(not(windows))]
 pub use unsupported::{Acquisition, ActivationWorker, OwnerLease};

@@ -2,7 +2,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
-        mpsc::sync_channel,
+        mpsc::{SyncSender, sync_channel},
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -24,7 +24,8 @@ use windows_sys::Win32::{
 };
 
 use super::{
-    ActivationRequest, NativeError, NativeErrorKind, Role, STABLE_OWNER_NAMESPACE, SecondLaunch,
+    ActivationCallbackResult, ActivationCancellation, ActivationRequest, NativeError,
+    NativeErrorKind, Role, STABLE_OWNER_NAMESPACE, SecondLaunch,
     handles::{MutexWaitResult, OwnedHandle, OwnedMutex, last_error, native_failure, wide},
     identity::FileIdentity,
     layout::{self, PreparedLayout},
@@ -34,17 +35,116 @@ use super::{
     },
     state::{
         OwnerIdentity, ROLE_MAINTENANCE, ROLE_NORMAL, STATE_ACKNOWLEDGED, STATE_IDLE,
-        STATE_PENDING, STATUS_HANDLED, STATUS_NONE, StateFile, StateRecord,
+        STATE_PENDING, STATUS_CALLBACK_QUEUED, STATUS_CALLBACK_RUNNING, STATUS_CANCEL_REQUESTED,
+        STATUS_CANCELLED, STATUS_HANDLED, STATUS_NONE, STATUS_UNCERTAIN, StateFile, StateRecord,
     },
 };
 
 const ACTIVATION_EVENT_PREFIX: &str = "Local\\JARVIS-DESKTOP-ACTIVATE-";
 const ACK_EVENT_PREFIX: &str = "Local\\JARVIS-DESKTOP-ACK-";
 const PENDING_HOUSEKEEPING: Duration = Duration::from_secs(2);
+const ACTIVATION_RECONCILIATION: Duration = Duration::from_millis(500);
+const CALLBACK_DEADLINE: Duration = Duration::from_millis(500);
+
+enum ArbitrationCommand {
+    Wait(u32, SyncSender<Result<MutexWaitResult, NativeError>>),
+    Release(SyncSender<Result<(), NativeError>>),
+}
+
+#[derive(Debug)]
+struct ArbitrationLease {
+    command: SyncSender<ArbitrationCommand>,
+    join: Mutex<Option<JoinHandle<()>>>,
+    released: AtomicBool,
+}
+
+impl ArbitrationLease {
+    fn spawn(mut mutex: OwnedMutex) -> Result<Arc<Self>, NativeError> {
+        let (command, receiver) = sync_channel(1);
+        let (ready_sender, ready_receiver) = sync_channel(0);
+        let thread = thread::Builder::new()
+            .name("jarvis-arbitration-owner".to_owned())
+            .spawn(move || {
+                let _ = ready_sender.send(());
+                while let Ok(command) = receiver.recv() {
+                    match command {
+                        ArbitrationCommand::Wait(timeout_ms, result_sender) => {
+                            let _ = result_sender.send(mutex.wait(timeout_ms));
+                        }
+                        ArbitrationCommand::Release(result_sender) => {
+                            let result = mutex.release();
+                            let _ = result_sender.send(result);
+                            break;
+                        }
+                    }
+                }
+            })
+            .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))?;
+        if ready_receiver
+            .recv_timeout(Duration::from_millis(500))
+            .is_err()
+        {
+            drop(command);
+            let _ = thread.join();
+            return Err(native_failure(NativeErrorKind::ArbitrationUnavailable));
+        }
+        Ok(Arc::new(Self {
+            command,
+            join: Mutex::new(Some(thread)),
+            released: AtomicBool::new(false),
+        }))
+    }
+
+    fn wait(&self, timeout_ms: u32) -> Result<MutexWaitResult, NativeError> {
+        if self.released.load(Ordering::Acquire) {
+            return Err(native_failure(NativeErrorKind::ArbitrationUnavailable));
+        }
+        let (result_sender, result_receiver) = sync_channel(0);
+        self.command
+            .send(ArbitrationCommand::Wait(timeout_ms, result_sender))
+            .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))?;
+        result_receiver
+            .recv_timeout(Duration::from_millis(u64::from(timeout_ms) + 500))
+            .map_err(|_| native_failure(NativeErrorKind::ArbitrationUnavailable))?
+    }
+
+    fn release(&self) -> Result<(), NativeError> {
+        if self.released.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        let (result_sender, result_receiver) = sync_channel(0);
+        self.command
+            .send(ArbitrationCommand::Release(result_sender))
+            .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))?;
+        result_receiver
+            .recv_timeout(Duration::from_millis(500))
+            .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))??;
+        let mut join = self
+            .join
+            .lock()
+            .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))?;
+        if let Some(thread) = join.take() {
+            thread
+                .join()
+                .map_err(|_| native_failure(NativeErrorKind::ArbitrationReleaseUncertain))?;
+        }
+        self.released.store(true, Ordering::Release);
+        Ok(())
+    }
+}
+
+impl Drop for ArbitrationLease {
+    fn drop(&mut self) {
+        if !self.released.load(Ordering::Acquire) && self.release().is_err() {
+            // A failed release leaves the process-level ownership decision
+            // ambiguous. Do not silently drop the guard.
+            std::process::abort();
+        }
+    }
+}
 
 #[derive(Debug)]
 struct OwnerInner {
-    _mutex: OwnedMutex,
     _layout: layout::Layout,
     state: StateFile,
     activation_event: OwnedHandle,
@@ -57,20 +157,18 @@ struct OwnerInner {
     pending: Mutex<Option<(u64, Instant, bool)>>,
     stopping: AtomicBool,
     worker_failed: AtomicBool,
+    worker_cleanup_failed: AtomicBool,
+    callback_active: AtomicBool,
 }
 
-// OwnerInner is shared only by the bounded activation worker and the Tauri
-// owner. StateFile transactions serialize all mutable state and the kernel
-// event handles are safe to signal/wait concurrently.
-// SAFETY: OwnerInner contains only process-owned kernel handles and state
-// transactions are serialized before shared access.
-unsafe impl Send for OwnerInner {}
-// SAFETY: all shared mutable state is behind synchronization and the kernel
-// event operations are safe for concurrent use by this owner.
-unsafe impl Sync for OwnerInner {}
+#[derive(Debug)]
+pub struct OwnerLease {
+    inner: Arc<OwnerInner>,
+    arbitration: Arc<ArbitrationLease>,
+}
 
 #[derive(Clone, Debug)]
-pub struct OwnerLease {
+pub struct OwnerController {
     inner: Arc<OwnerInner>,
 }
 
@@ -84,6 +182,191 @@ pub struct ActivationWorker {
 pub enum Acquisition {
     Owner(OwnerLease),
     SecondLaunch(SecondLaunch),
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ActivationRequestContext {
+    inner: Arc<OwnerInner>,
+    generation: u64,
+}
+
+#[derive(Debug)]
+pub struct ActivationPresentation {
+    inner: Arc<OwnerInner>,
+    generation: u64,
+    completed: bool,
+}
+
+#[derive(Debug)]
+pub enum ActivationStart {
+    Started(ActivationPresentation),
+    Cancelled,
+}
+
+impl ActivationRequestContext {
+    pub(crate) fn begin_presentation(&self) -> Result<ActivationStart, NativeError> {
+        if self.inner.worker_cleanup_failed.load(Ordering::Acquire) {
+            return Err(native_failure(NativeErrorKind::ActivationUncertain));
+        }
+        let outcome = self.inner.state.transact(|record| {
+            if record.request_generation != self.generation {
+                return Ok(true);
+            }
+            if record.state == STATE_ACKNOWLEDGED && record.status == STATUS_CANCELLED {
+                return Ok(true);
+            }
+            if record.state != STATE_PENDING {
+                return Ok(true);
+            }
+            match record.status {
+                STATUS_NONE | STATUS_CALLBACK_QUEUED => {
+                    record.status = STATUS_CALLBACK_RUNNING;
+                    Ok(false)
+                }
+                STATUS_CANCEL_REQUESTED => {
+                    record.state = STATE_ACKNOWLEDGED;
+                    record.status = STATUS_CANCELLED;
+                    record.ack_generation = self.generation;
+                    Ok(true)
+                }
+                STATUS_CALLBACK_RUNNING | STATUS_UNCERTAIN => {
+                    Err(native_failure(NativeErrorKind::ActivationUncertain))
+                }
+                _ => Err(native_failure(NativeErrorKind::ActivationUncertain)),
+            }
+        });
+        let cancelled = match outcome {
+            Ok(cancelled) => cancelled,
+            Err(error) => {
+                self.inner
+                    .worker_cleanup_failed
+                    .store(true, Ordering::Release);
+                return Err(error);
+            }
+        };
+        if cancelled {
+            signal_ack(&self.inner);
+            Ok(ActivationStart::Cancelled)
+        } else {
+            Ok(ActivationStart::Started(ActivationPresentation {
+                inner: Arc::clone(&self.inner),
+                generation: self.generation,
+                completed: false,
+            }))
+        }
+    }
+
+    pub(crate) fn cancel(&self) -> ActivationCancellation {
+        let outcome = self.inner.state.transact(|record| {
+            if record.request_generation != self.generation {
+                return Ok(true);
+            }
+            if record.state != STATE_PENDING {
+                return match record.status {
+                    STATUS_CANCELLED if record.state == STATE_ACKNOWLEDGED => Ok(true),
+                    _ => Err(native_failure(NativeErrorKind::ActivationUncertain)),
+                };
+            }
+            match record.status {
+                STATUS_NONE | STATUS_CALLBACK_QUEUED => {
+                    record.state = STATE_ACKNOWLEDGED;
+                    record.status = STATUS_CANCELLED;
+                    record.ack_generation = self.generation;
+                    Ok(true)
+                }
+                STATUS_CALLBACK_RUNNING => {
+                    record.status = STATUS_CANCEL_REQUESTED;
+                    Ok(false)
+                }
+                STATUS_CANCEL_REQUESTED | STATUS_UNCERTAIN => Ok(false),
+                _ => Err(native_failure(NativeErrorKind::ActivationUncertain)),
+            }
+        });
+        match outcome {
+            Ok(true) => {
+                signal_ack(&self.inner);
+                ActivationCancellation::Cancelled
+            }
+            Ok(false) => ActivationCancellation::InFlight,
+            Err(_) => {
+                self.inner
+                    .worker_cleanup_failed
+                    .store(true, Ordering::Release);
+                ActivationCancellation::Uncertain
+            }
+        }
+    }
+}
+
+impl ActivationPresentation {
+    pub fn complete(mut self, result: ActivationCallbackResult) -> Result<(), NativeError> {
+        let outcome = self.complete_inner(result);
+        self.completed = true;
+        outcome
+    }
+
+    fn complete_inner(&self, result: ActivationCallbackResult) -> Result<(), NativeError> {
+        let outcome = self.inner.state.transact(|record| {
+            if record.request_generation != self.generation {
+                return Ok(false);
+            }
+            if record.state != STATE_PENDING && record.state != STATE_ACKNOWLEDGED {
+                return Ok(false);
+            }
+            match result {
+                ActivationCallbackResult::Handled => {
+                    if record.state == STATE_ACKNOWLEDGED && record.status == STATUS_HANDLED {
+                        return Ok(false);
+                    }
+                    if record.state == STATE_PENDING
+                        && matches!(
+                            record.status,
+                            STATUS_CALLBACK_RUNNING | STATUS_CANCEL_REQUESTED | STATUS_UNCERTAIN
+                        )
+                    {
+                        record.state = STATE_ACKNOWLEDGED;
+                        record.status = STATUS_HANDLED;
+                        record.ack_generation = self.generation;
+                        return Ok(true);
+                    }
+                    Err(native_failure(NativeErrorKind::ActivationUncertain))
+                }
+                ActivationCallbackResult::NotStarted => {
+                    if record.state == STATE_ACKNOWLEDGED && record.status == STATUS_CANCELLED {
+                        return Ok(false);
+                    }
+                    Err(native_failure(NativeErrorKind::ActivationUncertain))
+                }
+                ActivationCallbackResult::Uncertain => {
+                    if record.state == STATE_ACKNOWLEDGED {
+                        return Ok(false);
+                    }
+                    record.state = STATE_PENDING;
+                    record.status = STATUS_UNCERTAIN;
+                    record.ack_generation = 0;
+                    Ok(false)
+                }
+            }
+        })?;
+        if outcome {
+            signal_ack(&self.inner);
+        }
+        Ok(())
+    }
+}
+
+impl Drop for ActivationPresentation {
+    fn drop(&mut self) {
+        if !self.completed
+            && self
+                .complete_inner(ActivationCallbackResult::Uncertain)
+                .is_err()
+        {
+            self.inner
+                .worker_cleanup_failed
+                .store(true, Ordering::Release);
+        }
+    }
 }
 
 struct SecurityBundle {
@@ -110,51 +393,54 @@ pub fn acquire(role: Role) -> Result<Acquisition, NativeError> {
     let mutex_security = ExplicitSecurity::for_sid(&sid, MUTEX_ACCESS_MASK)?;
     let security = SecurityBundle::for_sid(&sid)?;
     let mutex_name = stable_mutex_name(&sid, prepared.parent_identity);
-    let (mut mutex, created) = create_mutex(&mutex_name, &mutex_security, &sid)?;
-    if !created {
-        match mutex.wait(0)? {
-            MutexWaitResult::Acquired | MutexWaitResult::Abandoned => {
-                return acquire_recovered_owner(
-                    mutex,
-                    prepared,
-                    sid.clone(),
-                    sid_hash,
-                    role,
-                    security,
-                );
-            }
-            MutexWaitResult::Timeout => {}
+    let (mutex, created) = create_mutex(&mutex_name, &mutex_security, &sid)?;
+    let arbitration = ArbitrationLease::spawn(mutex)?;
+    match arbitration.wait(0)? {
+        MutexWaitResult::Acquired | MutexWaitResult::Abandoned => {
+            return acquire_owner(
+                Arc::clone(&arbitration),
+                prepared,
+                sid,
+                sid_hash,
+                security,
+                role,
+            );
         }
-
-        let activation = acquire_second_launch(prepared, &sid, &security, sid_hash, role);
-        match activation {
-            Ok(result) => return Ok(result),
-            Err(original_error) => match mutex.wait(500) {
-                Ok(MutexWaitResult::Acquired | MutexWaitResult::Abandoned) => {
-                    let recovered_prepared = layout::prepare()?;
-                    if recovered_prepared.parent_identity != parent_identity {
-                        return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
-                    }
-                    return acquire_recovered_owner(
-                        mutex,
-                        recovered_prepared,
-                        sid.clone(),
-                        sid_hash,
-                        role,
-                        SecurityBundle::for_sid(&sid)?,
-                    );
-                }
-                Ok(MutexWaitResult::Timeout) => return Err(original_error),
-                Err(_) => return Err(original_error),
-            },
+        MutexWaitResult::Timeout if created => {
+            return Err(native_failure(NativeErrorKind::ArbitrationUnavailable));
+        }
+        MutexWaitResult::Timeout => {
+            #[cfg(feature = "test-support")]
+            signal_recovery_waiter_barrier();
         }
     }
 
-    acquire_owner(mutex, prepared, sid, sid_hash, security, role)
+    let activation = acquire_second_launch(prepared, &sid, &security, sid_hash, role);
+    match activation {
+        Ok(result) => Ok(result),
+        Err(original_error) => match arbitration.wait(500) {
+            Ok(MutexWaitResult::Acquired | MutexWaitResult::Abandoned) => {
+                let recovered_prepared = layout::prepare()?;
+                if recovered_prepared.parent_identity != parent_identity {
+                    return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
+                }
+                acquire_recovered_owner(
+                    Arc::clone(&arbitration),
+                    recovered_prepared,
+                    sid.clone(),
+                    sid_hash,
+                    role,
+                    SecurityBundle::for_sid(&sid)?,
+                )
+            }
+            Ok(MutexWaitResult::Timeout) => Err(original_error),
+            Err(_) => Err(original_error),
+        },
+    }
 }
 
 fn acquire_owner(
-    mutex: OwnedMutex,
+    arbitration: Arc<ArbitrationLease>,
     mut prepared: PreparedLayout,
     sid: String,
     sid_hash: [u8; 32],
@@ -196,7 +482,6 @@ fn acquire_owner(
             Ok(state) => {
                 return Ok(Acquisition::Owner(OwnerLease {
                     inner: Arc::new(OwnerInner {
-                        _mutex: mutex,
                         _layout: layout,
                         state,
                         activation_event,
@@ -209,7 +494,10 @@ fn acquire_owner(
                         pending: Mutex::new(None),
                         stopping: AtomicBool::new(false),
                         worker_failed: AtomicBool::new(false),
+                        worker_cleanup_failed: AtomicBool::new(false),
+                        callback_active: AtomicBool::new(false),
                     }),
+                    arbitration,
                 }));
             }
             Err(error)
@@ -230,7 +518,7 @@ fn acquire_owner(
 }
 
 fn acquire_recovered_owner(
-    mutex: OwnedMutex,
+    arbitration: Arc<ArbitrationLease>,
     prepared: PreparedLayout,
     sid: String,
     sid_hash: [u8; 32],
@@ -249,7 +537,7 @@ fn acquire_recovered_owner(
     if prepared.parent_identity != parent_identity {
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
-    acquire_owner(mutex, prepared, sid, sid_hash, security, role)
+    acquire_owner(arbitration, prepared, sid, sid_hash, security, role)
 }
 
 fn validate_recovered_state(
@@ -305,7 +593,42 @@ fn validate_recovered_state(
 }
 
 impl OwnerLease {
+    pub fn controller(&self) -> OwnerController {
+        OwnerController {
+            inner: Arc::clone(&self.inner),
+        }
+    }
+
+    pub fn release(self) -> Result<(), NativeError> {
+        self.arbitration.release()
+    }
+
     pub fn mark_ready(&self) -> Result<(), NativeError> {
+        self.controller().mark_ready()
+    }
+
+    pub fn start_activation_worker<F>(&self, callback: F) -> Result<ActivationWorker, NativeError>
+    where
+        F: Fn(ActivationRequest) -> ActivationCallbackResult + Send + 'static,
+    {
+        self.controller().start_activation_worker(callback)
+    }
+}
+
+impl Drop for OwnerLease {
+    fn drop(&mut self) {
+        if !self.arbitration.released.load(Ordering::Acquire) && self.arbitration.release().is_err()
+        {
+            std::process::abort();
+        }
+    }
+}
+
+impl OwnerController {
+    pub fn mark_ready(&self) -> Result<(), NativeError> {
+        if self.inner.worker_cleanup_failed.load(Ordering::Acquire) {
+            return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
+        }
         self.inner.state.transact(|record| {
             validate_owner_record(&self.inner, record)?;
             if record.readiness != 0 {
@@ -316,12 +639,27 @@ impl OwnerLease {
         })
     }
 
+    /// Starts the single owned activation dispatcher.
+    ///
+    /// The callback is a bounded protocol participant: it must return within
+    /// the native callback deadline after either completing or explicitly
+    /// reporting `Uncertain`. A callback that remains active past the bounded
+    /// shutdown window is never detached; worker drop fails closed by
+    /// terminating the process rather than leaving an unowned callback thread.
     pub fn start_activation_worker<F>(&self, callback: F) -> Result<ActivationWorker, NativeError>
     where
-        F: Fn(ActivationRequest) -> bool + Send + 'static,
+        F: Fn(ActivationRequest) -> ActivationCallbackResult + Send + 'static,
     {
         if self.inner.role != Role::Normal {
             return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
+        }
+        if self.inner.worker_cleanup_failed.load(Ordering::Acquire)
+            || self.inner.worker_failed.load(Ordering::Acquire)
+        {
+            reconcile_inflight(&self.inner)?;
+            self.inner
+                .worker_cleanup_failed
+                .store(false, Ordering::Release);
         }
         self.inner.stopping.store(false, Ordering::Release);
         self.inner.worker_failed.store(false, Ordering::Release);
@@ -342,7 +680,7 @@ impl OwnerLease {
                         let ready = result != WAIT_FAILED;
                         let _ = ready_sender.send(ready);
                         if !ready {
-                            mark_worker_failed(&thread_inner);
+                            let _ = mark_worker_failed(&thread_inner);
                             break;
                         }
                     }
@@ -351,8 +689,12 @@ impl OwnerLease {
                     }
                     if result == WAIT_OBJECT_0 || result == WAIT_TIMEOUT {
                         process_pending(&thread_inner, &callback);
+                        if thread_inner.worker_failed.load(Ordering::Acquire) {
+                            let _ = mark_worker_failed(&thread_inner);
+                            break;
+                        }
                     } else {
-                        mark_worker_failed(&thread_inner);
+                        let _ = mark_worker_failed(&thread_inner);
                         break;
                     }
                 }
@@ -385,11 +727,32 @@ impl Drop for ActivationWorker {
         unsafe {
             let _ = SetEvent(self.inner.activation_event.raw());
         }
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
+        let deadline = Instant::now() + CALLBACK_DEADLINE;
+        while self.inner.callback_active.load(Ordering::Acquire) && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(5));
         }
-        mark_worker_failed(&self.inner);
-        reconcile_inflight(&self.inner);
+        if self.inner.callback_active.load(Ordering::Acquire) {
+            self.inner.worker_failed.store(true, Ordering::Release);
+            self.inner
+                .worker_cleanup_failed
+                .store(true, Ordering::Release);
+            // A callback that ignores the bounded shutdown protocol cannot be
+            // safely detached or joined. Terminate rather than hang or leave
+            // an unowned activation worker behind.
+            std::process::abort();
+        }
+        if let Some(thread) = self.thread.take()
+            && thread.join().is_err()
+        {
+            self.inner
+                .worker_cleanup_failed
+                .store(true, Ordering::Release);
+        }
+        if mark_worker_failed(&self.inner).is_err() || reconcile_inflight(&self.inner).is_err() {
+            self.inner
+                .worker_cleanup_failed
+                .store(true, Ordering::Release);
+        }
     }
 }
 
@@ -431,6 +794,12 @@ fn acquire_second_launch(
         return Err(native_failure(NativeErrorKind::NotReady));
     }
 
+    if let Some(true) = settle_prior_request(&state, current_pid, current_start)? {
+        return Ok(Acquisition::SecondLaunch(SecondLaunch {
+            acknowledged: true,
+        }));
+    }
+
     let request_generation = state.transact(|record| {
         if record.role != ROLE_NORMAL
             || record.parent != layout.parent_identity
@@ -460,19 +829,27 @@ fn acquire_second_launch(
     let activation = match open_event(&activation_name, EVENT_MODIFY_STATE) {
         Ok(event) => event,
         Err(error) => {
-            return Err(activation_failure(&state, request_generation, error.kind));
+            return Err(cancel_before_dispatch(
+                &state,
+                request_generation,
+                error.kind,
+            ));
         }
     };
     let ack = match open_event(&ack_name, SYNCHRONIZE) {
         Ok(event) => event,
         Err(error) => {
-            return Err(activation_failure(&state, request_generation, error.kind));
+            return Err(cancel_before_dispatch(
+                &state,
+                request_generation,
+                error.kind,
+            ));
         }
     };
     // SAFETY: the existing authority owns the event and the handle remains
     // valid for this bounded signal operation.
     if unsafe { SetEvent(activation.raw()) } == 0 {
-        return Err(activation_failure(
+        return Err(cancel_before_dispatch(
             &state,
             request_generation,
             NativeErrorKind::ActivationUnavailable,
@@ -481,74 +858,301 @@ fn acquire_second_launch(
     // SAFETY: the wait is explicitly bounded to the contract's two-second
     // acknowledgement envelope.
     let wait = unsafe { WaitForSingleObject(ack.raw(), 2_000) };
-    if wait != WAIT_OBJECT_0 {
-        return Err(activation_failure(
-            &state,
-            request_generation,
-            if wait == WAIT_TIMEOUT {
-                NativeErrorKind::ActivationUnavailable
-            } else if wait == WAIT_FAILED {
-                NativeErrorKind::ActivationUncertain
-            } else {
-                NativeErrorKind::ActivationUnavailable
-            },
-        ));
-    }
-    match state.transact(|record| {
-        if record.state != STATE_ACKNOWLEDGED
-            || record.request_generation != request_generation
-            || record.ack_generation != request_generation
-            || record.status != STATUS_HANDLED
-        {
-            return Err(native_failure(NativeErrorKind::ActivationUncertain));
+    if wait == WAIT_OBJECT_0 {
+        let settled = settle_request(&state, request_generation)?;
+        if settled == ActivationSettlement::Pending {
+            return match observe_request_after_signal(&state, request_generation) {
+                Ok(ActivationSettlement::Handled) => Ok(Acquisition::SecondLaunch(SecondLaunch {
+                    acknowledged: true,
+                })),
+                Ok(ActivationSettlement::Cancelled) => {
+                    Err(native_failure(NativeErrorKind::ActivationUnavailable))
+                }
+                Ok(ActivationSettlement::Pending) | Err(_) => {
+                    Err(native_failure(NativeErrorKind::ActivationUncertain))
+                }
+            };
         }
-        clear_request(record);
-        Ok(())
-    }) {
-        Ok(()) => Ok(Acquisition::SecondLaunch(SecondLaunch {
+        return match settled {
+            ActivationSettlement::Handled => Ok(Acquisition::SecondLaunch(SecondLaunch {
+                acknowledged: true,
+            })),
+            ActivationSettlement::Cancelled => {
+                Err(native_failure(NativeErrorKind::ActivationUnavailable))
+            }
+            ActivationSettlement::Pending => {
+                Err(native_failure(NativeErrorKind::ActivationUncertain))
+            }
+        };
+    }
+
+    match reconcile_request(&state, &ack, request_generation) {
+        Ok(ActivationSettlement::Handled) => Ok(Acquisition::SecondLaunch(SecondLaunch {
             acknowledged: true,
         })),
-        Err(error) => Err(activation_failure(&state, request_generation, error.kind)),
+        Ok(ActivationSettlement::Cancelled) => {
+            Err(native_failure(NativeErrorKind::ActivationUnavailable))
+        }
+        Ok(ActivationSettlement::Pending) | Err(_) => {
+            Err(native_failure(NativeErrorKind::ActivationUncertain))
+        }
     }
 }
 
-fn activation_failure(
+#[cfg(feature = "test-support")]
+fn signal_recovery_waiter_barrier() {
+    if std::env::var("JARVIS_NATIVE_QUALIFICATION_CHILD").as_deref() == Ok("recovery-waiter")
+        && let Ok(path) = std::env::var("JARVIS_NATIVE_QUALIFICATION_READY_FILE")
+    {
+        let _ = std::fs::write(path, b"opened-existing-mutex");
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ActivationSettlement {
+    Handled,
+    Cancelled,
+    Pending,
+}
+
+fn settle_prior_request(
+    state: &StateFile,
+    current_pid: u32,
+    current_start: u64,
+) -> Result<Option<bool>, NativeError> {
+    let snapshot = state.read_snapshot()?;
+    match snapshot.state {
+        STATE_ACKNOWLEDGED if snapshot.status == STATUS_HANDLED => {
+            state.transact(|record| {
+                if record.request_generation != snapshot.request_generation
+                    || record.state != STATE_ACKNOWLEDGED
+                    || record.status != STATUS_HANDLED
+                {
+                    return Err(native_failure(NativeErrorKind::ActivationUncertain));
+                }
+                clear_request(record);
+                Ok(())
+            })?;
+            Ok(Some(true))
+        }
+        STATE_ACKNOWLEDGED if snapshot.status == STATUS_CANCELLED => {
+            state.transact(|record| {
+                if record.request_generation != snapshot.request_generation
+                    || record.state != STATE_ACKNOWLEDGED
+                    || record.status != STATUS_CANCELLED
+                {
+                    return Err(native_failure(NativeErrorKind::ActivationUncertain));
+                }
+                clear_request(record);
+                Ok(())
+            })?;
+            Ok(Some(false))
+        }
+        STATE_PENDING
+            if matches!(snapshot.status, STATUS_NONE | STATUS_CALLBACK_QUEUED)
+                && !request_is_alive(&snapshot, current_pid, current_start) =>
+        {
+            state.transact(|record| {
+                if record.request_generation == snapshot.request_generation
+                    && record.state == STATE_PENDING
+                    && matches!(record.status, STATUS_NONE | STATUS_CALLBACK_QUEUED)
+                {
+                    clear_request(record);
+                }
+                Ok(())
+            })?;
+            Ok(None)
+        }
+        STATE_IDLE => Ok(None),
+        _ => Err(native_failure(NativeErrorKind::ActivationUncertain)),
+    }
+}
+
+fn settle_request(
+    state: &StateFile,
+    request_generation: u64,
+) -> Result<ActivationSettlement, NativeError> {
+    state.transact(|record| {
+        if record.request_generation != request_generation {
+            return Err(native_failure(NativeErrorKind::ActivationUncertain));
+        }
+        match (record.state, record.status) {
+            (STATE_ACKNOWLEDGED, STATUS_HANDLED) => {
+                clear_request(record);
+                Ok(ActivationSettlement::Handled)
+            }
+            (STATE_ACKNOWLEDGED, STATUS_CANCELLED) => {
+                clear_request(record);
+                Ok(ActivationSettlement::Cancelled)
+            }
+            (STATE_PENDING, _) => Ok(ActivationSettlement::Pending),
+            _ => Err(native_failure(NativeErrorKind::ActivationUncertain)),
+        }
+    })
+}
+
+fn cancel_before_dispatch(
     state: &StateFile,
     request_generation: u64,
     kind: NativeErrorKind,
 ) -> NativeError {
     match state.transact(|record| {
-        if record.request_generation == request_generation
-            && matches!(record.state, STATE_PENDING | STATE_ACKNOWLEDGED)
+        if record.request_generation != request_generation {
+            return Ok(false);
+        }
+        if record.state == STATE_PENDING
+            && matches!(record.status, STATUS_NONE | STATUS_CALLBACK_QUEUED)
         {
             clear_request(record);
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
     }) {
-        Ok(()) => native_failure(kind),
-        Err(_) => native_failure(NativeErrorKind::ActivationUncertain),
+        Ok(true) => native_failure(kind),
+        Ok(false) | Err(_) => native_failure(NativeErrorKind::ActivationUncertain),
     }
+}
+
+fn reconcile_request(
+    state: &StateFile,
+    ack: &OwnedHandle,
+    request_generation: u64,
+) -> Result<ActivationSettlement, NativeError> {
+    let deadline = Instant::now() + ACTIVATION_RECONCILIATION;
+    loop {
+        let snapshot = state.read_snapshot()?;
+        if snapshot.request_generation != request_generation {
+            return Err(native_failure(NativeErrorKind::ActivationUncertain));
+        }
+        match (snapshot.state, snapshot.status) {
+            (STATE_ACKNOWLEDGED, STATUS_HANDLED) => {
+                return settle_request(state, request_generation);
+            }
+            (STATE_ACKNOWLEDGED, STATUS_CANCELLED) => {
+                return settle_request(state, request_generation);
+            }
+            (STATE_PENDING, STATUS_NONE | STATUS_CALLBACK_QUEUED) => {
+                if matches!(
+                    cancel_state_request(state, request_generation)?,
+                    ActivationCancellation::Cancelled
+                ) {
+                    signal_external_ack(ack);
+                }
+            }
+            (STATE_PENDING, STATUS_CALLBACK_RUNNING) => {
+                let _ = cancel_state_request(state, request_generation)?;
+            }
+            (STATE_PENDING, STATUS_CANCEL_REQUESTED | STATUS_UNCERTAIN) => {}
+            _ => return Err(native_failure(NativeErrorKind::ActivationUncertain)),
+        }
+        if Instant::now() >= deadline {
+            return Ok(ActivationSettlement::Pending);
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn observe_request_after_signal(
+    state: &StateFile,
+    request_generation: u64,
+) -> Result<ActivationSettlement, NativeError> {
+    let deadline = Instant::now() + ACTIVATION_RECONCILIATION;
+    loop {
+        match state.read_snapshot()? {
+            snapshot if snapshot.request_generation == request_generation => {
+                match (snapshot.state, snapshot.status) {
+                    (STATE_ACKNOWLEDGED, STATUS_HANDLED)
+                    | (STATE_ACKNOWLEDGED, STATUS_CANCELLED) => {
+                        return settle_request(state, request_generation);
+                    }
+                    (STATE_PENDING, _) => {}
+                    _ => return Err(native_failure(NativeErrorKind::ActivationUncertain)),
+                }
+            }
+            _ => return Err(native_failure(NativeErrorKind::ActivationUncertain)),
+        }
+        if Instant::now() >= deadline {
+            return Ok(ActivationSettlement::Pending);
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+}
+
+fn cancel_state_request(
+    state: &StateFile,
+    request_generation: u64,
+) -> Result<ActivationCancellation, NativeError> {
+    state.transact(|record| {
+        if record.request_generation != request_generation {
+            return Err(native_failure(NativeErrorKind::ActivationUncertain));
+        }
+        match (record.state, record.status) {
+            (STATE_PENDING, STATUS_NONE | STATUS_CALLBACK_QUEUED) => {
+                record.state = STATE_ACKNOWLEDGED;
+                record.status = STATUS_CANCELLED;
+                record.ack_generation = request_generation;
+                Ok(ActivationCancellation::Cancelled)
+            }
+            (STATE_PENDING, STATUS_CALLBACK_RUNNING) => {
+                record.status = STATUS_CANCEL_REQUESTED;
+                Ok(ActivationCancellation::InFlight)
+            }
+            (STATE_PENDING, STATUS_CANCEL_REQUESTED | STATUS_UNCERTAIN) => {
+                Ok(ActivationCancellation::Uncertain)
+            }
+            (STATE_ACKNOWLEDGED, STATUS_CANCELLED) => Ok(ActivationCancellation::Cancelled),
+            _ => Ok(ActivationCancellation::Uncertain),
+        }
+    })
+}
+
+fn request_is_alive(snapshot: &StateRecord, current_pid: u32, current_start: u64) -> bool {
+    if snapshot.request_pid == current_pid && snapshot.request_start_filetime == current_start {
+        return true;
+    }
+    process_start_filetime_for_pid(snapshot.request_pid)
+        .map(|start| start == snapshot.request_start_filetime)
+        .unwrap_or(false)
 }
 
 fn process_pending<F>(inner: &Arc<OwnerInner>, callback: &F)
 where
-    F: Fn(ActivationRequest) -> bool,
+    F: Fn(ActivationRequest) -> ActivationCallbackResult,
 {
+    if inner.worker_cleanup_failed.load(Ordering::Acquire) {
+        return;
+    }
     let snapshot = match inner.state.read_snapshot() {
         Ok(snapshot) => snapshot,
-        Err(_) => return,
+        Err(_) => {
+            let _ = mark_worker_failed(inner);
+            return;
+        }
     };
-    if snapshot.state != STATE_PENDING && snapshot.state != STATE_ACKNOWLEDGED {
+    if snapshot.state == STATE_ACKNOWLEDGED {
+        let started = pending_started(inner, snapshot.request_generation);
+        if started.is_some_and(|started| started.elapsed() >= PENDING_HOUSEKEEPING)
+            && reset_pending_if_current(inner, snapshot.request_generation).is_err()
+        {
+            inner.worker_cleanup_failed.store(true, Ordering::Release);
+        }
+        return;
+    }
+    if snapshot.state != STATE_PENDING {
         if let Ok(mut pending) = inner.pending.lock() {
             *pending = None;
         }
         return;
     }
 
-    let (pending_started, callback_attempted) = {
+    let (_started, attempted) = {
         let mut pending = match inner.pending.lock() {
             Ok(pending) => pending,
-            Err(_) => return,
+            Err(_) => {
+                let _ = mark_worker_failed(inner);
+                return;
+            }
         };
         match *pending {
             Some((generation, started, attempted)) if generation == snapshot.request_generation => {
@@ -562,95 +1166,155 @@ where
         }
     };
 
-    if snapshot.state == STATE_ACKNOWLEDGED {
-        if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
-            reset_pending_if_current(inner, snapshot.request_generation);
-        }
-        return;
-    }
-
     if snapshot.readiness == 0
         || snapshot.session != inner.session
         || snapshot.request_session != inner.session
         || snapshot.request_sid_hash != inner.sid_hash
     {
-        if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
-            reset_pending_if_current(inner, snapshot.request_generation);
-        }
         return;
     }
 
-    if process_start_filetime_for_pid(snapshot.request_pid)
-        .map(|start| start == snapshot.request_start_filetime)
-        != Ok(true)
-    {
-        if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
-            reset_pending_if_current(inner, snapshot.request_generation);
-        }
+    if !request_is_alive(&snapshot, inner.pid, inner.start_filetime) {
         return;
     }
 
-    if callback_attempted {
-        if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
-            reset_pending_if_current(inner, snapshot.request_generation);
+    if attempted || snapshot.status != STATUS_NONE {
+        return;
+    }
+
+    let queued = inner.state.transact(|record| {
+        if record.state == STATE_PENDING
+            && record.request_generation == snapshot.request_generation
+            && record.status == STATUS_NONE
+        {
+            record.status = STATUS_CALLBACK_QUEUED;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    });
+    if queued != Ok(true) {
+        if queued.is_err() {
+            inner.worker_cleanup_failed.store(true, Ordering::Release);
         }
         return;
     }
 
     if let Ok(mut pending) = inner.pending.lock()
-        && pending
-            .as_ref()
-            .is_some_and(|(generation, _, _)| *generation == snapshot.request_generation)
-        && let Some((_, _, attempted)) = pending.as_mut()
+        && let Some((generation, _, attempted)) = pending.as_mut()
+        && *generation == snapshot.request_generation
     {
         *attempted = true;
     }
 
-    let callback_succeeded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    inner.callback_active.store(true, Ordering::Release);
+    let callback_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         callback(ActivationRequest {
             process_id: snapshot.request_pid,
+            generation: snapshot.request_generation,
+            context: ActivationRequestContext {
+                inner: Arc::clone(inner),
+                generation: snapshot.request_generation,
+            },
         })
     }))
-    .unwrap_or(false);
+    .unwrap_or(ActivationCallbackResult::Uncertain);
+    inner.callback_active.store(false, Ordering::Release);
 
-    if callback_succeeded {
-        let acknowledged = inner.state.transact(|record| {
-            if record.state != STATE_PENDING
-                || record.request_generation != snapshot.request_generation
-            {
-                return Err(native_failure(NativeErrorKind::ActivationUnavailable));
-            }
-            record.state = STATE_ACKNOWLEDGED;
-            record.status = STATUS_HANDLED;
-            record.ack_generation = record.request_generation;
-            Ok(true)
-        });
-        if acknowledged.is_ok() {
-            // SAFETY: the owner event handle remains valid for the owner
-            // lifetime and the client waits only on this bounded signal.
-            unsafe {
-                let _ = SetEvent(inner.ack_event.raw());
-            }
-            if let Ok(mut pending) = inner.pending.lock() {
-                *pending = None;
-            }
-        } else if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
-            reset_pending_if_current(inner, snapshot.request_generation);
-        }
-    } else if pending_started.elapsed() >= PENDING_HOUSEKEEPING {
-        reset_pending_if_current(inner, snapshot.request_generation);
+    if finalize_callback(inner, snapshot.request_generation, callback_result).is_err() {
+        inner.worker_cleanup_failed.store(true, Ordering::Release);
     }
 }
 
-fn reset_pending_if_current(inner: &Arc<OwnerInner>, request_generation: u64) {
-    let _ = inner.state.transact(|record| {
+fn pending_started(inner: &Arc<OwnerInner>, request_generation: u64) -> Option<Instant> {
+    inner.pending.lock().ok().and_then(|pending| {
+        pending.as_ref().and_then(|(generation, started, _)| {
+            (*generation == request_generation).then_some(*started)
+        })
+    })
+}
+
+fn finalize_callback(
+    inner: &Arc<OwnerInner>,
+    request_generation: u64,
+    result: ActivationCallbackResult,
+) -> Result<(), NativeError> {
+    let acknowledged = inner.state.transact(|record| {
+        if record.request_generation != request_generation {
+            return Ok(false);
+        }
+        match result {
+            ActivationCallbackResult::Handled => {
+                if record.state == STATE_ACKNOWLEDGED && record.status == STATUS_HANDLED {
+                    Ok(true)
+                } else {
+                    if record.state == STATE_PENDING {
+                        record.status = STATUS_UNCERTAIN;
+                    }
+                    Ok(false)
+                }
+            }
+            ActivationCallbackResult::NotStarted => {
+                if record.state == STATE_ACKNOWLEDGED && record.status == STATUS_CANCELLED {
+                    Ok(false)
+                } else if record.state == STATE_PENDING
+                    && matches!(record.status, STATUS_NONE | STATUS_CALLBACK_QUEUED)
+                {
+                    record.state = STATE_ACKNOWLEDGED;
+                    record.status = STATUS_CANCELLED;
+                    record.ack_generation = request_generation;
+                    Ok(false)
+                } else {
+                    if record.state == STATE_PENDING {
+                        record.status = STATUS_UNCERTAIN;
+                    }
+                    Ok(false)
+                }
+            }
+            ActivationCallbackResult::Uncertain => {
+                if record.state == STATE_PENDING {
+                    if matches!(record.status, STATUS_NONE | STATUS_CALLBACK_QUEUED) {
+                        record.state = STATE_ACKNOWLEDGED;
+                        record.status = STATUS_CANCELLED;
+                        record.ack_generation = request_generation;
+                    } else {
+                        record.status = STATUS_UNCERTAIN;
+                    }
+                }
+                Ok(false)
+            }
+        }
+    })?;
+    let should_signal = acknowledged
+        || inner
+            .state
+            .read_snapshot()
+            .map(|record| {
+                record.state == STATE_ACKNOWLEDGED
+                    && matches!(record.status, STATUS_HANDLED | STATUS_CANCELLED)
+            })
+            .unwrap_or(false);
+    if should_signal {
+        signal_ack(inner);
+        if let Ok(mut pending) = inner.pending.lock() {
+            *pending = None;
+        }
+    }
+    Ok(())
+}
+
+fn reset_pending_if_current(
+    inner: &Arc<OwnerInner>,
+    request_generation: u64,
+) -> Result<(), NativeError> {
+    inner.state.transact(|record| {
         if record.request_generation == request_generation
             && matches!(record.state, STATE_PENDING | STATE_ACKNOWLEDGED)
         {
             clear_request(record);
         }
         Ok(())
-    });
+    })?;
     if let Ok(mut pending) = inner.pending.lock()
         && pending
             .as_ref()
@@ -658,25 +1322,45 @@ fn reset_pending_if_current(inner: &Arc<OwnerInner>, request_generation: u64) {
     {
         *pending = None;
     }
+    Ok(())
 }
 
-fn mark_worker_failed(inner: &Arc<OwnerInner>) {
+fn mark_worker_failed(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
     inner.worker_failed.store(true, Ordering::Release);
-    let _ = inner.state.transact(|record| {
+    let result = inner.state.transact(|record| {
         validate_owner_record(inner, record)?;
         record.readiness = 0;
-        if matches!(record.state, STATE_PENDING | STATE_ACKNOWLEDGED) {
+        if record.state == STATE_ACKNOWLEDGED {
             clear_request(record);
         }
         Ok(())
     });
+    if result.is_err() {
+        inner.worker_cleanup_failed.store(true, Ordering::Release);
+    }
+    result
 }
 
-fn reconcile_inflight(inner: &Arc<OwnerInner>) {
-    if let Ok(snapshot) = inner.state.read_snapshot()
-        && matches!(snapshot.state, STATE_PENDING | STATE_ACKNOWLEDGED)
-    {
-        reset_pending_if_current(inner, snapshot.request_generation);
+fn reconcile_inflight(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
+    let snapshot = inner.state.read_snapshot()?;
+    match snapshot.state {
+        STATE_ACKNOWLEDGED => reset_pending_if_current(inner, snapshot.request_generation)?,
+        STATE_PENDING => return Err(native_failure(NativeErrorKind::ActivationUncertain)),
+        STATE_IDLE => {}
+        _ => return Err(native_failure(NativeErrorKind::StateCorrupt)),
+    }
+    Ok(())
+}
+
+fn signal_ack(inner: &Arc<OwnerInner>) {
+    signal_external_ack(&inner.ack_event);
+}
+
+fn signal_external_ack(ack_event: &OwnedHandle) {
+    // SAFETY: the owner event handle remains valid while the state transition
+    // that produced the terminal result is observed by the client.
+    unsafe {
+        let _ = SetEvent(ack_event.raw());
     }
 }
 
@@ -743,7 +1427,9 @@ fn create_mutex(
 ) -> Result<(OwnedMutex, bool), NativeError> {
     let name = wide(name);
     // SAFETY: name/security remain valid for the synchronous creator call.
-    let raw = unsafe { CreateMutexW(security.as_ptr(), 1, name.as_ptr()) };
+    // The dedicated arbitration thread performs every wait and release so
+    // mutex ownership never becomes thread-affine state in OwnerInner.
+    let raw = unsafe { CreateMutexW(security.as_ptr(), 0, name.as_ptr()) };
     if raw.is_null() && last_error() == windows_sys::Win32::Foundation::ERROR_ACCESS_DENIED {
         // CreateMutexW requests the creator's full mutex access when opening
         // an existing named object. Re-open the existing object with exactly

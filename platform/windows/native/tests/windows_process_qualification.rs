@@ -11,7 +11,9 @@ use std::{
     time::Duration,
 };
 
-use jarvis_windows_native::{Acquisition, NativeErrorKind, Role, acquire};
+use jarvis_windows_native::{
+    Acquisition, ActivationCallbackResult, ActivationStart, NativeErrorKind, Role, acquire,
+};
 
 const CHILD_ENV: &str = "JARVIS_NATIVE_QUALIFICATION_CHILD";
 const TEST_NAME_ENV: &str = "JARVIS_NATIVE_QUALIFICATION_TEST";
@@ -61,12 +63,22 @@ fn windows_owner_second_launch_and_crash_recovery_qualification() {
     let callback_failure = Arc::clone(&fail_next);
     let callback_panic = Arc::clone(&panic_next);
     let mut worker = owner
-        .start_activation_worker(move |_request| {
+        .start_activation_worker(move |request| {
             callback_count.fetch_add(1, Ordering::SeqCst);
             if callback_panic.swap(false, Ordering::SeqCst) {
                 panic!("qualification callback panic");
             }
-            !callback_failure.swap(false, Ordering::SeqCst)
+            if callback_failure.swap(false, Ordering::SeqCst) {
+                return ActivationCallbackResult::NotStarted;
+            }
+            let presentation = match request.begin_presentation() {
+                Ok(ActivationStart::Started(presentation)) => presentation,
+                Ok(ActivationStart::Cancelled) => return ActivationCallbackResult::NotStarted,
+                Err(_) => return ActivationCallbackResult::Uncertain,
+            };
+            let result = ActivationCallbackResult::Handled;
+            let _ = presentation.complete(result);
+            result
         })
         .expect("same-session activation receiver must start");
     owner
@@ -116,7 +128,16 @@ fn windows_owner_second_launch_and_crash_recovery_qualification() {
     );
 
     worker = owner
-        .start_activation_worker(|_request| true)
+        .start_activation_worker(|request| {
+            let presentation = match request.begin_presentation() {
+                Ok(ActivationStart::Started(presentation)) => presentation,
+                Ok(ActivationStart::Cancelled) => return ActivationCallbackResult::NotStarted,
+                Err(_) => return ActivationCallbackResult::Uncertain,
+            };
+            let result = ActivationCallbackResult::Handled;
+            let _ = presentation.complete(result);
+            result
+        })
         .expect("the owner must be able to restart its bounded receiver");
     owner
         .mark_ready()
@@ -204,6 +225,114 @@ fn windows_normal_maintenance_contention_and_recovery_qualification() {
     fs::remove_dir_all(test_root).expect("role qualification fixture must be removed");
 }
 
+#[test]
+fn windows_activation_timeout_reconciles_late_success_without_duplicate_callback() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
+    let _guard = qualification_lock().lock().expect("qualification lock");
+
+    let test_root = create_fixture();
+    let ready_file = test_root.join("delayed.ready");
+    set_test_environment(
+        &test_root,
+        "windows_activation_timeout_reconciles_late_success_without_duplicate_callback",
+        &ready_file,
+    );
+
+    let owner = acquire_owner(Role::Normal);
+    let callbacks = Arc::new(AtomicUsize::new(0));
+    let callback_started = Arc::new(AtomicBool::new(false));
+    let callback_count = Arc::clone(&callbacks);
+    let callback_started_flag = Arc::clone(&callback_started);
+    let worker = owner
+        .start_activation_worker(move |request| {
+            callback_count.fetch_add(1, Ordering::SeqCst);
+            let presentation = match request.begin_presentation() {
+                Ok(ActivationStart::Started(presentation)) => presentation,
+                Ok(ActivationStart::Cancelled) => return ActivationCallbackResult::NotStarted,
+                Err(_) => return ActivationCallbackResult::Uncertain,
+            };
+            callback_started_flag.store(true, Ordering::SeqCst);
+            thread::sleep(Duration::from_millis(3_000));
+            let result = ActivationCallbackResult::Handled;
+            let _ = presentation.complete(result);
+            result
+        })
+        .expect("same-session activation receiver must start");
+    owner.mark_ready().expect("readiness must be committed");
+
+    let first = spawn_child("second");
+    assert_eq!(
+        first.code(),
+        Some(5),
+        "a bounded wait with a callback still in flight must remain uncertain: {first:?}"
+    );
+    assert!(callback_started.load(Ordering::SeqCst));
+    thread::sleep(Duration::from_millis(700));
+    let second = spawn_child("second");
+    assert!(
+        second.success(),
+        "the late handled result must reconcile without issuing a second callback: {second:?}"
+    );
+    assert_eq!(callbacks.load(Ordering::SeqCst), 1);
+
+    drop(worker);
+    drop(owner);
+    clear_test_environment();
+    fs::remove_dir_all(test_root).expect("delayed activation fixture must be removed");
+}
+
+#[test]
+fn windows_owner_release_is_safe_when_lease_moves_threads() {
+    let _guard = qualification_lock().lock().expect("qualification lock");
+    let test_root = create_fixture();
+    set_test_environment(
+        &test_root,
+        "windows_owner_release_is_safe_when_lease_moves_threads",
+        &test_root.join("unused.ready"),
+    );
+
+    let owner = acquire_owner(Role::Normal);
+    thread::spawn(move || drop(owner))
+        .join()
+        .expect("moved owner lease must drop cleanly");
+    let reacquired = acquire_owner(Role::Normal);
+    drop(reacquired);
+
+    clear_test_environment();
+    fs::remove_dir_all(test_root).expect("moved-owner fixture must be removed");
+}
+
+#[test]
+fn windows_state_unlock_uncertainty_is_reported_and_recoverable() {
+    let _guard = qualification_lock().lock().expect("qualification lock");
+    let test_root = create_fixture();
+    set_test_environment(
+        &test_root,
+        "windows_state_unlock_uncertainty_is_reported_and_recoverable",
+        &test_root.join("unused.ready"),
+    );
+
+    let owner = acquire_owner(Role::Normal);
+    jarvis_windows_native::test_fail_next_state_unlock();
+    assert_eq!(
+        owner
+            .mark_ready()
+            .expect_err("unlock failure must be surfaced")
+            .kind,
+        NativeErrorKind::LockUncertain
+    );
+    owner
+        .mark_ready()
+        .expect("the next transaction must recover after the injected cleanup failure");
+    drop(owner);
+
+    clear_test_environment();
+    fs::remove_dir_all(test_root).expect("unlock-failure fixture must be removed");
+}
+
 fn create_fixture() -> std::path::PathBuf {
     let test_root = env::temp_dir().join(format!(
         "JARVIS-NativeQualification-{}-{}",
@@ -278,12 +407,6 @@ fn unique_suffix() -> u128 {
 }
 
 fn run_child(mode: &str) {
-    if let Ok(path) = env::var(READY_FILE_ENV)
-        && mode == "recovery-waiter"
-    {
-        fs::write(path, b"opened").expect("recovery waiter marker must be written");
-    }
-
     match mode {
         "second" => match acquire(Role::Normal) {
             Ok(Acquisition::SecondLaunch(result)) if result.acknowledged => (),

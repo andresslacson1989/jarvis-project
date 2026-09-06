@@ -1,4 +1,6 @@
-use super::{ActivationRequest, NativeError, NativeErrorKind, Role, SecondLaunch};
+use super::{
+    ActivationCallbackResult, ActivationRequest, NativeError, NativeErrorKind, Role, SecondLaunch,
+};
 
 #[derive(Debug)]
 pub enum Acquisition {
@@ -22,7 +24,7 @@ impl OwnerLease {
 
     pub fn start_activation_worker<F>(&self, _callback: F) -> Result<ActivationWorker, NativeError>
     where
-        F: Fn(ActivationRequest) -> bool + Send + 'static,
+        F: Fn(ActivationRequest) -> ActivationCallbackResult + Send + 'static,
     {
         Err(NativeError {
             kind: NativeErrorKind::UnsupportedPlatform,
