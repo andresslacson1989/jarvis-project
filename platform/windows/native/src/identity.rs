@@ -58,13 +58,9 @@ pub(super) fn local_app_data() -> Result<PathBuf, NativeError> {
             &mut allocated,
         )
     };
-    let _native_error = result as u32;
+    let _hresult = result;
     if result < 0 || allocated.is_null() {
-        record_test_failure!(
-            "identity.local_app_data",
-            "SHGetKnownFolderPath",
-            _native_error,
-        );
+        record_test_hresult!("identity.local_app_data", "SHGetKnownFolderPath", _hresult,);
         if !allocated.is_null() {
             // SAFETY: the pointer is owned by the known-folder API.
             unsafe { CoTaskMemFree(allocated.cast()) };
@@ -253,7 +249,7 @@ fn validate_fixed_handle(
         || (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0
     {
         record_test_failure!(
-            "identity.validate_file_attributes",
+            "identity.final_path_attribute_rejected",
             "GetFileInformationByHandle",
             0,
         );
@@ -272,27 +268,73 @@ fn validate_fixed_handle(
         )
     };
     let _path_error = last_error();
-    if length == 0 || length >= final_path.len() as u32 {
-        record_test_failure!(
-            "identity.validate_final_path",
+    let capacity = final_path.len() as u32;
+    if length == 0 {
+        record_test_final_path!(
+            "identity.final_path_api_failure",
             "GetFinalPathNameByHandleW",
-            _path_error,
+            crate::handles::TestDiagnosticStatus::Win32Error(_path_error),
+            length,
+            capacity,
+            None,
+            None,
         );
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
-    let actual = String::from_utf16(&final_path[..length as usize])
-        .map_err(|_| native_failure(NativeErrorKind::SecurityBoundaryUnavailable))?;
+    if length >= capacity {
+        record_test_final_path!(
+            "identity.final_path_too_long",
+            "GetFinalPathNameByHandleW",
+            crate::handles::TestDiagnosticStatus::NoStatus,
+            length,
+            capacity,
+            None,
+            None,
+        );
+        return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
+    }
+    let actual = match String::from_utf16(&final_path[..length as usize]) {
+        Ok(actual) => actual,
+        Err(_) => {
+            record_test_final_path!(
+                "identity.final_path_utf16_decode",
+                "String::from_utf16",
+                crate::handles::TestDiagnosticStatus::NoStatus,
+                length,
+                capacity,
+                None,
+                None,
+            );
+            return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
+        }
+    };
     if actual.starts_with("\\\\?\\UNC\\") {
-        record_test_failure!(
-            "identity.validate_final_path",
+        record_test_final_path!(
+            "identity.final_path_unc_rejected",
             "GetFinalPathNameByHandleW",
-            0,
+            crate::handles::TestDiagnosticStatus::NoStatus,
+            length,
+            capacity,
+            Some(actual.as_str()),
+            None,
         );
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
-    let expected = expected_path
-        .to_str()
-        .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+    let expected = match expected_path.to_str() {
+        Some(expected) => expected,
+        None => {
+            record_test_final_path!(
+                "identity.final_path_expected_conversion",
+                "Path::to_str",
+                crate::handles::TestDiagnosticStatus::NoStatus,
+                length,
+                capacity,
+                Some(actual.as_str()),
+                None,
+            );
+            return Err(native_failure(NativeErrorKind::InvalidPath));
+        }
+    };
     let expected = expected.to_owned();
     let expected = if expected.starts_with("\\\\?\\") {
         expected
@@ -303,10 +345,14 @@ fn validate_fixed_handle(
         .trim_end_matches('\\')
         .eq_ignore_ascii_case(expected.trim_end_matches('\\'))
     {
-        record_test_failure!(
-            "identity.validate_final_path",
+        record_test_final_path!(
+            "identity.final_path_mismatch",
             "GetFinalPathNameByHandleW",
-            0,
+            crate::handles::TestDiagnosticStatus::NoStatus,
+            length,
+            capacity,
+            Some(actual.as_str()),
+            Some(expected.as_str()),
         );
         return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
     }
@@ -328,5 +374,113 @@ mod tests {
 
         let empty = [0u16];
         assert_eq!(bounded_utf16_length(empty.as_ptr()), None);
+    }
+
+    #[cfg(feature = "test-support")]
+    #[test]
+    fn final_path_diagnostic_stages_are_specific_and_redacted() {
+        use crate::handles::{
+            TestDiagnosticStatus, format_test_failure_diagnostic, format_test_final_path_diagnostic,
+        };
+
+        let actual = r#"\\?\C:\runner\JARVIS\"#;
+        let expected = r#"\\?\C:\runner\Other"#;
+        let cases = [
+            (
+                "identity.final_path_api_failure",
+                TestDiagnosticStatus::Win32Error(5),
+                true,
+            ),
+            (
+                "identity.final_path_too_long",
+                TestDiagnosticStatus::NoStatus,
+                true,
+            ),
+            (
+                "identity.final_path_unc_rejected",
+                TestDiagnosticStatus::NoStatus,
+                true,
+            ),
+            (
+                "identity.final_path_utf16_decode",
+                TestDiagnosticStatus::NoStatus,
+                true,
+            ),
+            (
+                "identity.final_path_expected_conversion",
+                TestDiagnosticStatus::NoStatus,
+                true,
+            ),
+            (
+                "identity.final_path_mismatch",
+                TestDiagnosticStatus::NoStatus,
+                true,
+            ),
+        ];
+
+        for (stage, status, includes_metadata) in cases {
+            let diagnostic = format_test_final_path_diagnostic(
+                stage,
+                "GetFinalPathNameByHandleW",
+                status,
+                42,
+                1024,
+                Some(actual),
+                Some(expected),
+            );
+            assert!(diagnostic.starts_with(&format!("stage={stage};")));
+            assert!(diagnostic.contains("status_kind="));
+            if includes_metadata {
+                assert!(diagnostic.contains("returned_length=42;capacity=1024"));
+                assert!(diagnostic.contains("actual_prefix=DEVICE_DOS"));
+                assert!(diagnostic.contains("expected_prefix=DEVICE_DOS"));
+                assert!(diagnostic.contains("actual_trailing_separator=true"));
+                assert!(diagnostic.contains("expected_trailing_separator=false"));
+                assert!(!diagnostic.contains("runner"));
+                assert!(!diagnostic.contains("Other"));
+            }
+        }
+
+        let diagnostic = format_test_failure_diagnostic(
+            "identity.final_path_attribute_rejected",
+            "GetFileInformationByHandle",
+            TestDiagnosticStatus::NoStatus,
+        );
+        assert_eq!(
+            diagnostic,
+            "stage=identity.final_path_attribute_rejected;api=GetFileInformationByHandle;status_kind=NONE;status=none"
+        );
+    }
+
+    #[cfg(feature = "test-support")]
+    #[test]
+    fn diagnostic_status_kinds_do_not_conflate_zero_with_no_status() {
+        use crate::handles::{TestDiagnosticStatus, format_test_failure_diagnostic};
+
+        let cases = [
+            (
+                TestDiagnosticStatus::Win32Error(0),
+                "status_kind=WIN32_ERROR;status=0",
+            ),
+            (
+                TestDiagnosticStatus::HResult(0),
+                "status_kind=HRESULT;status=0",
+            ),
+            (
+                TestDiagnosticStatus::ApiStatus(0),
+                "status_kind=API_STATUS;status=0",
+            ),
+            (
+                TestDiagnosticStatus::NoStatus,
+                "status_kind=NONE;status=none",
+            ),
+        ];
+
+        for (status, expected) in cases {
+            assert!(
+                format_test_failure_diagnostic("identity.test_status", "test", status)
+                    .contains(expected)
+            );
+        }
     }
 }

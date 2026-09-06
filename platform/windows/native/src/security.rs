@@ -151,7 +151,7 @@ impl ExplicitSecurity {
         if result == 0 {
             Ok(())
         } else {
-            record_test_failure!("security.set_object_dacl", "SetSecurityInfo", result);
+            record_test_api_status!("security.set_object_dacl", "SetSecurityInfo", result);
             Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable))
         }
     }
@@ -193,7 +193,7 @@ impl ExplicitSecurity {
             )
         };
         if result != 0 {
-            record_test_failure!("security.get_object_dacl", "GetSecurityInfo", result);
+            record_test_api_status!("security.get_object_dacl", "GetSecurityInfo", result);
         }
         let valid = if result == 0 && !descriptor.is_null() && !dacl.is_null() {
             let mut control = 0u16;

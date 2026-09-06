@@ -9,10 +9,67 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 macro_rules! record_test_failure {
+    ($stage:expr, $api:expr, 0 $(,)?) => {{
+        #[cfg(feature = "test-support")]
+        {
+            crate::handles::record_test_failure(
+                $stage,
+                $api,
+                crate::handles::TestDiagnosticStatus::NoStatus,
+            );
+        }
+    }};
     ($stage:expr, $api:expr, $error:expr $(,)?) => {{
         #[cfg(feature = "test-support")]
         {
-            crate::handles::record_test_failure($stage, $api, $error);
+            crate::handles::record_test_failure(
+                $stage,
+                $api,
+                crate::handles::TestDiagnosticStatus::Win32Error($error),
+            );
+        }
+    }};
+}
+
+macro_rules! record_test_api_status {
+    ($stage:expr, $api:expr, $status:expr $(,)?) => {{
+        #[cfg(feature = "test-support")]
+        {
+            crate::handles::record_test_failure(
+                $stage,
+                $api,
+                crate::handles::TestDiagnosticStatus::ApiStatus($status),
+            );
+        }
+    }};
+}
+
+macro_rules! record_test_hresult {
+    ($stage:expr, $api:expr, $status:expr $(,)?) => {{
+        #[cfg(feature = "test-support")]
+        {
+            crate::handles::record_test_failure(
+                $stage,
+                $api,
+                crate::handles::TestDiagnosticStatus::HResult($status),
+            );
+        }
+    }};
+}
+
+macro_rules! record_test_final_path {
+    ($stage:expr, $api:expr, $status:expr, $returned_length:expr, $capacity:expr, $actual:expr, $expected:expr $(,)?) => {{
+        #[cfg(feature = "test-support")]
+        {
+            crate::handles::record_test_final_path(
+                $stage,
+                $api,
+                $status,
+                $returned_length,
+                $capacity,
+                $actual,
+                $expected,
+            );
         }
     }};
 }

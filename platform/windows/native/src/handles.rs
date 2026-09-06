@@ -8,6 +8,9 @@ use std::{
 #[cfg(feature = "test-support")]
 use std::sync::{Mutex, OnceLock};
 
+#[cfg(feature = "test-support")]
+use sha2::{Digest, Sha256};
+
 use windows_sys::Win32::{
     Foundation::{
         CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, WAIT_ABANDONED, WAIT_FAILED,
@@ -36,10 +39,35 @@ pub(super) fn native_failure(kind: NativeErrorKind) -> NativeError {
 
 #[cfg(feature = "test-support")]
 #[derive(Clone, Copy, Debug)]
+pub(crate) enum TestDiagnosticStatus {
+    Win32Error(u32),
+    HResult(i32),
+    ApiStatus(u32),
+    NoStatus,
+}
+
+#[cfg(feature = "test-support")]
+#[derive(Clone, Copy, Debug)]
+struct FinalPathDiagnostic {
+    returned_length: u32,
+    capacity: u32,
+    actual_chars: Option<u32>,
+    expected_chars: Option<u32>,
+    actual_prefix: Option<&'static str>,
+    expected_prefix: Option<&'static str>,
+    actual_trailing_separator: Option<bool>,
+    expected_trailing_separator: Option<bool>,
+    actual_fingerprint: Option<u64>,
+    expected_fingerprint: Option<u64>,
+}
+
+#[cfg(feature = "test-support")]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct TestDiagnostic {
     stage: &'static str,
     api: &'static str,
-    win32_error: u32,
+    status: TestDiagnosticStatus,
+    final_path: Option<FinalPathDiagnostic>,
 }
 
 #[cfg(feature = "test-support")]
@@ -60,7 +88,56 @@ pub(crate) fn clear_test_diagnostic() {
 }
 
 #[cfg(feature = "test-support")]
-pub(crate) fn record_test_failure(stage: &'static str, api: &'static str, win32_error: u32) {
+pub(crate) fn record_test_failure(
+    stage: &'static str,
+    api: &'static str,
+    status: TestDiagnosticStatus,
+) {
+    record_test_diagnostic(stage, api, status, None);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn record_test_final_path(
+    stage: &'static str,
+    api: &'static str,
+    status: TestDiagnosticStatus,
+    returned_length: u32,
+    capacity: u32,
+    actual: Option<&str>,
+    expected: Option<&str>,
+) {
+    let final_path = final_path_diagnostic(returned_length, capacity, actual, expected);
+    record_test_diagnostic(stage, api, status, Some(final_path));
+}
+
+#[cfg(feature = "test-support")]
+fn final_path_diagnostic(
+    returned_length: u32,
+    capacity: u32,
+    actual: Option<&str>,
+    expected: Option<&str>,
+) -> FinalPathDiagnostic {
+    FinalPathDiagnostic {
+        returned_length,
+        capacity,
+        actual_chars: actual.and_then(character_count),
+        expected_chars: expected.and_then(character_count),
+        actual_prefix: actual.map(path_prefix),
+        expected_prefix: expected.map(path_prefix),
+        actual_trailing_separator: actual.map(has_trailing_separator),
+        expected_trailing_separator: expected.map(has_trailing_separator),
+        actual_fingerprint: actual.map(path_fingerprint),
+        expected_fingerprint: expected.map(path_fingerprint),
+    }
+}
+
+#[cfg(feature = "test-support")]
+fn record_test_diagnostic(
+    stage: &'static str,
+    api: &'static str,
+    status: TestDiagnosticStatus,
+    final_path: Option<FinalPathDiagnostic>,
+) {
     let mut diagnostic = match test_diagnostic_store().lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
@@ -69,7 +146,8 @@ pub(crate) fn record_test_failure(stage: &'static str, api: &'static str, win32_
         *diagnostic = Some(TestDiagnostic {
             stage,
             api,
-            win32_error,
+            status,
+            final_path,
         });
     }
 }
@@ -80,12 +158,137 @@ pub(crate) fn test_diagnostic() -> Option<String> {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
     };
-    diagnostic.map(|value| {
-        format!(
-            "stage={};api={};win32_error={}",
-            value.stage, value.api, value.win32_error
-        )
+    diagnostic.map(format_test_diagnostic)
+}
+
+#[cfg(feature = "test-support")]
+fn format_test_diagnostic(value: TestDiagnostic) -> String {
+    let (status_kind, status) = match value.status {
+        TestDiagnosticStatus::Win32Error(error) => ("WIN32_ERROR", error.to_string()),
+        TestDiagnosticStatus::HResult(error) => ("HRESULT", error.to_string()),
+        TestDiagnosticStatus::ApiStatus(status) => ("API_STATUS", status.to_string()),
+        TestDiagnosticStatus::NoStatus => ("NONE", "none".to_owned()),
+    };
+    let mut rendered = format!(
+        "stage={};api={};status_kind={};status={}",
+        value.stage, value.api, status_kind, status
+    );
+    if let Some(final_path) = value.final_path {
+        rendered.push_str(&format!(
+            ";returned_length={};capacity={};actual_chars={};expected_chars={};actual_prefix={};expected_prefix={};actual_trailing_separator={};expected_trailing_separator={};actual_fingerprint={};expected_fingerprint={}",
+            final_path.returned_length,
+            final_path.capacity,
+            optional_u32(final_path.actual_chars),
+            optional_u32(final_path.expected_chars),
+            optional_text(final_path.actual_prefix),
+            optional_text(final_path.expected_prefix),
+            optional_bool(final_path.actual_trailing_separator),
+            optional_bool(final_path.expected_trailing_separator),
+            optional_fingerprint(final_path.actual_fingerprint),
+            optional_fingerprint(final_path.expected_fingerprint),
+        ));
+    }
+    rendered
+}
+
+#[cfg(all(feature = "test-support", test))]
+pub(crate) fn format_test_failure_diagnostic(
+    stage: &'static str,
+    api: &'static str,
+    status: TestDiagnosticStatus,
+) -> String {
+    format_test_diagnostic(TestDiagnostic {
+        stage,
+        api,
+        status,
+        final_path: None,
     })
+}
+
+#[cfg(all(feature = "test-support", test))]
+pub(crate) fn format_test_final_path_diagnostic(
+    stage: &'static str,
+    api: &'static str,
+    status: TestDiagnosticStatus,
+    returned_length: u32,
+    capacity: u32,
+    actual: Option<&str>,
+    expected: Option<&str>,
+) -> String {
+    format_test_diagnostic(TestDiagnostic {
+        stage,
+        api,
+        status,
+        final_path: Some(final_path_diagnostic(
+            returned_length,
+            capacity,
+            actual,
+            expected,
+        )),
+    })
+}
+
+#[cfg(feature = "test-support")]
+fn character_count(value: &str) -> Option<u32> {
+    u32::try_from(value.chars().count()).ok()
+}
+
+#[cfg(feature = "test-support")]
+fn has_trailing_separator(value: &str) -> bool {
+    value.ends_with('\\') || value.ends_with('/')
+}
+
+#[cfg(feature = "test-support")]
+fn path_prefix(value: &str) -> &'static str {
+    if value.starts_with("\\\\?\\UNC\\") {
+        "DEVICE_UNC"
+    } else if value.starts_with("\\\\?\\Volume{") {
+        "DEVICE_VOLUME"
+    } else if value.starts_with("\\\\?\\") {
+        "DEVICE_DOS"
+    } else if value.starts_with("\\\\") {
+        "UNC"
+    } else if value.as_bytes().get(1) == Some(&b':') {
+        "DOS"
+    } else {
+        "OTHER"
+    }
+}
+
+#[cfg(feature = "test-support")]
+fn path_fingerprint(value: &str) -> u64 {
+    let digest = Sha256::digest(value.as_bytes());
+    let mut prefix = [0u8; 8];
+    prefix.copy_from_slice(&digest[..8]);
+    u64::from_be_bytes(prefix)
+}
+
+#[cfg(feature = "test-support")]
+fn optional_u32(value: Option<u32>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "unavailable".to_owned())
+}
+
+#[cfg(feature = "test-support")]
+fn optional_text(value: Option<&'static str>) -> &'static str {
+    value.unwrap_or("unavailable")
+}
+
+#[cfg(feature = "test-support")]
+fn optional_bool(value: Option<bool>) -> &'static str {
+    match value {
+        Some(true) => "true",
+        Some(false) => "false",
+        None => "unavailable",
+    }
+}
+
+#[cfg(feature = "test-support")]
+fn optional_fingerprint(value: Option<u64>) -> String {
+    value
+        .map(|value| format!("{value:016x}"))
+        .unwrap_or_else(|| "unavailable".to_owned())
 }
 
 #[cfg(feature = "test-support")]

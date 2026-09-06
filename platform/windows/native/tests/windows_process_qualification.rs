@@ -65,7 +65,9 @@ fn windows_qualification_failure_recovers_lock_and_reports_root_diagnostic() {
     assert_eq!(failure.kind, NativeErrorKind::InvalidPath);
     assert_eq!(
         jarvis_windows_native::test_acquisition_diagnostic().as_deref(),
-        Some("stage=identity.test_local_app_data;api=validate_absolute_local_path;win32_error=0")
+        Some(
+            "stage=identity.test_local_app_data;api=validate_absolute_local_path;status_kind=NONE;status=none"
+        )
     );
     drop(_guard);
 
