@@ -38,6 +38,15 @@ pub(crate) static FAIL_NEXT_STATE_UNLOCK: AtomicBool = AtomicBool::new(false);
 pub(crate) static FAIL_NEXT_STATE_UNLOCK_BEFORE_CALL: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "test-support")]
+pub(crate) static FAIL_NEXT_STATE_CLOSE: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
+pub(crate) static FAIL_NEXT_ACTIVATION_CLOSE: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
+pub(crate) static FAIL_NEXT_ACK_CLOSE: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
 pub(crate) static FAIL_NEXT_EVENT_SIGNAL: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "test-support")]
@@ -54,6 +63,21 @@ pub(crate) fn fail_next_state_unlock_for_test() {
 #[cfg(feature = "test-support")]
 pub(crate) fn fail_next_state_unlock_before_call_for_test() {
     FAIL_NEXT_STATE_UNLOCK_BEFORE_CALL.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn fail_next_state_close_for_test() {
+    FAIL_NEXT_STATE_CLOSE.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn fail_next_activation_close_for_test() {
+    FAIL_NEXT_ACTIVATION_CLOSE.store(true, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn fail_next_ack_close_for_test() {
+    FAIL_NEXT_ACK_CLOSE.store(true, Ordering::Release);
 }
 
 #[cfg(feature = "test-support")]
@@ -75,6 +99,7 @@ pub(crate) fn fail_next_mutex_release_for_test() {
 pub(super) struct OwnedHandle {
     raw: NonNull<std::ffi::c_void>,
     closed: AtomicBool,
+    retain_on_drop: AtomicBool,
 }
 
 impl OwnedHandle {
@@ -84,12 +109,21 @@ impl OwnedHandle {
             .map(|raw| Self {
                 raw,
                 closed: AtomicBool::new(false),
+                retain_on_drop: AtomicBool::new(false),
             })
             .ok_or_else(|| native_failure(kind))
     }
 
     pub(super) fn raw(&self) -> HANDLE {
         self.raw.as_ptr()
+    }
+
+    pub(super) fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::Acquire)
+    }
+
+    pub(super) fn retain_on_drop(&self) {
+        self.retain_on_drop.store(true, Ordering::Release);
     }
 
     pub(super) fn close(&self) -> Result<(), ()> {
@@ -104,6 +138,14 @@ impl OwnedHandle {
         } else {
             Ok(())
         }
+    }
+
+    #[cfg(feature = "test-support")]
+    pub(super) fn close_with_test_failure(&self, failure: &AtomicBool) -> Result<(), ()> {
+        if failure.swap(false, Ordering::AcqRel) {
+            return Err(());
+        }
+        self.close()
     }
 }
 
@@ -120,6 +162,9 @@ unsafe impl Sync for OwnedHandle {}
 
 impl Drop for OwnedHandle {
     fn drop(&mut self) {
+        if self.retain_on_drop.load(Ordering::Acquire) {
+            return;
+        }
         let _ = self.close();
     }
 }

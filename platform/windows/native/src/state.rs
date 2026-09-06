@@ -323,9 +323,21 @@ impl StateFile {
     }
 
     pub(super) fn close(&self) -> Result<(), NativeError> {
-        self.handle
-            .close()
-            .map_err(|_| native_failure(NativeErrorKind::StateUnavailable))
+        #[cfg(feature = "test-support")]
+        let result = self
+            .handle
+            .close_with_test_failure(&crate::handles::FAIL_NEXT_STATE_CLOSE);
+        #[cfg(not(feature = "test-support"))]
+        let result = self.handle.close();
+        result.map_err(|_| native_failure(NativeErrorKind::StateUnavailable))
+    }
+
+    pub(super) fn is_closed(&self) -> bool {
+        self.handle.is_closed()
+    }
+
+    pub(super) fn retain_handle_on_drop(&self) {
+        self.handle.retain_on_drop();
     }
 
     fn validate_regular_file(&self) -> Result<(), NativeError> {

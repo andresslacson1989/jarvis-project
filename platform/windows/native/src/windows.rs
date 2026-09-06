@@ -53,6 +53,11 @@ const ARBITRATION_RELEASED: u8 = 1;
 const ARBITRATION_UNCERTAIN: u8 = 2;
 const ARBITRATION_DEFERRED: u8 = 3;
 
+const OWNER_LIFECYCLE_ACTIVE: u8 = 0;
+const OWNER_LIFECYCLE_RELEASED: u8 = 1;
+const OWNER_LIFECYCLE_DEFERRED: u8 = 2;
+const OWNER_LIFECYCLE_ARBITRATION_UNCERTAIN: u8 = 3;
+
 enum ArbitrationCommand {
     Wait(u32, SyncSender<Result<MutexWaitResult, NativeError>>),
     Release(SyncSender<Result<(), NativeError>>),
@@ -75,6 +80,9 @@ static HOLD_BEFORE_ARBITRATION_RELEASE: AtomicBool = AtomicBool::new(false);
 static ARBITRATION_RELEASE_BARRIER_REACHED: AtomicBool = AtomicBool::new(false);
 
 #[cfg(feature = "test-support")]
+static PANIC_AFTER_CALLBACK: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "test-support")]
 pub(crate) fn active_arbitration_threads_for_test() -> usize {
     ACTIVE_ARBITRATION_THREADS.load(Ordering::Acquire)
 }
@@ -93,6 +101,11 @@ pub(crate) fn arbitration_release_barrier_reached_for_test() -> bool {
 #[cfg(feature = "test-support")]
 pub(crate) fn continue_arbitration_release_for_test() {
     HOLD_BEFORE_ARBITRATION_RELEASE.store(false, Ordering::Release);
+}
+
+#[cfg(feature = "test-support")]
+pub(crate) fn panic_next_worker_after_callback_for_test() {
+    PANIC_AFTER_CALLBACK.store(true, Ordering::Release);
 }
 
 #[cfg(feature = "test-support")]
@@ -269,6 +282,51 @@ struct WorkerControl {
     exited: AtomicBool,
 }
 
+struct WorkerExitGuard {
+    inner: Arc<OwnerInner>,
+    control: Arc<WorkerControl>,
+    generation: u64,
+    normal_exit: bool,
+}
+
+impl WorkerExitGuard {
+    fn new(inner: Arc<OwnerInner>, control: Arc<WorkerControl>, generation: u64) -> Self {
+        Self {
+            inner,
+            control,
+            generation,
+            normal_exit: false,
+        }
+    }
+
+    fn finish(mut self) {
+        self.normal_exit = true;
+        self.retire();
+    }
+
+    fn retire(&self) {
+        self.inner
+            .worker_alive_generation
+            .compare_exchange(self.generation, 0, Ordering::AcqRel, Ordering::Acquire)
+            .ok();
+        self.inner
+            .worker_ready_generation
+            .compare_exchange(self.generation, 0, Ordering::AcqRel, Ordering::Acquire)
+            .ok();
+        self.control.exited.store(true, Ordering::Release);
+    }
+}
+
+impl Drop for WorkerExitGuard {
+    fn drop(&mut self) {
+        if !self.normal_exit {
+            self.inner.worker_failed.store(true, Ordering::Release);
+            let _ = mark_worker_failed(&self.inner);
+        }
+        self.retire();
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ProcessLiveness {
     Alive,
@@ -303,6 +361,9 @@ struct OwnerInner {
     start_filetime: u64,
     sid_hash: [u8; 32],
     role: Role,
+    lifecycle_gate: Mutex<()>,
+    lifecycle_state: AtomicU8,
+    release_error: Mutex<Option<NativeErrorKind>>,
     pending: Mutex<Option<(u64, Instant, bool)>>,
     worker: Mutex<Option<Arc<WorkerControl>>>,
     quarantined_worker: Mutex<Option<Arc<WorkerControl>>>,
@@ -324,7 +385,6 @@ struct OwnerInner {
 pub struct OwnerLease {
     inner: Arc<OwnerInner>,
     arbitration: Arc<ArbitrationLease>,
-    released: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -658,6 +718,13 @@ pub fn acquire(role: Role) -> Result<Acquisition, NativeError> {
     let activation = acquire_second_launch(prepared, &sid, &security, sid_hash, role);
     match activation {
         Ok(result) => Ok(result),
+        Err(original_error) if original_error.kind == NativeErrorKind::ActivationUncertain => {
+            // An activation request may already have reached the owner when
+            // its acknowledgement is uncertain. Never convert that
+            // unresolved consequence into a new owner merely because the
+            // arbitration mutex becomes available afterward.
+            Err(original_error)
+        }
         Err(original_error) => match arbitration.wait(500) {
             Ok(MutexWaitResult::Acquired | MutexWaitResult::Abandoned) => {
                 let recovered_prepared = layout::prepare()?;
@@ -738,6 +805,9 @@ fn acquire_owner(
                         start_filetime,
                         sid_hash,
                         role,
+                        lifecycle_gate: Mutex::new(()),
+                        lifecycle_state: AtomicU8::new(OWNER_LIFECYCLE_ACTIVE),
+                        release_error: Mutex::new(None),
                         pending: Mutex::new(None),
                         worker: Mutex::new(None),
                         quarantined_worker: Mutex::new(None),
@@ -755,7 +825,6 @@ fn acquire_owner(
                         resources_closed: AtomicBool::new(false),
                     }),
                     arbitration,
-                    released: false,
                 }));
             }
             Err(error)
@@ -870,8 +939,18 @@ impl OwnerLease {
     }
 
     pub fn release(&mut self) -> Result<(), NativeError> {
-        if self.released {
-            return Ok(());
+        let _lifecycle = self
+            .inner
+            .lifecycle_gate
+            .lock()
+            .map_err(|_| native_failure(NativeErrorKind::InvalidRuntimeState))?;
+        match self.inner.lifecycle_state.load(Ordering::Acquire) {
+            OWNER_LIFECYCLE_RELEASED => return Ok(()),
+            OWNER_LIFECYCLE_DEFERRED | OWNER_LIFECYCLE_ARBITRATION_UNCERTAIN => {
+                return Err(self.inner.release_error());
+            }
+            OWNER_LIFECYCLE_ACTIVE => {}
+            _ => return Err(native_failure(NativeErrorKind::InvalidRuntimeState)),
         }
         let worker_result = stop_worker(&self.inner);
         let state_result = shutdown_state(&self.inner);
@@ -888,18 +967,22 @@ impl OwnerLease {
         wait_before_arbitration_release_for_test();
         if let Err(error) = self.arbitration.release() {
             self.inner.authority_released.store(true, Ordering::Release);
-            self.released = true;
+            self.inner
+                .record_release_error(OWNER_LIFECYCLE_ARBITRATION_UNCERTAIN, error);
             return Err(error);
         }
         self.inner.authority_released.store(true, Ordering::Release);
-        self.released = true;
+        self.inner
+            .lifecycle_state
+            .store(OWNER_LIFECYCLE_RELEASED, Ordering::Release);
         Ok(())
     }
 
-    fn defer_release_after_failure(&mut self, error: NativeError) -> Result<(), NativeError> {
+    fn defer_release_after_failure(&self, error: NativeError) -> Result<(), NativeError> {
         self.arbitration.defer_release();
         self.inner.authority_released.store(true, Ordering::Release);
-        self.released = true;
+        self.inner
+            .record_release_error(OWNER_LIFECYCLE_DEFERRED, error);
         Err(error)
     }
 
@@ -916,24 +999,66 @@ impl OwnerLease {
 }
 
 impl OwnerInner {
+    fn record_release_error(&self, lifecycle_state: u8, error: NativeError) {
+        if let Ok(mut release_error) = self.release_error.lock()
+            && release_error.is_none()
+        {
+            *release_error = Some(error.kind);
+        }
+        self.lifecycle_state
+            .store(lifecycle_state, Ordering::Release);
+    }
+
+    fn release_error(&self) -> NativeError {
+        self.release_error
+            .lock()
+            .ok()
+            .and_then(|error| *error)
+            .map(native_failure)
+            .unwrap_or_else(|| native_failure(NativeErrorKind::ActivationUncertain))
+    }
+
     fn close_resources(&self) -> Result<(), NativeError> {
         if self.resources_closed.load(Ordering::Acquire) {
             return Ok(());
         }
         let state_result = self.state.close();
-        let activation_result = self
+        #[cfg(feature = "test-support")]
+        let activation_close = self
             .activation_event
-            .close()
-            .map_err(|_| native_failure(NativeErrorKind::EventUnavailable));
-        let ack_result = self
+            .close_with_test_failure(&super::handles::FAIL_NEXT_ACTIVATION_CLOSE);
+        #[cfg(not(feature = "test-support"))]
+        let activation_close = self.activation_event.close();
+        let activation_result =
+            activation_close.map_err(|_| native_failure(NativeErrorKind::EventUnavailable));
+        #[cfg(feature = "test-support")]
+        let ack_close = self
             .ack_event
-            .close()
-            .map_err(|_| native_failure(NativeErrorKind::EventUnavailable));
-        state_result?;
-        activation_result?;
-        ack_result?;
+            .close_with_test_failure(&super::handles::FAIL_NEXT_ACK_CLOSE);
+        #[cfg(not(feature = "test-support"))]
+        let ack_close = self.ack_event.close();
+        let ack_result = ack_close.map_err(|_| native_failure(NativeErrorKind::EventUnavailable));
+        let first_error = state_result
+            .err()
+            .or_else(|| activation_result.err())
+            .or_else(|| ack_result.err());
+        if let Some(error) = first_error {
+            return Err(error);
+        }
         self.resources_closed.store(true, Ordering::Release);
         Ok(())
+    }
+}
+
+impl Drop for OwnerInner {
+    fn drop(&mut self) {
+        if self.lifecycle_state.load(Ordering::Acquire) != OWNER_LIFECYCLE_RELEASED {
+            // A deferred or uncertain owner must keep the delete-on-close
+            // state record until this process terminates. Closing it here
+            // would make an abandoned mutex look like a stale owner while
+            // this process can still hold unresolved authority.
+            self.state.retain_handle_on_drop();
+        }
     }
 }
 
@@ -951,18 +1076,49 @@ impl OwnerController {
     /// close owner resources, and release deferred arbitration; it never
     /// restores readiness or normal authority.
     pub fn recover_after_shutdown(&self) -> Result<(), NativeError> {
+        let _lifecycle = self
+            .inner
+            .lifecycle_gate
+            .lock()
+            .map_err(|_| native_failure(NativeErrorKind::InvalidRuntimeState))?;
+        match self.inner.lifecycle_state.load(Ordering::Acquire) {
+            OWNER_LIFECYCLE_RELEASED => return Ok(()),
+            OWNER_LIFECYCLE_ARBITRATION_UNCERTAIN => {
+                return Err(self.inner.release_error());
+            }
+            OWNER_LIFECYCLE_DEFERRED => {}
+            OWNER_LIFECYCLE_ACTIVE => {
+                return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
+            }
+            _ => return Err(native_failure(NativeErrorKind::InvalidRuntimeState)),
+        }
         if !self.inner.shutting_down.load(Ordering::Acquire) {
             return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
         }
         reap_worker_if_exited(&self.inner)?;
-        shutdown_state(&self.inner)?;
+        if !self.inner.state.is_closed() {
+            shutdown_state(&self.inner)?;
+        }
         self.inner.close_resources()?;
-        self.arbitration.release()?;
+        if let Err(error) = self.arbitration.release() {
+            self.inner.authority_released.store(true, Ordering::Release);
+            self.inner
+                .record_release_error(OWNER_LIFECYCLE_ARBITRATION_UNCERTAIN, error);
+            return Err(error);
+        }
         self.inner.authority_released.store(true, Ordering::Release);
+        self.inner
+            .lifecycle_state
+            .store(OWNER_LIFECYCLE_RELEASED, Ordering::Release);
         Ok(())
     }
 
     pub fn mark_ready(&self) -> Result<(), NativeError> {
+        let _lifecycle = self
+            .inner
+            .lifecycle_gate
+            .lock()
+            .map_err(|_| native_failure(NativeErrorKind::InvalidRuntimeState))?;
         if self.inner.shutting_down.load(Ordering::Acquire)
             || self.inner.authority_released.load(Ordering::Acquire)
             || self.inner.worker_cleanup_failed.load(Ordering::Acquire)
@@ -1007,6 +1163,11 @@ impl OwnerController {
     where
         F: Fn(ActivationRequest) -> ActivationCallbackResult + Send + 'static,
     {
+        let _lifecycle = self
+            .inner
+            .lifecycle_gate
+            .lock()
+            .map_err(|_| native_failure(NativeErrorKind::InvalidRuntimeState))?;
         if self.inner.role != Role::Normal {
             return Err(native_failure(NativeErrorKind::InvalidRuntimeState));
         }
@@ -1062,6 +1223,11 @@ impl OwnerController {
         let thread = match thread::Builder::new()
             .name("jarvis-activation-receiver".to_owned())
             .spawn(move || {
+                let exit_guard = WorkerExitGuard::new(
+                    Arc::clone(&thread_inner),
+                    Arc::clone(&thread_control),
+                    generation,
+                );
                 thread_inner
                     .worker_alive_generation
                     .store(generation, Ordering::Release);
@@ -1085,6 +1251,10 @@ impl OwnerController {
                     }
                     if result == WAIT_OBJECT_0 || result == WAIT_TIMEOUT {
                         process_pending(&thread_inner, &callback);
+                        #[cfg(feature = "test-support")]
+                        if PANIC_AFTER_CALLBACK.swap(false, Ordering::AcqRel) {
+                            panic!("qualification worker panic outside callback boundary");
+                        }
                         if thread_inner.worker_failed.load(Ordering::Acquire) {
                             let _ = mark_worker_failed(&thread_inner);
                             break;
@@ -1094,15 +1264,7 @@ impl OwnerController {
                         break;
                     }
                 }
-                thread_inner
-                    .worker_alive_generation
-                    .compare_exchange(generation, 0, Ordering::AcqRel, Ordering::Acquire)
-                    .ok();
-                thread_inner
-                    .worker_ready_generation
-                    .compare_exchange(generation, 0, Ordering::AcqRel, Ordering::Acquire)
-                    .ok();
-                thread_control.exited.store(true, Ordering::Release);
+                exit_guard.finish();
             }) {
             Ok(thread) => thread,
             Err(_) => {
@@ -1146,7 +1308,13 @@ impl OwnerController {
 
 impl Drop for ActivationWorker {
     fn drop(&mut self) {
-        if stop_worker_control(&self.inner, &self.control).is_err() {
+        let stop_result = self
+            .inner
+            .lifecycle_gate
+            .lock()
+            .map_err(|_| native_failure(NativeErrorKind::InvalidRuntimeState))
+            .and_then(|_lifecycle| stop_worker_control(&self.inner, &self.control));
+        if stop_result.is_err() {
             self.inner
                 .worker_cleanup_failed
                 .store(true, Ordering::Release);
@@ -1242,20 +1410,25 @@ fn reap_worker_if_exited(inner: &Arc<OwnerInner>) -> Result<(), NativeError> {
     let Some(control) = control else {
         return Ok(());
     };
-    if !control.exited.load(Ordering::Acquire) {
-        return Err(native_failure(NativeErrorKind::ActivationUncertain));
-    }
-    control
+    let mut thread_slot = control
         .thread
         .lock()
-        .map_err(|_| native_failure(NativeErrorKind::ActivationUncertain))?
+        .map_err(|_| native_failure(NativeErrorKind::ActivationUncertain))?;
+    let can_reap = control.exited.load(Ordering::Acquire)
+        || thread_slot
+            .as_ref()
+            .is_some_and(std::thread::JoinHandle::is_finished);
+    if !can_reap {
+        return Err(native_failure(NativeErrorKind::ActivationUncertain));
+    }
+    let joined_panic = thread_slot
         .take()
-        .map(|thread| {
-            thread
-                .join()
-                .map_err(|_| native_failure(NativeErrorKind::ActivationUncertain))
-        })
-        .transpose()?;
+        .map(|thread| thread.join().is_err())
+        .unwrap_or(false);
+    drop(thread_slot);
+    if joined_panic {
+        inner.worker_failed.store(true, Ordering::Release);
+    }
     clear_worker_if_current(inner, &control);
     let mut quarantined = inner
         .quarantined_worker

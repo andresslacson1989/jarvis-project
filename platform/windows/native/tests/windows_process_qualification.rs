@@ -4,7 +4,7 @@ use std::{
     env, fs,
     process::{self, Child, Command, ExitStatus},
     sync::{
-        Arc, Mutex, OnceLock,
+        Arc, Barrier, Mutex, OnceLock,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
@@ -567,6 +567,367 @@ fn windows_inflight_worker_failure_reconciles_after_join() {
 }
 
 #[test]
+fn windows_partial_resource_close_failure_requires_explicit_recovery() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
+    let _guard = qualification_lock().lock().expect("qualification lock");
+
+    for failure in ["state", "activation", "ack"] {
+        let test_root = create_fixture();
+        let ready_file = test_root.join("partial-close.ready");
+        set_test_environment(
+            &test_root,
+            "windows_partial_resource_close_failure_requires_explicit_recovery",
+            &ready_file,
+        );
+
+        let mut owner = acquire_owner(Role::Normal);
+        let controller = owner.controller();
+        match failure {
+            "state" => jarvis_windows_native::test_fail_next_state_close(),
+            "activation" => jarvis_windows_native::test_fail_next_activation_close(),
+            "ack" => jarvis_windows_native::test_fail_next_ack_close(),
+            _ => unreachable!("fixed close-failure cases"),
+        }
+        let expected_kind = match failure {
+            "state" => NativeErrorKind::StateUnavailable,
+            "activation" | "ack" => NativeErrorKind::EventUnavailable,
+            _ => unreachable!("fixed close-failure cases"),
+        };
+        let first_error = owner
+            .release()
+            .expect_err("the injected resource close failure must be reported");
+        assert_eq!(first_error.kind, expected_kind);
+        assert_eq!(
+            owner
+                .release()
+                .expect_err("a deferred release must not become a false success")
+                .kind,
+            expected_kind
+        );
+
+        let mut waiter = spawn_child_process("recovery-waiter-retry");
+        wait_for_marker(&ready_file);
+        assert!(
+            waiter
+                .try_wait()
+                .expect("recovery waiter status must be readable")
+                .is_none(),
+            "arbitration must remain held before explicit close recovery for {failure}"
+        );
+        controller
+            .recover_after_shutdown()
+            .expect("partial resource closure must be recoverable");
+        assert!(
+            waiter
+                .wait_with_output()
+                .expect("recovery waiter must exit")
+                .status
+                .success(),
+            "fresh ownership must follow explicit resource recovery for {failure}"
+        );
+        assert!(
+            owner.release().is_ok(),
+            "release must become idempotently successful only after recovery for {failure}"
+        );
+        assert!(
+            controller.recover_after_shutdown().is_ok(),
+            "successful recovery must be idempotent for {failure}"
+        );
+
+        drop(controller);
+        clear_test_environment();
+        fs::remove_dir_all(test_root).expect("partial-close fixture must be removed");
+    }
+}
+
+#[test]
+fn windows_deferred_shutdown_without_controller_joins_and_stays_fail_closed() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
+    let _guard = qualification_lock().lock().expect("qualification lock");
+    let test_root = create_fixture();
+    let ready_file = test_root.join("deferred-disposal.ready");
+    set_test_environment(
+        &test_root,
+        "windows_deferred_shutdown_without_controller_joins_and_stays_fail_closed",
+        &ready_file,
+    );
+
+    let mut owner = acquire_owner(Role::Normal);
+    let callback_started = Arc::new(AtomicBool::new(false));
+    let callback_unblock = Arc::new(AtomicBool::new(false));
+    let callback_finished = Arc::new(AtomicBool::new(false));
+    let callback_started_for_worker = Arc::clone(&callback_started);
+    let callback_unblock_for_worker = Arc::clone(&callback_unblock);
+    let callback_finished_for_worker = Arc::clone(&callback_finished);
+    let worker = owner
+        .start_activation_worker(move |request| {
+            let presentation = match request.begin_presentation() {
+                Ok(ActivationStart::Started(presentation)) => presentation,
+                Ok(ActivationStart::Cancelled | ActivationStart::Stale) => {
+                    return ActivationCallbackResult::NotStarted;
+                }
+                Err(_) => return ActivationCallbackResult::Uncertain,
+            };
+            callback_started_for_worker.store(true, Ordering::Release);
+            while !callback_unblock_for_worker.load(Ordering::Acquire) {
+                thread::sleep(Duration::from_millis(5));
+            }
+            drop(presentation);
+            callback_finished_for_worker.store(true, Ordering::Release);
+            ActivationCallbackResult::Uncertain
+        })
+        .expect("worker must start before deferred-disposal qualification");
+    owner.mark_ready().expect("owner must be ready");
+    let mut activation = spawn_child_process("second");
+    let started = std::time::Instant::now();
+    while !callback_started.load(Ordering::Acquire) {
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "callback did not enter the deferred-disposal phase"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    let first_error = owner
+        .release()
+        .expect_err("live callback shutdown must remain uncertain");
+    assert_eq!(first_error.kind, NativeErrorKind::ActivationUncertain);
+    assert_eq!(
+        owner
+            .release()
+            .expect_err("repeated live-worker release must remain uncertain")
+            .kind,
+        NativeErrorKind::ActivationUncertain
+    );
+    callback_unblock.store(true, Ordering::Release);
+    let callback_deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while !callback_finished.load(Ordering::Acquire) {
+        assert!(
+            std::time::Instant::now() < callback_deadline,
+            "deferred callback did not terminate"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(
+        activation
+            .wait()
+            .expect("activation requester must exit")
+            .code(),
+        Some(5)
+    );
+    drop(worker);
+    drop(owner);
+    assert_eq!(
+        jarvis_windows_native::test_active_arbitration_threads(),
+        0,
+        "dropping the last deferred owner must join the arbitration thread"
+    );
+
+    assert!(
+        test_root.join("JARVIS").join("owner.state").exists(),
+        "deferred owner state must remain present until the owning process exits"
+    );
+    let waiter = spawn_child_process("recovery-waiter-retry");
+    let waiter_status = waiter
+        .wait_with_output()
+        .expect("fail-closed recovery waiter must exit");
+    assert!(!waiter_status.status.success());
+
+    clear_test_environment();
+    fs::remove_dir_all(test_root).expect("deferred-disposal fixture must be removed");
+}
+
+#[test]
+fn windows_lifecycle_gate_serializes_release_worker_and_recovery_operations() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
+    let _guard = qualification_lock().lock().expect("qualification lock");
+    let test_root = create_fixture();
+    set_test_environment(
+        &test_root,
+        "windows_lifecycle_gate_serializes_release_worker_and_recovery_operations",
+        &test_root.join("lifecycle-gate.ready"),
+    );
+
+    let owner = acquire_owner(Role::Normal);
+    let controller = owner.controller();
+    let barrier = Arc::new(Barrier::new(4));
+
+    let release_barrier = Arc::clone(&barrier);
+    let release_thread = thread::spawn(move || {
+        release_barrier.wait();
+        let mut owner = owner;
+        owner.release()
+    });
+
+    let start_barrier = Arc::clone(&barrier);
+    let start_controller = controller.clone();
+    let start_thread = thread::spawn(move || {
+        start_barrier.wait();
+        start_controller.start_activation_worker(|_| ActivationCallbackResult::Uncertain)
+    });
+
+    let ready_barrier = Arc::clone(&barrier);
+    let ready_controller = controller.clone();
+    let ready_thread = thread::spawn(move || {
+        ready_barrier.wait();
+        ready_controller.mark_ready()
+    });
+
+    let recovery_barrier = Arc::clone(&barrier);
+    let recovery_controller = controller.clone();
+    let recovery_thread = thread::spawn(move || {
+        recovery_barrier.wait();
+        recovery_controller.recover_after_shutdown()
+    });
+
+    let release_result = release_thread
+        .join()
+        .expect("release race thread must not panic");
+    let start_result = start_thread
+        .join()
+        .expect("worker-start race thread must not panic");
+    let ready_result = ready_thread
+        .join()
+        .expect("readiness race thread must not panic");
+    let recovery_result = recovery_thread
+        .join()
+        .expect("recovery race thread must not panic");
+
+    if let Ok(worker) = start_result {
+        drop(worker);
+    }
+    assert!(
+        release_result.is_ok(),
+        "a cooperative concurrent release must complete: {release_result:?}"
+    );
+    assert!(
+        ready_result.is_ok()
+            || ready_result
+                .as_ref()
+                .expect_err("readiness race result must be an error")
+                .kind
+                == NativeErrorKind::InvalidRuntimeState,
+        "readiness race must be serialized and typed: {ready_result:?}"
+    );
+    assert!(
+        recovery_result.is_ok()
+            || recovery_result
+                .as_ref()
+                .expect_err("recovery race result must be an error")
+                .kind
+                == NativeErrorKind::InvalidRuntimeState,
+        "recovery race must be serialized and typed: {recovery_result:?}"
+    );
+    assert_eq!(
+        jarvis_windows_native::test_active_arbitration_threads(),
+        0,
+        "serialized lifecycle completion must retire arbitration"
+    );
+
+    drop(controller);
+    clear_test_environment();
+    fs::remove_dir_all(test_root).expect("lifecycle-gate fixture must be removed");
+}
+
+#[test]
+fn windows_unexpected_worker_panic_is_reaped_and_recoverable() {
+    if let Ok(mode) = env::var(CHILD_ENV) {
+        run_child(&mode);
+        return;
+    }
+    let _guard = qualification_lock().lock().expect("qualification lock");
+    let test_root = create_fixture();
+    set_test_environment(
+        &test_root,
+        "windows_unexpected_worker_panic_is_reaped_and_recoverable",
+        &test_root.join("unexpected-panic.ready"),
+    );
+
+    let owner = acquire_owner(Role::Normal);
+    let callback_started = Arc::new(AtomicBool::new(false));
+    let callback_started_for_worker = Arc::clone(&callback_started);
+    let worker = owner
+        .start_activation_worker(move |request| {
+            let presentation = match request.begin_presentation() {
+                Ok(ActivationStart::Started(presentation)) => presentation,
+                Ok(ActivationStart::Cancelled | ActivationStart::Stale) => {
+                    return ActivationCallbackResult::NotStarted;
+                }
+                Err(_) => return ActivationCallbackResult::Uncertain,
+            };
+            callback_started_for_worker.store(true, Ordering::Release);
+            drop(presentation);
+            ActivationCallbackResult::Uncertain
+        })
+        .expect("worker must start before unexpected-panic qualification");
+    owner.mark_ready().expect("owner must be ready");
+    let mut activation = spawn_child_process("second");
+    let started = std::time::Instant::now();
+    while !callback_started.load(Ordering::Acquire) {
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "callback did not run before the worker panic seam"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    jarvis_windows_native::test_panic_next_worker_after_callback();
+    let panic_deadline = std::time::Instant::now() + Duration::from_secs(2);
+    loop {
+        match owner.mark_ready() {
+            Ok(()) => {
+                assert!(
+                    std::time::Instant::now() < panic_deadline,
+                    "unexpected worker panic did not clear readiness"
+                );
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) if error.kind == NativeErrorKind::InvalidRuntimeState => break,
+            Err(error) => panic!("unexpected readiness result before panic reaping: {error:?}"),
+        }
+    }
+
+    let recovery_started = std::time::Instant::now();
+    let restarted_worker = loop {
+        match owner.start_activation_worker(|_| ActivationCallbackResult::Uncertain) {
+            Ok(worker) => break worker,
+            Err(error) if error.kind == NativeErrorKind::ActivationUncertain => {
+                assert!(
+                    recovery_started.elapsed() < Duration::from_secs(2),
+                    "unexpected worker panic remained permanently unreapable"
+                );
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => panic!("unexpected panic recovery error: {error:?}"),
+        }
+    };
+    assert_eq!(
+        activation
+            .wait()
+            .expect("unexpected-panic requester must exit")
+            .code(),
+        Some(5),
+        "a worker panic must not acknowledge the in-flight request"
+    );
+    owner
+        .mark_ready()
+        .expect("readiness may be restored only by the explicit fresh worker");
+    drop(worker);
+    drop(restarted_worker);
+    drop(owner);
+    clear_test_environment();
+    fs::remove_dir_all(test_root).expect("unexpected-panic fixture must be removed");
+}
+
+#[test]
 fn windows_state_unlock_uncertainty_is_reported_and_recoverable() {
     let _guard = qualification_lock().lock().expect("qualification lock");
     let test_root = create_fixture();
@@ -793,6 +1154,11 @@ fn windows_mutex_wait_failure_is_reported_without_claiming_ownership() {
             .kind,
         NativeErrorKind::ArbitrationUnavailable
     );
+    assert_eq!(
+        jarvis_windows_native::test_active_arbitration_threads(),
+        0,
+        "an acquisition wait failure must retire its arbitration thread"
+    );
 
     clear_test_environment();
     fs::remove_dir_all(test_root).expect("mutex-wait fixture must be removed");
@@ -942,7 +1308,11 @@ fn run_child(mode: &str) {
             let error = owner
                 .release()
                 .expect_err("injected mutex release failure must be surfaced");
+            let repeated_error = owner
+                .release()
+                .expect_err("repeated uncertain release must remain uncertain");
             if error.kind != NativeErrorKind::ArbitrationReleaseUncertain
+                || repeated_error.kind != NativeErrorKind::ArbitrationReleaseUncertain
                 || owner.mark_ready().is_ok()
                 || jarvis_windows_native::test_active_arbitration_threads() != 0
             {

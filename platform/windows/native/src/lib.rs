@@ -62,6 +62,24 @@ pub fn test_fail_next_state_unlock_before_call() {
 }
 
 #[cfg(all(windows, feature = "test-support"))]
+/// Test-only fault injection before closing the owner state handle.
+pub fn test_fail_next_state_close() {
+    handles::fail_next_state_close_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only fault injection before closing the activation event handle.
+pub fn test_fail_next_activation_close() {
+    handles::fail_next_activation_close_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only fault injection before closing the acknowledgement event handle.
+pub fn test_fail_next_ack_close() {
+    handles::fail_next_ack_close_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
 /// Test-only fault injection for activation event signalling.
 pub fn test_fail_next_event_signal() {
     handles::fail_next_event_signal_for_test();
@@ -102,6 +120,13 @@ pub fn test_arbitration_release_barrier_reached() -> bool {
 /// Test-only continuation of the close-before-release barrier.
 pub fn test_continue_arbitration_release() {
     windows::continue_arbitration_release_for_test();
+}
+
+#[cfg(all(windows, feature = "test-support"))]
+/// Test-only fault injection for an unexpected activation-worker panic after
+/// callback processing has returned.
+pub fn test_panic_next_worker_after_callback() {
+    windows::panic_next_worker_after_callback_for_test();
 }
 
 /// The startup operation competing for the one stable authority.
