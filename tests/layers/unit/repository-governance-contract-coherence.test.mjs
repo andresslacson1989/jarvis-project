@@ -55,7 +55,7 @@ test("owner execution goal is non-normative and agrees with the active authority
   const agents = read("AGENTS.md");
   assert.match(goal, /non-normative execution guidance/);
   assert.match(goal, /GitHub `origin\/master`/);
-  assert.match(goal, /GitHub Actions is the selected and primary CI authority/);
+  assert.match(goal, /GitHub Actions is the sole selected and authoritative CI authority/);
   assert.match(goal, /GitLab is mirror-only/);
   assert.match(agents, /JARVIS-DEVELOPER-EXECUTION-GOAL\.md/);
 });
@@ -67,6 +67,6 @@ test("owner execution goal names the auditor loop and truthful continuation chec
   assert.match(goal, /matrix as the implementation plan/);
   assert.match(goal, /highly detailed next-step plan/);
   assert.match(goal, /truthful statuses/);
-  assert.match(goal, /LocalCI may become authoritative only after/);
+  assert.match(goal, /LocalCI remains governed by the v1\.0\.7 qualification rules but is not selected or authoritative/);
   assert.match(goal, /Production Complete/);
 });

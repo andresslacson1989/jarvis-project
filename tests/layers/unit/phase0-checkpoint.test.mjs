@@ -269,9 +269,9 @@ test("Phase 0 checkout contains the referenced owner authority decision", () => 
   const goal = readFileSync("docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md", "utf8");
   assert.match(agents, /docs\/implementation\/JARVIS-DEVELOPER-EXECUTION-GOAL\.md/);
   assert.match(goal, /Repeat the following seventeen steps/);
-  assert.match(goal, /GitHub Actions is the selected and primary CI authority/);
+  assert.match(goal, /GitHub Actions is the sole selected and authoritative CI authority/);
   assert.match(goal, /GitLab is mirror-only/);
-  assert.match(goal, /LocalCI remains an eligible alternative authority/);
+  assert.match(goal, /LocalCI is unselected and unqualified for this lifecycle/);
   assert.match(goal, /codex:\/\/threads\/01a066d6-1a98-7260-8ce3-d8e8c2c07968/);
   assert.match(goal, /Original goal/);
   assert.match(goal, /Remaining/);

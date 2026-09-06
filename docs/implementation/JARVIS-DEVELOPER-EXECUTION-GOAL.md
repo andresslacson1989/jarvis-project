@@ -12,9 +12,9 @@ The owner’s current authority decision supersedes the stale local v1.0.5 instr
 
 - GitHub `origin/master` is the authoritative repository branch and source-of-truth ref.
 - The JARVIS v1.0.7 contract suite is the active normative suite.
-- GitHub Actions is the selected and primary CI authority for this lifecycle.
+- GitHub Actions is the sole selected and authoritative CI authority for this lifecycle, including qualification and approval evidence.
 - GitLab is mirror-only. It is not a CI authority and must not satisfy a mandatory CI gate.
-- LocalCI remains an eligible alternative authority only under the v1.0.7 qualification rules. It is unselected and unqualified for this lifecycle unless a later owner/governance decision explicitly selects and qualifies it.
+- LocalCI is unselected and unqualified for this lifecycle and must not be used as a substitute for GitHub Actions unless a later owner/governance decision explicitly selects and qualifies it under the v1.0.7 rules.
 - GitHub publication precedes any GitLab mirror publication. Mirroring never creates authority or permits a different source of truth.
 
 This decision must remain consistent across `AGENTS.md`, `README.md`, the machine-readable governance profile, the implementation matrix, evidence records, and auditor reports. No documentation may promote GitLab or an unqualified LocalCI instance into an authoritative role.
@@ -43,7 +43,7 @@ Repeat the following seventeen steps for every matrix subsection until the compl
 
 ## Authority, integration, and LocalCI rules
 
-GitHub Actions is the selected authority for the current candidate. The exact implementation SHA must receive a complete passing GitHub Actions run with the pinned toolchain and all mandatory Windows/static gates. LocalCI may become authoritative only after the active v1.0.7 LocalCI qualification rules are met for the exact appliance/service, authenticated TLS, separate least-privilege API credentials, repository/profile/ref allowlists, server-side exact revision resolution, rootless isolation, secret non-exposure, controlled operations, evidence retention, and cancellation/recovery. A demo, stale, unknown, or materially changed LocalCI instance is not authoritative. GitLab remains mirror-only.
+GitHub Actions is the sole selected authority for the current candidate. The exact implementation SHA must receive a complete passing GitHub Actions run with the pinned toolchain and all mandatory Windows/static gates. LocalCI remains governed by the v1.0.7 qualification rules but is not selected or authoritative for this lifecycle; a demo, stale, unknown, or materially changed LocalCI instance cannot substitute for GitHub Actions. GitLab remains mirror-only and cannot satisfy a mandatory CI gate.
 
 Before any permitted integration, obtain independent auditor approval for the exact implementation candidate and evidence, re-fetch `origin/master` immediately before integration, use only the permitted non-force operation, verify the resulting authoritative `master` SHA and intended diff, and run/verify the post-integration authoritative CI. Never use a synthetic merge, force push, mutable tag, stale candidate, or skipped gate as a substitute.
 

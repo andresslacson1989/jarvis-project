@@ -144,7 +144,7 @@ test("owner execution goal is checked in, referenced, and reconciled with select
   const profile = JSON.parse(readFileSync(new URL("../../../docs/implementation/governance/repository-governance-profile.json", import.meta.url), "utf8"));
   assert.match(agents, /docs\/implementation\/JARVIS-DEVELOPER-EXECUTION-GOAL\.md/);
   assert.match(ownerGoal, /JARVIS v1\.0\.7/);
-  assert.match(ownerGoal, /GitHub Actions is the selected and primary CI authority/);
+  assert.match(ownerGoal, /GitHub Actions is the sole selected and authoritative CI authority/);
   assert.match(ownerGoal, /GitLab is mirror-only/);
   assert.match(ownerGoal, /non-normative execution guidance/);
   assert.equal(profile.mandatoryCi.selectedAuthority.type, "GITHUB_ACTIONS");
