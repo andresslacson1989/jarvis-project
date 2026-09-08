@@ -12,7 +12,7 @@ test-support = ["jarvis-windows-native/test-support"]
 tauri-build = { version = "=2.6.3", features = [] }
 
 [dependencies]
-tauri = { version = "=2.11.5", default-features = false, features = [] }
+tauri = { version = "=2.11.5", default-features = false , features = [] }
 tauri-plugin-opener = "=2.5.4"
 jarvis-windows-native = { path = "../../../platform/windows/native" }
 
