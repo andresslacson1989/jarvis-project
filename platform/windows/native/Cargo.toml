@@ -1,0 +1,26 @@
+[package]
+name = "jarvis-windows-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[features]
+test-support = []
+
+[dependencies]
+sha2 = "=0.10.9"
+
+[target.'cfg(windows)'.dependencies]
+getrandom = "=0.3.4"
+windows-sys = { version = "=0.61.2", default-features = false, features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_RemoteDesktop",
+    "Win32_System_IO",
+    "Win32_System_Com",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+] }
