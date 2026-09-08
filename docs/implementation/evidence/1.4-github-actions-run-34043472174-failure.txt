@@ -1,0 +1,36 @@
+JARVIS Section 1.4 authoritative GitHub Actions failure evidence
+
+run_id=34043472174
+windows_job_id=101514269159
+static_job_id=101516294756
+head_branch=impl/section1-4-final-path-diagnostic
+head_sha=e67be6a0615d0672cfad534d06b7f6366fa37591
+event=push
+workflow=Static CI
+terminal_status=completed
+terminal_conclusion=failure
+run_url=https://github.com/andresslacson1989/jarvis-project/actions/runs/34043472174
+
+This is a bounded, redacted excerpt of the exact candidate Windows and static
+jobs. It contains no credentials, SID values, handles, tokens, raw paths, or
+secret material.
+
+--- sanitized Windows qualification evidence ---
+command=cargo test --locked -p jarvis-windows-native --features test-support --test windows_process_qualification -- --test-threads=1
+checkout_sha=e67be6a0615d0672cfad534d06b7f6366fa37591
+test_result=1 passed; 17 failed; 0 ignored; 0 measured; 0 filtered out
+first_failure=NativeError { kind: SecurityBoundaryUnavailable }
+first_diagnostic=stage=identity.final_path_mismatch;api=GetFinalPathNameByHandleW;status_kind=NONE;status=none;returned_length=95;capacity=1024;actual_chars=95;expected_chars=92;actual_prefix=DEVICE_DOS;expected_prefix=DEVICE_DOS;actual_trailing_separator=false;expected_trailing_separator=false;actual_fingerprint=4f1141a3c1e330fd;expected_fingerprint=cc1dbafc7e56eab0
+c10_reached=false
+diagnostic_scope=bounded length/prefix/trailing metadata and salted fingerprints only; no raw path emitted
+failure_model=the remaining failures cascaded from the first owner-acquisition failure; they are not independent native-stage evidence
+--- end sanitized Windows qualification evidence ---
+
+--- sanitized static CI evidence ---
+static_result=failed at the native Windows Tauri prerequisite after the Windows job failed
+downstream_static_gates=not_run
+--- end sanitized static CI evidence ---
+
+No workflow bypass, continue-on-error, cancellation, or rerun-to-green was
+used. This run is evidence of the failed candidate only and is not a passing
+qualification result.
