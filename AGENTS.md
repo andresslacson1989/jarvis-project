@@ -189,6 +189,10 @@ Do not:
 
 These rules apply once the user explicitly authorizes application implementation. They operationalize the locked active contract suite; they do not replace it, narrow it, or become a competing source of product/security truth.
 
+### Owner execution goal
+
+The canonical owner-provided developer execution goal is recorded in [`docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`](docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md). The developer and independent auditor SHALL read that file before beginning or resuming a subsection and before acting on or reporting a developer handoff. It is an execution aid, not a normative contract; active contracts, the manifest, this file, and applicable release requirements remain authoritative. Any conflict SHALL be stopped and resolved through the contract-governed resolution process.
+
 ### Contract is master authority
 
 - The active manifest and every active normative component remain the master authority for implementation behavior.
