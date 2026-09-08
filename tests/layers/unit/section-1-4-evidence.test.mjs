@@ -81,7 +81,7 @@ function tauriEvidence(overrides = {}) {
     cleanup: { attempted: true, succeeded: true, error: null },
     failure: null,
     ownerInitial: snapshot(),
-    ownerHidden: { ...snapshot(), visible: false, foregroundOwner: false },
+    ownerHidden: { ...snapshot(), visible: false, foregroundPid: 1, foregroundOwner: false },
     second: { pid: 11, exitCode: 0 },
     ownerFinal: snapshot(),
     diagnostics: { ownerStderr: "", secondStderr: "" },
@@ -229,6 +229,7 @@ test("supporting local evidence cannot be promoted to authoritative evidence", (
 test("passing Tauri evidence proves semantic window and process invariants", () => {
   assertRejected(tauriEvidence({ ownerInitial: { ...snapshot(), visible: false } }), { authoritative: true });
   assertRejected(tauriEvidence({ ownerHidden: { ...snapshot(), visible: false, running: false } }), { authoritative: true });
+  assertRejected(tauriEvidence({ ownerHidden: { ...snapshot(), visible: false, foregroundOwner: true, foregroundPid: 10 } }), { authoritative: true });
   assertRejected(tauriEvidence({ ownerFinal: { ...snapshot(), foregroundOwner: false } }), { authoritative: true });
   assertRejected(tauriEvidence({ ownerFinal: { ...snapshot(), pid: 12 } }), { authoritative: true });
   assertRejected(tauriEvidence({ second: { pid: 10, exitCode: 0 } }), { authoritative: true });

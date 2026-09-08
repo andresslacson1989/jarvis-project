@@ -646,7 +646,9 @@ function validateTauriEvidence(evidence) {
       if (evidence[key] === null) fail(`passing Tauri evidence requires ${key}`);
     }
     if (!initial.visible || !initial.running) fail("ownerInitial must be visible and running");
-    if (hidden.visible || !hidden.running) fail("ownerHidden must be hidden and running");
+    if (hidden.visible || hidden.foregroundOwner || hidden.foregroundPid === hidden.pid || !hidden.running) {
+      fail("ownerHidden must be hidden, non-foreground, and running");
+    }
     if (!final.visible || !final.running) fail("ownerFinal must be visible and running");
     if (initial.pid <= 0 || hidden.pid <= 0 || final.pid <= 0 ||
         initial.pid !== hidden.pid || initial.pid !== final.pid) {
