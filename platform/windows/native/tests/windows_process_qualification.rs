@@ -94,6 +94,9 @@ fn windows_owner_second_launch_and_crash_recovery_qualification() {
     set_test_environment(&test_root, DEFAULT_TEST_NAME, &ready_file);
 
     let owner = acquire_owner(Role::Normal);
+    if let Some(diagnostic) = jarvis_windows_native::test_acquisition_diagnostic() {
+        println!("bounded acquisition diagnostic: {diagnostic}");
+    }
     let not_ready = spawn_child("second");
     assert_eq!(
         not_ready.code(),
@@ -1515,8 +1518,10 @@ fn acquire_owner(role: Role) -> jarvis_windows_native::OwnerLease {
             panic!("qualification unexpectedly found an existing owner")
         }
         Err(error) => {
-            let diagnostic = jarvis_windows_native::test_acquisition_diagnostic()
-                .unwrap_or_else(|| "stage=unknown;api=unknown;win32_error=0".to_owned());
+            let diagnostic =
+                jarvis_windows_native::test_acquisition_diagnostic().unwrap_or_else(|| {
+                    "stage=unknown;api=unknown;status_kind=NONE;status=none".to_owned()
+                });
             panic!("qualification owner must acquire: {error:?}; {diagnostic}");
         }
     }

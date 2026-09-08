@@ -74,6 +74,24 @@ macro_rules! record_test_final_path {
     }};
 }
 
+macro_rules! record_test_final_path_classified {
+    ($stage:expr, $api:expr, $status:expr, $returned_length:expr, $capacity:expr, $actual:expr, $expected:expr, $classification:expr $(,)?) => {{
+        #[cfg(feature = "test-support")]
+        {
+            crate::handles::record_test_final_path_classified(
+                $stage,
+                $api,
+                $status,
+                $returned_length,
+                $capacity,
+                $actual,
+                $expected,
+                $classification,
+            );
+        }
+    }};
+}
+
 #[cfg(windows)]
 mod handles;
 
