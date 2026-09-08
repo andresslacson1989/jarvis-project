@@ -31,8 +31,15 @@ pub(super) struct Layout {
 
 pub(super) fn prepare() -> Result<PreparedLayout, NativeError> {
     let local_app_data = identity::local_app_data()?;
+    let path_snapshot = identity::validate_trusted_path_chain(&local_app_data, true)?;
     let parent = identity::open_directory(&local_app_data, None)?;
     let parent_identity = identity::identity(&parent)?;
+    if path_snapshot.final_identity != parent_identity {
+        record_test_failure!("layout.prepare_path_identity", "FileIdentity::compare", 0);
+        return Err(NativeError {
+            kind: NativeErrorKind::SecurityBoundaryUnavailable,
+        });
+    }
     Ok(PreparedLayout {
         local_app_data,
         parent,
@@ -46,9 +53,10 @@ impl PreparedLayout {
         sid: &str,
         security: &ExplicitSecurity,
     ) -> Result<Layout, NativeError> {
+        let before = identity::validate_trusted_path_chain(&self.local_app_data, true)?;
         let current_parent = identity::open_directory(&self.local_app_data, None)?;
         let current_identity = identity::identity(&current_parent)?;
-        if current_identity != self.parent_identity {
+        if current_identity != self.parent_identity || before.final_identity != current_identity {
             record_test_failure!(
                 "layout.validate_parent_identity",
                 "FileIdentity::compare",
@@ -77,6 +85,17 @@ impl PreparedLayout {
             )?;
             children.push(child);
         }
+        let after = identity::validate_trusted_path_chain(&self.local_app_data, true)?;
+        if after != before {
+            record_test_failure!(
+                "layout.validate_parent_chain_changed",
+                "FileIdentity::compare",
+                0
+            );
+            return Err(NativeError {
+                kind: NativeErrorKind::SecurityBoundaryUnavailable,
+            });
+        }
 
         Ok(Layout {
             _local_app_data: self.local_app_data,
@@ -95,9 +114,10 @@ impl PreparedLayout {
         security: &ExplicitSecurity,
         sid: &str,
     ) -> Result<Layout, NativeError> {
+        let before = identity::validate_trusted_path_chain(&self.local_app_data, true)?;
         let current_parent = identity::open_directory(&self.local_app_data, None)?;
         let current_identity = identity::identity(&current_parent)?;
-        if current_identity != self.parent_identity {
+        if current_identity != self.parent_identity || before.final_identity != current_identity {
             record_test_failure!("layout.finish_parent_identity", "FileIdentity::compare", 0);
             return Err(NativeError {
                 kind: NativeErrorKind::SecurityBoundaryUnavailable,
@@ -111,6 +131,18 @@ impl PreparedLayout {
         for name in REQUIRED_DATA_DIRECTORIES {
             let path = root_path.join(name);
             children.push(identity::create_or_open_directory(&path, security, sid)?);
+        }
+
+        let after = identity::validate_trusted_path_chain(&self.local_app_data, true)?;
+        if after != before {
+            record_test_failure!(
+                "layout.finish_parent_chain_changed",
+                "FileIdentity::compare",
+                0
+            );
+            return Err(NativeError {
+                kind: NativeErrorKind::SecurityBoundaryUnavailable,
+            });
         }
 
         let state_path = root_path.join(STATE_FILE_NAME);

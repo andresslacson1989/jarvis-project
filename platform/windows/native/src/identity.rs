@@ -32,6 +32,12 @@ impl FileIdentity {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub(super) struct PathChainSnapshot {
+    pub(super) identities: Vec<FileIdentity>,
+    pub(super) final_identity: FileIdentity,
+}
+
 pub(super) fn local_app_data() -> Result<PathBuf, NativeError> {
     #[cfg(feature = "test-support")]
     if let Some(path) = std::env::var_os("JARVIS_NATIVE_TEST_LOCALAPPDATA") {
@@ -101,20 +107,64 @@ fn bounded_utf16_length(allocated: *const u16) -> Option<usize> {
     None
 }
 
-pub(super) fn validate_absolute_local_path(path: &Path) -> Result<(), NativeError> {
+struct ParsedAbsolutePath<'a> {
+    text: &'a str,
+    drive: u8,
+    components: Vec<&'a str>,
+}
+
+fn parse_supported_absolute_path(path: &Path) -> Result<ParsedAbsolutePath<'_>, NativeError> {
     let text = path
         .to_str()
         .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
-    if text.len() < 3
-        || !text.as_bytes()[1..2].eq(b":")
-        || !text.as_bytes()[2..3].eq(b"\\")
+    let bytes = text.as_bytes();
+    if text.encode_utf16().count() > 32_767
+        || bytes.len() < 4
+        || !bytes[0].is_ascii_alphabetic()
+        || bytes.get(1) != Some(&b':')
+        || bytes.get(2) != Some(&b'\\')
         || text.starts_with("\\\\")
-        || text.contains("..")
+        || text.starts_with("\\\\?\\")
+        || text.starts_with("\\\\.\\")
         || text.contains('\0')
+        || text.contains('/')
     {
         return Err(native_failure(NativeErrorKind::InvalidPath));
     }
-    Ok(())
+
+    // A trailing separator is a permitted directory alias, but it is not a
+    // separate component. The drive root itself is never a supported JARVIS
+    // target.
+    let component_text = text[3..].trim_end_matches('\\');
+    if component_text.is_empty() {
+        return Err(native_failure(NativeErrorKind::InvalidPath));
+    }
+
+    let mut components = Vec::new();
+    for component in component_text.split('\\') {
+        if component.is_empty()
+            || component == "."
+            || component == ".."
+            || component.eq_ignore_ascii_case("GLOBALROOT")
+            || component.chars().any(|character| {
+                character.is_control()
+                    || matches!(character, ':' | '*' | '?' | '"' | '<' | '>' | '|')
+            })
+        {
+            return Err(native_failure(NativeErrorKind::InvalidPath));
+        }
+        components.push(component);
+    }
+
+    Ok(ParsedAbsolutePath {
+        text,
+        drive: bytes[0].to_ascii_uppercase(),
+        components,
+    })
+}
+
+pub(super) fn validate_absolute_local_path(path: &Path) -> Result<(), NativeError> {
+    parse_supported_absolute_path(path).map(|_| ())
 }
 
 pub(super) fn identity(handle: &OwnedHandle) -> Result<FileIdentity, NativeError> {
@@ -143,11 +193,217 @@ fn identity_with_stage(
     })
 }
 
+fn open_path_component(path: &Path, expected_directory: bool) -> Result<OwnedHandle, NativeError> {
+    let path_text = path
+        .to_str()
+        .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+    let path_wide = wide(path_text);
+    let flags = FILE_FLAG_OPEN_REPARSE_POINT
+        | if expected_directory {
+            FILE_FLAG_BACKUP_SEMANTICS
+        } else {
+            0
+        };
+    // SAFETY: the path is NUL-terminated and all output/handle arguments are
+    // valid for this synchronous call; OPEN_REPARSE_POINT observes the final
+    // component instead of silently following its reparse target.
+    let raw = unsafe {
+        CreateFileW(
+            path_wide.as_ptr(),
+            FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+            FILE_SHARE_READ
+                | FILE_SHARE_WRITE
+                | windows_sys::Win32::Storage::FileSystem::FILE_SHARE_DELETE,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            flags,
+            std::ptr::null_mut(),
+        )
+    };
+    if raw.is_null() || raw == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+        let _error = last_error();
+        record_test_failure!("identity.path_chain_open", "CreateFileW", _error,);
+        return Err(native_failure(NativeErrorKind::PathIdentityMismatch));
+    }
+    OwnedHandle::from_raw(raw, NativeErrorKind::PathIdentityMismatch)
+}
+
+fn validate_component_handle(
+    handle: &OwnedHandle,
+    expected_directory: bool,
+) -> Result<FileIdentity, NativeError> {
+    let mut info = BY_HANDLE_FILE_INFORMATION::default();
+    // SAFETY: the handle is owned and the output structure is writable.
+    if unsafe { GetFileInformationByHandle(handle.raw(), &mut info) } == 0 {
+        let _error = last_error();
+        record_test_failure!(
+            "identity.path_chain_file_information",
+            "GetFileInformationByHandle",
+            _error,
+        );
+        return Err(native_failure(NativeErrorKind::PathApiFailure));
+    }
+    let is_directory = (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    if is_directory != expected_directory
+        || (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0
+    {
+        record_test_failure!(
+            "identity.path_chain_reparse_or_type",
+            "GetFileInformationByHandle",
+            0,
+        );
+        return Err(native_failure(NativeErrorKind::PathIdentityMismatch));
+    }
+    Ok(FileIdentity {
+        volume_serial: info.dwVolumeSerialNumber,
+        file_index: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
+    })
+}
+
+fn ascii_starts_with_ignore_case(value: &str, prefix: &str) -> bool {
+    value
+        .get(..prefix.len())
+        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix))
+}
+
+fn final_path_drive(value: &str) -> Option<u8> {
+    let value = if value.starts_with(r"\\?\") {
+        value.get(4..)?
+    } else {
+        value
+    };
+    let bytes = value.as_bytes();
+    if bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'\\' {
+        Some(bytes[0].to_ascii_uppercase())
+    } else {
+        None
+    }
+}
+
+fn final_path_for_handle(
+    handle: &OwnedHandle,
+    expected_drive: u8,
+    _stage: &'static str,
+) -> Result<String, NativeError> {
+    let mut final_path = [0u16; 1024];
+    // SAFETY: the destination buffer is writable and large enough for the
+    // bounded fixed application paths.
+    let length = unsafe {
+        GetFinalPathNameByHandleW(
+            handle.raw(),
+            final_path.as_mut_ptr(),
+            final_path.len() as u32,
+            0,
+        )
+    };
+    let capacity = final_path.len() as u32;
+    if length == 0 {
+        let _error = last_error();
+        record_test_final_path!(
+            _stage,
+            "GetFinalPathNameByHandleW",
+            crate::handles::TestDiagnosticStatus::Win32Error(_error),
+            length,
+            capacity,
+            None,
+            None,
+        );
+        return Err(native_failure(NativeErrorKind::PathApiFailure));
+    }
+    if length >= capacity {
+        record_test_final_path!(
+            _stage,
+            "GetFinalPathNameByHandleW",
+            crate::handles::TestDiagnosticStatus::NoStatus,
+            length,
+            capacity,
+            None,
+            None,
+        );
+        return Err(native_failure(NativeErrorKind::SecurityBoundaryUnavailable));
+    }
+    let value = String::from_utf16(&final_path[..length as usize]).map_err(|_| {
+        record_test_final_path!(
+            _stage,
+            "String::from_utf16",
+            crate::handles::TestDiagnosticStatus::NoStatus,
+            length,
+            capacity,
+            None,
+            None,
+        );
+        native_failure(NativeErrorKind::PathApiFailure)
+    })?;
+
+    if ascii_starts_with_ignore_case(&value, r"\\?\UNC\")
+        || ascii_starts_with_ignore_case(&value, r"\\?\Volume{")
+        || ascii_starts_with_ignore_case(&value, r"\\?\GLOBALROOT\")
+        || ascii_starts_with_ignore_case(&value, r"\\.\")
+        || ascii_starts_with_ignore_case(&value, r"\\GLOBALROOT\")
+        || (value.starts_with(r"\\") && !value.starts_with(r"\\?\"))
+        || final_path_drive(&value) != Some(expected_drive)
+    {
+        record_test_final_path!(
+            _stage,
+            "GetFinalPathNameByHandleW",
+            crate::handles::TestDiagnosticStatus::NoStatus,
+            length,
+            capacity,
+            Some(value.as_str()),
+            None,
+        );
+        return Err(native_failure(NativeErrorKind::PathIdentityMismatch));
+    }
+    Ok(value)
+}
+
+/// Validate every component of a supported fixed path without following a
+/// reparse point. The snapshot is used around subsequent operations so an
+/// ancestor replacement cannot be mistaken for the original trusted chain.
+pub(super) fn validate_trusted_path_chain(
+    path: &Path,
+    expected_directory: bool,
+) -> Result<PathChainSnapshot, NativeError> {
+    let parsed = parse_supported_absolute_path(path)?;
+    if !expected_directory && parsed.text.ends_with('\\') {
+        return Err(native_failure(NativeErrorKind::InvalidPath));
+    }
+
+    let mut prefix = PathBuf::from(&parsed.text[..3]);
+    let mut identities = Vec::with_capacity(parsed.components.len());
+    for (index, component) in parsed.components.iter().enumerate() {
+        prefix.push(component);
+        let is_final = index + 1 == parsed.components.len();
+        let handle =
+            open_path_component(&prefix, if is_final { expected_directory } else { true })?;
+        let component_identity =
+            validate_component_handle(&handle, if is_final { expected_directory } else { true })?;
+        let _ = final_path_for_handle(&handle, parsed.drive, "identity.path_chain_final_path")?;
+        identities.push(component_identity);
+    }
+
+    let final_identity = identities
+        .last()
+        .copied()
+        .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+    Ok(PathChainSnapshot {
+        identities,
+        final_identity,
+    })
+}
+
+pub(super) fn validate_parent_path_chain(path: &Path) -> Result<PathChainSnapshot, NativeError> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
+    validate_trusted_path_chain(parent, true)
+}
+
 pub(super) fn open_directory(
     path: &Path,
     _security: Option<&ExplicitSecurity>,
 ) -> Result<OwnedHandle, NativeError> {
-    validate_absolute_local_path(path)?;
+    let before = validate_trusted_path_chain(path, true)?;
     let path_text = path
         .to_str()
         .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
@@ -176,6 +432,15 @@ pub(super) fn open_directory(
     }
     let handle = OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?;
     validate_directory_handle(&handle, path)?;
+    let after = validate_trusted_path_chain(path, true)?;
+    if before != after {
+        record_test_failure!(
+            "identity.open_directory_chain_changed",
+            "FileIdentity::compare",
+            0,
+        );
+        return Err(native_failure(NativeErrorKind::PathIdentityMismatch));
+    }
     Ok(handle)
 }
 
@@ -185,6 +450,7 @@ pub(super) fn create_or_open_directory(
     sid: &str,
 ) -> Result<OwnedHandle, NativeError> {
     validate_absolute_local_path(path)?;
+    let parent_before = validate_parent_path_chain(path)?;
     let path_text = path
         .to_str()
         .ok_or_else(|| native_failure(NativeErrorKind::InvalidPath))?;
@@ -199,6 +465,15 @@ pub(super) fn create_or_open_directory(
             create_error,
         );
         return Err(native_failure(NativeErrorKind::StateUnavailable));
+    }
+    let parent_after = validate_parent_path_chain(path)?;
+    if parent_before != parent_after {
+        record_test_failure!(
+            "identity.create_directory_parent_changed",
+            "FileIdentity::compare",
+            0,
+        );
+        return Err(native_failure(NativeErrorKind::PathIdentityMismatch));
     }
     let handle = open_directory(path, None)?;
     security.validate_handle(
@@ -228,6 +503,7 @@ pub(super) fn validate_ancestor_identities(
     expected_parent: FileIdentity,
     expected_root: FileIdentity,
 ) -> Result<(), NativeError> {
+    let _state_chain = validate_trusted_path_chain(path, false)?;
     let root_path = match path.parent() {
         Some(path) => path,
         None => {
@@ -242,22 +518,8 @@ pub(super) fn validate_ancestor_identities(
             return Err(native_failure(NativeErrorKind::InvalidPath));
         }
     };
-    let parent = match open_directory(parent_path, None) {
-        Ok(handle) => handle,
-        Err(error) => {
-            record_test_failure!("identity.ancestor_parent_open", "open_directory", 0,);
-            return Err(error);
-        }
-    };
-    let root = match open_directory(root_path, None) {
-        Ok(handle) => handle,
-        Err(error) => {
-            record_test_failure!("identity.ancestor_root_open", "open_directory", 0,);
-            return Err(error);
-        }
-    };
-    let parent_identity = identity_with_stage(&parent, "identity.ancestor_parent_identity")?;
-    let root_identity = identity_with_stage(&root, "identity.ancestor_root_identity")?;
+    let parent_identity = validate_trusted_path_chain(parent_path, true)?.final_identity;
+    let root_identity = validate_trusted_path_chain(root_path, true)?.final_identity;
     if parent_identity != expected_parent {
         record_test_failure!(
             "identity.ancestor_parent_mismatch",
@@ -300,80 +562,19 @@ fn probe_expected_path_identity(
     expected_path: &Path,
     expected_directory: bool,
 ) -> Result<FileIdentity, ExpectedPathProbeFailure> {
-    if let Err(error) = validate_absolute_local_path(expected_path) {
-        return Err(ExpectedPathProbeFailure::Open {
-            error,
-            status: None,
-        });
-    }
-    let path_text = match expected_path.to_str() {
-        Some(path) => path,
-        None => {
-            return Err(ExpectedPathProbeFailure::Open {
-                error: native_failure(NativeErrorKind::InvalidPath),
-                status: None,
-            });
-        }
-    };
-    let path_wide = wide(path_text);
-    let flags = FILE_FLAG_OPEN_REPARSE_POINT
-        | if expected_directory {
-            FILE_FLAG_BACKUP_SEMANTICS
-        } else {
-            0
-        };
-    // SAFETY: the path is NUL-terminated and all output/handle arguments are
-    // valid for the complete synchronous call.
-    let raw = unsafe {
-        CreateFileW(
-            path_wide.as_ptr(),
-            FILE_READ_ATTRIBUTES | SYNCHRONIZE,
-            FILE_SHARE_READ
-                | FILE_SHARE_WRITE
-                | windows_sys::Win32::Storage::FileSystem::FILE_SHARE_DELETE,
-            std::ptr::null(),
-            OPEN_EXISTING,
-            flags,
-            std::ptr::null_mut(),
-        )
-    };
-    if raw.is_null() || raw == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
-        let status = last_error();
-        return Err(ExpectedPathProbeFailure::Open {
-            error: native_failure(NativeErrorKind::SecurityBoundaryUnavailable),
-            status: Some(status),
-        });
-    }
-    let handle = match OwnedHandle::from_raw(raw, NativeErrorKind::SecurityBoundaryUnavailable) {
-        Ok(handle) => handle,
-        Err(error) => {
-            return Err(ExpectedPathProbeFailure::Open {
+    validate_trusted_path_chain(expected_path, expected_directory)
+        .map(|snapshot| snapshot.final_identity)
+        .map_err(|error| match error.kind {
+            NativeErrorKind::PathApiFailure => ExpectedPathProbeFailure::Identity {
                 error,
                 status: None,
-            });
-        }
-    };
-    let mut info = BY_HANDLE_FILE_INFORMATION::default();
-    // SAFETY: the probe handle is valid and the output structure is writable.
-    if unsafe { GetFileInformationByHandle(handle.raw(), &mut info) } == 0 {
-        let status = last_error();
-        return Err(ExpectedPathProbeFailure::Identity {
-            error: native_failure(NativeErrorKind::SecurityBoundaryUnavailable),
-            status: Some(status),
-        });
-    }
-    let is_directory = (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-    if is_directory != expected_directory
-        || (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0
-    {
-        return Err(ExpectedPathProbeFailure::Attribute(native_failure(
-            NativeErrorKind::SecurityBoundaryUnavailable,
-        )));
-    }
-    Ok(FileIdentity {
-        volume_serial: info.dwVolumeSerialNumber,
-        file_index: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
-    })
+            },
+            NativeErrorKind::PathIdentityMismatch => ExpectedPathProbeFailure::Attribute(error),
+            _ => ExpectedPathProbeFailure::Open {
+                error,
+                status: None,
+            },
+        })
 }
 
 fn validate_fixed_handle(
@@ -465,7 +666,22 @@ fn validate_fixed_handle(
             return Err(native_failure(NativeErrorKind::PathApiFailure));
         }
     };
-    if actual.starts_with("\\\\?\\Volume{") {
+    let expected_drive = match parse_supported_absolute_path(expected_path) {
+        Ok(parsed) => parsed.drive,
+        Err(error) => {
+            record_test_final_path!(
+                "identity.final_path_expected_conversion",
+                "parse_supported_absolute_path",
+                crate::handles::TestDiagnosticStatus::NoStatus,
+                length,
+                capacity,
+                Some(actual.as_str()),
+                None,
+            );
+            return Err(error);
+        }
+    };
+    if ascii_starts_with_ignore_case(&actual, r"\\?\Volume{") {
         record_test_final_path!(
             "identity.final_path_volume_rejected",
             "GetFinalPathNameByHandleW",
@@ -477,7 +693,13 @@ fn validate_fixed_handle(
         );
         return Err(native_failure(NativeErrorKind::PathIdentityMismatch));
     }
-    if actual.starts_with("\\\\?\\UNC\\") {
+    if ascii_starts_with_ignore_case(&actual, r"\\?\UNC\")
+        || ascii_starts_with_ignore_case(&actual, r"\\?\GLOBALROOT\")
+        || ascii_starts_with_ignore_case(&actual, r"\\.\")
+        || ascii_starts_with_ignore_case(&actual, r"\\GLOBALROOT\")
+        || (actual.starts_with(r"\\") && !actual.starts_with(r"\\?\"))
+        || final_path_drive(&actual) != Some(expected_drive)
+    {
         record_test_final_path!(
             "identity.final_path_unc_rejected",
             "GetFinalPathNameByHandleW",
@@ -505,97 +727,228 @@ fn validate_fixed_handle(
         }
     };
     let expected = expected.to_owned();
-    let expected = if expected.starts_with("\\\\?\\") {
+    let _expected = if expected.starts_with("\\\\?\\") {
         expected
     } else {
         format!("\\\\?\\{expected}")
     };
-    if !actual
-        .trim_end_matches('\\')
-        .eq_ignore_ascii_case(expected.trim_end_matches('\\'))
-    {
-        match probe_expected_path_identity(expected_path, expected_directory) {
-            Ok(expected_identity) if expected_identity == actual_identity => {
-                record_test_final_path_classified!(
-                    "identity.final_path_alias_same_object",
-                    "GetFinalPathNameByHandleW",
-                    crate::handles::TestDiagnosticStatus::NoStatus,
-                    length,
-                    capacity,
-                    Some(actual.as_str()),
-                    Some(expected.as_str()),
-                    crate::handles::TestFinalPathClassification::SameVerifiedObject,
-                );
-                return Ok(());
-            }
-            Ok(_) => {
-                record_test_final_path_classified!(
-                    "identity.final_path_mismatch",
-                    "GetFinalPathNameByHandleW",
-                    crate::handles::TestDiagnosticStatus::NoStatus,
-                    length,
-                    capacity,
-                    Some(actual.as_str()),
-                    Some(expected.as_str()),
-                    crate::handles::TestFinalPathClassification::DifferentObject,
-                );
-            }
-            Err(ExpectedPathProbeFailure::Open {
-                error: _error,
-                status: _status,
-            }) => {
-                record_test_final_path_classified!(
-                    "identity.final_path_alias_probe_failed",
-                    "CreateFileW",
-                    probe_diagnostic_status(_status),
-                    length,
-                    capacity,
-                    Some(actual.as_str()),
-                    Some(expected.as_str()),
-                    crate::handles::TestFinalPathClassification::ProbeOpenFailed,
-                );
-                return Err(native_failure(NativeErrorKind::PathAliasProbeFailed));
-            }
-            Err(ExpectedPathProbeFailure::Identity {
-                error: _error,
-                status: _status,
-            }) => {
-                record_test_final_path_classified!(
-                    "identity.final_path_alias_probe_failed",
-                    "GetFileInformationByHandle",
-                    probe_diagnostic_status(_status),
-                    length,
-                    capacity,
-                    Some(actual.as_str()),
-                    Some(expected.as_str()),
-                    crate::handles::TestFinalPathClassification::ProbeIdentityFailed,
-                );
-                return Err(native_failure(NativeErrorKind::PathAliasProbeFailed));
-            }
-            Err(ExpectedPathProbeFailure::Attribute(_error)) => {
-                record_test_final_path_classified!(
-                    "identity.final_path_alias_probe_failed",
-                    "GetFileInformationByHandle",
-                    crate::handles::TestDiagnosticStatus::NoStatus,
-                    length,
-                    capacity,
-                    Some(actual.as_str()),
-                    Some(expected.as_str()),
-                    crate::handles::TestFinalPathClassification::ProbeAttributeRejected,
-                );
-                return Err(native_failure(NativeErrorKind::PathIdentityMismatch));
-            }
+    // The final-path spelling is diagnostic only. Even an exact
+    // case-insensitive string match must pass the independent handle-identity
+    // probe; aliases are accepted only after volume/file-index equality and
+    // the complete reparse-free ancestor chain have been proved.
+    match probe_expected_path_identity(expected_path, expected_directory) {
+        Ok(expected_identity) if expected_identity == actual_identity => {
+            record_test_final_path_classified!(
+                "identity.final_path_alias_same_object",
+                "GetFinalPathNameByHandleW",
+                crate::handles::TestDiagnosticStatus::NoStatus,
+                length,
+                capacity,
+                Some(actual.as_str()),
+                Some(_expected.as_str()),
+                crate::handles::TestFinalPathClassification::SameVerifiedObject,
+            );
+            Ok(())
         }
-        return Err(native_failure(NativeErrorKind::PathIdentityMismatch));
+        Ok(_) => {
+            record_test_final_path_classified!(
+                "identity.final_path_mismatch",
+                "GetFinalPathNameByHandleW",
+                crate::handles::TestDiagnosticStatus::NoStatus,
+                length,
+                capacity,
+                Some(actual.as_str()),
+                Some(_expected.as_str()),
+                crate::handles::TestFinalPathClassification::DifferentObject,
+            );
+            Err(native_failure(NativeErrorKind::PathIdentityMismatch))
+        }
+        Err(ExpectedPathProbeFailure::Open {
+            error: _error,
+            status: _status,
+        }) => {
+            record_test_final_path_classified!(
+                "identity.final_path_alias_probe_failed",
+                "CreateFileW",
+                probe_diagnostic_status(_status),
+                length,
+                capacity,
+                Some(actual.as_str()),
+                Some(_expected.as_str()),
+                crate::handles::TestFinalPathClassification::ProbeOpenFailed,
+            );
+            Err(native_failure(NativeErrorKind::PathAliasProbeFailed))
+        }
+        Err(ExpectedPathProbeFailure::Identity {
+            error: _error,
+            status: _status,
+        }) => {
+            record_test_final_path_classified!(
+                "identity.final_path_alias_probe_failed",
+                "GetFileInformationByHandle",
+                probe_diagnostic_status(_status),
+                length,
+                capacity,
+                Some(actual.as_str()),
+                Some(_expected.as_str()),
+                crate::handles::TestFinalPathClassification::ProbeIdentityFailed,
+            );
+            Err(native_failure(NativeErrorKind::PathAliasProbeFailed))
+        }
+        Err(ExpectedPathProbeFailure::Attribute(_error)) => {
+            record_test_final_path_classified!(
+                "identity.final_path_alias_probe_failed",
+                "GetFileInformationByHandle",
+                crate::handles::TestDiagnosticStatus::NoStatus,
+                length,
+                capacity,
+                Some(actual.as_str()),
+                Some(_expected.as_str()),
+                crate::handles::TestFinalPathClassification::ProbeAttributeRejected,
+            );
+            Err(native_failure(NativeErrorKind::PathIdentityMismatch))
+        }
     }
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
+    #[cfg(feature = "test-support")]
+    use std::{io, ptr};
 
-    use super::{bounded_utf16_length, validate_absolute_local_path};
+    use super::{NativeErrorKind, bounded_utf16_length, validate_absolute_local_path};
+
+    #[cfg(feature = "test-support")]
+    fn create_directory_junction(link: &Path, target: &Path) -> io::Result<()> {
+        use windows_sys::Win32::{
+            Foundation::{CloseHandle, INVALID_HANDLE_VALUE},
+            Storage::FileSystem::{
+                CreateFileW, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+                FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_WRITE_ATTRIBUTES,
+                OPEN_EXISTING,
+            },
+            System::IO::DeviceIoControl,
+        };
+
+        // The mount-point reparse buffer is deliberately local to this
+        // qualification fixture. Production code never creates reparse
+        // points; it rejects them.
+        #[repr(C)]
+        struct MountPointReparseData {
+            substitute_name_offset: u16,
+            substitute_name_length: u16,
+            print_name_offset: u16,
+            print_name_length: u16,
+            path_buffer: [u16; 1024],
+        }
+
+        #[repr(C)]
+        struct ReparseDataBuffer {
+            reparse_tag: u32,
+            reparse_data_length: u16,
+            reserved: u16,
+            mount_point: MountPointReparseData,
+        }
+
+        std::fs::create_dir(link)?;
+        let target_text = target
+            .to_str()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "target is not UTF-8"))?;
+        let substitute = format!(r"\??\{target_text}");
+        let substitute_units: Vec<u16> = substitute.encode_utf16().collect();
+        let print_units: Vec<u16> = target_text.encode_utf16().collect();
+        let path_units = substitute_units
+            .len()
+            .checked_add(1)
+            .and_then(|value| value.checked_add(print_units.len()))
+            .and_then(|value| value.checked_add(1))
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "junction path too long"))?;
+        if path_units > 1024 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "junction path exceeds the bounded fixture buffer",
+            ));
+        }
+
+        let mut buffer = ReparseDataBuffer {
+            reparse_tag: 0xA0000003,
+            reparse_data_length: u16::try_from(8usize + (path_units * 2))
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "junction too large"))?,
+            reserved: 0,
+            mount_point: MountPointReparseData {
+                substitute_name_offset: 0,
+                substitute_name_length: u16::try_from(substitute_units.len() * 2).map_err(
+                    |_| io::Error::new(io::ErrorKind::InvalidInput, "junction too large"),
+                )?,
+                print_name_offset: u16::try_from((substitute_units.len() + 1) * 2).map_err(
+                    |_| io::Error::new(io::ErrorKind::InvalidInput, "junction too large"),
+                )?,
+                print_name_length: u16::try_from(print_units.len() * 2).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "junction too large")
+                })?,
+                path_buffer: [0; 1024],
+            },
+        };
+        let mut offset = 0usize;
+        buffer.mount_point.path_buffer[offset..offset + substitute_units.len()]
+            .copy_from_slice(&substitute_units);
+        offset += substitute_units.len() + 1;
+        buffer.mount_point.path_buffer[offset..offset + print_units.len()]
+            .copy_from_slice(&print_units);
+
+        let link_wide = super::wide(
+            link.to_str()
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "link is not UTF-8"))?,
+        );
+        // SAFETY: the path is NUL-terminated and the returned handle is used
+        // only for the synchronous DeviceIoControl call below.
+        let handle = unsafe {
+            CreateFileW(
+                link_wide.as_ptr(),
+                FILE_WRITE_ATTRIBUTES,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                ptr::null(),
+                OPEN_EXISTING,
+                FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+                ptr::null_mut(),
+            )
+        };
+        if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+            let error = io::Error::last_os_error();
+            let _ = std::fs::remove_dir(link);
+            return Err(error);
+        }
+
+        let mut returned = 0u32;
+        // SAFETY: the reparse buffer is initialized, bounded, and remains
+        // live for the complete synchronous call; the handle is valid.
+        let ok = unsafe {
+            DeviceIoControl(
+                handle,
+                589_988,
+                (&buffer as *const ReparseDataBuffer).cast(),
+                u32::try_from(16usize + (path_units * 2)).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "junction too large")
+                })?,
+                ptr::null_mut(),
+                0,
+                &mut returned,
+                ptr::null_mut(),
+            )
+        };
+        let result = if ok == 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        };
+        // SAFETY: this is the valid handle returned by CreateFileW.
+        unsafe { CloseHandle(handle) };
+        if result.is_err() {
+            let _ = std::fs::remove_dir(link);
+        }
+        result
+    }
 
     #[test]
     fn bounded_local_app_data_scan_requires_terminator_inside_limit() {
@@ -616,12 +969,135 @@ mod tests {
             Path::new("relative-path"),
             Path::new(r"\\server\share\JARVIS"),
             Path::new(r"\\?\Volume{00000000-0000-0000-0000-000000000000}\JARVIS"),
+            Path::new(r"C:\"),
+            Path::new(r"C:\JARVIS\.\data"),
             Path::new(r"C:\JARVIS\..\other"),
+            Path::new(r"C:\JARVIS\\data"),
+            Path::new(r"C:/JARVIS/data"),
+            Path::new(r"C:\JARVIS\data::stream"),
+            Path::new(r"C:\GLOBALROOT\JARVIS"),
         ] {
             assert!(validate_absolute_local_path(path).is_err());
         }
 
         assert!(validate_absolute_local_path(Path::new(r"C:\JARVIS\data")).is_ok());
+        assert!(validate_absolute_local_path(Path::new(r"C:\JARVIS\data\")).is_ok());
+    }
+
+    #[cfg(feature = "test-support")]
+    #[test]
+    fn trusted_path_chain_accepts_case_and_trailing_directory_aliases() {
+        use super::{open_directory, validate_fixed_handle};
+
+        let suffix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let path =
+            std::env::temp_dir().join(format!("JARVIS-PathAlias-{}-{suffix}", std::process::id()));
+        std::fs::create_dir(&path).expect("path-alias fixture must be created");
+        let handle = open_directory(&path, None).expect("path-alias fixture must open");
+        let path_text = path.to_str().expect("path-alias fixture must be UTF-8");
+        let case_alias = std::path::PathBuf::from(path_text.to_ascii_uppercase());
+        let trailing_alias = std::path::PathBuf::from(format!("{path_text}\\"));
+
+        validate_fixed_handle(&handle, &case_alias, true)
+            .expect("case-only alias must pass stable identity validation");
+        validate_fixed_handle(&handle, &trailing_alias, true)
+            .expect("trailing-separator alias must pass stable identity validation");
+
+        drop(handle);
+        std::fs::remove_dir_all(path).expect("path-alias fixture must be removed");
+    }
+
+    #[cfg(feature = "test-support")]
+    #[test]
+    fn trusted_path_chain_rejects_intermediate_reparse_points() {
+        use super::validate_trusted_path_chain;
+
+        let suffix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let fixture = std::env::temp_dir().join(format!(
+            "JARVIS-ReparseChain-{}-{suffix}",
+            std::process::id()
+        ));
+        let real = fixture.join("real");
+        let alias = fixture.join("alias");
+        std::fs::create_dir_all(real.join("child")).expect("reparse-chain fixture must be created");
+        create_directory_junction(&alias, &real).expect(
+            "reparse-chain qualification requires the Windows test host to permit directory junctions",
+        );
+
+        let final_error = validate_trusted_path_chain(&alias, true)
+            .expect_err("final reparse point must be rejected");
+        assert_eq!(final_error.kind, NativeErrorKind::PathIdentityMismatch);
+
+        let error = validate_trusted_path_chain(&alias.join("child"), true)
+            .expect_err("intermediate reparse point must be rejected");
+        assert_eq!(error.kind, NativeErrorKind::PathIdentityMismatch);
+
+        std::fs::remove_dir(&alias).expect("junction fixture must be removed");
+        std::fs::remove_dir_all(fixture).expect("reparse-chain fixture must be removed");
+    }
+
+    #[cfg(feature = "test-support")]
+    #[test]
+    fn validate_fixed_handle_requires_distinct_object_identity_proof() {
+        use super::{open_directory, validate_fixed_handle};
+
+        let suffix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let fixture = std::env::temp_dir().join(format!(
+            "JARVIS-DistinctIdentity-{}-{suffix}",
+            std::process::id()
+        ));
+        let first = fixture.join("first");
+        let second = fixture.join("second");
+        std::fs::create_dir_all(&first).expect("identity fixture must be created");
+        std::fs::create_dir(&second).expect("identity fixture sibling must be created");
+        let handle = open_directory(&first, None).expect("identity fixture must open");
+
+        let error = validate_fixed_handle(&handle, &second, true)
+            .expect_err("a distinct object must never pass a path spelling check");
+        assert_eq!(error.kind, NativeErrorKind::PathIdentityMismatch);
+
+        drop(handle);
+        std::fs::remove_dir_all(fixture).expect("identity fixture must be removed");
+    }
+
+    #[cfg(feature = "test-support")]
+    #[test]
+    fn validate_fixed_handle_rejects_disappearing_expected_object() {
+        use super::{open_directory, validate_fixed_handle};
+
+        let suffix = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        let fixture = std::env::temp_dir().join(format!(
+            "JARVIS-DisappearingIdentity-{}-{suffix}",
+            std::process::id()
+        ));
+        let actual = fixture.join("actual");
+        let expected = fixture.join("expected");
+        std::fs::create_dir_all(&actual).expect("disappearing fixture must be created");
+        std::fs::create_dir(&expected).expect("disappearing sibling must be created");
+        let handle = open_directory(&actual, None).expect("disappearing fixture must open");
+        std::fs::remove_dir(&expected).expect("expected object must be removed for the test");
+
+        let error = validate_fixed_handle(&handle, &expected, true)
+            .expect_err("missing expected object must fail closed");
+        assert!(matches!(
+            error.kind,
+            NativeErrorKind::PathAliasProbeFailed | NativeErrorKind::PathIdentityMismatch
+        ));
+
+        drop(handle);
+        std::fs::remove_dir_all(fixture).expect("disappearing fixture must be removed");
     }
 
     #[cfg(feature = "test-support")]
@@ -661,14 +1137,16 @@ mod tests {
                 short_path.len() as u32,
             )
         };
-        if length == 0 || length >= short_path.len() as u32 {
-            return;
-        }
+        assert!(
+            length > 0 && length < short_path.len() as u32,
+            "short-name identity qualification is unavailable on this volume"
+        );
         let short_path = String::from_utf16(&short_path[..length as usize])
             .expect("Windows short path must be valid UTF-16");
-        if short_path.eq_ignore_ascii_case(path_text) {
-            return;
-        }
+        assert!(
+            !short_path.eq_ignore_ascii_case(path_text),
+            "fixture did not produce a distinct short-name alias"
+        );
 
         validate_fixed_handle(&handle, Path::new(&short_path), true)
             .expect("a verified short-name spelling must identify the same directory");

@@ -232,6 +232,9 @@ impl StateRecord {
 #[derive(Debug)]
 pub(super) struct StateFile {
     handle: OwnedHandle,
+    path: std::path::PathBuf,
+    expected_parent: FileIdentity,
+    expected_root: FileIdentity,
     lock_cleanup_failed: AtomicBool,
 }
 
@@ -244,6 +247,7 @@ impl StateFile {
         expected_root: FileIdentity,
         initial: StateRecord,
     ) -> Result<Self, NativeError> {
+        identity::validate_parent_path_chain(path)?;
         let path_text = path.to_str().ok_or_else(|| {
             record_test_failure!("state.create_owner_path", "Path::to_str", 0);
             native_failure(NativeErrorKind::InvalidPath)
@@ -272,6 +276,9 @@ impl StateFile {
         let handle = OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?;
         let state = Self {
             handle,
+            path: path.to_owned(),
+            expected_parent,
+            expected_root,
             lock_cleanup_failed: AtomicBool::new(false),
         };
         state.validate_regular_file()?;
@@ -294,6 +301,11 @@ impl StateFile {
         expected_parent: FileIdentity,
         expected_root: FileIdentity,
     ) -> Result<Self, NativeError> {
+        // The state file may legitimately disappear while an abandoned owner
+        // releases DELETE_ON_CLOSE. Validate the full trusted chain after the
+        // handle is opened so that this preflight preserves the bounded
+        // recovery retry classification for a transiently absent file.
+        identity::validate_parent_path_chain(path)?;
         let path_text = path.to_str().ok_or_else(|| {
             record_test_failure!("state.open_client_path", "Path::to_str", 0);
             native_failure(NativeErrorKind::InvalidPath)
@@ -319,6 +331,9 @@ impl StateFile {
         }
         let state = Self {
             handle: OwnedHandle::from_raw(raw, NativeErrorKind::StateUnavailable)?,
+            path: path.to_owned(),
+            expected_parent,
+            expected_root,
             lock_cleanup_failed: AtomicBool::new(false),
         };
         state.validate_regular_file()?;
@@ -356,6 +371,12 @@ impl StateFile {
         } else {
             Ok(())
         }
+    }
+
+    fn validate_for_use(&self) -> Result<(), NativeError> {
+        self.ensure_open()?;
+        identity::validate_file_handle(&self.handle, &self.path)?;
+        identity::validate_ancestor_identities(&self.path, self.expected_parent, self.expected_root)
     }
 
     fn validate_regular_file(&self) -> Result<(), NativeError> {
@@ -519,7 +540,7 @@ impl StateFile {
     }
 
     fn lock(&self) -> Result<StateLock<'_>, NativeError> {
-        self.ensure_open()?;
+        self.validate_for_use()?;
         if self.lock_cleanup_failed.load(Ordering::Acquire) {
             return Err(native_failure(NativeErrorKind::LockUncertain));
         }

@@ -118,8 +118,24 @@ fn run_tauri_host(_host: WindowsHostRegistration) -> Result<(), HostStartupError
                                 Ok(jarvis_windows_native::ActivationStart::Started(
                                     presentation,
                                 )) => {
-                                    let presented =
-                                        window.show().is_ok() && window.set_focus().is_ok();
+                                    let presented = match window.is_visible() {
+                                        Ok(true) => {
+                                            window.unminimize().is_ok()
+                                                && window.show().is_ok()
+                                                && window.set_focus().is_ok()
+                                        }
+                                        // Tauri/tao keeps an internal visibility flag. A
+                                        // native hide can leave that flag stale, making a
+                                        // subsequent show a no-op. Force the state transition
+                                        // only for an actually hidden window before presenting.
+                                        Ok(false) => {
+                                            window.hide().is_ok()
+                                                && window.unminimize().is_ok()
+                                                && window.show().is_ok()
+                                                && window.set_focus().is_ok()
+                                        }
+                                        Err(_) => false,
+                                    };
                                     let result = if presented {
                                         jarvis_windows_native::ActivationCallbackResult::Handled
                                     } else {

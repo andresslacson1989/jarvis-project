@@ -32,12 +32,28 @@ const QUALIFICATION_TEST_MANIFEST: &[(&str, &str)] = &[
         "bounded-known-folder-utf16-resolution",
     ),
     (
-        "identity::tests::absolute_local_app_data_rejects_non_local_root_forms",
+        "identity::tests::absolute_local_path_rejects_non_local_root_forms",
         "absolute-local-path-and-unc-volume-rejection",
     ),
     (
         "identity::tests::handle_verified_short_name_alias_is_accepted_when_available",
         "same-object-short-name-alias-identity-proof",
+    ),
+    (
+        "identity::tests::trusted_path_chain_accepts_case_and_trailing_directory_aliases",
+        "same-object-case-and-trailing-separator-alias-proof",
+    ),
+    (
+        "identity::tests::trusted_path_chain_rejects_intermediate_reparse_points",
+        "final-and-intermediate-reparse-chain-rejection",
+    ),
+    (
+        "identity::tests::validate_fixed_handle_requires_distinct_object_identity_proof",
+        "distinct-final-object-identity-rejection",
+    ),
+    (
+        "identity::tests::validate_fixed_handle_rejects_disappearing_expected_object",
+        "disappearing-expected-object-failure",
     ),
     (
         "identity::tests::final_path_diagnostic_stages_are_specific_and_redacted",
@@ -78,6 +94,10 @@ const QUALIFICATION_TEST_MANIFEST: &[(&str, &str)] = &[
     (
         "windows::tests::stable_mutex_is_session_scoped_without_global_namespace_claim",
         "session-scoped-mutex-namespace",
+    ),
+    (
+        "security::tests::protected_dacl_shape_rejects_wrong_sid_mask_inheritance_and_extra_aces",
+        "protected-dacl-rejects-wrong-sid-mask-inheritance-and-extra-aces",
     ),
     (
         "windows_qualification_manifest_is_complete_and_mapped",

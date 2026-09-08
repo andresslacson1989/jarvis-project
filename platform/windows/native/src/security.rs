@@ -240,55 +240,15 @@ impl ExplicitSecurity {
                 }
                 false
             } else {
-                let mut size = ACL_SIZE_INFORMATION::default();
-                // SAFETY: the ACL pointer and size output are valid.
-                let acl_ok = unsafe {
-                    GetAclInformation(
-                        dacl,
-                        &mut size as *mut _ as *mut _,
-                        std::mem::size_of::<ACL_SIZE_INFORMATION>() as u32,
-                        AclSizeInformation,
-                    )
-                } != 0;
-                if !acl_ok
-                    || size.AceCount != 1
-                    || size.AclBytesInUse < std::mem::size_of::<ACL>() as u32
-                {
+                let valid_ace = validate_dacl_shape(dacl, expected_sid, self.access_mask());
+                if !valid_ace {
                     record_test_failure!(
-                        "security.protected_dacl_acl_shape",
-                        "GetAclInformation",
-                        super::handles::last_error(),
+                        "security.protected_dacl_ace_validation",
+                        "GetAclInformation/GetAce/EqualSid/ACL-mask-validation",
+                        0,
                     );
-                    false
-                } else {
-                    let mut ace = ptr::null_mut();
-                    // SAFETY: GetAce writes one pointer for the validated ACL.
-                    let ace_ok = unsafe { GetAce(dacl, 0, &mut ace) } != 0;
-                    if !ace_ok || ace.is_null() {
-                        record_test_failure!(
-                            "security.protected_dacl_ace",
-                            "GetAce",
-                            super::handles::last_error(),
-                        );
-                        false
-                    } else {
-                        let valid_ace = validate_single_ace(
-                            dacl,
-                            size.AclBytesInUse as usize,
-                            ace,
-                            expected_sid,
-                            self.access_mask(),
-                        );
-                        if !valid_ace {
-                            record_test_failure!(
-                                "security.protected_dacl_ace_validation",
-                                "EqualSid/ACL-mask-validation",
-                                0,
-                            );
-                        }
-                        valid_ace
-                    }
                 }
+                valid_ace
             }
         } else {
             false
@@ -312,6 +272,46 @@ impl ExplicitSecurity {
     fn access_mask(&self) -> u32 {
         self.access_mask
     }
+}
+
+fn validate_dacl_shape(
+    dacl: *mut ACL,
+    expected_sid: *mut std::ffi::c_void,
+    expected_mask: u32,
+) -> bool {
+    if dacl.is_null() {
+        return false;
+    }
+
+    let mut size = ACL_SIZE_INFORMATION::default();
+    // SAFETY: the caller received this ACL from a successful Windows security
+    // API, and the output buffer is correctly sized.
+    let acl_ok = unsafe {
+        GetAclInformation(
+            dacl,
+            &mut size as *mut _ as *mut _,
+            std::mem::size_of::<ACL_SIZE_INFORMATION>() as u32,
+            AclSizeInformation,
+        )
+    } != 0;
+    if !acl_ok || size.AceCount != 1 || size.AclBytesInUse < std::mem::size_of::<ACL>() as u32 {
+        return false;
+    }
+
+    let mut ace = ptr::null_mut();
+    // SAFETY: the ACL shape check above proves that ACE index zero exists.
+    let ace_ok = unsafe { GetAce(dacl, 0, &mut ace) } != 0;
+    if !ace_ok || ace.is_null() {
+        return false;
+    }
+
+    validate_single_ace(
+        dacl,
+        size.AclBytesInUse as usize,
+        ace,
+        expected_sid,
+        expected_mask,
+    )
 }
 
 fn validate_single_ace(
@@ -494,4 +494,110 @@ pub(super) fn current_sid() -> Result<String, NativeError> {
     }
 
     sid
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ptr;
+
+    use super::{validate_dacl_shape, wide};
+    use windows_sys::Win32::{
+        Foundation::{HLOCAL, LocalFree},
+        Security::Authorization::ConvertStringSidToSidW,
+        Security::{
+            ACL, ACL_REVISION, AddAccessAllowedAce, AddAccessAllowedAceEx, CONTAINER_INHERIT_ACE,
+            InitializeAcl,
+        },
+    };
+
+    fn acl_with_entries(entries: &[(&str, u32, u32)]) -> Vec<u8> {
+        let mut buffer = vec![0u8; 1024];
+        let acl = buffer.as_mut_ptr().cast::<ACL>();
+        // SAFETY: the buffer is writable and large enough for the bounded
+        // fixture ACLs used by this unit test.
+        assert_ne!(
+            unsafe { InitializeAcl(acl, buffer.len() as u32, ACL_REVISION) },
+            0
+        );
+
+        for (sid_text, mask, flags) in entries {
+            let sid_text = wide(sid_text);
+            let mut sid = ptr::null_mut();
+            // SAFETY: the SID text is NUL terminated and the output pointer is
+            // writable for the LocalAlloc-owned SID.
+            assert_ne!(
+                unsafe { ConvertStringSidToSidW(sid_text.as_ptr(), &mut sid) },
+                0
+            );
+            let added = if *flags == 0 {
+                // SAFETY: the ACL and SID are valid for this synchronous API.
+                unsafe { AddAccessAllowedAce(acl, ACL_REVISION, *mask, sid) }
+            } else {
+                // SAFETY: the ACL and SID are valid for this synchronous API.
+                unsafe { AddAccessAllowedAceEx(acl, ACL_REVISION, *flags, *mask, sid) }
+            };
+            let _ = unsafe { LocalFree(sid as HLOCAL) };
+            assert_ne!(added, 0);
+        }
+
+        buffer
+    }
+
+    #[test]
+    fn protected_dacl_shape_rejects_wrong_sid_mask_inheritance_and_extra_aces() {
+        const EXPECTED_SID: &str = "S-1-5-18";
+        const WRONG_SID: &str = "S-1-5-32-544";
+        const EXPECTED_MASK: u32 = 0x0001_0001;
+
+        let expected_sid_text = wide(EXPECTED_SID);
+        let mut expected_sid = ptr::null_mut();
+        // SAFETY: the SID text is NUL terminated and the output pointer is
+        // writable for the LocalAlloc-owned SID.
+        assert_ne!(
+            unsafe { ConvertStringSidToSidW(expected_sid_text.as_ptr(), &mut expected_sid) },
+            0
+        );
+
+        let valid = acl_with_entries(&[(EXPECTED_SID, EXPECTED_MASK, 0)]);
+        assert!(validate_dacl_shape(
+            valid.as_ptr().cast_mut().cast(),
+            expected_sid,
+            EXPECTED_MASK
+        ));
+
+        let wrong_sid = acl_with_entries(&[(WRONG_SID, EXPECTED_MASK, 0)]);
+        assert!(!validate_dacl_shape(
+            wrong_sid.as_ptr().cast_mut().cast(),
+            expected_sid,
+            EXPECTED_MASK
+        ));
+
+        let wrong_mask = acl_with_entries(&[(EXPECTED_SID, EXPECTED_MASK ^ 1, 0)]);
+        assert!(!validate_dacl_shape(
+            wrong_mask.as_ptr().cast_mut().cast(),
+            expected_sid,
+            EXPECTED_MASK
+        ));
+
+        let inherited = acl_with_entries(&[(EXPECTED_SID, EXPECTED_MASK, CONTAINER_INHERIT_ACE)]);
+        assert!(!validate_dacl_shape(
+            inherited.as_ptr().cast_mut().cast(),
+            expected_sid,
+            EXPECTED_MASK
+        ));
+
+        let extra_ace = acl_with_entries(&[
+            (EXPECTED_SID, EXPECTED_MASK, 0),
+            (EXPECTED_SID, EXPECTED_MASK, 0),
+        ]);
+        assert!(!validate_dacl_shape(
+            extra_ace.as_ptr().cast_mut().cast(),
+            expected_sid,
+            EXPECTED_MASK
+        ));
+
+        // SAFETY: expected_sid was allocated by ConvertStringSidToSidW and is
+        // released exactly once after all ACL-shape assertions complete.
+        let _ = unsafe { LocalFree(expected_sid as HLOCAL) };
+    }
 }
