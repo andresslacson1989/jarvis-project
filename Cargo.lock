@@ -1703,6 +1703,7 @@ name = "jarvis-windows-native"
 version = "0.0.0"
 dependencies = [
  "getrandom 0.3.4",
+ "serde_json",
  "sha2",
  "windows-sys 0.61.2",
 ]

@@ -124,6 +124,10 @@ const QUALIFICATION_TEST_MANIFEST: &[(&str, &str)] = &[
         "invalid-path-fail-closed-and-redacted-test-diagnostic",
     ),
     (
+        "qualification::tests::cleanup_fault_is_reported_after_profile_removal",
+        "qualification-cleanup-failure-is-retained-and-never-passes",
+    ),
+    (
         "windows_owner_second_launch_and_crash_recovery_qualification",
         "primary-owner-second-launch-activation-and-owner-crash-recovery",
     ),

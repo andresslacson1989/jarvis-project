@@ -7,6 +7,12 @@ $log_path = Join-Path $runner_temp 'jarvis-windows-native-qualification.log'
 $evidence_path = Join-Path $runner_temp 'jarvis-windows-native-qualification.json'
 $evidence_mode = if ($env:JARVIS_EVIDENCE_MODE) { $env:JARVIS_EVIDENCE_MODE.Trim() } else { 'SUPPORTING_LOCAL' }
 $identity_errors = [System.Collections.Generic.List[string]]::new()
+$authority_policy = $null
+try {
+    $authority_policy = Get-Content -LiteralPath (Join-Path $repository_root 'tools\ci\section-1-4-authority-policy.json') -Raw | ConvertFrom-Json
+} catch {
+    $identity_errors.Add("authority policy unavailable: $($_.Exception.Message)")
+}
 
 function Invoke-GitOutput([string[]] $arguments, [bool] $allow_empty = $false) {
     $output = & git -C $repository_root @arguments 2>$null
@@ -41,14 +47,29 @@ function Test-GitAncestor([string] $candidate, [string] $checkout) {
     return $LASTEXITCODE -eq 0
 }
 
-function Test-SupportedRef([string] $value) {
-    return $value -match '^refs/(heads/.+|pull/[0-9]+/merge)$'
+function Test-ValidHeadRef([string] $value) {
+    if ([string]::IsNullOrWhiteSpace($value) -or $value -notmatch [string]$authority_policy.headRefPattern) {
+        return $false
+    }
+    return $value -notmatch '\.\.' -and $value -notmatch '//' -and $value -notmatch '@\{' -and
+        $value -notmatch '^\.' -and $value -notmatch '\.$' -and $value -notmatch '^/' -and $value -notmatch '/$'
 }
 
-function Test-RemoteRepository([string] $value, [string] $repository) {
-    $normalized_remote = ($value.TrimEnd('/') -replace '\.git$', '').ToLowerInvariant()
-    $normalized_repository = $repository.ToLowerInvariant()
-    return $normalized_remote.EndsWith("/$normalized_repository") -or $normalized_remote.EndsWith(":$normalized_repository")
+function Test-ApprovedRemote([string] $value) {
+    if ([string]::IsNullOrWhiteSpace($value) -or $null -eq $authority_policy) { return $false }
+    return @($authority_policy.remoteForms | ForEach-Object { ([string]$_).ToLowerInvariant() }) -contains $value.ToLowerInvariant()
+}
+
+function Test-AuthorityRef([string] $value, [AllowNull()][string] $head_ref) {
+    if ([string]::IsNullOrWhiteSpace($value) -or $null -eq $authority_policy) { return $false }
+    if ($value -match [string]$authority_policy.pullRefPattern) {
+        return Test-ValidHeadRef $head_ref
+    }
+    $push_allowed = @($authority_policy.allowedPushRefs | ForEach-Object { [string]$_ }) | Where-Object {
+        $allowed = $_
+        $value -eq $allowed -or ($allowed.EndsWith('/') -and $value.StartsWith($allowed) -and (Test-ValidHeadRef ($value.Substring('refs/heads/'.Length))))
+    }
+    return $push_allowed.Count -gt 0 -and [string]::IsNullOrWhiteSpace($head_ref)
 }
 
 $checkout_sha = $null
@@ -104,8 +125,10 @@ if ($evidence_mode -eq 'AUTHORITATIVE_GITHUB_ACTIONS') {
     if ([string]::IsNullOrWhiteSpace($remote)) { $identity_errors.Add('sanitized origin remote unavailable') }
     if ($worktree_clean -ne $true) { $identity_errors.Add('authoritative worktree is not clean') }
     if ($checkout_relationship -eq 'UNKNOWN') { $identity_errors.Add('candidate-to-checkout relationship is unproven') }
-    if (-not (Test-SupportedRef ([string]$authority.ref))) { $identity_errors.Add('authoritative ref is not a supported full Git ref') }
-    if (-not [string]::IsNullOrWhiteSpace($remote) -and -not (Test-RemoteRepository $remote ([string]$authority.repository))) { $identity_errors.Add('origin remote does not identify the authoritative repository') }
+    if ($null -eq $authority_policy -or ([string]$authority.repository).ToLowerInvariant() -ne ([string]$authority_policy.repository).ToLowerInvariant()) { $identity_errors.Add('authority repository is not the approved repository') }
+    if (-not (Test-AuthorityRef ([string]$authority.ref) $authority.headRef)) { $identity_errors.Add('authoritative ref/headRef is outside the approved policy') }
+    if (-not (Test-ApprovedRemote $remote)) { $identity_errors.Add('origin remote is not an approved GitHub remote form') }
+    if (([string]$authority.ref).StartsWith('refs/heads/') -and ($checkout_relationship -ne 'EXACT_CHECKOUT' -or $checkout_sha -ne $candidate_sha)) { $identity_errors.Add('push-ref checkout is not an exact candidate checkout') }
 }
 $identity_error = if ($identity_errors.Count -gt 0) { $identity_errors -join '; ' } else { $null }
 $started_at = [DateTime]::UtcNow

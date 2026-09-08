@@ -25,6 +25,11 @@ mod qualification {
         core::BOOL,
     };
 
+    const AUTHORITY_POLICY_JSON: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../tools/ci/section-1-4-authority-policy.json"
+    ));
+
     #[derive(Clone, Debug)]
     struct WindowSnapshot {
         pid: u32,
@@ -54,6 +59,24 @@ mod qualification {
         owner_stderr: Option<String>,
         second_stderr: Option<String>,
         forced_cleanup: bool,
+        cleanup: CleanupOutcome,
+    }
+
+    #[derive(Clone, Debug)]
+    struct CleanupOutcome {
+        attempted: bool,
+        succeeded: bool,
+        error: Option<String>,
+    }
+
+    impl CleanupOutcome {
+        fn not_attempted() -> Self {
+            Self {
+                attempted: false,
+                succeeded: false,
+                error: None,
+            }
+        }
     }
 
     #[derive(Clone, Debug)]
@@ -198,15 +221,24 @@ mod qualification {
             {
                 return Some("authoritative checkout identity is missing or mismatched".to_owned());
             }
-            if !self.reference.as_deref().is_some_and(is_supported_ref)
-                || !self.remote.as_deref().is_some_and(|remote| {
-                    remote_matches_repository(
-                        remote,
-                        self.repository.as_deref().unwrap_or_default(),
-                    )
-                })
-            {
+            if !self.reference.as_deref().is_some_and(|reference| {
+                policy_identity_matches(
+                    self.repository.as_deref().unwrap_or_default(),
+                    reference,
+                    self.head_ref.as_deref(),
+                    self.remote.as_deref().unwrap_or_default(),
+                )
+            }) {
                 return Some("authoritative repository/ref identity is mismatched".to_owned());
+            }
+            if self
+                .reference
+                .as_deref()
+                .is_some_and(|reference| reference.starts_with("refs/heads/"))
+                && (self.checkout_relationship != "EXACT_CHECKOUT"
+                    || self.checkout_sha.as_deref() != Some(self.candidate_sha.as_str()))
+            {
+                return Some("authoritative push-ref checkout is not exact".to_owned());
             }
             None
         }
@@ -244,6 +276,7 @@ mod qualification {
                 owner_stderr: None,
                 second_stderr: None,
                 forced_cleanup: false,
+                cleanup: CleanupOutcome::not_attempted(),
             })
         }
 
@@ -270,7 +303,21 @@ mod qualification {
             if let Some(second) = self.second.take() {
                 self.second_stderr = Some(cleanup_child(second, None, &mut self.forced_cleanup));
             }
-            let _ = fs::remove_dir_all(&self.profile_path);
+            self.cleanup = match remove_profile(
+                &self.profile_path,
+                env::var_os("JARVIS_NATIVE_TEST_FORCE_CLEANUP_FAILURE").is_some(),
+            ) {
+                Ok(()) => CleanupOutcome {
+                    attempted: true,
+                    succeeded: true,
+                    error: None,
+                },
+                Err(error) => CleanupOutcome {
+                    attempted: true,
+                    succeeded: false,
+                    error: Some(error),
+                },
+            };
         }
     }
 
@@ -313,6 +360,9 @@ mod qualification {
         context.cleanup();
         if context.forced_cleanup && failure.is_none() {
             failure = Some("qualification process required forced cleanup".to_owned());
+        }
+        if !context.cleanup.succeeded && failure.is_none() {
+            failure = context.cleanup.error.clone();
         }
         if failure.is_none() {
             failure = identity.authoritative_failure();
@@ -507,6 +557,15 @@ mod qualification {
         }
     }
 
+    fn remove_profile(path: &Path, inject_failure: bool) -> Result<(), String> {
+        fs::remove_dir_all(path).map_err(|error| format!("profile cleanup failed: {error}"))?;
+        if inject_failure {
+            Err("injected profile cleanup failure".to_owned())
+        } else {
+            Ok(())
+        }
+    }
+
     fn sanitized_output(output: &Output) -> String {
         let mut bytes = if output.stderr.is_empty() {
             output.stdout.clone()
@@ -619,6 +678,9 @@ mod qualification {
         let second_exit_code = context.and_then(|value| value.second_exit_code);
         let owner_stderr = context.and_then(|value| value.owner_stderr.as_deref());
         let second_stderr = context.and_then(|value| value.second_stderr.as_deref());
+        let cleanup = context
+            .map(|value| value.cleanup.clone())
+            .unwrap_or_else(CleanupOutcome::not_attempted);
         format!(
             concat!(
                 "{{\"schemaVersion\":2,\"scope\":\"SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION\",",
@@ -633,7 +695,8 @@ mod qualification {
                 "\"feature\":\"test-support\",\"dataRoot\":\"fresh temporary test-support LocalAppData override\",",
                 "\"startupBoundSeconds\":15,\"activationBoundSeconds\":10,\"readinessGraceSeconds\":5,\"hideBoundSeconds\":5}},",
                 "\"executableSha256\":{},\"startedAt\":{},\"finishedAt\":{},\"failure\":{},",
-                "\"forcedCleanup\":{},\"ownerInitial\":{},\"ownerHidden\":{},",
+                "\"forcedCleanup\":{},\"cleanup\":{{\"attempted\":{},\"succeeded\":{},\"error\":{} }},",
+                "\"ownerInitial\":{},\"ownerHidden\":{},",
                 "\"second\":{{\"pid\":{},\"exitCode\":{}}},\"ownerFinal\":{},",
                 "\"diagnostics\":{{\"ownerStderr\":{},\"secondStderr\":{}}}}}"
             ),
@@ -679,6 +742,13 @@ mod qualification {
                 .map(json_string)
                 .unwrap_or_else(|| "null".to_owned()),
             if forced_cleanup { "true" } else { "false" },
+            if cleanup.attempted { "true" } else { "false" },
+            if cleanup.succeeded { "true" } else { "false" },
+            cleanup
+                .error
+                .as_deref()
+                .map(json_string)
+                .unwrap_or_else(|| "null".to_owned()),
             snapshot_json(owner_initial),
             snapshot_json(owner_hidden),
             second_pid.unwrap_or_default(),
@@ -760,24 +830,96 @@ mod qualification {
             && value == value.to_ascii_lowercase()
     }
 
-    fn is_supported_ref(value: &str) -> bool {
-        value
-            .strip_prefix("refs/heads/")
-            .is_some_and(|branch| !branch.is_empty())
-            || value.strip_prefix("refs/pull/").is_some_and(|pull| {
-                pull.strip_suffix("/merge").is_some_and(|number| {
-                    !number.is_empty() && number.chars().all(|character| character.is_ascii_digit())
+    fn policy_value() -> Option<serde_json::Value> {
+        serde_json::from_str(AUTHORITY_POLICY_JSON).ok()
+    }
+
+    fn policy_string<'a>(policy: &'a serde_json::Value, key: &str) -> Option<&'a str> {
+        policy.get(key).and_then(serde_json::Value::as_str)
+    }
+
+    fn policy_contains_string(policy: &serde_json::Value, key: &str, value: &str) -> bool {
+        policy
+            .get(key)
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|values| {
+                values.iter().any(|candidate| {
+                    candidate
+                        .as_str()
+                        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(value))
                 })
             })
     }
 
-    fn remote_matches_repository(remote: &str, repository: &str) -> bool {
-        let remote = remote
-            .trim_end_matches('/')
-            .trim_end_matches(".git")
-            .to_ascii_lowercase();
-        let repository = repository.to_ascii_lowercase();
-        remote.ends_with(&format!("/{repository}")) || remote.ends_with(&format!(":{repository}"))
+    fn valid_head_ref(value: &str, policy: &serde_json::Value) -> bool {
+        let pattern = policy_string(policy, "headRefPattern");
+        pattern.is_some_and(|pattern| {
+            pattern == "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+                && !value.is_empty()
+                && value.chars().all(|character| {
+                    character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '/' | '-')
+                })
+                && !value.starts_with('.')
+                && !value.ends_with('.')
+                && !value.starts_with('/')
+                && !value.ends_with('/')
+                && !value.contains("..")
+                && !value.contains("//")
+                && !value.contains("@{")
+        })
+    }
+
+    fn policy_ref_matches(
+        reference: &str,
+        head_ref: Option<&str>,
+        policy: &serde_json::Value,
+    ) -> bool {
+        let pull_pattern = policy_string(policy, "pullRefPattern");
+        if pull_pattern == Some("^refs/pull/[1-9][0-9]*/merge$")
+            && let Some(number) = reference
+                .strip_prefix("refs/pull/")
+                .and_then(|value| value.strip_suffix("/merge"))
+        {
+            return number
+                .chars()
+                .next()
+                .is_some_and(|character| character.is_ascii_digit() && character != '0')
+                && number.chars().all(|character| character.is_ascii_digit())
+                && head_ref.is_some_and(|value| valid_head_ref(value, policy));
+        }
+        let push_allowed = policy
+            .get("allowedPushRefs")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|values| {
+                values.iter().any(|allowed| {
+                    let Some(allowed) = allowed.as_str() else {
+                        return false;
+                    };
+                    reference == allowed
+                        || (allowed.ends_with('/')
+                            && reference.starts_with(allowed)
+                            && valid_head_ref(
+                                reference.strip_prefix("refs/heads/").unwrap_or_default(),
+                                policy,
+                            ))
+                })
+            });
+        push_allowed && head_ref.is_none()
+    }
+
+    fn policy_identity_matches(
+        repository: &str,
+        reference: &str,
+        head_ref: Option<&str>,
+        remote: &str,
+    ) -> bool {
+        let Some(policy) = policy_value() else {
+            return false;
+        };
+        policy_string(&policy, "repository")
+            .is_some_and(|approved| approved.eq_ignore_ascii_case(repository))
+            && policy_ref_matches(reference, head_ref, &policy)
+            && policy_contains_string(&policy, "remoteForms", remote)
     }
 
     fn git_output(args: &[&str]) -> Result<String, String> {
@@ -886,6 +1028,27 @@ mod qualification {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn cleanup_fault_is_reported_after_profile_removal() {
+            let profile = env::temp_dir().join(format!(
+                "jarvis-tauri-cleanup-fault-{}-{}",
+                std::process::id(),
+                unique_suffix()
+            ));
+            fs::create_dir_all(&profile).expect("profile directory should be created");
+            let result = remove_profile(&profile, true);
+            assert_eq!(result, Err("injected profile cleanup failure".to_owned()));
+            assert!(
+                !profile.exists(),
+                "fault injection must not leak the test profile"
+            );
+        }
     }
 }
 

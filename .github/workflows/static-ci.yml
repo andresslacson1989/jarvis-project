@@ -78,6 +78,10 @@ jobs:
         working-directory: apps/desktop
         run: pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci --features test-support
 
+      - name: Verify deterministic Tauri generated artifacts and clean checkout
+        shell: pwsh
+        run: node tools/ci/verify-tauri-generated-artifacts.mjs
+
       - name: Windows Tauri Section 1.4 single-instance qualification
         shell: pwsh
         env:

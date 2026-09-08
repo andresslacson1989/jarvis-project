@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "repository": "andresslacson1989/jarvis-project",
+  "remoteForms": [
+    "https://github.com/andresslacson1989/jarvis-project",
+    "https://github.com/andresslacson1989/jarvis-project.git",
+    "ssh://github.com/andresslacson1989/jarvis-project",
+    "ssh://github.com/andresslacson1989/jarvis-project.git",
+    "ssh://github.com:andresslacson1989/jarvis-project",
+    "ssh://github.com:andresslacson1989/jarvis-project.git"
+  ],
+  "allowedPushRefs": [
+    "refs/heads/master",
+    "refs/heads/impl/"
+  ],
+  "pullRefPattern": "^refs/pull/[1-9][0-9]*/merge$",
+  "headRefPattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$"
+}
