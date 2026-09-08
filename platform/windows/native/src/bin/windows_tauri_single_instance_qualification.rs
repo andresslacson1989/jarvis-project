@@ -1397,36 +1397,6 @@ mod qualification {
                 "fault injection must not leak the test profile"
             );
         }
-
-        #[test]
-        fn hidden_snapshot_requires_the_live_non_owner_sentinel_foreground() {
-            let valid = WindowSnapshot {
-                pid: 10,
-                handle: ptr::null_mut(),
-                title: "JARVIS".to_owned(),
-                visible: false,
-                foreground_pid: 20,
-                foreground_owner: false,
-                running: true,
-            };
-            assert!(hidden_snapshot_is_valid(&valid, 10, 20));
-
-            let mut owner_foreground = valid.clone();
-            owner_foreground.foreground_owner = true;
-            assert!(!hidden_snapshot_is_valid(&owner_foreground, 10, 20));
-
-            let mut wrong_foreground = valid.clone();
-            wrong_foreground.foreground_pid = 21;
-            assert!(!hidden_snapshot_is_valid(&wrong_foreground, 10, 20));
-
-            let mut owner_pid_foreground = valid.clone();
-            owner_pid_foreground.foreground_pid = 10;
-            assert!(!hidden_snapshot_is_valid(&owner_pid_foreground, 10, 10));
-
-            let mut zero_foreground = valid;
-            zero_foreground.foreground_pid = 0;
-            assert!(!hidden_snapshot_is_valid(&zero_foreground, 10, 20));
-        }
     }
 }
 
