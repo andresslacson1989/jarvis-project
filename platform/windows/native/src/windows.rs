@@ -918,10 +918,10 @@ fn acquire_owner(
         let activation_name = event_name(ACTIVATION_EVENT_PREFIX, nonce);
         let ack_name = event_name(ACK_EVENT_PREFIX, nonce);
         let activation_event =
-            create_event(&activation_name, &security.event).inspect_err(|_error| {
+            create_event(&activation_name, &security.event, &sid).inspect_err(|_error| {
                 record_test_failure!("windows.acquire_owner_activation_event", "create_event", 0);
             })?;
-        let ack_event = create_event(&ack_name, &security.event).inspect_err(|_error| {
+        let ack_event = create_event(&ack_name, &security.event, &sid).inspect_err(|_error| {
             record_test_failure!("windows.acquire_owner_ack_event", "create_event", 0);
         })?;
         let initial = StateRecord::new(
@@ -1797,7 +1797,7 @@ fn acquire_second_launch(
 
     let activation_name = event_name(ACTIVATION_EVENT_PREFIX, snapshot.nonce);
     let ack_name = event_name(ACK_EVENT_PREFIX, snapshot.nonce);
-    let activation = match open_event(&activation_name, EVENT_MODIFY_STATE) {
+    let activation = match open_event(&activation_name, EVENT_MODIFY_STATE, &security.event, sid) {
         Ok(event) => event,
         Err(error) => {
             return Err(cancel_before_dispatch(
@@ -1807,7 +1807,7 @@ fn acquire_second_launch(
             ));
         }
     };
-    let ack = match open_event(&ack_name, SYNCHRONIZE) {
+    let ack = match open_event(&ack_name, SYNCHRONIZE, &security.event, sid) {
         Ok(event) => event,
         Err(error) => {
             return Err(cancel_before_dispatch(
@@ -2536,6 +2536,11 @@ fn create_mutex(
             &handle,
             windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT,
         )?;
+        security.validate_handle(
+            &handle,
+            sid,
+            windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT,
+        )?;
     } else {
         security.validate_handle(
             &handle,
@@ -2546,7 +2551,11 @@ fn create_mutex(
     Ok((OwnedMutex::new(handle), created))
 }
 
-fn create_event(name: &str, security: &ExplicitSecurity) -> Result<OwnedHandle, NativeError> {
+fn create_event(
+    name: &str,
+    security: &ExplicitSecurity,
+    sid: &str,
+) -> Result<OwnedHandle, NativeError> {
     let name = wide(name);
     // SAFETY: the event name/security remain valid for the synchronous call.
     let raw = unsafe { CreateEventW(security.as_ptr(), 0, 0, name.as_ptr()) };
@@ -2569,18 +2578,40 @@ fn create_event(name: &str, security: &ExplicitSecurity) -> Result<OwnedHandle, 
         &handle,
         windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT,
     )?;
+    security.validate_handle(
+        &handle,
+        sid,
+        windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT,
+    )?;
     Ok(handle)
 }
 
-fn open_event(name: &str, access: u32) -> Result<OwnedHandle, NativeError> {
+fn open_event(
+    name: &str,
+    access: u32,
+    security: &ExplicitSecurity,
+    sid: &str,
+) -> Result<OwnedHandle, NativeError> {
     let name = wide(name);
     // SAFETY: the NUL-terminated name remains valid for the synchronous call.
-    let raw = unsafe { OpenEventW(access, 0, name.as_ptr()) };
+    let raw = unsafe {
+        OpenEventW(
+            access | windows_sys::Win32::Storage::FileSystem::READ_CONTROL,
+            0,
+            name.as_ptr(),
+        )
+    };
     let _native_error = last_error();
     if raw.is_null() {
         record_test_failure!("windows.open_event", "OpenEventW", _native_error);
     }
-    OwnedHandle::from_raw(raw, NativeErrorKind::EventUnavailable)
+    let handle = OwnedHandle::from_raw(raw, NativeErrorKind::EventUnavailable)?;
+    security.validate_handle(
+        &handle,
+        sid,
+        windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT,
+    )?;
+    Ok(handle)
 }
 
 fn settle_client_state(
@@ -2739,7 +2770,11 @@ fn classify_process_liveness(
 
 #[cfg(test)]
 mod tests {
-    use super::{FileIdentity, ProcessLiveness, classify_process_liveness, stable_mutex_name};
+    use super::{
+        EVENT_ACCESS_MASK, EVENT_MODIFY_STATE, ExplicitSecurity, FileIdentity, MUTEX_ACCESS_MASK,
+        ProcessLiveness, SYNCHRONIZE, classify_process_liveness, create_mutex, current_sid,
+        event_name, open_event, stable_mutex_name,
+    };
 
     #[test]
     fn liveness_query_failures_remain_unknown() {
@@ -2788,5 +2823,73 @@ mod tests {
         );
         assert!(name.starts_with("Local\\JARVIS-DESKTOP-"));
         assert!(!name.starts_with("Global\\"));
+    }
+
+    #[test]
+    fn newly_created_named_objects_are_read_back_validated() {
+        let sid = current_sid().expect("the Windows test principal must have a SID");
+        let mutex_security = ExplicitSecurity::for_sid(&sid, MUTEX_ACCESS_MASK)
+            .expect("the test mutex security descriptor must be created");
+        let event_security = ExplicitSecurity::for_sid(&sid, EVENT_ACCESS_MASK)
+            .expect("the test event security descriptor must be created");
+        let suffix = unique_test_suffix();
+        let mutex_name = format!("Local\\JARVIS-QUALIFICATION-MUTEX-{suffix}");
+        let event_name = event_name("Local\\JARVIS-QUALIFICATION-EVENT-", suffix_bytes(suffix));
+
+        let (mutex, created) = create_mutex(&mutex_name, &mutex_security, &sid)
+            .expect("newly created mutex must have a readable exact DACL");
+        assert!(created, "the qualification mutex name must be unique");
+
+        let event = super::create_event(&event_name, &event_security, &sid)
+            .expect("newly created event must have a readable exact DACL");
+        let activation_handle = open_event(&event_name, EVENT_MODIFY_STATE, &event_security, &sid)
+            .expect("the activation client handle must pass exact DACL read-back");
+        let acknowledgement_handle = open_event(&event_name, SYNCHRONIZE, &event_security, &sid)
+            .expect("the acknowledgement client handle must pass exact DACL read-back");
+
+        drop(acknowledgement_handle);
+        drop(activation_handle);
+        drop(event);
+        drop(mutex);
+    }
+
+    #[test]
+    fn hostile_named_object_is_rejected_before_use() {
+        let sid = current_sid().expect("the Windows test principal must have a SID");
+        let hostile_security = ExplicitSecurity::for_sid(
+            &sid,
+            MUTEX_ACCESS_MASK | windows_sys::Win32::Storage::FileSystem::DELETE,
+        )
+        .expect("the hostile test security descriptor must be created");
+        let expected_security = ExplicitSecurity::for_sid(&sid, MUTEX_ACCESS_MASK)
+            .expect("the expected test security descriptor must be created");
+        let mutex_name = format!(
+            "Local\\JARVIS-QUALIFICATION-HOSTILE-MUTEX-{}",
+            unique_test_suffix()
+        );
+
+        let (hostile_mutex, created) = create_mutex(&mutex_name, &hostile_security, &sid)
+            .expect("the hostile fixture must be created before the acquisition attempt");
+        assert!(created, "the hostile mutex name must be unique");
+
+        let error = create_mutex(&mutex_name, &expected_security, &sid)
+            .expect_err("a named object with an extra ACE mask must fail closed");
+        assert!(matches!(
+            error.kind,
+            super::NativeErrorKind::SecurityBoundaryUnavailable
+                | super::NativeErrorKind::ArbitrationUnavailable
+        ));
+        drop(hostile_mutex);
+    }
+
+    fn unique_test_suffix() -> u128 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("the test clock must be after the Unix epoch")
+            .as_nanos()
+    }
+
+    fn suffix_bytes(value: u128) -> [u8; 16] {
+        value.to_le_bytes()
     }
 }

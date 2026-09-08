@@ -32,7 +32,7 @@ impl FileIdentity {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct PathChainSnapshot {
     pub(super) identities: Vec<FileIdentity>,
     pub(super) final_identity: FileIdentity,

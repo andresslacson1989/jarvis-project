@@ -56,6 +56,173 @@ mod qualification {
         forced_cleanup: bool,
     }
 
+    #[derive(Clone, Debug)]
+    struct EvidenceIdentity {
+        mode: String,
+        candidate_sha: String,
+        repository: Option<String>,
+        reference: Option<String>,
+        head_ref: Option<String>,
+        workflow: Option<String>,
+        run_id: Option<String>,
+        run_attempt: Option<String>,
+        job: Option<String>,
+        runner_os: Option<String>,
+        runner_arch: Option<String>,
+        runner_image: Option<String>,
+        checkout_sha: Option<String>,
+        tree_sha: Option<String>,
+        remote: Option<String>,
+        checkout_relationship: String,
+        worktree_clean: Option<bool>,
+        identity_error: Option<String>,
+    }
+
+    impl EvidenceIdentity {
+        fn collect() -> Self {
+            let mode = env::var("JARVIS_EVIDENCE_MODE")
+                .unwrap_or_else(|_| "SUPPORTING_LOCAL".to_owned())
+                .trim()
+                .to_owned();
+            let checkout_sha = git_output(&["rev-parse", "HEAD"]).ok();
+            let candidate_sha = env::var("JARVIS_CANDIDATE_SHA")
+                .map(|value| value.trim().to_owned())
+                .unwrap_or_else(|_| checkout_sha.clone().unwrap_or_else(|| "unknown".to_owned()));
+            let tree_sha = git_output(&["rev-parse", "HEAD^{tree}"]).ok();
+            let remote = git_output(&["config", "--get", "remote.origin.url"])
+                .ok()
+                .map(|value| sanitize_remote(&value));
+            let worktree_clean =
+                git_output_allow_empty(&["status", "--porcelain=v1", "--untracked-files=all"])
+                    .ok()
+                    .map(|value| value.trim().is_empty());
+
+            let (repository, reference, head_ref, workflow, run_id, run_attempt, job) =
+                if mode == "AUTHORITATIVE_GITHUB_ACTIONS" {
+                    (
+                        env_option("GITHUB_REPOSITORY"),
+                        env_option("GITHUB_REF"),
+                        env_option("GITHUB_HEAD_REF"),
+                        env_option("GITHUB_WORKFLOW"),
+                        env_option("GITHUB_RUN_ID"),
+                        env_option("GITHUB_RUN_ATTEMPT"),
+                        env_option("GITHUB_JOB"),
+                    )
+                } else {
+                    (None, None, None, None, None, None, None)
+                };
+            let (runner_os, runner_arch, runner_image) = if mode == "AUTHORITATIVE_GITHUB_ACTIONS" {
+                (
+                    env_option("RUNNER_OS"),
+                    env_option("RUNNER_ARCH"),
+                    env_option("ImageOS"),
+                )
+            } else {
+                (None, None, None)
+            };
+
+            let checkout_relationship = if mode == "SUPPORTING_LOCAL" {
+                "SUPPORTING_LOCAL".to_owned()
+            } else if checkout_sha.as_deref() == Some(candidate_sha.as_str()) {
+                "EXACT_CHECKOUT".to_owned()
+            } else if reference
+                .as_deref()
+                .is_some_and(|value| value.starts_with("refs/pull/") && value.ends_with("/merge"))
+                && checkout_sha
+                    .as_deref()
+                    .is_some_and(|checkout| git_is_ancestor(&candidate_sha, checkout))
+            {
+                "PR_HEAD_ANCESTOR_OF_MERGE_CHECKOUT".to_owned()
+            } else {
+                "UNKNOWN".to_owned()
+            };
+
+            let identity_error =
+                if mode != "AUTHORITATIVE_GITHUB_ACTIONS" && mode != "SUPPORTING_LOCAL" {
+                    Some("unsupported evidence mode".to_owned())
+                } else {
+                    None
+                };
+
+            Self {
+                mode,
+                candidate_sha,
+                repository,
+                reference,
+                head_ref,
+                workflow,
+                run_id,
+                run_attempt,
+                job,
+                runner_os,
+                runner_arch,
+                runner_image,
+                checkout_sha,
+                tree_sha,
+                remote,
+                checkout_relationship,
+                worktree_clean,
+                identity_error,
+            }
+        }
+
+        fn authoritative_failure(&self) -> Option<String> {
+            if self.mode != "AUTHORITATIVE_GITHUB_ACTIONS" {
+                return self.identity_error.clone().or_else(|| {
+                    (self.mode != "SUPPORTING_LOCAL")
+                        .then_some("unsupported evidence mode".to_owned())
+                });
+            }
+            if !is_sha(&self.candidate_sha)
+                || self.repository.as_deref().is_none_or(str::is_empty)
+                || self.reference.as_deref().is_none_or(str::is_empty)
+                || self.workflow.as_deref().is_none_or(str::is_empty)
+                || self.run_id.as_deref().is_none_or(str::is_empty)
+                || self.run_attempt.as_deref().is_none_or(str::is_empty)
+                || self.job.as_deref().is_none_or(str::is_empty)
+                || self.runner_os.as_deref().is_none_or(str::is_empty)
+                || self.runner_arch.as_deref().is_none_or(str::is_empty)
+            {
+                return Some(
+                    "authoritative GitHub identity metadata is missing or malformed".to_owned(),
+                );
+            }
+            if self
+                .checkout_sha
+                .as_deref()
+                .is_none_or(|value| !is_sha(value))
+                || self.tree_sha.as_deref().is_none_or(|value| !is_sha(value))
+                || self.remote.as_deref().is_none_or(str::is_empty)
+                || self.worktree_clean != Some(true)
+                || self.checkout_relationship == "UNKNOWN"
+            {
+                return Some("authoritative checkout identity is missing or mismatched".to_owned());
+            }
+            if !self.reference.as_deref().is_some_and(is_supported_ref)
+                || !self.remote.as_deref().is_some_and(|remote| {
+                    remote_matches_repository(
+                        remote,
+                        self.repository.as_deref().unwrap_or_default(),
+                    )
+                })
+            {
+                return Some("authoritative repository/ref identity is mismatched".to_owned());
+            }
+            None
+        }
+
+        fn status(&self, passed: bool) -> &'static str {
+            match (self.mode.as_str(), passed) {
+                ("AUTHORITATIVE_GITHUB_ACTIONS", true) => "PASS",
+                ("AUTHORITATIVE_GITHUB_ACTIONS", false) => "FAIL",
+                ("SUPPORTING_LOCAL", true) => "SUPPORTING_PASS",
+                ("SUPPORTING_LOCAL", false) => "SUPPORTING_FAIL",
+                (_, true) => "FAIL",
+                (_, false) => "FAIL",
+            }
+        }
+    }
+
     impl RunContext {
         fn new() -> io::Result<Self> {
             let profile_path = env::temp_dir().join(format!(
@@ -117,52 +284,53 @@ mod qualification {
         }
         let executable = PathBuf::from(&arguments[1]);
         let evidence_path = PathBuf::from(&arguments[2]);
-        let candidate_sha = env::var("JARVIS_CANDIDATE_SHA")
-            .unwrap_or_else(|_| "unknown".to_owned())
-            .trim()
-            .to_owned();
+        let identity = EvidenceIdentity::collect();
         let started_at = utc_timestamp();
 
         let mut context = match RunContext::new() {
             Ok(context) => context,
             Err(error) => {
-                let evidence = failure_evidence(
-                    &candidate_sha,
+                let failure = format!("could not create isolated profile: {error}");
+                let evidence = build_evidence(
+                    identity.status(false),
+                    &identity,
                     &started_at,
-                    &format!("could not create isolated profile: {error}"),
+                    &Some(failure),
                     false,
                     None,
                     None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
                 );
-                write_evidence(&evidence_path, &evidence);
+                if let Err(write_error) = write_evidence(&evidence_path, &evidence) {
+                    eprintln!("could not write failure evidence: {write_error}");
+                    return 1;
+                }
                 eprintln!("{evidence}");
                 return 1;
             }
         };
 
-        let failure = execute(&mut context, &executable).err();
+        let mut failure = execute(&mut context, &executable).err();
         context.cleanup();
-        let failure = if context.forced_cleanup && failure.is_none() {
-            Some("qualification process required forced cleanup".to_owned())
-        } else {
-            failure
-        };
-        let status = if failure.is_none() { "PASS" } else { "FAIL" };
+        if context.forced_cleanup && failure.is_none() {
+            failure = Some("qualification process required forced cleanup".to_owned());
+        }
+        if failure.is_none() {
+            failure = identity.authoritative_failure();
+        }
+        let status = identity.status(failure.is_none());
         let evidence = build_evidence(
             status,
-            &candidate_sha,
+            &identity,
             &started_at,
             &failure,
             context.forced_cleanup,
-            &context,
-            &executable,
+            Some(&context),
+            Some(&executable),
         );
-        write_evidence(&evidence_path, &evidence);
+        if let Err(write_error) = write_evidence(&evidence_path, &evidence) {
+            eprintln!("could not write qualification evidence: {write_error}");
+            return 1;
+        }
         println!("[tauri-single-instance-evidence] {evidence}");
         println!(
             "[tauri-single-instance-evidence-path] {}",
@@ -434,22 +602,32 @@ mod qualification {
 
     fn build_evidence(
         status: &str,
-        candidate_sha: &str,
+        identity: &EvidenceIdentity,
         started_at: &str,
         failure: &Option<String>,
         forced_cleanup: bool,
-        context: &RunContext,
-        executable: &Path,
+        context: Option<&RunContext>,
+        executable: Option<&Path>,
     ) -> String {
         let finished_at = utc_timestamp();
-        let binary_sha = sha256_file(executable);
+        let binary_sha = executable.and_then(sha256_file);
         let toolchain = |command: &str| command_version(command);
+        let owner_initial = context.and_then(|value| value.owner_initial.as_ref());
+        let owner_hidden = context.and_then(|value| value.owner_hidden.as_ref());
+        let owner_final = context.and_then(|value| value.owner_final.as_ref());
+        let second_pid = context.and_then(|value| value.second_pid);
+        let second_exit_code = context.and_then(|value| value.second_exit_code);
+        let owner_stderr = context.and_then(|value| value.owner_stderr.as_deref());
+        let second_stderr = context.and_then(|value| value.second_stderr.as_deref());
         format!(
             concat!(
-                "{{\"schemaVersion\":1,\"scope\":\"SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION\",",
-                "\"status\":{},\"candidateSha\":{},\"repository\":{},\"ref\":{},\"headRef\":{},",
-                "\"workflow\":{},\"runId\":{},\"runAttempt\":{},\"job\":{},",
+                "{{\"schemaVersion\":2,\"scope\":\"SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION\",",
+                "\"status\":{},\"evidenceMode\":{},\"candidateSha\":{},",
+                "\"authority\":{{\"type\":{},\"repository\":{},\"ref\":{},\"headRef\":{},",
+                "\"workflow\":{},\"runId\":{},\"runAttempt\":{},\"job\":{}}},",
                 "\"runner\":{{\"os\":{},\"arch\":{},\"image\":{}}},",
+                "\"observed\":{{\"checkoutSha\":{},\"treeSha\":{},\"remote\":{},",
+                "\"checkoutRelationship\":{},\"worktreeClean\":{},\"identityError\":{}}},",
                 "\"toolchain\":{{\"rust\":{},\"cargo\":{},\"node\":{},\"pnpm\":{}}},",
                 "\"profile\":{{\"executable\":\"target/x86_64-pc-windows-msvc/release/jarvis-desktop.exe\",",
                 "\"feature\":\"test-support\",\"dataRoot\":\"fresh temporary test-support LocalAppData override\",",
@@ -460,17 +638,32 @@ mod qualification {
                 "\"diagnostics\":{{\"ownerStderr\":{},\"secondStderr\":{}}}}}"
             ),
             json_string(status),
-            json_string(candidate_sha),
-            json_env("GITHUB_REPOSITORY"),
-            json_env("GITHUB_REF"),
-            json_env("GITHUB_HEAD_REF"),
-            json_env("GITHUB_WORKFLOW"),
-            json_env("GITHUB_RUN_ID"),
-            json_env("GITHUB_RUN_ATTEMPT"),
-            json_env("GITHUB_JOB"),
-            json_env("RUNNER_OS"),
-            json_env("RUNNER_ARCH"),
-            json_env("ImageOS"),
+            json_string(&identity.mode),
+            json_string(&identity.candidate_sha),
+            if identity.mode == "AUTHORITATIVE_GITHUB_ACTIONS" {
+                "\"GITHUB_ACTIONS\""
+            } else {
+                "null"
+            },
+            json_option(&identity.repository),
+            json_option(&identity.reference),
+            json_option(&identity.head_ref),
+            json_option(&identity.workflow),
+            json_option(&identity.run_id),
+            json_option(&identity.run_attempt),
+            json_option(&identity.job),
+            json_option(&identity.runner_os),
+            json_option(&identity.runner_arch),
+            json_option(&identity.runner_image),
+            json_option(&identity.checkout_sha),
+            json_option(&identity.tree_sha),
+            json_option(&identity.remote),
+            json_string(&identity.checkout_relationship),
+            identity
+                .worktree_clean
+                .map(|value| if value { "true" } else { "false" })
+                .unwrap_or("null"),
+            json_option(&identity.identity_error),
             json_string(&toolchain("rustc")),
             json_string(&toolchain("cargo")),
             json_string(&toolchain("node")),
@@ -485,55 +678,6 @@ mod qualification {
                 .as_deref()
                 .map(json_string)
                 .unwrap_or_else(|| "null".to_owned()),
-            if forced_cleanup { "true" } else { "false" },
-            snapshot_json(context.owner_initial.as_ref()),
-            snapshot_json(context.owner_hidden.as_ref()),
-            context.second_pid.unwrap_or_default(),
-            context
-                .second_exit_code
-                .map(|code| code.to_string())
-                .unwrap_or_else(|| "null".to_owned()),
-            snapshot_json(context.owner_final.as_ref()),
-            context
-                .owner_stderr
-                .as_deref()
-                .map(json_string)
-                .unwrap_or_else(|| "null".to_owned()),
-            context
-                .second_stderr
-                .as_deref()
-                .map(json_string)
-                .unwrap_or_else(|| "null".to_owned()),
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn failure_evidence(
-        candidate_sha: &str,
-        started_at: &str,
-        failure: &str,
-        forced_cleanup: bool,
-        owner_initial: Option<&WindowSnapshot>,
-        owner_hidden: Option<&WindowSnapshot>,
-        owner_final: Option<&WindowSnapshot>,
-        second_pid: Option<u32>,
-        second_exit_code: Option<i32>,
-        owner_stderr: Option<&str>,
-        second_stderr: Option<&str>,
-    ) -> String {
-        let finished_at = utc_timestamp();
-        format!(
-            concat!(
-                "{{\"schemaVersion\":1,\"scope\":\"SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION\",",
-                "\"status\":\"FAIL\",\"candidateSha\":{},\"startedAt\":{},\"finishedAt\":{},",
-                "\"failure\":{},\"forcedCleanup\":{},\"ownerInitial\":{},\"ownerHidden\":{},",
-                "\"second\":{{\"pid\":{},\"exitCode\":{}}},\"ownerFinal\":{},",
-                "\"diagnostics\":{{\"ownerStderr\":{},\"secondStderr\":{}}}}}"
-            ),
-            json_string(candidate_sha),
-            json_string(started_at),
-            json_string(&finished_at),
-            json_string(failure),
             if forced_cleanup { "true" } else { "false" },
             snapshot_json(owner_initial),
             snapshot_json(owner_hidden),
@@ -571,14 +715,15 @@ mod qualification {
         )
     }
 
-    fn write_evidence(path: &Path, evidence: &str) {
+    fn write_evidence(path: &Path, evidence: &str) -> io::Result<()> {
         if let Some(parent) = path.parent() {
-            let _ = fs::create_dir_all(parent);
+            fs::create_dir_all(parent)?;
         }
-        let _ = fs::write(path, evidence.as_bytes());
+        fs::write(path, evidence.as_bytes())?;
         let mut log_path = path.to_path_buf();
         log_path.set_extension("log");
-        let _ = fs::write(log_path, format!("{evidence}\n").as_bytes());
+        fs::write(log_path, format!("{evidence}\n").as_bytes())?;
+        Ok(())
     }
 
     fn command_version(command: &str) -> String {
@@ -595,11 +740,95 @@ mod qualification {
         Some(format!("{digest:x}"))
     }
 
-    fn json_env(name: &str) -> String {
+    fn env_option(name: &str) -> Option<String> {
         env::var(name)
             .ok()
-            .map(|value| json_string(&value))
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+    }
+
+    fn json_option(value: &Option<String>) -> String {
+        value
+            .as_deref()
+            .map(json_string)
             .unwrap_or_else(|| "null".to_owned())
+    }
+
+    fn is_sha(value: &str) -> bool {
+        value.len() == 40
+            && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+            && value == value.to_ascii_lowercase()
+    }
+
+    fn is_supported_ref(value: &str) -> bool {
+        value
+            .strip_prefix("refs/heads/")
+            .is_some_and(|branch| !branch.is_empty())
+            || value.strip_prefix("refs/pull/").is_some_and(|pull| {
+                pull.strip_suffix("/merge").is_some_and(|number| {
+                    !number.is_empty() && number.chars().all(|character| character.is_ascii_digit())
+                })
+            })
+    }
+
+    fn remote_matches_repository(remote: &str, repository: &str) -> bool {
+        let remote = remote
+            .trim_end_matches('/')
+            .trim_end_matches(".git")
+            .to_ascii_lowercase();
+        let repository = repository.to_ascii_lowercase();
+        remote.ends_with(&format!("/{repository}")) || remote.ends_with(&format!(":{repository}"))
+    }
+
+    fn git_output(args: &[&str]) -> Result<String, String> {
+        let output = Command::new("git")
+            .args(args)
+            .output()
+            .map_err(|error| format!("git invocation failed: {error}"))?;
+        if !output.status.success() {
+            return Err(format!("git command exited with {}", output.status));
+        }
+        let value = String::from_utf8(output.stdout)
+            .map_err(|_| "git command returned non-UTF-8 output".to_owned())?
+            .trim()
+            .to_owned();
+        if value.is_empty() {
+            return Err("git command returned empty output".to_owned());
+        }
+        Ok(value)
+    }
+
+    fn git_output_allow_empty(args: &[&str]) -> Result<String, String> {
+        let output = Command::new("git")
+            .args(args)
+            .output()
+            .map_err(|error| format!("git invocation failed: {error}"))?;
+        if !output.status.success() {
+            return Err(format!("git command exited with {}", output.status));
+        }
+        String::from_utf8(output.stdout)
+            .map_err(|_| "git command returned non-UTF-8 output".to_owned())
+    }
+
+    fn git_is_ancestor(candidate: &str, checkout: &str) -> bool {
+        Command::new("git")
+            .args(["merge-base", "--is-ancestor", candidate, checkout])
+            .status()
+            .is_ok_and(|status| status.success())
+    }
+
+    fn sanitize_remote(value: &str) -> String {
+        let value = value.trim();
+        if let Some((scheme, remainder)) = value.split_once("://") {
+            let host_and_path = remainder
+                .rsplit_once('@')
+                .map_or(remainder, |(_, rest)| rest);
+            return format!("{scheme}://{host_and_path}");
+        }
+        if let Some((_, host_and_path)) = value.split_once('@') {
+            return format!("ssh://{host_and_path}");
+        }
+        value.to_owned()
     }
 
     fn json_string(value: &str) -> String {

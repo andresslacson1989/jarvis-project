@@ -81,8 +81,16 @@ jobs:
       - name: Windows Tauri Section 1.4 single-instance qualification
         shell: pwsh
         env:
+          JARVIS_EVIDENCE_MODE: AUTHORITATIVE_GITHUB_ACTIONS
           JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: cargo run --locked --release -p jarvis-windows-native --features test-support --bin windows-tauri-single-instance-qualification -- "${{ github.workspace }}\target\x86_64-pc-windows-msvc\release\jarvis-desktop.exe" "${{ runner.temp }}\jarvis-tauri-single-instance-qualification.json"
+
+      - name: Verify Windows Tauri Section 1.4 evidence identity
+        if: ${{ always() }}
+        shell: pwsh
+        env:
+          JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: node tools/ci/verify-section-1-4-evidence.mjs "${{ runner.temp }}\jarvis-tauri-single-instance-qualification.json" --authoritative --expected-candidate "$env:JARVIS_CANDIDATE_SHA"
 
       - name: Upload Windows Tauri single-instance evidence
         if: ${{ always() }}
@@ -97,8 +105,16 @@ jobs:
       - name: Windows native Section 1.4 qualification
         shell: pwsh
         env:
+          JARVIS_EVIDENCE_MODE: AUTHORITATIVE_GITHUB_ACTIONS
           JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: .\tools\ci\run-windows-native-qualification.ps1
+
+      - name: Verify Windows native Section 1.4 evidence identity
+        if: ${{ always() }}
+        shell: pwsh
+        env:
+          JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: node tools/ci/verify-section-1-4-evidence.mjs "${{ runner.temp }}\jarvis-windows-native-qualification.json" --authoritative --expected-candidate "$env:JARVIS_CANDIDATE_SHA"
 
       - name: Upload Windows native qualification evidence
         if: ${{ always() }}

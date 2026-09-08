@@ -5,11 +5,109 @@ $manifest_path = Join-Path $repository_root 'platform\windows\native\tests\windo
 $runner_temp = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [System.IO.Path]::GetTempPath() }
 $log_path = Join-Path $runner_temp 'jarvis-windows-native-qualification.log'
 $evidence_path = Join-Path $runner_temp 'jarvis-windows-native-qualification.json'
-$candidate_sha = if ($env:JARVIS_CANDIDATE_SHA) {
-    $env:JARVIS_CANDIDATE_SHA.Trim()
-} else {
-    (git -C $repository_root rev-parse HEAD).Trim()
+$evidence_mode = if ($env:JARVIS_EVIDENCE_MODE) { $env:JARVIS_EVIDENCE_MODE.Trim() } else { 'SUPPORTING_LOCAL' }
+$identity_errors = [System.Collections.Generic.List[string]]::new()
+
+function Invoke-GitOutput([string[]] $arguments, [bool] $allow_empty = $false) {
+    $output = & git -C $repository_root @arguments 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "git $($arguments -join ' ') failed"
+    }
+    $value = ($output -join "`n").Trim()
+    if (-not $allow_empty -and -not $value) {
+        throw "git $($arguments -join ' ') returned empty output"
+    }
+    return $value
 }
+
+function Get-SafeRemote([string] $value) {
+    $value = $value.Trim()
+    if ($value -match '^(?<scheme>[A-Za-z][A-Za-z0-9+.-]*)://(?<rest>.*)$') {
+        $rest = $Matches.rest -replace '^[^/]*@', ''
+        return "$($Matches.scheme)://$rest"
+    }
+    if ($value -match '^[^@]+@(?<rest>.+)$') {
+        return "ssh://$($Matches.rest)"
+    }
+    return $value
+}
+
+function Test-Sha([string] $value, [int] $length = 40) {
+    return $value -match "^[0-9a-f]{$length}$"
+}
+
+function Test-GitAncestor([string] $candidate, [string] $checkout) {
+    & git -C $repository_root merge-base --is-ancestor $candidate $checkout 2>$null
+    return $LASTEXITCODE -eq 0
+}
+
+function Test-SupportedRef([string] $value) {
+    return $value -match '^refs/(heads/.+|pull/[0-9]+/merge)$'
+}
+
+function Test-RemoteRepository([string] $value, [string] $repository) {
+    $normalized_remote = ($value.TrimEnd('/') -replace '\.git$', '').ToLowerInvariant()
+    $normalized_repository = $repository.ToLowerInvariant()
+    return $normalized_remote.EndsWith("/$normalized_repository") -or $normalized_remote.EndsWith(":$normalized_repository")
+}
+
+$checkout_sha = $null
+$tree_sha = $null
+$remote = $null
+$worktree_clean = $null
+try { $checkout_sha = Invoke-GitOutput @('rev-parse', 'HEAD') } catch { $identity_errors.Add('checkout SHA unavailable') }
+try { $tree_sha = Invoke-GitOutput @('rev-parse', 'HEAD^{tree}') } catch { $identity_errors.Add('checkout tree SHA unavailable') }
+try { $remote = Get-SafeRemote (Invoke-GitOutput @('config', '--get', 'remote.origin.url')) } catch { $identity_errors.Add('origin remote unavailable') }
+try { $worktree_clean = [string]::IsNullOrWhiteSpace((Invoke-GitOutput @('status', '--porcelain=v1', '--untracked-files=all') $true)) } catch { $identity_errors.Add('worktree status unavailable') }
+$candidate_sha = if ($null -ne $env:JARVIS_CANDIDATE_SHA) { $env:JARVIS_CANDIDATE_SHA.Trim() } else { $checkout_sha }
+if ($null -eq $candidate_sha) { $candidate_sha = 'unknown' }
+
+$authority = [ordered]@{ type = $null; repository = $null; ref = $null; headRef = $null; workflow = $null; runId = $null; runAttempt = $null; job = $null }
+$runner = [ordered]@{ os = $null; arch = $null; image = $null }
+if ($evidence_mode -eq 'AUTHORITATIVE_GITHUB_ACTIONS') {
+    $authority = [ordered]@{
+        type = 'GITHUB_ACTIONS'
+        repository = $env:GITHUB_REPOSITORY
+        ref = $env:GITHUB_REF
+        headRef = $env:GITHUB_HEAD_REF
+        workflow = $env:GITHUB_WORKFLOW
+        runId = $env:GITHUB_RUN_ID
+        runAttempt = $env:GITHUB_RUN_ATTEMPT
+        job = $env:GITHUB_JOB
+    }
+    $runner = [ordered]@{ os = $env:RUNNER_OS; arch = $env:RUNNER_ARCH; image = $env:ImageOS }
+}
+
+$checkout_relationship = if ($evidence_mode -eq 'SUPPORTING_LOCAL') {
+    'SUPPORTING_LOCAL'
+} elseif ($checkout_sha -and $candidate_sha -and $checkout_sha -eq $candidate_sha) {
+    'EXACT_CHECKOUT'
+} elseif ($authority.ref -match '^refs/pull/[0-9]+/merge$' -and $checkout_sha -and (Test-Sha $candidate_sha) -and (Test-Sha $checkout_sha) -and (Test-GitAncestor $candidate_sha $checkout_sha)) {
+    'PR_HEAD_ANCESTOR_OF_MERGE_CHECKOUT'
+} else {
+    'UNKNOWN'
+}
+
+if ($evidence_mode -ne 'AUTHORITATIVE_GITHUB_ACTIONS' -and $evidence_mode -ne 'SUPPORTING_LOCAL') {
+    $identity_errors.Add('unsupported evidence mode')
+}
+if ($evidence_mode -eq 'AUTHORITATIVE_GITHUB_ACTIONS') {
+    foreach ($field in @('repository', 'ref', 'workflow', 'runId', 'runAttempt', 'job')) {
+        if ([string]::IsNullOrWhiteSpace([string]$authority[$field])) { $identity_errors.Add("authority.$field unavailable") }
+    }
+    foreach ($field in @('os', 'arch')) {
+        if ([string]::IsNullOrWhiteSpace([string]$runner[$field])) { $identity_errors.Add("runner.$field unavailable") }
+    }
+    if (-not (Test-Sha $candidate_sha)) { $identity_errors.Add('candidate SHA is not a lowercase 40-hex value') }
+    if (-not (Test-Sha $checkout_sha)) { $identity_errors.Add('checkout SHA is not a lowercase 40-hex value') }
+    if (-not (Test-Sha $tree_sha)) { $identity_errors.Add('checkout tree SHA is not a lowercase 40-hex value') }
+    if ([string]::IsNullOrWhiteSpace($remote)) { $identity_errors.Add('sanitized origin remote unavailable') }
+    if ($worktree_clean -ne $true) { $identity_errors.Add('authoritative worktree is not clean') }
+    if ($checkout_relationship -eq 'UNKNOWN') { $identity_errors.Add('candidate-to-checkout relationship is unproven') }
+    if (-not (Test-SupportedRef ([string]$authority.ref))) { $identity_errors.Add('authoritative ref is not a supported full Git ref') }
+    if (-not [string]::IsNullOrWhiteSpace($remote) -and -not (Test-RemoteRepository $remote ([string]$authority.repository))) { $identity_errors.Add('origin remote does not identify the authoritative repository') }
+}
+$identity_error = if ($identity_errors.Count -gt 0) { $identity_errors -join '; ' } else { $null }
 $started_at = [DateTime]::UtcNow
 $test_exit = 1
 $manifest_error = $null
@@ -113,10 +211,25 @@ $all_expected_passed = $expected_tests.Count -gt 0 -and
     $missing_names.Count -eq 0 -and
     $unexpected_names.Count -eq 0 -and
     @($test_records | Where-Object { $_.result -ne 'OK' }).Count -eq 0
-$qualification_status = if (-not $manifest_error -and $test_exit -eq 0 -and $all_expected_passed) {
-    'PASS'
+$tests_passed = -not $manifest_error -and $test_exit -eq 0 -and $all_expected_passed
+$qualification_ok = $tests_passed -and $identity_errors.Count -eq 0
+$qualification_status = if ($qualification_ok) {
+    if ($evidence_mode -eq 'AUTHORITATIVE_GITHUB_ACTIONS') { 'PASS' } else { 'SUPPORTING_PASS' }
+} elseif ($evidence_mode -eq 'SUPPORTING_LOCAL') {
+    'SUPPORTING_FAIL'
 } else {
     'FAIL'
+}
+$failure = if ($qualification_ok) {
+    $null
+} elseif ($identity_errors.Count -gt 0) {
+    "evidence identity failed: $($identity_errors -join '; ')"
+} elseif ($manifest_error) {
+    "qualification manifest failed: $manifest_error"
+} elseif ($test_exit -ne 0) {
+    "cargo qualification exited with code $test_exit"
+} else {
+    'qualification manifest did not observe every expected passing test'
 }
 $finished_at = [DateTime]::UtcNow
 $log_hash = if (Test-Path -LiteralPath $log_path) {
@@ -125,21 +238,20 @@ $log_hash = if (Test-Path -LiteralPath $log_path) {
     $null
 }
 $evidence = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     scope = 'SECTION_1_4_WINDOWS_NATIVE_QUALIFICATION'
     status = $qualification_status
+    evidenceMode = $evidence_mode
     candidateSha = $candidate_sha
-    repository = $env:GITHUB_REPOSITORY
-    ref = $env:GITHUB_REF
-    headRef = $env:GITHUB_HEAD_REF
-    workflow = $env:GITHUB_WORKFLOW
-    runId = $env:GITHUB_RUN_ID
-    runAttempt = $env:GITHUB_RUN_ATTEMPT
-    job = $env:GITHUB_JOB
-    runner = [ordered]@{
-        os = $env:RUNNER_OS
-        arch = $env:RUNNER_ARCH
-        image = $env:ImageOS
+    authority = $authority
+    runner = $runner
+    observed = [ordered]@{
+        checkoutSha = $checkout_sha
+        treeSha = $tree_sha
+        remote = $remote
+        checkoutRelationship = $checkout_relationship
+        worktreeClean = $worktree_clean
+        identityError = $identity_error
     }
     toolchain = [ordered]@{
         rust = (& rustc --version).Trim()
@@ -155,6 +267,8 @@ $evidence = [ordered]@{
     }
     startedAt = $started_at.ToString('o')
     finishedAt = $finished_at.ToString('o')
+    failure = $failure
+    forcedCleanup = $false
     exitCode = $test_exit
     manifestCount = $expected_tests.Count
     observedCount = $observed_tests.Count
@@ -165,14 +279,25 @@ $evidence = [ordered]@{
     tests = $test_records
 }
 $evidence_json = $evidence | ConvertTo-Json -Depth 8 -Compress
-[System.IO.File]::WriteAllText(
-    $evidence_path,
-    $evidence_json,
-    [System.Text.UTF8Encoding]::new($false)
-)
+try {
+    $evidence_parent = Split-Path -Parent $evidence_path
+    if ($evidence_parent) { [System.IO.Directory]::CreateDirectory($evidence_parent) | Out-Null }
+    [System.IO.File]::WriteAllText(
+        $evidence_path,
+        $evidence_json,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    [System.IO.File]::WriteAllText(
+        [System.IO.Path]::ChangeExtension($evidence_path, '.log'),
+        "$evidence_json$([Environment]::NewLine)",
+        [System.Text.UTF8Encoding]::new($false)
+    )
+} catch {
+    throw "unable to write Section 1.4 evidence: $($_.Exception.Message)"
+}
 Write-Output "[windows-native-evidence] $evidence_json"
 Write-Output "[windows-native-evidence-path] $evidence_path"
 
-if ($qualification_status -ne 'PASS') {
+if ($qualification_status -notin @('PASS', 'SUPPORTING_PASS')) {
     throw "Windows native Section 1.4 qualification failed; evidence: $evidence_path"
 }

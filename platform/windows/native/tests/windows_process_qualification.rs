@@ -68,6 +68,10 @@ const QUALIFICATION_TEST_MANIFEST: &[(&str, &str)] = &[
         "diagnostic-status-kind-integrity",
     ),
     (
+        "layout::tests::finish_rejects_root_replacement_between_root_and_children",
+        "root-replacement-between-layout-operations-fails-closed",
+    ),
+    (
         "state::tests::committed_slot_round_trips_and_tampering_fails_closed",
         "owner-state-commit-and-tamper-rejection",
     ),
@@ -98,6 +102,14 @@ const QUALIFICATION_TEST_MANIFEST: &[(&str, &str)] = &[
     (
         "windows::tests::stable_mutex_is_session_scoped_without_global_namespace_claim",
         "session-scoped-mutex-namespace",
+    ),
+    (
+        "windows::tests::newly_created_named_objects_are_read_back_validated",
+        "newly-created-named-object-exact-dacl-readback",
+    ),
+    (
+        "windows::tests::hostile_named_object_is_rejected_before_use",
+        "hostile-named-object-fails-closed-before-use",
     ),
     (
         "security::tests::protected_dacl_shape_rejects_wrong_sid_mask_inheritance_and_extra_aces",
