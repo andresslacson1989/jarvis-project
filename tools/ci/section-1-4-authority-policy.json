@@ -27,7 +27,8 @@
     "arch": "X64",
     "images": [
       "win25",
-      "windows-2025"
+      "windows-2025",
+      "win25-vs2026"
     ]
   },
   "checkoutRelationship": "EXACT_CHECKOUT",

@@ -8,7 +8,7 @@ mod qualification {
         fs, io,
         path::{Path, PathBuf},
         process::{Child, Command, ExitStatus, Output, Stdio},
-        thread,
+        ptr, thread,
         time::{Duration, Instant, SystemTime, UNIX_EPOCH},
     };
 
@@ -16,10 +16,17 @@ mod qualification {
     use windows_sys::{
         Win32::{
             Foundation::{HWND, LPARAM, WPARAM},
+            System::{
+                LibraryLoader::GetModuleHandleW,
+                Threading::{AttachThreadInput, GetCurrentThreadId},
+            },
             UI::WindowsAndMessaging::{
+                BringWindowToTop, CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
                 EnumWindows, GetForegroundWindow, GetWindowTextLengthW, GetWindowTextW,
-                GetWindowThreadProcessId, IsWindowVisible, PostMessageW, SW_HIDE, ShowWindow,
-                WM_CLOSE,
+                GetWindowThreadProcessId, IsWindow, IsWindowVisible, MSG, PM_REMOVE, PeekMessageW,
+                PostMessageW, RegisterClassW, SW_HIDE, SW_SHOW, SetForegroundWindow, ShowWindow,
+                TranslateMessage, UnregisterClassW, WM_CLOSE, WNDCLASSW, WS_CAPTION,
+                WS_EX_TOOLWINDOW, WS_POPUP, WS_SYSMENU,
             },
         },
         core::BOOL,
@@ -30,7 +37,7 @@ mod qualification {
         "/../../../tools/ci/section-1-4-authority-policy.json"
     ));
     const AUTHORITY_POLICY_SHA256: &str =
-        "bf13c67f288a1f229bf3347dd867791814c6b0e7a295a0d8923a6cd1dc03d388";
+        "0f9f6b228c3e8ac231644b1c07a4090c0aff398de6db94482008bb461386b0fe";
 
     #[derive(Clone, Debug)]
     struct WindowSnapshot {
@@ -69,6 +76,233 @@ mod qualification {
         attempted: bool,
         succeeded: bool,
         error: Option<String>,
+    }
+
+    struct ForegroundSentinel {
+        handle: HWND,
+        class_name: Vec<u16>,
+        instance: *mut core::ffi::c_void,
+    }
+
+    struct ThreadInputAttachment {
+        current_thread: u32,
+        foreground_thread: u32,
+        detached: bool,
+    }
+
+    impl ForegroundSentinel {
+        fn create() -> Result<Self, String> {
+            let class_name: Vec<u16> = format!(
+                "JARVISQualificationSentinelClass_{}_{}",
+                std::process::id(),
+                unique_suffix()
+            )
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+            let title = format!(
+                "JARVIS qualification foreground sentinel {} {}",
+                std::process::id(),
+                unique_suffix()
+            );
+            let title: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+            // SAFETY: the null module name obtains this qualification binary's
+            // module handle, and the class name is unique to this process/run.
+            let instance = unsafe { GetModuleHandleW(ptr::null()) };
+            if instance.is_null() {
+                return Err("foreground sentinel module handle lookup failed".to_owned());
+            }
+            let window_class = WNDCLASSW {
+                lpfnWndProc: Some(DefWindowProcW),
+                hInstance: instance,
+                lpszClassName: class_name.as_ptr(),
+                ..Default::default()
+            };
+            // SAFETY: window_class and its UTF-16 class name remain valid for
+            // the synchronous registration call.
+            if unsafe { RegisterClassW(&window_class) } == 0 {
+                return Err("foreground sentinel window class registration failed".to_owned());
+            }
+            // SAFETY: the registered class, title, and instance are owned by
+            // this qualification process; null parent/menu/creation parameter
+            // create an independent top-level test-owned window.
+            let handle = unsafe {
+                CreateWindowExW(
+                    WS_EX_TOOLWINDOW,
+                    class_name.as_ptr(),
+                    title.as_ptr(),
+                    WS_POPUP | WS_CAPTION | WS_SYSMENU,
+                    0,
+                    0,
+                    640,
+                    480,
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                    instance,
+                    ptr::null(),
+                )
+            };
+            if handle.is_null() {
+                // SAFETY: registration succeeded for this unique class and no
+                // window was created, so unregistering it is safe cleanup.
+                unsafe {
+                    UnregisterClassW(class_name.as_ptr(), instance);
+                }
+                return Err("foreground sentinel window creation failed".to_owned());
+            }
+            Ok(Self {
+                handle,
+                class_name,
+                instance,
+            })
+        }
+
+        fn activate(&self, owner_pid: u32) -> Result<(), String> {
+            let attachment = ThreadInputAttachment::attach()?;
+            // SAFETY: the handle was returned by CreateWindowExW and remains
+            // owned by this sentinel for the bounded activation attempt.
+            let activation = unsafe {
+                ShowWindow(self.handle, SW_SHOW);
+                if BringWindowToTop(self.handle) == 0 {
+                    Err("foreground sentinel could not be raised".to_owned())
+                } else if SetForegroundWindow(self.handle) == 0 {
+                    Err(
+                        "foreground sentinel activation failed: SetForegroundWindow returned false"
+                            .to_owned(),
+                    )
+                } else {
+                    Ok(())
+                }
+            };
+            let detach = attachment
+                .map(|attachment| attachment.detach())
+                .transpose()
+                .map(|_| ());
+            activation?;
+            detach?;
+
+            let sentinel_pid = std::process::id();
+            let deadline = Instant::now() + Duration::from_secs(10);
+            let mut observed_pid = 0u32;
+            loop {
+                pump_messages();
+                // SAFETY: Windows returns the process-global foreground
+                // window handle without borrowing or retaining caller memory.
+                let foreground = unsafe { GetForegroundWindow() };
+                if foreground == self.handle && !foreground.is_null() {
+                    observed_pid = 0;
+                    // SAFETY: foreground is the current process-global
+                    // foreground window and the output pointer is valid.
+                    unsafe { GetWindowThreadProcessId(foreground, &mut observed_pid) };
+                    if observed_pid == sentinel_pid && observed_pid != owner_pid {
+                        return Ok(());
+                    }
+                }
+                if Instant::now() >= deadline {
+                    return Err(format!(
+                        "foreground sentinel activation was not proven (observedPid={observed_pid}, ownerPid={owner_pid})"
+                    ));
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+        }
+
+        fn destroy(&mut self) -> Result<(), String> {
+            if self.handle.is_null() {
+                return Ok(());
+            }
+            let handle = self.handle;
+            // SAFETY: this is the live test-owned sentinel handle and no other
+            // thread owns or destroys it.
+            let destroyed = unsafe { DestroyWindow(handle) != 0 };
+            // SAFETY: the same handle is used only to verify destruction.
+            let still_window = unsafe { IsWindow(handle) != 0 };
+            // SAFETY: the class was registered by this process and is no
+            // longer needed once its only test window is destroyed.
+            let unregistered =
+                unsafe { UnregisterClassW(self.class_name.as_ptr(), self.instance) != 0 };
+            if !destroyed || still_window || !unregistered {
+                return Err("foreground sentinel cleanup failed".to_owned());
+            }
+            self.handle = ptr::null_mut();
+            Ok(())
+        }
+    }
+
+    impl Drop for ForegroundSentinel {
+        fn drop(&mut self) {
+            if !self.handle.is_null() {
+                // SAFETY: Drop is the final owner of this test-created window.
+                unsafe {
+                    DestroyWindow(self.handle);
+                    UnregisterClassW(self.class_name.as_ptr(), self.instance);
+                }
+                self.handle = ptr::null_mut();
+            }
+        }
+    }
+
+    impl ThreadInputAttachment {
+        fn attach() -> Result<Option<Self>, String> {
+            // SAFETY: GetCurrentThreadId reads only the calling qualification
+            // thread identity and has no pointer arguments.
+            let current_thread = unsafe { GetCurrentThreadId() };
+            // SAFETY: Windows returns the process-global foreground window
+            // handle without borrowing or retaining caller memory.
+            let foreground = unsafe { GetForegroundWindow() };
+            if foreground.is_null() {
+                return Ok(None);
+            }
+            let mut foreground_pid = 0u32;
+            // SAFETY: foreground is returned by Windows and the output pointer
+            // is valid for this synchronous query.
+            let foreground_thread =
+                unsafe { GetWindowThreadProcessId(foreground, &mut foreground_pid) };
+            if foreground_thread == 0 || foreground_thread == current_thread {
+                return Ok(None);
+            }
+            // SAFETY: this narrowly joins the qualification thread to the
+            // current foreground thread for one bounded test-support focus
+            // transition. It is detached before the activation result is used.
+            if unsafe { AttachThreadInput(current_thread, foreground_thread, 1) } == 0 {
+                return Err("foreground sentinel input-thread handoff failed".to_owned());
+            }
+            Ok(Some(Self {
+                current_thread,
+                foreground_thread,
+                detached: false,
+            }))
+        }
+
+        fn detach(mut self) -> Result<(), String> {
+            if !self.detached {
+                // SAFETY: this reverses the exact attachment created by
+                // attach() and runs before the guard is dropped.
+                let detached = unsafe {
+                    AttachThreadInput(self.current_thread, self.foreground_thread, 0) != 0
+                };
+                self.detached = true;
+                if !detached {
+                    return Err(
+                        "foreground sentinel input-thread handoff cleanup failed".to_owned()
+                    );
+                }
+            }
+            Ok(())
+        }
+    }
+
+    impl Drop for ThreadInputAttachment {
+        fn drop(&mut self) {
+            if !self.detached {
+                // SAFETY: best-effort fallback for an exceptional path; the
+                // normal path uses detach() and reports failure explicitly.
+                unsafe {
+                    AttachThreadInput(self.current_thread, self.foreground_thread, 0);
+                }
+                self.detached = true;
+            }
+        }
     }
 
     impl CleanupOutcome {
@@ -475,25 +709,32 @@ mod qualification {
         unsafe {
             ShowWindow(owner_initial.handle, SW_HIDE);
         }
+        let mut sentinel = ForegroundSentinel::create()?;
+        sentinel.activate(owner_pid)?;
         let hidden_deadline = Instant::now() + Duration::from_secs(5);
         let owner_hidden = loop {
             let owner = context.owner.as_mut().expect("owner was stored");
             if let Some(status) = owner.try_wait().map_err(|error| error.to_string())? {
                 return Err(format!("owner exited while hiding: {status}"));
             }
+            pump_messages();
             if let Some(snapshot) = snapshot_for_pid(owner_pid, true)
-                && !snapshot.visible
+                && hidden_snapshot_is_valid(&snapshot, owner_pid, std::process::id())
             {
                 break snapshot;
             }
             if Instant::now() >= hidden_deadline {
-                return Err("owner window did not become hidden within 5 seconds".to_owned());
+                return Err(
+                    "owner window did not become hidden with the foreground sentinel within 5 seconds"
+                        .to_owned(),
+                );
             }
             thread::sleep(Duration::from_millis(100));
         };
         if !owner_hidden.running {
             return Err("hiding the owner window terminated the owner".to_owned());
         }
+        sentinel.destroy()?;
         context.owner_hidden = Some(owner_hidden);
 
         // Tauri marks the native activation controller ready after the window
@@ -662,6 +903,32 @@ mod qualification {
         snapshot.foreground_owner = foreground_pid == pid;
         snapshot.running = running;
         Some(snapshot)
+    }
+
+    fn hidden_snapshot_is_valid(
+        snapshot: &WindowSnapshot,
+        owner_pid: u32,
+        sentinel_pid: u32,
+    ) -> bool {
+        !snapshot.visible
+            && snapshot.running
+            && !snapshot.foreground_owner
+            && snapshot.foreground_pid == sentinel_pid
+            && snapshot.foreground_pid != owner_pid
+    }
+
+    fn pump_messages() {
+        let mut message = MSG::default();
+        // SAFETY: message points to a valid stack-owned MSG and this loop only
+        // pumps messages for the qualification process's own thread.
+        while unsafe { PeekMessageW(&mut message, ptr::null_mut(), 0, 0, PM_REMOVE) } != 0 {
+            // SAFETY: message was populated by PeekMessageW and remains valid
+            // for the synchronous translation and dispatch calls.
+            unsafe {
+                TranslateMessage(&message);
+                DispatchMessageW(&message);
+            }
+        }
     }
 
     // SAFETY: EnumWindows invokes this callback synchronously on the caller's
@@ -1129,6 +1396,36 @@ mod qualification {
                 !profile.exists(),
                 "fault injection must not leak the test profile"
             );
+        }
+
+        #[test]
+        fn hidden_snapshot_requires_the_live_non_owner_sentinel_foreground() {
+            let valid = WindowSnapshot {
+                pid: 10,
+                handle: ptr::null_mut(),
+                title: "JARVIS".to_owned(),
+                visible: false,
+                foreground_pid: 20,
+                foreground_owner: false,
+                running: true,
+            };
+            assert!(hidden_snapshot_is_valid(&valid, 10, 20));
+
+            let mut owner_foreground = valid.clone();
+            owner_foreground.foreground_owner = true;
+            assert!(!hidden_snapshot_is_valid(&owner_foreground, 10, 20));
+
+            let mut wrong_foreground = valid.clone();
+            wrong_foreground.foreground_pid = 21;
+            assert!(!hidden_snapshot_is_valid(&wrong_foreground, 10, 20));
+
+            let mut owner_pid_foreground = valid.clone();
+            owner_pid_foreground.foreground_pid = 10;
+            assert!(!hidden_snapshot_is_valid(&owner_pid_foreground, 10, 10));
+
+            let mut zero_foreground = valid;
+            zero_foreground.foreground_pid = 0;
+            assert!(!hidden_snapshot_is_valid(&zero_foreground, 10, 20));
         }
     }
 }

@@ -8,7 +8,7 @@ const AUTHORITY_POLICY_TEXT = readFileSync(
   "utf8",
 );
 const AUTHORITY_POLICY = JSON.parse(AUTHORITY_POLICY_TEXT);
-const EXPECTED_AUTHORITY_POLICY_SHA256 = "bf13c67f288a1f229bf3347dd867791814c6b0e7a295a0d8923a6cd1dc03d388";
+const EXPECTED_AUTHORITY_POLICY_SHA256 = "0f9f6b228c3e8ac231644b1c07a4090c0aff398de6db94482008bb461386b0fe";
 const NATIVE_MANIFEST_TEXT = readFileSync(
   new URL("../../platform/windows/native/tests/windows_process_qualification.rs", import.meta.url),
   "utf8",
@@ -124,7 +124,7 @@ const EXPECTED_AUTHORITY_POLICY = {
   runner: {
     os: "Windows",
     arch: "X64",
-    images: ["win25", "windows-2025"],
+    images: ["win25", "windows-2025", "win25-vs2026"],
   },
   checkoutRelationship: "EXACT_CHECKOUT",
   profiles: {
@@ -646,8 +646,9 @@ function validateTauriEvidence(evidence) {
       if (evidence[key] === null) fail(`passing Tauri evidence requires ${key}`);
     }
     if (!initial.visible || !initial.running) fail("ownerInitial must be visible and running");
-    if (hidden.visible || hidden.foregroundOwner || hidden.foregroundPid === hidden.pid || !hidden.running) {
-      fail("ownerHidden must be hidden, non-foreground, and running");
+    if (hidden.visible || hidden.foregroundOwner || hidden.foregroundPid <= 0 ||
+        hidden.foregroundPid === hidden.pid || !hidden.running) {
+      fail("ownerHidden must be hidden, non-foreground, running, and have a live foreground PID");
     }
     if (!final.visible || !final.running) fail("ownerFinal must be visible and running");
     if (initial.pid <= 0 || hidden.pid <= 0 || final.pid <= 0 ||

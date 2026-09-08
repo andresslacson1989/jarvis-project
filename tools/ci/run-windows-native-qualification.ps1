@@ -10,7 +10,7 @@ $identity_errors = [System.Collections.Generic.List[string]]::new()
 $authority_policy = $null
 $authority_policy_text = $null
 $authority_policy_path = Join-Path $repository_root 'tools\ci\section-1-4-authority-policy.json'
-$expected_authority_policy_sha256 = 'bf13c67f288a1f229bf3347dd867791814c6b0e7a295a0d8923a6cd1dc03d388'
+$expected_authority_policy_sha256 = '0f9f6b228c3e8ac231644b1c07a4090c0aff398de6db94482008bb461386b0fe'
 $expected_manifest_sha256 = 'a0a37f469121abb9a83a7eca80d1ca0e71d1815190a051303f259762a89b43b6'
 try {
     $authority_policy_text = Get-Content -LiteralPath $authority_policy_path -Raw

@@ -156,6 +156,12 @@ test("authority workflow, run, job, and runner identity are exact allowlisted va
   assertRejected(tauriEvidence({ runner: { os: "Linux", arch: "X64", image: "windows-2025" } }), { authoritative: true });
   assertRejected(tauriEvidence({ runner: { os: "Windows", arch: "ARM64", image: "windows-2025" } }), { authoritative: true });
   assertRejected(tauriEvidence({ runner: { os: "Windows", arch: "X64", image: "untrusted-image" } }), { authoritative: true });
+  assert.equal(validateSection14Evidence(tauriEvidence({
+    runner: { os: "Windows", arch: "X64", image: "win25-vs2026" },
+  }), { authoritative: true }).status, "PASS");
+  for (const image of ["WIN25-VS2026", "win25-vs2026-suffix", "prefix-win25-vs2026"]) {
+    assertRejected(tauriEvidence({ runner: { os: "Windows", arch: "X64", image } }), { authoritative: true });
+  }
 });
 
 test("pull-request evidence cannot substitute ancestor checkout for exact checkout", () => {
@@ -229,12 +235,32 @@ test("supporting local evidence cannot be promoted to authoritative evidence", (
 test("passing Tauri evidence proves semantic window and process invariants", () => {
   assertRejected(tauriEvidence({ ownerInitial: { ...snapshot(), visible: false } }), { authoritative: true });
   assertRejected(tauriEvidence({ ownerHidden: { ...snapshot(), visible: false, running: false } }), { authoritative: true });
-  assertRejected(tauriEvidence({ ownerHidden: { ...snapshot(), visible: false, foregroundOwner: true, foregroundPid: 10 } }), { authoritative: true });
+  assertRejected(tauriEvidence({ ownerHidden: { ...snapshot(), visible: false, foregroundOwner: true, foregroundPid: 1 } }), { authoritative: true });
+  assertRejected(tauriEvidence({ ownerHidden: { ...snapshot(), visible: false, foregroundOwner: false, foregroundPid: 10 } }), { authoritative: true });
+  assertRejected(tauriEvidence({ ownerHidden: { ...snapshot(), visible: false, foregroundOwner: false, foregroundPid: 0 } }), { authoritative: true });
   assertRejected(tauriEvidence({ ownerFinal: { ...snapshot(), foregroundOwner: false } }), { authoritative: true });
   assertRejected(tauriEvidence({ ownerFinal: { ...snapshot(), pid: 12 } }), { authoritative: true });
   assertRejected(tauriEvidence({ second: { pid: 10, exitCode: 0 } }), { authoritative: true });
   assertRejected(tauriEvidence({ forcedCleanup: true }), { authoritative: true });
   assertRejected(tauriEvidence({ cleanup: { attempted: true, succeeded: false, error: "cleanup failed" } }), { authoritative: true });
+});
+
+test("foreground sentinel activation failures remain typed failures", () => {
+  const failure = tauriEvidence({
+    status: "FAIL",
+    failure: "foreground sentinel activation failed: SetForegroundWindow returned false",
+    ownerHidden: null,
+    ownerFinal: null,
+    second: { pid: 0, exitCode: null },
+  });
+  assert.equal(validateSection14Evidence(failure, { authoritative: true }).status, "FAIL");
+  assertRejected(tauriEvidence({
+    status: "PASS",
+    failure: null,
+    ownerHidden: null,
+    ownerFinal: null,
+    second: { pid: 0, exitCode: null },
+  }), { authoritative: true });
 });
 
 test("native passing evidence is bound to the canonical manifest", () => {
