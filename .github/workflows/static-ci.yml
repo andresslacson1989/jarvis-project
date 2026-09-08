@@ -103,6 +103,7 @@ jobs:
           if-no-files-found: error
 
       - name: Windows native Section 1.4 qualification
+        if: ${{ always() }}
         shell: pwsh
         env:
           JARVIS_EVIDENCE_MODE: AUTHORITATIVE_GITHUB_ACTIONS
