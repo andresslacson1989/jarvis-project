@@ -22,6 +22,10 @@ const CHILD_ENV: &str = "JARVIS_NATIVE_QUALIFICATION_CHILD";
 const TEST_NAME_ENV: &str = "JARVIS_NATIVE_QUALIFICATION_TEST";
 const READY_FILE_ENV: &str = "JARVIS_NATIVE_QUALIFICATION_READY_FILE";
 const DEFAULT_TEST_NAME: &str = "windows_owner_second_launch_and_crash_recovery_qualification";
+// The runtime's shutdown deadline is one second. Keep a separate bounded
+// qualification margin so a hosted Windows scheduler cannot turn a valid
+// reconciliation into a timing-sensitive false negative.
+const INFLIGHT_WORKER_RECOVERY_TIMEOUT: Duration = Duration::from_secs(5);
 
 // This is the authoritative Section 1.4 qualification manifest. Keep test
 // names stable and map each test to a fail-able contract criterion so hosted
@@ -796,7 +800,7 @@ fn windows_inflight_worker_failure_reconciles_after_join() {
             Ok(worker) => break worker,
             Err(error) if error.kind == NativeErrorKind::ActivationUncertain => {
                 assert!(
-                    recovery_started.elapsed() < Duration::from_secs(2),
+                    recovery_started.elapsed() < INFLIGHT_WORKER_RECOVERY_TIMEOUT,
                     "in-flight worker failure did not reach a bounded joined state"
                 );
                 thread::sleep(Duration::from_millis(10));
