@@ -29,6 +29,8 @@ mod qualification {
         env!("CARGO_MANIFEST_DIR"),
         "/../../../tools/ci/section-1-4-authority-policy.json"
     ));
+    const AUTHORITY_POLICY_SHA256: &str =
+        "bf13c67f288a1f229bf3347dd867791814c6b0e7a295a0d8923a6cd1dc03d388";
 
     #[derive(Clone, Debug)]
     struct WindowSnapshot {
@@ -110,7 +112,13 @@ mod qualification {
             let checkout_sha = git_output(&["rev-parse", "HEAD"]).ok();
             let candidate_sha = env::var("JARVIS_CANDIDATE_SHA")
                 .map(|value| value.trim().to_owned())
-                .unwrap_or_else(|_| checkout_sha.clone().unwrap_or_else(|| "unknown".to_owned()));
+                .unwrap_or_else(|_| {
+                    if mode == "AUTHORITATIVE_GITHUB_ACTIONS" {
+                        String::new()
+                    } else {
+                        checkout_sha.clone().unwrap_or_default()
+                    }
+                });
             let tree_sha = git_output(&["rev-parse", "HEAD^{tree}"]).ok();
             let remote = git_output(&["config", "--get", "remote.origin.url"])
                 .ok()
@@ -148,14 +156,6 @@ mod qualification {
                 "SUPPORTING_LOCAL".to_owned()
             } else if checkout_sha.as_deref() == Some(candidate_sha.as_str()) {
                 "EXACT_CHECKOUT".to_owned()
-            } else if reference
-                .as_deref()
-                .is_some_and(|value| value.starts_with("refs/pull/") && value.ends_with("/merge"))
-                && checkout_sha
-                    .as_deref()
-                    .is_some_and(|checkout| git_is_ancestor(&candidate_sha, checkout))
-            {
-                "PR_HEAD_ANCESTOR_OF_MERGE_CHECKOUT".to_owned()
             } else {
                 "UNKNOWN".to_owned()
             };
@@ -205,6 +205,7 @@ mod qualification {
                 || self.job.as_deref().is_none_or(str::is_empty)
                 || self.runner_os.as_deref().is_none_or(str::is_empty)
                 || self.runner_arch.as_deref().is_none_or(str::is_empty)
+                || self.runner_image.as_deref().is_none_or(str::is_empty)
             {
                 return Some(
                     "authoritative GitHub identity metadata is missing or malformed".to_owned(),
@@ -217,7 +218,8 @@ mod qualification {
                 || self.tree_sha.as_deref().is_none_or(|value| !is_sha(value))
                 || self.remote.as_deref().is_none_or(str::is_empty)
                 || self.worktree_clean != Some(true)
-                || self.checkout_relationship == "UNKNOWN"
+                || self.checkout_relationship != "EXACT_CHECKOUT"
+                || self.checkout_sha.as_deref() != Some(self.candidate_sha.as_str())
             {
                 return Some("authoritative checkout identity is missing or mismatched".to_owned());
             }
@@ -230,6 +232,51 @@ mod qualification {
                 )
             }) {
                 return Some("authoritative repository/ref identity is mismatched".to_owned());
+            }
+            let Some(policy) = policy_value() else {
+                return Some("authority policy is unavailable or has the wrong digest".to_owned());
+            };
+            if !policy_tauri_profile_matches(&policy) {
+                return Some("Tauri qualification profile is not the approved profile".to_owned());
+            }
+            let authority = policy.get("authority");
+            let runner = policy.get("runner");
+            if self.workflow.as_deref()
+                != authority
+                    .and_then(|value| value.get("workflow"))
+                    .and_then(|value| value.as_str())
+                || self.job.as_deref()
+                    != authority
+                        .and_then(|value| value.get("job"))
+                        .and_then(|value| value.as_str())
+                || self
+                    .run_id
+                    .as_deref()
+                    .is_none_or(|value| !is_positive_decimal(value))
+                || self
+                    .run_attempt
+                    .as_deref()
+                    .is_none_or(|value| !is_positive_decimal(value))
+                || self.runner_os.as_deref()
+                    != runner
+                        .and_then(|value| value.get("os"))
+                        .and_then(|value| value.as_str())
+                || self.runner_arch.as_deref()
+                    != runner
+                        .and_then(|value| value.get("arch"))
+                        .and_then(|value| value.as_str())
+                || !runner
+                    .and_then(|value| value.get("images"))
+                    .and_then(|value| value.as_array())
+                    .is_some_and(|images| {
+                        images
+                            .iter()
+                            .any(|image| image.as_str() == self.runner_image.as_deref())
+                    })
+            {
+                return Some(
+                    "authoritative workflow, run, or runner identity is not approved".to_owned(),
+                );
             }
             if self
                 .reference
@@ -683,7 +730,7 @@ mod qualification {
             .unwrap_or_else(CleanupOutcome::not_attempted);
         format!(
             concat!(
-                "{{\"schemaVersion\":2,\"scope\":\"SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION\",",
+                "{{\"schemaVersion\":3,\"scope\":\"SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION\",",
                 "\"status\":{},\"evidenceMode\":{},\"candidateSha\":{},",
                 "\"authority\":{{\"type\":{},\"repository\":{},\"ref\":{},\"headRef\":{},",
                 "\"workflow\":{},\"runId\":{},\"runAttempt\":{},\"job\":{}}},",
@@ -695,14 +742,18 @@ mod qualification {
                 "\"feature\":\"test-support\",\"dataRoot\":\"fresh temporary test-support LocalAppData override\",",
                 "\"startupBoundSeconds\":15,\"activationBoundSeconds\":10,\"readinessGraceSeconds\":5,\"hideBoundSeconds\":5}},",
                 "\"executableSha256\":{},\"startedAt\":{},\"finishedAt\":{},\"failure\":{},",
-                "\"forcedCleanup\":{},\"cleanup\":{{\"attempted\":{},\"succeeded\":{},\"error\":{} }},",
+                "\"forcedCleanup\":{},\"cleanup\":{{\"attempted\":{},\"succeeded\":{},\"error\":{}}},",
                 "\"ownerInitial\":{},\"ownerHidden\":{},",
                 "\"second\":{{\"pid\":{},\"exitCode\":{}}},\"ownerFinal\":{},",
                 "\"diagnostics\":{{\"ownerStderr\":{},\"secondStderr\":{}}}}}"
             ),
             json_string(status),
             json_string(&identity.mode),
-            json_string(&identity.candidate_sha),
+            if identity.candidate_sha.is_empty() {
+                "null".to_owned()
+            } else {
+                json_string(&identity.candidate_sha)
+            },
             if identity.mode == "AUTHORITATIVE_GITHUB_ACTIONS" {
                 "\"GITHUB_ACTIONS\""
             } else {
@@ -831,7 +882,44 @@ mod qualification {
     }
 
     fn policy_value() -> Option<serde_json::Value> {
+        let digest = Sha256::digest(AUTHORITY_POLICY_JSON.as_bytes());
+        if format!("{digest:x}") != AUTHORITY_POLICY_SHA256 {
+            return None;
+        }
         serde_json::from_str(AUTHORITY_POLICY_JSON).ok()
+    }
+
+    fn policy_tauri_profile_matches(policy: &serde_json::Value) -> bool {
+        let Some(profile) = policy.get("profiles").and_then(|value| value.get("tauri")) else {
+            return false;
+        };
+        profile.get("executable").and_then(|value| value.as_str())
+            == Some("target/x86_64-pc-windows-msvc/release/jarvis-desktop.exe")
+            && profile.get("feature").and_then(|value| value.as_str()) == Some("test-support")
+            && profile.get("dataRoot").and_then(|value| value.as_str())
+                == Some("fresh temporary test-support LocalAppData override")
+            && profile
+                .get("startupBoundSeconds")
+                .and_then(|value| value.as_u64())
+                == Some(15)
+            && profile
+                .get("activationBoundSeconds")
+                .and_then(|value| value.as_u64())
+                == Some(10)
+            && profile
+                .get("readinessGraceSeconds")
+                .and_then(|value| value.as_u64())
+                == Some(5)
+            && profile
+                .get("hideBoundSeconds")
+                .and_then(|value| value.as_u64())
+                == Some(5)
+    }
+
+    fn is_positive_decimal(value: &str) -> bool {
+        !value.is_empty()
+            && value.chars().all(|character| character.is_ascii_digit())
+            && !value.starts_with('0')
     }
 
     fn policy_string<'a>(policy: &'a serde_json::Value, key: &str) -> Option<&'a str> {
@@ -950,13 +1038,6 @@ mod qualification {
         }
         String::from_utf8(output.stdout)
             .map_err(|_| "git command returned non-UTF-8 output".to_owned())
-    }
-
-    fn git_is_ancestor(candidate: &str, checkout: &str) -> bool {
-        Command::new("git")
-            .args(["merge-base", "--is-ancestor", candidate, checkout])
-            .status()
-            .is_ok_and(|status| status.success())
     }
 
     fn sanitize_remote(value: &str) -> String {

@@ -8,8 +8,17 @@ $evidence_path = Join-Path $runner_temp 'jarvis-windows-native-qualification.jso
 $evidence_mode = if ($env:JARVIS_EVIDENCE_MODE) { $env:JARVIS_EVIDENCE_MODE.Trim() } else { 'SUPPORTING_LOCAL' }
 $identity_errors = [System.Collections.Generic.List[string]]::new()
 $authority_policy = $null
+$authority_policy_text = $null
+$authority_policy_path = Join-Path $repository_root 'tools\ci\section-1-4-authority-policy.json'
+$expected_authority_policy_sha256 = 'bf13c67f288a1f229bf3347dd867791814c6b0e7a295a0d8923a6cd1dc03d388'
+$expected_manifest_sha256 = 'a0a37f469121abb9a83a7eca80d1ca0e71d1815190a051303f259762a89b43b6'
 try {
-    $authority_policy = Get-Content -LiteralPath (Join-Path $repository_root 'tools\ci\section-1-4-authority-policy.json') -Raw | ConvertFrom-Json
+    $authority_policy_text = Get-Content -LiteralPath $authority_policy_path -Raw
+    $authority_policy = $authority_policy_text | ConvertFrom-Json
+    $observed_policy_sha256 = (Get-FileHash -LiteralPath $authority_policy_path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($observed_policy_sha256 -cne $expected_authority_policy_sha256) {
+        $identity_errors.Add('authority policy content digest is not the approved digest')
+    }
 } catch {
     $identity_errors.Add("authority policy unavailable: $($_.Exception.Message)")
 }
@@ -39,20 +48,15 @@ function Get-SafeRemote([string] $value) {
 }
 
 function Test-Sha([string] $value, [int] $length = 40) {
-    return $value -match "^[0-9a-f]{$length}$"
-}
-
-function Test-GitAncestor([string] $candidate, [string] $checkout) {
-    & git -C $repository_root merge-base --is-ancestor $candidate $checkout 2>$null
-    return $LASTEXITCODE -eq 0
+    return $value -cmatch "^[0-9a-f]{$length}$"
 }
 
 function Test-ValidHeadRef([string] $value) {
-    if ([string]::IsNullOrWhiteSpace($value) -or $value -notmatch [string]$authority_policy.headRefPattern) {
+    if ([string]::IsNullOrWhiteSpace($value) -or $value -cnotmatch [string]$authority_policy.headRefPattern) {
         return $false
     }
-    return $value -notmatch '\.\.' -and $value -notmatch '//' -and $value -notmatch '@\{' -and
-        $value -notmatch '^\.' -and $value -notmatch '\.$' -and $value -notmatch '^/' -and $value -notmatch '/$'
+    return $value -cnotmatch '\.\.' -and $value -cnotmatch '//' -and $value -cnotmatch '@\{' -and
+        $value -cnotmatch '^\.' -and $value -cnotmatch '\.$' -and $value -cnotmatch '^/' -and $value -cnotmatch '/$'
 }
 
 function Test-ApprovedRemote([string] $value) {
@@ -62,14 +66,18 @@ function Test-ApprovedRemote([string] $value) {
 
 function Test-AuthorityRef([string] $value, [AllowNull()][string] $head_ref) {
     if ([string]::IsNullOrWhiteSpace($value) -or $null -eq $authority_policy) { return $false }
-    if ($value -match [string]$authority_policy.pullRefPattern) {
+    if ($value -cmatch [string]$authority_policy.pullRefPattern) {
         return Test-ValidHeadRef $head_ref
     }
     $push_allowed = @($authority_policy.allowedPushRefs | ForEach-Object { [string]$_ }) | Where-Object {
         $allowed = $_
-        $value -eq $allowed -or ($allowed.EndsWith('/') -and $value.StartsWith($allowed) -and (Test-ValidHeadRef ($value.Substring('refs/heads/'.Length))))
+        $value -ceq $allowed -or ($allowed.EndsWith('/') -and $value.StartsWith($allowed, [System.StringComparison]::Ordinal) -and (Test-ValidHeadRef ($value.Substring('refs/heads/'.Length))))
     }
     return $push_allowed.Count -gt 0 -and [string]::IsNullOrWhiteSpace($head_ref)
+}
+
+function Test-PositiveDecimal([string] $value) {
+    return $value -cmatch '^[1-9][0-9]*$'
 }
 
 $checkout_sha = $null
@@ -80,8 +88,13 @@ try { $checkout_sha = Invoke-GitOutput @('rev-parse', 'HEAD') } catch { $identit
 try { $tree_sha = Invoke-GitOutput @('rev-parse', 'HEAD^{tree}') } catch { $identity_errors.Add('checkout tree SHA unavailable') }
 try { $remote = Get-SafeRemote (Invoke-GitOutput @('config', '--get', 'remote.origin.url')) } catch { $identity_errors.Add('origin remote unavailable') }
 try { $worktree_clean = [string]::IsNullOrWhiteSpace((Invoke-GitOutput @('status', '--porcelain=v1', '--untracked-files=all') $true)) } catch { $identity_errors.Add('worktree status unavailable') }
-$candidate_sha = if ($null -ne $env:JARVIS_CANDIDATE_SHA) { $env:JARVIS_CANDIDATE_SHA.Trim() } else { $checkout_sha }
-if ($null -eq $candidate_sha) { $candidate_sha = 'unknown' }
+$candidate_sha = if (-not [string]::IsNullOrWhiteSpace($env:JARVIS_CANDIDATE_SHA)) {
+    $env:JARVIS_CANDIDATE_SHA.Trim()
+} elseif ($evidence_mode -eq 'AUTHORITATIVE_GITHUB_ACTIONS') {
+    $null
+} else {
+    $checkout_sha
+}
 
 $authority = [ordered]@{ type = $null; repository = $null; ref = $null; headRef = $null; workflow = $null; runId = $null; runAttempt = $null; job = $null }
 $runner = [ordered]@{ os = $null; arch = $null; image = $null }
@@ -103,8 +116,6 @@ $checkout_relationship = if ($evidence_mode -eq 'SUPPORTING_LOCAL') {
     'SUPPORTING_LOCAL'
 } elseif ($checkout_sha -and $candidate_sha -and $checkout_sha -eq $candidate_sha) {
     'EXACT_CHECKOUT'
-} elseif ($authority.ref -match '^refs/pull/[0-9]+/merge$' -and $checkout_sha -and (Test-Sha $candidate_sha) -and (Test-Sha $checkout_sha) -and (Test-GitAncestor $candidate_sha $checkout_sha)) {
-    'PR_HEAD_ANCESTOR_OF_MERGE_CHECKOUT'
 } else {
     'UNKNOWN'
 }
@@ -124,18 +135,47 @@ if ($evidence_mode -eq 'AUTHORITATIVE_GITHUB_ACTIONS') {
     if (-not (Test-Sha $tree_sha)) { $identity_errors.Add('checkout tree SHA is not a lowercase 40-hex value') }
     if ([string]::IsNullOrWhiteSpace($remote)) { $identity_errors.Add('sanitized origin remote unavailable') }
     if ($worktree_clean -ne $true) { $identity_errors.Add('authoritative worktree is not clean') }
-    if ($checkout_relationship -eq 'UNKNOWN') { $identity_errors.Add('candidate-to-checkout relationship is unproven') }
+    if ($checkout_relationship -ne 'EXACT_CHECKOUT' -or $checkout_sha -cne $candidate_sha) { $identity_errors.Add('candidate checkout is not exact') }
     if ($null -eq $authority_policy -or ([string]$authority.repository).ToLowerInvariant() -ne ([string]$authority_policy.repository).ToLowerInvariant()) { $identity_errors.Add('authority repository is not the approved repository') }
     if (-not (Test-AuthorityRef ([string]$authority.ref) $authority.headRef)) { $identity_errors.Add('authoritative ref/headRef is outside the approved policy') }
     if (-not (Test-ApprovedRemote $remote)) { $identity_errors.Add('origin remote is not an approved GitHub remote form') }
-    if (([string]$authority.ref).StartsWith('refs/heads/') -and ($checkout_relationship -ne 'EXACT_CHECKOUT' -or $checkout_sha -ne $candidate_sha)) { $identity_errors.Add('push-ref checkout is not an exact candidate checkout') }
+    if ([string]$authority.type -cne 'GITHUB_ACTIONS' -or
+        [string]$authority.workflow -cne [string]$authority_policy.authority.workflow -or
+        [string]$authority.job -cne [string]$authority_policy.authority.job -or
+        -not (Test-PositiveDecimal ([string]$authority.runId)) -or
+        -not (Test-PositiveDecimal ([string]$authority.runAttempt))) {
+        $identity_errors.Add('authoritative workflow/run identity is not approved')
+    }
+    if ([string]$runner.os -cne [string]$authority_policy.runner.os -or
+        [string]$runner.arch -cne [string]$authority_policy.runner.arch -or
+        @($authority_policy.runner.images | ForEach-Object { [string]$_ }) -cnotcontains [string]$runner.image) {
+        $identity_errors.Add('authoritative runner identity is not approved')
+    }
+}
+$cargo_command = 'cargo test --locked -p jarvis-windows-native --features test-support --all-targets -- --test-threads=1'
+if ($null -eq $authority_policy -or
+    $cargo_command -cne [string]$authority_policy.profiles.native.cargoCommand -or
+    @($authority_policy.profiles.native.features | ForEach-Object { [string]$_ }) -cnotcontains 'test-support' -or
+    [string]$authority_policy.profiles.native.target -cne 'host Windows x64' -or
+    [int]$authority_policy.profiles.native.testThreads -ne 1) {
+    $identity_errors.Add('native qualification profile is not the approved profile')
 }
 $identity_error = if ($identity_errors.Count -gt 0) { $identity_errors -join '; ' } else { $null }
 $started_at = [DateTime]::UtcNow
 $test_exit = 1
 $manifest_error = $null
+$manifest_sha256 = $null
 $expected_tests = @()
 $observed_tests = @{}
+
+try {
+    $manifest_sha256 = (Get-FileHash -LiteralPath $manifest_path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($manifest_sha256 -cne $expected_manifest_sha256) {
+        $identity_errors.Add('native qualification manifest content digest is not the approved digest')
+    }
+} catch {
+    $identity_errors.Add("native qualification manifest digest unavailable: $($_.Exception.Message)")
+}
 
 try {
     $manifest_source = Get-Content -LiteralPath $manifest_path -Raw
@@ -162,18 +202,26 @@ catch {
     $manifest_error = $_.Exception.Message
 }
 
-$cargo_command = 'cargo test --locked -p jarvis-windows-native --features test-support --all-targets -- --test-threads=1'
 if (-not $manifest_error) {
-    $env:CARGO_TERM_COLOR = 'never'
-    & cargo test --locked -p jarvis-windows-native --features test-support --all-targets -- --test-threads=1 2>&1 |
-        Tee-Object -FilePath $log_path
-    $test_exit = $LASTEXITCODE
+    try {
+        $env:CARGO_TERM_COLOR = 'never'
+        & cargo test --locked -p jarvis-windows-native --features test-support --all-targets -- --test-threads=1 2>&1 |
+            Tee-Object -FilePath $log_path
+        $test_exit = $LASTEXITCODE
+    } catch {
+        $test_exit = 1
+        $identity_errors.Add("qualification test or log write failed: $($_.Exception.Message)")
+    }
 } else {
-    [System.IO.File]::WriteAllText(
-        $log_path,
-        "manifest_error=$manifest_error$([Environment]::NewLine)",
-        [System.Text.UTF8Encoding]::new($false)
-    )
+    try {
+        [System.IO.File]::WriteAllText(
+            $log_path,
+            "manifest_error=$manifest_error$([Environment]::NewLine)",
+            [System.Text.UTF8Encoding]::new($false)
+        )
+    } catch {
+        $identity_errors.Add("qualification log write failed: $($_.Exception.Message)")
+    }
 }
 
 if (Test-Path -LiteralPath $log_path) {
@@ -234,6 +282,7 @@ $all_expected_passed = $expected_tests.Count -gt 0 -and
     $missing_names.Count -eq 0 -and
     $unexpected_names.Count -eq 0 -and
     @($test_records | Where-Object { $_.result -ne 'OK' }).Count -eq 0
+$identity_error = if ($identity_errors.Count -gt 0) { $identity_errors -join '; ' } else { $null }
 $tests_passed = -not $manifest_error -and $test_exit -eq 0 -and $all_expected_passed
 $qualification_ok = $tests_passed -and $identity_errors.Count -eq 0
 $qualification_status = if ($qualification_ok) {
@@ -261,7 +310,7 @@ $log_hash = if (Test-Path -LiteralPath $log_path) {
     $null
 }
 $evidence = [ordered]@{
-    schemaVersion = 2
+    schemaVersion = 3
     scope = 'SECTION_1_4_WINDOWS_NATIVE_QUALIFICATION'
     status = $qualification_status
     evidenceMode = $evidence_mode
@@ -298,6 +347,7 @@ $evidence = [ordered]@{
     missingTests = $missing_names
     unexpectedTests = $unexpected_names
     manifestError = $manifest_error
+    manifestSha256 = $manifest_sha256
     logSha256 = $log_hash
     tests = $test_records
 }

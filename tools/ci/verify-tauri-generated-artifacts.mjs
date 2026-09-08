@@ -4,15 +4,35 @@ import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { isMain } from "./lib.mjs";
 
-const manifest = JSON.parse(
-  readFileSync(new URL("./tauri-generated-artifacts.json", import.meta.url), "utf8"),
-);
+const manifestText = readFileSync(new URL("./tauri-generated-artifacts.json", import.meta.url), "utf8");
+const manifest = JSON.parse(manifestText);
+const EXPECTED_MANIFEST_SHA256 = "14ad311646e2bd99e02fb36220279a02828c828d17a046b32fb69847175bedd7";
+const EXPECTED_MANIFEST = {
+  schemaVersion: 1,
+  root: "apps/desktop/src-tauri/gen/schemas",
+  files: {
+    "acl-manifests.json": "4d93885b464518dae2a2ed75ec63efc2c9d5a8991f51c26e6764dcb4264623c5",
+    "capabilities.json": "29eb267745a510845c1334f9ef0e342d5e85294a5ee22ab83f7c2902b6f67222",
+    "desktop-schema.json": "623c82e1cf0b1093b61b4b0900f8e2f06fbef272b8e5c24cc90dde35b063da97",
+    "windows-schema.json": "623c82e1cf0b1093b61b4b0900f8e2f06fbef272b8e5c24cc90dde35b063da97",
+  },
+};
 
 function fail(message) {
   throw new Error(`Tauri generated-artifact verification failed: ${message}`);
 }
 
+export function validateManifest(value = manifest, rawText = manifestText) {
+  if (rawText !== null && createHash("sha256").update(rawText, "utf8").digest("hex") !== EXPECTED_MANIFEST_SHA256) {
+    fail("generated-artifact manifest content digest does not match the approved manifest");
+  }
+  if (JSON.stringify(value) !== JSON.stringify(EXPECTED_MANIFEST)) {
+    fail("generated-artifact manifest values do not match the approved manifest");
+  }
+}
+
 function requireManifest() {
+  validateManifest();
   if (manifest.schemaVersion !== 1 || typeof manifest.root !== "string" || manifest.root.length === 0) {
     fail("generated-artifact manifest is malformed");
   }
