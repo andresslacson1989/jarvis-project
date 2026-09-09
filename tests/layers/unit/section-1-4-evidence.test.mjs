@@ -108,7 +108,7 @@ function nativeEvidence(overrides = {}) {
     missingTests: [],
     unexpectedTests: [],
     manifestError: null,
-    manifestSha256: "a0a37f469121abb9a83a7eca80d1ca0e71d1815190a051303f259762a89b43b6",
+    manifestSha256: "77dbf32273136adc2ecbcb9131f5352c8a0507ed95abc2f144d2749ed0c23939",
     logSha256: "d".repeat(64),
     exitCode: 0,
     tests: NATIVE_QUALIFICATION_MANIFEST.map((entry) => ({ ...entry, result: "OK" })),

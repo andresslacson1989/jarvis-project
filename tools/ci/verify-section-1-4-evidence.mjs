@@ -13,7 +13,7 @@ const NATIVE_MANIFEST_TEXT = readFileSync(
   new URL("../../platform/windows/native/tests/windows_process_qualification.rs", import.meta.url),
   "utf8",
 );
-const EXPECTED_NATIVE_MANIFEST_SHA256 = "a0a37f469121abb9a83a7eca80d1ca0e71d1815190a051303f259762a89b43b6";
+const EXPECTED_NATIVE_MANIFEST_SHA256 = "77dbf32273136adc2ecbcb9131f5352c8a0507ed95abc2f144d2749ed0c23939";
 const SCOPES = new Set([
   "SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION",
   "SECTION_1_4_WINDOWS_NATIVE_QUALIFICATION",

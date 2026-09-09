@@ -4,7 +4,7 @@ use std::{
     env, fs,
     panic::{self, AssertUnwindSafe},
     path::{Path, PathBuf},
-    process::{self, Child, Command, ExitStatus},
+    process::{self, Child, Command, ExitStatus, Stdio},
     sync::{
         Arc, Barrier, Mutex, MutexGuard, OnceLock,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -14,7 +14,7 @@ use std::{
 };
 
 use jarvis_windows_native::{
-    Acquisition, ActivationCallbackResult, ActivationCancellation, ActivationStart,
+    Acquisition, ActivationCallbackResult, ActivationCancellation, ActivationStart, NativeError,
     NativeErrorKind, Role, acquire,
 };
 
@@ -1333,8 +1333,10 @@ fn windows_stale_generation_cannot_signal_or_mutate_new_request() {
         .expect("same-session activation receiver must start");
     owner.mark_ready().expect("readiness must be committed");
 
-    assert!(spawn_child("second").success());
-    assert!(spawn_child("second").success());
+    let first = spawn_child_with_report("stale-generation", "second");
+    assert!(first.success(), "first stale-generation child failed");
+    let second = spawn_child_with_report("stale-generation", "second");
+    assert!(second.success(), "second stale-generation child failed");
     assert_eq!(callback_count.load(Ordering::SeqCst), 2);
 
     drop(worker);
@@ -1599,7 +1601,8 @@ fn windows_event_signal_failure_is_typed_and_recovers_closed() {
     owner
         .mark_ready()
         .expect("readiness must recover after restart");
-    assert!(spawn_child("second").success());
+    let recovered = spawn_child_with_report("event-signal-recovery", "second");
+    assert!(recovered.success(), "event-signal recovery child failed");
 
     drop(worker);
     drop(owner);
@@ -1776,12 +1779,12 @@ fn run_child(mode: &str) {
             Ok(Acquisition::SecondLaunch(_)) => process::exit(2),
             Ok(Acquisition::Owner(_)) => process::exit(3),
             Err(error) if error.kind == NativeErrorKind::NotReady => process::exit(4),
-            Err(_) => process::exit(5),
+            Err(error) => exit_child_acquisition_failure(mode, error, 5),
         },
         "recovery-waiter" => match acquire(Role::Normal) {
             Ok(Acquisition::Owner(_owner)) => process::exit(0),
             Ok(Acquisition::SecondLaunch(_)) => process::exit(6),
-            Err(_) => process::exit(7),
+            Err(error) => exit_child_acquisition_failure(mode, error, 7),
         },
         "recovery-waiter-retry" => {
             let deadline = std::time::Instant::now() + Duration::from_secs(4);
@@ -1792,14 +1795,14 @@ fn run_child(mode: &str) {
                     Err(_) if std::time::Instant::now() < deadline => {
                         thread::sleep(Duration::from_millis(25));
                     }
-                    Err(_) => process::exit(7),
+                    Err(error) => exit_child_acquisition_failure(mode, error, 7),
                 }
             }
         }
         "owner-crash" => match acquire(Role::Normal) {
             Ok(Acquisition::Owner(_owner)) => process::exit(0),
             Ok(Acquisition::SecondLaunch(_)) => process::exit(8),
-            Err(_) => process::exit(9),
+            Err(error) => exit_child_acquisition_failure(mode, error, 9),
         },
         "mutex-release-failure-owner" => {
             let mut owner = acquire_owner(Role::Normal);
@@ -1832,7 +1835,7 @@ fn run_child(mode: &str) {
                 process::exit(0);
             }
             Ok(Acquisition::SecondLaunch(_)) => process::exit(10),
-            Err(_) => process::exit(11),
+            Err(error) => exit_child_acquisition_failure(mode, error, 11),
         },
         "maintenance-hold" => match acquire(Role::Maintenance) {
             Ok(Acquisition::Owner(_owner)) => {
@@ -1840,7 +1843,7 @@ fn run_child(mode: &str) {
                 process::exit(0);
             }
             Ok(Acquisition::SecondLaunch(_)) => process::exit(12),
-            Err(_) => process::exit(13),
+            Err(error) => exit_child_acquisition_failure(mode, error, 13),
         },
         "maintenance-while-normal" => match acquire(Role::Maintenance) {
             Err(error) if error.kind == NativeErrorKind::NormalHeld => process::exit(21),
@@ -1896,6 +1899,164 @@ fn spawn_child(mode: &str) -> ExitStatus {
     spawn_child_process(mode)
         .wait()
         .expect("spawn qualification child")
+}
+
+const CHILD_REPORT_MAX_CHARS: usize = 2_048;
+
+#[derive(Debug)]
+struct ChildOutcome {
+    pid: Option<u32>,
+    status: Option<ExitStatus>,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+    launch_error: Option<String>,
+    wait_error: Option<String>,
+}
+
+impl ChildOutcome {
+    fn success(&self) -> bool {
+        self.status.is_some_and(|status| status.success())
+    }
+}
+
+fn spawn_child_with_report(label: &str, mode: &str) -> ChildOutcome {
+    let test_name = env::var(TEST_NAME_ENV).unwrap_or_else(|_| DEFAULT_TEST_NAME.to_owned());
+    let executable = match env::current_exe() {
+        Ok(executable) => executable,
+        Err(error) => {
+            return ChildOutcome {
+                pid: None,
+                status: None,
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+                launch_error: Some(error.to_string()),
+                wait_error: None,
+            };
+        }
+    };
+    let mut command = Command::new(executable);
+    command
+        .env(CHILD_ENV, mode)
+        .arg("--exact")
+        .arg(&test_name)
+        .arg("--nocapture")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            return ChildOutcome {
+                pid: None,
+                status: None,
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+                launch_error: Some(error.to_string()),
+                wait_error: None,
+            };
+        }
+    };
+    let pid = Some(child.id());
+    match child.wait_with_output() {
+        Ok(output) => ChildOutcome {
+            pid,
+            status: Some(output.status),
+            stdout: output.stdout,
+            stderr: output.stderr,
+            launch_error: None,
+            wait_error: None,
+        },
+        Err(error) => ChildOutcome {
+            pid,
+            status: None,
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+            launch_error: None,
+            wait_error: Some(error.to_string()),
+        },
+    }
+    .tap_failure_report(label, mode, &test_name)
+}
+
+impl ChildOutcome {
+    fn tap_failure_report(self, label: &str, mode: &str, test_name: &str) -> Self {
+        if !self.success() {
+            eprintln!(
+                "[qualification-child-report] label={};mode={};test={};pid={};exit_code={};terminated_without_exit_code={};launch_error={};wait_error={};stdout={};stderr={}",
+                bounded_log_text(label),
+                bounded_log_text(mode),
+                bounded_log_text(test_name),
+                self.pid
+                    .map_or_else(|| "none".to_owned(), |pid| pid.to_string()),
+                self.status
+                    .and_then(|status| status.code())
+                    .map_or_else(|| "none".to_owned(), |code| code.to_string()),
+                self.status.is_some_and(|status| status.code().is_none()),
+                self.launch_error
+                    .as_deref()
+                    .map_or_else(|| "none".to_owned(), bounded_log_text),
+                self.wait_error
+                    .as_deref()
+                    .map_or_else(|| "none".to_owned(), bounded_log_text),
+                bounded_log_bytes(&self.stdout),
+                bounded_log_bytes(&self.stderr),
+            );
+        }
+        self
+    }
+}
+
+fn exit_child_acquisition_failure(mode: &str, error: NativeError, exit_code: i32) -> ! {
+    let test_name = env::var(TEST_NAME_ENV).unwrap_or_else(|_| DEFAULT_TEST_NAME.to_owned());
+    let diagnostic = jarvis_windows_native::test_acquisition_diagnostic()
+        .unwrap_or_else(|| "unavailable".to_owned());
+    eprintln!(
+        "[qualification-child-failure] mode={};test={};pid={};error_kind={:?};error={};diagnostic={}",
+        bounded_log_text(mode),
+        bounded_log_text(&test_name),
+        process::id(),
+        error.kind,
+        bounded_log_text(&error.to_string()),
+        bounded_log_text(&diagnostic),
+    );
+    process::exit(exit_code)
+}
+
+fn bounded_log_bytes(value: &[u8]) -> String {
+    bounded_log_text(&String::from_utf8_lossy(value))
+}
+
+fn bounded_log_text(value: &str) -> String {
+    let characters: Vec<char> = value.chars().collect();
+    let mut rendered = String::new();
+    let mut index = 0;
+    while index < characters.len() && rendered.chars().count() < CHILD_REPORT_MAX_CHARS {
+        if index + 2 < characters.len()
+            && characters[index].is_ascii_alphabetic()
+            && characters[index + 1] == ':'
+            && matches!(characters[index + 2], '\\' | '/')
+        {
+            rendered.push_str("<path>");
+            index += 3;
+            while index < characters.len()
+                && !characters[index].is_whitespace()
+                && characters[index] != ';'
+            {
+                index += 1;
+            }
+            continue;
+        }
+        let character = characters[index];
+        rendered.push(if character.is_ascii_graphic() || character == ' ' {
+            if character == ';' { ',' } else { character }
+        } else {
+            '?'
+        });
+        index += 1;
+    }
+    if index < characters.len() {
+        rendered.push_str("...[truncated]");
+    }
+    rendered
 }
 
 fn wait_all(children: Vec<Child>) -> Vec<ExitStatus> {
