@@ -635,7 +635,6 @@ mod qualification {
                     &identity,
                     &started_at,
                     &Some(failure),
-                    false,
                     None,
                     None,
                     log_sha256.as_deref(),
@@ -678,7 +677,6 @@ mod qualification {
             &identity,
             &started_at,
             &failure,
-            context.forced_cleanup,
             Some(&context),
             Some(&executable),
             log_sha256.as_deref(),
@@ -1004,7 +1002,6 @@ mod qualification {
         identity: &EvidenceIdentity,
         started_at: &str,
         failure: &Option<String>,
-        forced_cleanup: bool,
         context: Option<&RunContext>,
         executable: Option<&Path>,
         log_sha256: Option<&str>,
@@ -1022,6 +1019,7 @@ mod qualification {
         let cleanup = context
             .map(|value| value.cleanup.clone())
             .unwrap_or_else(CleanupOutcome::not_attempted);
+        let forced_cleanup = context.map(|value| value.forced_cleanup).unwrap_or(false);
         format!(
             concat!(
                 "{{\"schemaVersion\":3,\"scope\":\"SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION\",",
@@ -1239,12 +1237,8 @@ mod qualification {
             fs::create_dir_all(parent)?;
         }
         fs::write(path, log.as_bytes())?;
-        sha256_file(path).ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                "qualification log could not be hashed after writing",
-            )
-        })
+        sha256_file(path)
+            .ok_or_else(|| io::Error::other("qualification log could not be hashed after writing"))
     }
 
     fn command_version(command: &str) -> String {
