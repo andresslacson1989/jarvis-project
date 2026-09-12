@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildCiEvidence, buildLocalCiExecutionEvidence, GATES, parseLocalCiGateResults } from "../../../tools/ci/generate-evidence.mjs";
+import { buildCiEvidence, buildLocalCiExecutionEvidence, GATES, parseLocalCiGateResults, versionProbeInvocation } from "../../../tools/ci/generate-evidence.mjs";
 
 const candidateSha = "a".repeat(40);
 const syntheticMergeSha = "b".repeat(40);
@@ -30,6 +30,21 @@ const versions = {
   rust: "1.97.1",
   cargo: "1.97.1",
 };
+
+test("Windows version probes invoke pnpm through cmd without changing other commands", () => {
+  assert.deepEqual(
+    versionProbeInvocation("pnpm", ["exec", "tsc", "--version"], "cmd.exe"),
+    { command: "cmd.exe", args: ["/d", "/s", "/c", "pnpm exec tsc --version"] },
+  );
+  assert.deepEqual(
+    versionProbeInvocation("pnpm", ["--version"], ""),
+    { command: "pnpm", args: ["--version"] },
+  );
+  assert.deepEqual(
+    versionProbeInvocation("cargo", ["--version"], "cmd.exe"),
+    { command: "cargo", args: ["--version"] },
+  );
+});
 
 test("CI evidence binds to the explicitly verified candidate SHA instead of pull-request GITHUB_SHA", () => {
   const evidence = buildCiEvidence({

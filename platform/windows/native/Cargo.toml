@@ -1,0 +1,36 @@
+[package]
+name = "jarvis-windows-native"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[features]
+test-support = []
+qualification-focused-tests = ["test-support"]
+
+[[bin]]
+name = "windows-tauri-single-instance-qualification"
+path = "src/bin/windows_tauri_single_instance_qualification.rs"
+required-features = ["test-support"]
+
+[dependencies]
+serde_json = "=1.0.151"
+sha2 = "=0.10.9"
+
+[target.'cfg(windows)'.dependencies]
+getrandom = "=0.3.4"
+windows-sys = { version = "=0.61.2", default-features = false, features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_RemoteDesktop",
+    "Win32_System_IO",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Com",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }

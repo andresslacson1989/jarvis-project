@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 2,
+  "repository": "andresslacson1989/jarvis-project",
+  "remoteForms": [
+    "https://github.com/andresslacson1989/jarvis-project",
+    "https://github.com/andresslacson1989/jarvis-project.git",
+    "ssh://github.com/andresslacson1989/jarvis-project",
+    "ssh://github.com/andresslacson1989/jarvis-project.git",
+    "ssh://github.com:andresslacson1989/jarvis-project",
+    "ssh://github.com:andresslacson1989/jarvis-project.git"
+  ],
+  "allowedPushRefs": [
+    "refs/heads/master",
+    "refs/heads/impl/"
+  ],
+  "pullRefPattern": "^refs/pull/[1-9][0-9]*/merge$",
+  "headRefPattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$",
+  "authority": {
+    "type": "GITHUB_ACTIONS",
+    "workflow": "Static CI",
+    "job": "windows-tauri-build",
+    "runIdPattern": "^[1-9][0-9]*$",
+    "runAttemptPattern": "^[1-9][0-9]*$"
+  },
+  "runner": {
+    "os": "Windows",
+    "arch": "X64",
+    "images": [
+      "win25",
+      "windows-2025",
+      "win25-vs2026"
+    ]
+  },
+  "checkoutRelationship": "EXACT_CHECKOUT",
+  "profiles": {
+    "tauri": {
+      "executable": "target/x86_64-pc-windows-msvc/release/jarvis-desktop.exe",
+      "feature": "test-support",
+      "dataRoot": "fresh temporary test-support LocalAppData override",
+      "startupBoundSeconds": 15,
+      "activationBoundSeconds": 10,
+      "readinessGraceSeconds": 5,
+      "hideBoundSeconds": 5
+    },
+    "native": {
+      "cargoCommand": "cargo test --locked -p jarvis-windows-native --features test-support --all-targets -- --test-threads=1",
+      "features": [
+        "test-support"
+      ],
+      "target": "host Windows x64",
+      "testThreads": 1
+    }
+  }
+}
