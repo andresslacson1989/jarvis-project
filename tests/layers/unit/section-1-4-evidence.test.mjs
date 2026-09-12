@@ -442,6 +442,7 @@ test("PowerShell native producer uses case-sensitive SHA and ref validation", ()
   assert.match(script, /function Test-AuthorityRef[\s\S]*?if \(\$value -cmatch/);
   assert.doesNotMatch(script, /function Test-Sha[\s\S]*?return \$value -match/);
   assert.match(script, /Tee-Object -FilePath \$log_path/);
+  assert.match(script, /\$previous_error_action_preference = \$ErrorActionPreference[\s\S]*?\$ErrorActionPreference = 'Continue'[\s\S]*?finally[\s\S]*?\$ErrorActionPreference = \$previous_error_action_preference/);
   assert.doesNotMatch(script, /ChangeExtension\(\$evidence_path, '\.log'\)/);
   assertRejected(tauriEvidence({ candidateSha: candidate.toUpperCase() }), { authoritative: true });
   assertRejected(tauriEvidence({ authority: { ...hostedIdentity().authority, ref: "REFS/PULL/18/MERGE" } }), { authoritative: true });

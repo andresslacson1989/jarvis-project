@@ -203,14 +203,21 @@ catch {
 }
 
 if (-not $manifest_error) {
+    $previous_error_action_preference = $ErrorActionPreference
     try {
         $env:CARGO_TERM_COLOR = 'never'
+        # Cargo writes normal progress/status lines to stderr on Windows. Keep
+        # the transcript complete while preserving the native exit code as the
+        # qualification result.
+        $ErrorActionPreference = 'Continue'
         & cargo test --locked -p jarvis-windows-native --features test-support --all-targets -- --test-threads=1 2>&1 |
             Tee-Object -FilePath $log_path
         $test_exit = $LASTEXITCODE
     } catch {
         $test_exit = 1
         $identity_errors.Add("qualification test or log write failed: $($_.Exception.Message)")
+    } finally {
+        $ErrorActionPreference = $previous_error_action_preference
     }
 } else {
     try {
