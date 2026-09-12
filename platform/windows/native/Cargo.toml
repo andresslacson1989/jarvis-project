@@ -7,7 +7,7 @@ publish = false
 
 [features]
 test-support = []
-qualification-focused-tests = []
+qualification-focused-tests = ["test-support"]
 
 [[bin]]
 name = "windows-tauri-single-instance-qualification"

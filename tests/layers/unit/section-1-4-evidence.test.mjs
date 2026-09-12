@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import {
   NATIVE_QUALIFICATION_MANIFEST,
   parseSection14Evidence,
@@ -78,6 +81,7 @@ function tauriEvidence(overrides = {}) {
       hideBoundSeconds: 5,
     },
     executableSha256: "c".repeat(64),
+    logSha256: "e".repeat(64),
     cleanup: { attempted: true, succeeded: true, error: null },
     failure: null,
     ownerInitial: snapshot(),
@@ -108,7 +112,7 @@ function nativeEvidence(overrides = {}) {
     missingTests: [],
     unexpectedTests: [],
     manifestError: null,
-    manifestSha256: "77dbf32273136adc2ecbcb9131f5352c8a0507ed95abc2f144d2749ed0c23939",
+    manifestSha256: "3f4e7c55eea615c34fa0867d671db9affcf29d87e5545b3a76f15a20d3663ae0",
     logSha256: "d".repeat(64),
     exitCode: 0,
     tests: NATIVE_QUALIFICATION_MANIFEST.map((entry) => ({ ...entry, result: "OK" })),
@@ -263,6 +267,73 @@ test("foreground sentinel activation failures remain typed failures", () => {
   }), { authoritative: true });
 });
 
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function withTemporaryLog(filename, bytes, callback) {
+  const directory = mkdtempSync(join(tmpdir(), "jarvis-section-1-4-log-"));
+  const path = join(directory, filename);
+  try {
+    writeFileSync(path, bytes);
+    return callback(path);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+test("retained native logs are required and must match the exact evidence bytes", () => {
+  const transcript = Buffer.from("cargo test transcript\n", "utf8");
+  withTemporaryLog("jarvis-windows-native-qualification.log", transcript, (path) => {
+    const evidence = nativeEvidence({ logSha256: sha256(transcript) });
+    assert.equal(
+      validateSection14Evidence(evidence, { authoritative: true, retainedLogPath: path }).status,
+      "PASS",
+    );
+    assert.equal(
+      validateSection14Evidence(evidence, { authoritative: true, artifactDir: dirname(path) }).status,
+      "PASS",
+    );
+    assertRejected(nativeEvidence({ logSha256: sha256(Buffer.from("other\n")) }), {
+      authoritative: true,
+      retainedLogPath: path,
+    });
+    writeFileSync(path, Buffer.concat([transcript, Buffer.from("\n", "utf8")]));
+    assertRejected(evidence, { authoritative: true, retainedLogPath: path });
+  });
+  const missingDirectory = mkdtempSync(join(tmpdir(), "jarvis-section-1-4-missing-log-"));
+  try {
+    assertRejected(nativeEvidence(), {
+      authoritative: true,
+      retainedLogPath: join(missingDirectory, "missing.log"),
+    });
+  } finally {
+    rmSync(missingDirectory, { recursive: true, force: true });
+  }
+});
+
+test("Tauri retained logs are canonical transcripts, not serialized evidence JSON", () => {
+  const transcript = Buffer.from(
+    "JARVIS Section 1.4 qualification transcript v1\nresult=PASS\n",
+    "utf8",
+  );
+  withTemporaryLog("jarvis-tauri-single-instance-qualification.log", transcript, (path) => {
+    assert.equal(
+      validateSection14Evidence(
+        tauriEvidence({ logSha256: sha256(transcript) }),
+        { authoritative: true, retainedLogPath: path },
+      ).status,
+      "PASS",
+    );
+    const serializedEvidence = Buffer.from(`${JSON.stringify(tauriEvidence())}\n`, "utf8");
+    writeFileSync(path, serializedEvidence);
+    assertRejected(
+      tauriEvidence({ logSha256: sha256(serializedEvidence) }),
+      { authoritative: true, retainedLogPath: path },
+    );
+  });
+});
+
 test("native passing evidence is bound to the canonical manifest", () => {
   const mutations = [
     { tests: nativeEvidence().tests.map((test, index) => index === 0 ? { ...test, test_id: "evil" } : test) },
@@ -370,6 +441,18 @@ test("PowerShell native producer uses case-sensitive SHA and ref validation", ()
   assert.match(script, /function Test-ValidHeadRef[\s\S]*?\$value -cnotmatch/);
   assert.match(script, /function Test-AuthorityRef[\s\S]*?if \(\$value -cmatch/);
   assert.doesNotMatch(script, /function Test-Sha[\s\S]*?return \$value -match/);
+  assert.match(script, /Tee-Object -FilePath \$log_path/);
+  assert.doesNotMatch(script, /ChangeExtension\(\$evidence_path, '\.log'\)/);
   assertRejected(tauriEvidence({ candidateSha: candidate.toUpperCase() }), { authoritative: true });
   assertRejected(tauriEvidence({ authority: { ...hostedIdentity().authority, ref: "REFS/PULL/18/MERGE" } }), { authoritative: true });
+});
+
+test("hosted workflow verifies both retained qualification logs before upload", () => {
+  const workflow = readFileSync(".github/workflows/static-ci.yml", "utf8");
+  assert.equal(
+    workflow.match(/--artifact-dir "\$\{\{ runner\.temp \}\}"/g)?.length,
+    2,
+  );
+  assert.match(workflow, /jarvis-tauri-single-instance-qualification\.log/);
+  assert.match(workflow, /jarvis-windows-native-qualification\.log/);
 });

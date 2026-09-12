@@ -94,7 +94,7 @@ jobs:
         shell: pwsh
         env:
           JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-        run: node tools/ci/verify-section-1-4-evidence.mjs "${{ runner.temp }}\jarvis-tauri-single-instance-qualification.json" --authoritative --expected-candidate "$env:JARVIS_CANDIDATE_SHA"
+        run: node tools/ci/verify-section-1-4-evidence.mjs "${{ runner.temp }}\jarvis-tauri-single-instance-qualification.json" --authoritative --expected-candidate "$env:JARVIS_CANDIDATE_SHA" --artifact-dir "${{ runner.temp }}"
 
       - name: Upload Windows Tauri single-instance evidence
         if: ${{ always() }}
@@ -119,7 +119,7 @@ jobs:
         shell: pwsh
         env:
           JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-        run: node tools/ci/verify-section-1-4-evidence.mjs "${{ runner.temp }}\jarvis-windows-native-qualification.json" --authoritative --expected-candidate "$env:JARVIS_CANDIDATE_SHA"
+        run: node tools/ci/verify-section-1-4-evidence.mjs "${{ runner.temp }}\jarvis-windows-native-qualification.json" --authoritative --expected-candidate "$env:JARVIS_CANDIDATE_SHA" --artifact-dir "${{ runner.temp }}"
 
       - name: Upload Windows native qualification evidence
         if: ${{ always() }}

@@ -242,6 +242,7 @@ fn windows_qualification_manifest_is_complete_and_mapped() {
             "duplicate qualification test name: {name}"
         );
     }
+    assert_child_report_sanitizer_contract();
 }
 
 #[test]
@@ -2029,34 +2030,130 @@ fn bounded_log_text(value: &str) -> String {
     let characters: Vec<char> = value.chars().collect();
     let mut rendered = String::new();
     let mut index = 0;
-    while index < characters.len() && rendered.chars().count() < CHILD_REPORT_MAX_CHARS {
-        if index + 2 < characters.len()
-            && characters[index].is_ascii_alphabetic()
-            && characters[index + 1] == ':'
-            && matches!(characters[index + 2], '\\' | '/')
-        {
-            rendered.push_str("<path>");
-            index += 3;
-            while index < characters.len()
-                && !characters[index].is_whitespace()
-                && characters[index] != ';'
-            {
-                index += 1;
+    let mut truncated = false;
+    while index < characters.len() {
+        if let Some(path_end) = path_token_end(&characters, index) {
+            if !append_bounded(&mut rendered, "<path>") {
+                truncated = true;
+                break;
             }
+            index = path_end;
             continue;
         }
         let character = characters[index];
-        rendered.push(if character.is_ascii_graphic() || character == ' ' {
-            if character == ';' { ',' } else { character }
+        let replacement = if character.is_ascii_graphic() || character == ' ' {
+            if matches!(character, ';' | '=') {
+                ','
+            } else {
+                character
+            }
         } else {
             '?'
-        });
+        };
+        if !append_bounded(&mut rendered, &replacement.to_string()) {
+            truncated = true;
+            break;
+        }
         index += 1;
     }
-    if index < characters.len() {
-        rendered.push_str("...[truncated]");
+    if truncated {
+        let suffix = "...[truncated]";
+        let suffix_len = suffix.chars().count();
+        let keep = CHILD_REPORT_MAX_CHARS.saturating_sub(suffix_len);
+        if rendered.chars().count() > keep {
+            rendered = rendered.chars().take(keep).collect();
+        }
+        rendered.push_str(suffix);
     }
     rendered
+}
+
+fn append_bounded(rendered: &mut String, value: &str) -> bool {
+    let remaining = CHILD_REPORT_MAX_CHARS.saturating_sub(rendered.chars().count());
+    if value.chars().count() > remaining {
+        return false;
+    }
+    rendered.push_str(value);
+    true
+}
+
+fn path_token_end(characters: &[char], start: usize) -> Option<usize> {
+    let drive_path = start + 2 < characters.len()
+        && characters[start].is_ascii_alphabetic()
+        && characters[start + 1] == ':'
+        && matches!(characters[start + 2], '\\' | '/');
+    let network_path = start + 2 < characters.len()
+        && matches!(characters[start], '\\' | '/')
+        && matches!(characters[start + 1], '\\' | '/')
+        && !is_log_delimiter(characters[start + 2]);
+    if !drive_path && !network_path {
+        return None;
+    }
+    let mut end = start;
+    while end < characters.len() && !is_path_delimiter(characters[end]) {
+        end += 1;
+    }
+    Some(end)
+}
+
+fn is_path_delimiter(character: char) -> bool {
+    character == ';' || character == '=' || character.is_control()
+}
+
+fn is_log_delimiter(character: char) -> bool {
+    character == ';' || character == '=' || character.is_control()
+}
+
+fn assert_child_report_sanitizer_contract() {
+    for value in [
+        "field=value;next=attacker\r\nline\0",
+        "C:\\Users\\junme\\secret\\stdout.txt",
+        r"\\server\share\secret\stderr.txt",
+        r"\\?\C:\secret\extended.txt",
+        r"\\.\pipe\secret-device",
+    ] {
+        let rendered = bounded_log_text(value);
+        assert!(rendered.chars().count() <= CHILD_REPORT_MAX_CHARS);
+        assert!(
+            !rendered.contains('='),
+            "sanitized report may not contain '='"
+        );
+        assert!(
+            !rendered.contains(';'),
+            "sanitized report may not contain ';'"
+        );
+        assert!(!rendered.contains('\n'));
+        assert!(!rendered.contains('\r'));
+        assert!(!rendered.contains('\0'));
+    }
+    for path in [
+        r"C:\Users\junme\secret\stdout.txt",
+        r"\\server\share\secret\stderr.txt",
+        r"\\?\C:\secret\extended.txt",
+        r"\\.\pipe\secret-device",
+    ] {
+        let rendered = bounded_log_text(path);
+        assert!(rendered.contains("<path>"), "path must be redacted: {path}");
+        assert!(
+            !rendered.contains("secret"),
+            "path content must be redacted: {path}"
+        );
+    }
+    let exact = "x".repeat(CHILD_REPORT_MAX_CHARS);
+    let exact_rendered = bounded_log_text(&exact);
+    assert_eq!(exact_rendered.chars().count(), CHILD_REPORT_MAX_CHARS);
+    assert!(!exact_rendered.ends_with("...[truncated]"));
+
+    let oversized = format!("{}Z", "x".repeat(CHILD_REPORT_MAX_CHARS));
+    let oversized_rendered = bounded_log_text(&oversized);
+    assert_eq!(oversized_rendered.chars().count(), CHILD_REPORT_MAX_CHARS);
+    assert!(oversized_rendered.ends_with("...[truncated]"));
+
+    let captured = bounded_log_bytes(b"C:\\secret\\stdout;field=stderr\n");
+    assert!(captured.contains("<path>"));
+    assert!(!captured.contains("secret"));
+    assert!(!captured.contains('='));
+    assert!(!captured.contains(';'));
 }
 
 fn wait_all(children: Vec<Child>) -> Vec<ExitStatus> {

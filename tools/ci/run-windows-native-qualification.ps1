@@ -11,7 +11,7 @@ $authority_policy = $null
 $authority_policy_text = $null
 $authority_policy_path = Join-Path $repository_root 'tools\ci\section-1-4-authority-policy.json'
 $expected_authority_policy_sha256 = '0f9f6b228c3e8ac231644b1c07a4090c0aff398de6db94482008bb461386b0fe'
-$expected_manifest_sha256 = '77dbf32273136adc2ecbcb9131f5352c8a0507ed95abc2f144d2749ed0c23939'
+$expected_manifest_sha256 = '3f4e7c55eea615c34fa0867d671db9affcf29d87e5545b3a76f15a20d3663ae0'
 try {
     $authority_policy_text = Get-Content -LiteralPath $authority_policy_path -Raw
     $authority_policy = $authority_policy_text | ConvertFrom-Json
@@ -360,11 +360,9 @@ try {
         $evidence_json,
         [System.Text.UTF8Encoding]::new($false)
     )
-    [System.IO.File]::WriteAllText(
-        [System.IO.Path]::ChangeExtension($evidence_path, '.log'),
-        "$evidence_json$([Environment]::NewLine)",
-        [System.Text.UTF8Encoding]::new($false)
-    )
+    # The Cargo transcript is the retained log. Keep it separate from the
+    # serialized evidence JSON so logSha256 remains bound to the uploaded
+    # qualification transcript byte-for-byte.
 } catch {
     throw "unable to write Section 1.4 evidence: $($_.Exception.Message)"
 }

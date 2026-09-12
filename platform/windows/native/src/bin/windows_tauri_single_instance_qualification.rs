@@ -612,6 +612,7 @@ mod qualification {
         }
         let executable = PathBuf::from(&arguments[1]);
         let evidence_path = PathBuf::from(&arguments[2]);
+        let log_path = log_path_for(&evidence_path);
         let identity = EvidenceIdentity::collect();
         let started_at = utc_timestamp();
 
@@ -619,6 +620,16 @@ mod qualification {
             Ok(context) => context,
             Err(error) => {
                 let failure = format!("could not create isolated profile: {error}");
+                let log_sha256 = match write_log(
+                    &log_path,
+                    &build_qualification_log(&identity, None, Some(&failure)),
+                ) {
+                    Ok(digest) => Some(digest),
+                    Err(write_error) => {
+                        eprintln!("could not write failure qualification log: {write_error}");
+                        None
+                    }
+                };
                 let evidence = build_evidence(
                     identity.status(false),
                     &identity,
@@ -627,6 +638,7 @@ mod qualification {
                     false,
                     None,
                     None,
+                    log_sha256.as_deref(),
                 );
                 if let Err(write_error) = write_evidence(&evidence_path, &evidence) {
                     eprintln!("could not write failure evidence: {write_error}");
@@ -648,6 +660,18 @@ mod qualification {
         if failure.is_none() {
             failure = identity.authoritative_failure();
         }
+        let log_sha256 = match write_log(
+            &log_path,
+            &build_qualification_log(&identity, Some(&context), failure.as_deref()),
+        ) {
+            Ok(digest) => Some(digest),
+            Err(error) => {
+                if failure.is_none() {
+                    failure = Some(format!("qualification log write failed: {error}"));
+                }
+                None
+            }
+        };
         let status = identity.status(failure.is_none());
         let evidence = build_evidence(
             status,
@@ -657,6 +681,7 @@ mod qualification {
             context.forced_cleanup,
             Some(&context),
             Some(&executable),
+            log_sha256.as_deref(),
         );
         if let Err(write_error) = write_evidence(&evidence_path, &evidence) {
             eprintln!("could not write qualification evidence: {write_error}");
@@ -667,6 +692,7 @@ mod qualification {
             "[tauri-single-instance-evidence-path] {}",
             evidence_path.display()
         );
+        println!("[tauri-single-instance-log-path] {}", log_path.display());
         if let Some(failure) = failure {
             eprintln!("Windows Tauri single-instance qualification failed: {failure}");
             1
@@ -981,6 +1007,7 @@ mod qualification {
         forced_cleanup: bool,
         context: Option<&RunContext>,
         executable: Option<&Path>,
+        log_sha256: Option<&str>,
     ) -> String {
         let finished_at = utc_timestamp();
         let binary_sha = executable.and_then(sha256_file);
@@ -1008,7 +1035,7 @@ mod qualification {
                 "\"profile\":{{\"executable\":\"target/x86_64-pc-windows-msvc/release/jarvis-desktop.exe\",",
                 "\"feature\":\"test-support\",\"dataRoot\":\"fresh temporary test-support LocalAppData override\",",
                 "\"startupBoundSeconds\":15,\"activationBoundSeconds\":10,\"readinessGraceSeconds\":5,\"hideBoundSeconds\":5}},",
-                "\"executableSha256\":{},\"startedAt\":{},\"finishedAt\":{},\"failure\":{},",
+                "\"executableSha256\":{},\"logSha256\":{},\"startedAt\":{},\"finishedAt\":{},\"failure\":{},",
                 "\"forcedCleanup\":{},\"cleanup\":{{\"attempted\":{},\"succeeded\":{},\"error\":{}}},",
                 "\"ownerInitial\":{},\"ownerHidden\":{},",
                 "\"second\":{{\"pid\":{},\"exitCode\":{}}},\"ownerFinal\":{},",
@@ -1053,6 +1080,9 @@ mod qualification {
                 .as_deref()
                 .map(json_string)
                 .unwrap_or_else(|| "null".to_owned()),
+            log_sha256
+                .map(json_string)
+                .unwrap_or_else(|| "null".to_owned()),
             json_string(started_at),
             json_string(&finished_at),
             failure
@@ -1083,6 +1113,93 @@ mod qualification {
         )
     }
 
+    fn build_qualification_log(
+        identity: &EvidenceIdentity,
+        context: Option<&RunContext>,
+        failure: Option<&str>,
+    ) -> String {
+        let cleanup = context
+            .map(|value| &value.cleanup)
+            .cloned()
+            .unwrap_or_else(CleanupOutcome::not_attempted);
+        let forced_cleanup = context.is_some_and(|value| value.forced_cleanup);
+        let owner_initial = context.and_then(|value| value.owner_initial.as_ref());
+        let owner_hidden = context.and_then(|value| value.owner_hidden.as_ref());
+        let owner_final = context.and_then(|value| value.owner_final.as_ref());
+        let second_exit = context.and_then(|value| value.second_exit_code);
+        let clean_state = identity
+            .worktree_clean
+            .map_or("UNKNOWN", |value| if value { "CLEAN" } else { "DIRTY" });
+        let second_exit_state =
+            second_exit.map_or(
+                "NOT_OBSERVED",
+                |code| {
+                    if code == 0 { "ZERO" } else { "NONZERO" }
+                },
+            );
+        let result = if failure.is_none() { "PASS" } else { "FAIL" };
+        format!(
+            concat!(
+                "JARVIS Section 1.4 qualification transcript v1\n",
+                "scope=SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION\n",
+                "mode={mode}\n",
+                "candidate_sha_present={candidate}\n",
+                "checkout_sha_present={checkout}\n",
+                "tree_sha_present={tree}\n",
+                "checkout_relationship={relationship}\n",
+                "worktree={clean}\n",
+                "phase.owner_initial={owner_initial}\n",
+                "phase.owner_hidden={owner_hidden}\n",
+                "phase.second_launch_exit={second_exit}\n",
+                "phase.owner_final={owner_final}\n",
+                "cleanup.attempted={cleanup_attempted}\n",
+                "cleanup.succeeded={cleanup_succeeded}\n",
+                "forced_cleanup={forced_cleanup}\n",
+                "failure_present={failure}\n",
+                "result={result}\n"
+            ),
+            mode = match identity.mode.as_str() {
+                "AUTHORITATIVE_GITHUB_ACTIONS" => "AUTHORITATIVE_GITHUB_ACTIONS",
+                "SUPPORTING_LOCAL" => "SUPPORTING_LOCAL",
+                _ => "UNSUPPORTED",
+            },
+            candidate = if is_sha(&identity.candidate_sha) {
+                "true"
+            } else {
+                "false"
+            },
+            checkout = identity.checkout_sha.is_some(),
+            tree = identity.tree_sha.is_some(),
+            relationship = match identity.checkout_relationship.as_str() {
+                "EXACT_CHECKOUT" => "EXACT_CHECKOUT",
+                "SUPPORTING_LOCAL" => "SUPPORTING_LOCAL",
+                _ => "UNKNOWN",
+            },
+            clean = clean_state,
+            owner_initial = if owner_initial.is_some() {
+                "OBSERVED"
+            } else {
+                "NOT_OBSERVED"
+            },
+            owner_hidden = if owner_hidden.is_some() {
+                "OBSERVED"
+            } else {
+                "NOT_OBSERVED"
+            },
+            second_exit = second_exit_state,
+            owner_final = if owner_final.is_some() {
+                "OBSERVED"
+            } else {
+                "NOT_OBSERVED"
+            },
+            cleanup_attempted = cleanup.attempted,
+            cleanup_succeeded = cleanup.succeeded,
+            forced_cleanup = forced_cleanup,
+            failure = failure.is_some(),
+            result = result,
+        )
+    }
+
     fn snapshot_json(snapshot: Option<&WindowSnapshot>) -> String {
         let Some(snapshot) = snapshot else {
             return "null".to_owned();
@@ -1108,10 +1225,26 @@ mod qualification {
             fs::create_dir_all(parent)?;
         }
         fs::write(path, evidence.as_bytes())?;
-        let mut log_path = path.to_path_buf();
-        log_path.set_extension("log");
-        fs::write(log_path, format!("{evidence}\n").as_bytes())?;
         Ok(())
+    }
+
+    fn log_path_for(evidence_path: &Path) -> PathBuf {
+        let mut log_path = evidence_path.to_path_buf();
+        log_path.set_extension("log");
+        log_path
+    }
+
+    fn write_log(path: &Path, log: &str) -> io::Result<String> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, log.as_bytes())?;
+        sha256_file(path).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                "qualification log could not be hashed after writing",
+            )
+        })
     }
 
     fn command_version(command: &str) -> String {

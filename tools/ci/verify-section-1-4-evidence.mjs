@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { readFile as readFileAsync } from "node:fs/promises";
+import { join } from "node:path";
 import { isMain } from "./lib.mjs";
 
 const AUTHORITY_POLICY_TEXT = readFileSync(
@@ -13,7 +14,7 @@ const NATIVE_MANIFEST_TEXT = readFileSync(
   new URL("../../platform/windows/native/tests/windows_process_qualification.rs", import.meta.url),
   "utf8",
 );
-const EXPECTED_NATIVE_MANIFEST_SHA256 = "77dbf32273136adc2ecbcb9131f5352c8a0507ed95abc2f144d2749ed0c23939";
+const EXPECTED_NATIVE_MANIFEST_SHA256 = "3f4e7c55eea615c34fa0867d671db9affcf29d87e5545b3a76f15a20d3663ae0";
 const SCOPES = new Set([
   "SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION",
   "SECTION_1_4_WINDOWS_NATIVE_QUALIFICATION",
@@ -80,6 +81,7 @@ const COMMON_TOP_LEVEL_KEYS = [
 const TAURI_TOP_LEVEL_KEYS = [
   ...COMMON_TOP_LEVEL_KEYS,
   "executableSha256",
+  "logSha256",
   "cleanup",
   "ownerInitial",
   "ownerHidden",
@@ -99,6 +101,13 @@ const NATIVE_TOP_LEVEL_KEYS = [
   "logSha256",
   "tests",
 ];
+
+const RETAINED_LOG_FILENAMES = Object.freeze({
+  SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION:
+    "jarvis-tauri-single-instance-qualification.log",
+  SECTION_1_4_WINDOWS_NATIVE_QUALIFICATION:
+    "jarvis-windows-native-qualification.log",
+});
 
 const EXPECTED_AUTHORITY_POLICY = {
   schemaVersion: 2,
@@ -627,6 +636,7 @@ function validateTauriEvidence(evidence) {
       (typeof evidence.executableSha256 !== "string" || !/^[0-9a-f]{64}$/.test(evidence.executableSha256))) {
     fail("Tauri evidence executableSha256 must be a lowercase SHA-256 or null");
   }
+  validateLogSha256(evidence, "Tauri");
   for (const key of ["ownerInitial", "ownerHidden", "ownerFinal"]) validateSnapshot(evidence[key], key);
   const second = requireObject(evidence.second, "second");
   requireExactKeys(second, SECOND_KEYS, "second");
@@ -690,15 +700,11 @@ function validateNativeEvidence(evidence) {
       (typeof evidence.manifestSha256 !== "string" || !/^[0-9a-f]{64}$/.test(evidence.manifestSha256))) {
     fail("native evidence manifestSha256 must be a lowercase SHA-256 or null");
   }
-  if (evidence.logSha256 !== null &&
-      (typeof evidence.logSha256 !== "string" || !/^[0-9a-f]{64}$/.test(evidence.logSha256))) {
-    fail("native evidence logSha256 must be a lowercase SHA-256 or null");
-  }
+  validateLogSha256(evidence, "native");
   if (evidence.status.endsWith("PASS")) {
     if (evidence.manifestSha256 !== EXPECTED_NATIVE_MANIFEST_SHA256) {
       fail("passing native evidence manifest digest is not the approved manifest");
     }
-    if (evidence.logSha256 === null) fail("passing native evidence requires a log SHA-256");
     if (evidence.exitCode !== 0) fail("passing native evidence requires exitCode 0");
     if (evidence.manifestCount !== NATIVE_QUALIFICATION_MANIFEST.length) fail("native evidence manifestCount is not canonical");
     if (evidence.observedCount !== NATIVE_QUALIFICATION_MANIFEST.length) fail("native evidence observedCount is incomplete");
@@ -726,6 +732,40 @@ function validateNativeEvidence(evidence) {
   }
 }
 
+function validateLogSha256(evidence, label) {
+  if (evidence.logSha256 !== null &&
+      (typeof evidence.logSha256 !== "string" || !/^[0-9a-f]{64}$/.test(evidence.logSha256))) {
+    fail(`${label} evidence logSha256 must be a lowercase SHA-256 or null`);
+  }
+  if (evidence.status.endsWith("PASS") && evidence.logSha256 === null) {
+    fail(`passing ${label} evidence requires a log SHA-256`);
+  }
+}
+
+export function validateRetainedLog(evidence, retainedLogPath) {
+  if (typeof retainedLogPath !== "string" || retainedLogPath.length === 0) {
+    fail("retained qualification log path must be a non-empty string");
+  }
+  let logBytes;
+  try {
+    logBytes = readFileSync(retainedLogPath);
+  } catch (error) {
+    fail(`retained qualification log is unavailable: ${error.message}`);
+  }
+  if (evidence.logSha256 === null) {
+    fail("evidence with a retained qualification log requires logSha256");
+  }
+  const retainedSha256 = createHash("sha256").update(logBytes).digest("hex");
+  if (retainedSha256 !== evidence.logSha256) {
+    fail("retained qualification log does not match evidence logSha256");
+  }
+  if (evidence.scope === "SECTION_1_4_WINDOWS_TAURI_SINGLE_INSTANCE_QUALIFICATION" &&
+      !logBytes.toString("utf8").startsWith("JARVIS Section 1.4 qualification transcript v1\n")) {
+    fail("retained Tauri qualification log is not the canonical transcript format");
+  }
+  return Object.freeze({ retainedSha256 });
+}
+
 export function parseSection14Evidence(text) {
   if (typeof text !== "string") fail("evidence input must be text");
   assertNoDuplicateJsonKeys(text);
@@ -749,6 +789,21 @@ export function validateSection14Evidence(evidence, options = {}) {
   } else {
     validateNativeEvidence(evidence);
   }
+  if (options.retainedLogPath !== undefined && options.artifactDir !== undefined) {
+    fail("retainedLogPath and artifactDir are mutually exclusive");
+  }
+  if (options.retainedLogPath !== undefined) {
+    validateRetainedLog(evidence, options.retainedLogPath);
+  }
+  if (options.artifactDir !== undefined) {
+    if (typeof options.artifactDir !== "string" || options.artifactDir.length === 0) {
+      fail("artifactDir must be a non-empty string");
+    }
+    validateRetainedLog(
+      evidence,
+      join(options.artifactDir, RETAINED_LOG_FILENAMES[evidence.scope]),
+    );
+  }
   return Object.freeze({
     scope: evidence.scope,
     status: evidence.status,
@@ -759,14 +814,25 @@ export function validateSection14Evidence(evidence, options = {}) {
 
 async function main() {
   const [, , evidencePath, ...args] = process.argv;
-  if (!evidencePath) throw new Error("usage: verify-section-1-4-evidence.mjs <evidence.json> [--authoritative] [--expected-candidate <sha>]");
+  if (!evidencePath) throw new Error("usage: verify-section-1-4-evidence.mjs <evidence.json> [--authoritative] [--expected-candidate <sha>] [--artifact-dir <dir>] [--retained-log <path>]");
   const authoritative = args.includes("--authoritative");
   const expectedIndex = args.indexOf("--expected-candidate");
   const expectedCandidateSha = expectedIndex >= 0 ? args[expectedIndex + 1] : null;
   if (expectedIndex >= 0 && !expectedCandidateSha) throw new Error("--expected-candidate requires a SHA");
+  const artifactIndex = args.indexOf("--artifact-dir");
+  const artifactDir = artifactIndex >= 0 ? args[artifactIndex + 1] : undefined;
+  if (artifactIndex >= 0 && !artifactDir) throw new Error("--artifact-dir requires a directory");
+  const retainedLogIndex = args.indexOf("--retained-log");
+  const retainedLogPath = retainedLogIndex >= 0 ? args[retainedLogIndex + 1] : undefined;
+  if (retainedLogIndex >= 0 && !retainedLogPath) throw new Error("--retained-log requires a path");
   const text = await readFileAsync(evidencePath, "utf8");
   const evidence = parseSection14Evidence(text);
-  const result = validateSection14Evidence(evidence, { authoritative, expectedCandidateSha });
+  const result = validateSection14Evidence(evidence, {
+    authoritative,
+    expectedCandidateSha,
+    artifactDir,
+    retainedLogPath,
+  });
   console.log(`[section-1-4-evidence] ${JSON.stringify(result)}`);
 }
 
