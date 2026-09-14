@@ -21,6 +21,8 @@ const DECISION_RECORD_REFERENCE_EXEMPTIONS = new Set([
   "tests/layers/unit/contract-drift.test.mjs",
   "tests/layers/unit/phase0-checkpoint.test.mjs",
 ]);
+const ADR_REFERENCE_PATTERN = /(?:^|[-_.\s/])adr(?:\.[A-Za-z0-9]+|[-_ ](?:[A-Za-z0-9][A-Za-z0-9._-]*)?\.[A-Za-z0-9]+|[-_ ]?\d+(?:[-_.\s]|$))/i;
+const DECISION_RECORD_FILENAME_PATTERN = /(?:^|[-_. ])decision[-_ ]?records?(?:[-_. ]|$)/i;
 
 function extension(path) {
   const name = basename(path);
@@ -36,7 +38,7 @@ export function validateTrackedDecisionRecordPaths(paths) {
       violations.push(violation("MANIFEST_DECISION_RECORD_PATH", path, "tracked ADR/decision/history directories are prohibited, including nested and case variants"));
     }
     const name = segments.at(-1) ?? "";
-    if (/(?:^|\/)(?:adr|decision)[-_]?\d+(?:[-_.]|$)/i.test(path) || /(?:^|[-_.])decision[-_]?records?(?:[-_.]|$)/i.test(name)) {
+    if (ADR_REFERENCE_PATTERN.test(path) || DECISION_RECORD_FILENAME_PATTERN.test(name)) {
       violations.push(violation("MANIFEST_DECISION_RECORD_FILENAME", path, "tracked ADR-like or decision-like filenames are prohibited"));
     }
   }
@@ -45,10 +47,10 @@ export function validateTrackedDecisionRecordPaths(paths) {
 
 export function hasForbiddenDecisionRecordReference(text) {
   const value = String(text);
-  return /\badr[-_]\d+\b/i.test(value) ||
+  return ADR_REFERENCE_PATTERN.test(value) ||
     /(?:^|[\s`"'(])docs[\\/](?:adr|adrs|decision|decisions|history)(?=$|[\\/\s`"')])/im.test(value) ||
-    /(?:^|[\s`"'(])(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]*(?:decision[-_ ]?record|adr[-_]\d+)[A-Za-z0-9_.-]*\.[A-Za-z0-9]+(?=$|[\s`"')])/im.test(value) ||
-    /(?:^|[\s`"'(])(?:[A-Za-z0-9_.-]+[-_])*(?:decision[-_ ]?record|adr[-_]\d+)(?:[-_][A-Za-z0-9_.-]+)*(?:\.[A-Za-z0-9]+)(?=$|[\s`"')])/im.test(value);
+    /(?:^|[\s`"'(])(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]*decision[-_ ]?record[A-Za-z0-9_.-]*\.[A-Za-z0-9]+(?=$|[\s`"')])/im.test(value) ||
+    /(?:^|[\s`"'(])(?:[A-Za-z0-9_.-]+[-_])*(?:decision[-_ ]?record)(?:[-_][A-Za-z0-9_.-]+)*(?:\.[A-Za-z0-9]+)(?=$|[\s`"')])/im.test(value);
 }
 
 function trackedPaths(rootDir) {

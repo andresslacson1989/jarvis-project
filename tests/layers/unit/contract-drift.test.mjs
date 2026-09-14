@@ -43,18 +43,31 @@ import { hasForbiddenDecisionRecordReference, validateContractManifest, validate
 
 test("tracked ADR/decision/history paths are rejected globally, including nested case variants", () => {
   const violations = validateTrackedDecisionRecordPaths([
+    "archive/ADR.md",
+    "archive/ADR-example.md",
+    "archive/ADR-099.md",
+    "archive/ADR_099",
+    "archive/ADR099",
+    "archive/ADR 099",
     "docs/architecture/ADR-099.md",
     "docs/Architecture/Decisions/note.md",
     "docs/HISTORY/previous.md",
+    "notes/renamed-decision-record.md",
   ]);
   const codes = violations.map(({ code }) => code);
   assert.ok(codes.includes("MANIFEST_DECISION_RECORD_PATH"));
-  assert.ok(codes.includes("MANIFEST_DECISION_RECORD_FILENAME"));
+  const filenameViolations = violations.filter(({ code }) => code === "MANIFEST_DECISION_RECORD_FILENAME");
+  assert.equal(filenameViolations.length, 8);
 });
 
 test("tracked content cannot cite deleted ADR, decision, or history source paths", () => {
+  assert.equal(hasForbiddenDecisionRecordReference("See ADR.md"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See ADR-example.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See ADR-099"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See ADR-099.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See ADR_099"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See ADR099"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See ADR 099"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See adr-099"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/architecture/ADR-099.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/adr/ADR-099.md"), true);
@@ -62,7 +75,7 @@ test("tracked content cannot cite deleted ADR, decision, or history source paths
   assert.equal(hasForbiddenDecisionRecordReference("See docs/history/legacy.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See archive/renamed-decision-record.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See archive/renamed-DecisionRecord.md"), true);
-  assert.equal(hasForbiddenDecisionRecordReference("ADR/decision-record material is prohibited by policy."), false);
+  assert.equal(hasForbiddenDecisionRecordReference("ADRs are prohibited by policy; ADR/decision-record material is prohibited by policy."), false);
 });
 
 const canonical = JSON.parse(readFileSync(resolve(root, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"), "utf8"));
