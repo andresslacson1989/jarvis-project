@@ -21,7 +21,7 @@ const DECISION_RECORD_REFERENCE_EXEMPTIONS = new Set([
   "tests/layers/unit/contract-drift.test.mjs",
   "tests/layers/unit/phase0-checkpoint.test.mjs",
 ]);
-const ADR_REFERENCE_PATTERN = /(?:^|[-_.\s/])adr(?:\.[A-Za-z0-9]+|[-_ ](?:[A-Za-z0-9][A-Za-z0-9._-]*)?\.[A-Za-z0-9]+|[-_ ]?\d+(?:[-_.\s]|$))/i;
+const ADR_REFERENCE_PATTERN = /(?:^|[-_.\s/\\])adr(?:\.[A-Za-z0-9]+|[-_ ](?:[A-Za-z0-9][A-Za-z0-9._-]*)?\.[A-Za-z0-9]+|[-_ ]?\d+(?:[-_.\s]|$))/i;
 const DECISION_RECORD_FILENAME_PATTERN = /(?:^|[-_. ])decision[-_ ]?records?(?:[-_. ]|$)/i;
 
 function extension(path) {
@@ -33,12 +33,13 @@ function extension(path) {
 export function validateTrackedDecisionRecordPaths(paths) {
   const violations = [];
   for (const path of [...paths].sort((a, b) => a.localeCompare(b, "en"))) {
-    const segments = path.split("/");
+    const normalizedPath = path.replaceAll("\\", "/");
+    const segments = normalizedPath.split("/");
     if (segments.some((segment) => /^(?:adr|adrs|decision|decisions|history)$/i.test(segment))) {
       violations.push(violation("MANIFEST_DECISION_RECORD_PATH", path, "tracked ADR/decision/history directories are prohibited, including nested and case variants"));
     }
     const name = segments.at(-1) ?? "";
-    if (ADR_REFERENCE_PATTERN.test(path) || DECISION_RECORD_FILENAME_PATTERN.test(name)) {
+    if (ADR_REFERENCE_PATTERN.test(normalizedPath) || DECISION_RECORD_FILENAME_PATTERN.test(name)) {
       violations.push(violation("MANIFEST_DECISION_RECORD_FILENAME", path, "tracked ADR-like or decision-like filenames are prohibited"));
     }
   }

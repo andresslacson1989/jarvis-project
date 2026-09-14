@@ -42,22 +42,39 @@ import { checkGeneratedArtifacts, writeGeneratedArtifacts } from "../../../tools
 import { hasForbiddenDecisionRecordReference, validateContractManifest, validateTrackedDecisionRecordPaths } from "../../../tools/contract/manifest.mjs";
 
 test("tracked ADR/decision/history paths are rejected globally, including nested case variants", () => {
-  const violations = validateTrackedDecisionRecordPaths([
+  const prohibitedFilenamePaths = [
     "archive/ADR.md",
     "archive/ADR-example.md",
     "archive/ADR-099.md",
     "archive/ADR_099",
     "archive/ADR099",
     "archive/ADR 099",
+    "archive/ADR.099",
     "docs/architecture/ADR-099.md",
+    "docs\\architecture\\ADR-099.md",
+    "docs\\architecture\\ADR.md",
+    "notes/renamed-decision-record.md",
+    "archive\\decision-record.md",
+  ];
+  const prohibitedDirectoryPaths = [
     "docs/Architecture/Decisions/note.md",
     "docs/HISTORY/previous.md",
-    "notes/renamed-decision-record.md",
+    "docs\\history\\previous.md",
+  ];
+  const violations = validateTrackedDecisionRecordPaths([
+    ...prohibitedFilenamePaths,
+    ...prohibitedDirectoryPaths,
   ]);
   const codes = violations.map(({ code }) => code);
   assert.ok(codes.includes("MANIFEST_DECISION_RECORD_PATH"));
   const filenameViolations = violations.filter(({ code }) => code === "MANIFEST_DECISION_RECORD_FILENAME");
-  assert.equal(filenameViolations.length, 8);
+  assert.equal(filenameViolations.length, prohibitedFilenamePaths.length);
+  for (const path of prohibitedFilenamePaths) {
+    assert.ok(filenameViolations.some((item) => item.path === path), "expected filename rejection for " + path);
+  }
+  for (const path of prohibitedDirectoryPaths) {
+    assert.ok(violations.some((item) => item.code === "MANIFEST_DECISION_RECORD_PATH" && item.path === path), "expected directory rejection for " + path);
+  }
 });
 
 test("tracked content cannot cite deleted ADR, decision, or history source paths", () => {
@@ -68,13 +85,18 @@ test("tracked content cannot cite deleted ADR, decision, or history source paths
   assert.equal(hasForbiddenDecisionRecordReference("See ADR_099"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See ADR099"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See ADR 099"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See ADR.099"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See adr-099"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/architecture/ADR-099.md"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See docs\\architecture\\ADR-099.md"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See docs\\architecture\\ADR.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/adr/ADR-099.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/DECISIONS/legacy.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/history/legacy.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See archive/renamed-decision-record.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See archive/renamed-DecisionRecord.md"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See archive\\decision-record.md"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See archive\\renamed-DecisionRecord.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("ADRs are prohibited by policy; ADR/decision-record material is prohibited by policy."), false);
 });
 
@@ -185,6 +207,11 @@ test("manifest validation scans only tracked repository content end to end", asy
     await rm(forbiddenPath);
     const cleanReference = resolve(dir, "docs/architecture/notes.md");
     await writeFile(cleanReference, "See ADR_099 for the historical decision.\n");
+    execFileSync("git", ["add", "-A"], { cwd: dir, stdio: "ignore" });
+    result = await validateContractManifest(dir);
+    assert.ok(result.violations.some(({ code }) => code === "MANIFEST_DECISION_RECORD_REFERENCE"));
+
+    await writeFile(cleanReference, "See docs\\architecture\\ADR.md for the historical decision.\n");
     execFileSync("git", ["add", "-A"], { cwd: dir, stdio: "ignore" });
     result = await validateContractManifest(dir);
     assert.ok(result.violations.some(({ code }) => code === "MANIFEST_DECISION_RECORD_REFERENCE"));
