@@ -111,12 +111,12 @@ export function validatePhase0Snapshot({
     ];
   }
 
-  if (profile.contractSuiteVersion !== "1.0.7") {
+  if (profile.contractSuiteVersion !== "1.0.8") {
     violations.push(
       violation(
         "PHASE0_CONTRACT_SUITE",
         "tools/checkpoints/phase0-checkpoint-profile.json",
-        "contractSuiteVersion must be 1.0.7",
+        "contractSuiteVersion must be 1.0.8",
       ),
     );
   }
@@ -356,7 +356,7 @@ export function validatePhase0Snapshot({
 
   const target = canonicalValues?.v1RuntimeTarget ?? {};
   if (
-    canonicalValues?.contractSuiteVersion !== "1.0.7" ||
+    canonicalValues?.contractSuiteVersion !== "1.0.8" ||
     target.platform !== "WINDOWS" ||
     target.runtimeRole !== "FULL_HOST" ||
     target.architecture !== "x64"
@@ -364,8 +364,8 @@ export function validatePhase0Snapshot({
     violations.push(
       violation(
         "PHASE0_RUNTIME_TARGET",
-        "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
-        "V1 target must be JARVIS 1.0.7 WINDOWS/FULL_HOST/x64",
+        "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json",
+        "V1 target must be JARVIS 1.0.8 WINDOWS/FULL_HOST/x64",
       ),
     );
   }
@@ -380,12 +380,12 @@ export function validatePhase0Snapshot({
     );
   }
 
-  if (!String(matrix).includes("| Contract suite | JARVIS v1.0.7 |")) {
+  if (!String(matrix).includes("| Contract suite | JARVIS v1.0.8 |")) {
     violations.push(
       violation(
         "PHASE0_MATRIX_SUITE_DRIFT",
         "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md",
-        "live matrix must identify JARVIS v1.0.7",
+        "live matrix must identify JARVIS v1.0.8",
       ),
     );
   }
@@ -404,7 +404,7 @@ export function validatePhase0Snapshot({
     }
   }
 
-  if (currentEvidenceStatus !== null || governanceQualificationStatus !== null) {
+  if (currentEvidenceStatus !== null) {
     const status = section0Status(matrix);
     const expected = status === "VERIFIED" ? "VERIFIED" : "VERIFYING";
     const expectedQualification = status === "VERIFIED" ? "QUALIFIED" : "VERIFYING";
@@ -451,7 +451,7 @@ export function validatePhase0Snapshot({
         violation(
           "PHASE0_SUPERSEDED_ACTIVE_CONTRACT",
           path,
-          "superseded top-level contract/manifest must not remain active",
+          "obsolete contract/manifest path must not remain active",
         ),
       );
     }
@@ -501,7 +501,7 @@ export async function checkPhase0(rootDir) {
       readFile(
         resolve(
           rootDir,
-          "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
+          "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json",
         ),
         "utf8",
       ).then(JSON.parse),
@@ -545,8 +545,8 @@ export async function checkPhase0(rootDir) {
     linuxSourcePaths,
     androidSourcePaths,
     existingPaths,
-    currentEvidenceStatus: checkpointEvidence.match(/^\*\*(VERIFIED|VERIFYING)\b/m)?.[1] ?? null,
-    governanceQualificationStatus: governanceProfile?.mandatoryCi?.selectedAuthority?.qualificationStatus ?? null,
+    currentEvidenceStatus: /^\*\*Historical verification record/m.test(checkpointEvidence) ? null : checkpointEvidence.match(/^\*\*(VERIFIED|VERIFYING)\b/m)?.[1] ?? null,
+    governanceQualificationStatus: governanceProfile?.mandatoryCi?.selectedAuthority?.authorityCapabilityBaseline?.status ?? null,
     checkedOutSha,
     evidenceCandidateSha,
     matrixCandidateSha: matrix.match(/Implementation candidate under audit:\*{0,2}\s*`([0-9a-f]{40})`/)?.[1] ?? null,

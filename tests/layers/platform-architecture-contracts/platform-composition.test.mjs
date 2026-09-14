@@ -23,7 +23,7 @@ test("platform selection stays in the composition root and Linux remains non-run
 test("Rust host projection cannot drift from canonical platform identity", async () => {
   const canonical = JSON.parse(
     await readFile(
-      resolve(root, "packages", "schemas", "src", "canonical", "v1", "jarvis-v1.0.7.contract-values.json"),
+      resolve(root, "packages", "schemas", "src", "canonical", "v1", "jarvis-v1.0.8.contract-values.json"),
       "utf8",
     ),
   );

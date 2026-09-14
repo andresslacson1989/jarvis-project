@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "checkpointId": "0.CP",
   "checkpointName": "Repository Governance + Platform Boundary + Contract-Drift Protection Ready",
-  "contractSuiteVersion": "1.0.7",
+  "contractSuiteVersion": "1.0.8",
   "requiredWorkflowSteps": [
     {
       "name": "Install dependencies without lifecycle scripts",
@@ -21,16 +21,8 @@
       "run": "pnpm schema:check"
     },
     {
-      "name": "Generated contract artifacts",
-      "run": "pnpm contract:check-generated"
-    },
-    {
-      "name": "Contract manifest",
-      "run": "pnpm contract:check-manifest"
-    },
-    {
-      "name": "Contract and profile drift",
-      "run": "pnpm contract:check-drift"
+      "name": "Contract suite validation",
+      "run": "pnpm contract:check"
     },
     {
       "name": "Repository governance",
@@ -113,7 +105,29 @@
     "docs/implementation/evidence/0.13-master-protection-blocker.md"
   ],
   "forbiddenActivePaths": [
+    "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md",
+    "docs/JARVIS-CONTRACT-MANIFEST-v1.0.3.md",
+    "docs/JARVIS-CONTRACT-MANIFEST-v1.0.4.md",
     "docs/JARVIS-CONTRACT-MANIFEST-v1.0.5.md",
-    "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md"
+    "docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md",
+    "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md",
+    "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md",
+    "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md",
+    "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md",
+    "docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md",
+    "docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md",
+    "docs/implementation/JARVIS-DATA-STATE-CONTRACT.md",
+    "docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md",
+    "docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md",
+    "docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md",
+    "docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md",
+    "docs/implementation/JARVIS-RUNTIME-CONTRACT.md",
+    "docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md",
+    "docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md",
+    "docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md",
+    "docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md",
+    "docs/adr",
+    "docs/decisions",
+    "docs/history"
   ]
 }

@@ -1,13 +1,13 @@
 import { fileURLToPath } from "node:url";
-import { extractFenceAfter, extractTypeUnion, isMain, printViolations, readCanonical, readUtf8, sameSet, violation, escapeRegex } from "./lib.mjs";
+import { extractFenceAfter, extractTypeUnion, isMain, MANIFEST_PATH, printViolations, readCanonical, readUtf8, sameSet, violation, escapeRegex } from "./lib.mjs";
 
 const DOCS = Object.freeze({
-  manifest: "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md",
+  manifest: MANIFEST_PATH,
   releaseProfile: "docs/JARVIS-V1-RELEASE-PROFILE.md",
-  portability: "docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md",
-  protocol: "docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md",
-  backup: "docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md",
-  supplyChain: "docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md",
+  portability: "docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md",
+  protocol: "docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md",
+  backup: "docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md",
+  supplyChain: "docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md",
 });
 
 function regexValue(text, regex) {
@@ -87,12 +87,18 @@ export function checkContractDriftFromTexts(canonical, docs) {
   expectSet(violations, "DRIFT_PROVIDER_SETUP_STATES", DOCS.protocol, extractTypeUnion(protocol, "ProviderSetupState"), canonical.providerSetupStates, "ProviderSetupState");
   expectSet(violations, "DRIFT_MODULE_EXECUTION_CLASSES", DOCS.protocol, extractTypeUnion(protocol, "ModuleExecutionClass"), canonical.moduleExecutionClasses, "ModuleExecutionClass");
 
-  const governanceSection = section(releaseProfile, "# 17. REPOSITORY GOVERNANCE GATE", "# 18. PRODUCTION-COMPLETE GATE");
-  for (const authority of canonical.ciAuthorities.eligibleTypes) {
-    expectRegex(violations, "DRIFT_CI_AUTHORITY_TYPES", DOCS.releaseProfile, governanceSection, new RegExp(`\\b${escapeRegex(authority)}\\b`), `eligible CI authority ${authority} missing`);
-  }
+  const governanceSection = section(releaseProfile, "# RP-17 — REPOSITORY GOVERNANCE GATE", "# RP-18 — PRODUCTION-COMPLETE GATE");
+  if (JSON.stringify(canonical.ciAuthorities.eligibleTypes) !== JSON.stringify(["GITHUB_ACTIONS"])) violations.push(violation("DRIFT_CI_AUTHORITY_TYPES", DOCS.manifest, "only GITHUB_ACTIONS may be eligible"));
+  expectRegex(violations, "DRIFT_CI_AUTHORITY_TYPES", DOCS.releaseProfile, governanceSection, /GITHUB_ACTIONS/, "GitHub Actions authority missing");
+  expectRegex(violations, "DRIFT_CI_GITLAB_MIRROR", DOCS.releaseProfile, governanceSection, /GitLab is repository mirror-only/, "GitLab mirror-only rule missing");
+  expectRegex(violations, "DRIFT_CI_LOCALCI_NONAUTHORITY", DOCS.releaseProfile, governanceSection, /LocalCI[\s\S]*?cannot satisfy this gate/, "LocalCI non-authority rule missing");
   expectRegex(violations, "DRIFT_SELECTED_CI_AUTHORITY", DOCS.releaseProfile, governanceSection, new RegExp(`qualified[^\\n]*${escapeRegex(canonical.ciAuthorities.selectedType)}`, "i"), `selected CI authority ${canonical.ciAuthorities.selectedType} missing`);
   expectRegex(violations, "DRIFT_CI_PIPELINE_IDENTITY", DOCS.releaseProfile, governanceSection, new RegExp(`\\b${escapeRegex(canonical.ciAuthorities.pipelineIdentity)}\\b`, "i"), `CI pipeline identity ${canonical.ciAuthorities.pipelineIdentity} missing`);
+
+  const ttsAec = section(protocol, "## J01-RT-26A", "## J01-RT-27");
+  for (const marker of ["tts.started", "tts.audio_chunk", "tts.completed", "tts.stopped", "tts.error", "exact speaker/TTS render reference", "double-talk handling", "noise suppression", "gain control", "sample rates", "Provider Supervisor", "safe half-duplex fallback"]) {
+    expectRegex(violations, "DRIFT_TTS_AEC_CONTRACT", DOCS.protocol, ttsAec, new RegExp(escapeRegex(marker), "i"), `required normalized TTS/AEC marker missing: ${marker}`);
+  }
 
   const githubAll = [...canonical.githubCapabilities.mandatory, ...canonical.githubCapabilities.optional];
   expectSet(violations, "DRIFT_GITHUB_PROTOCOL_CAPABILITIES", DOCS.protocol, extractTypeUnion(protocol, "GitHubCapability"), githubAll, "GitHub protocol capabilities");

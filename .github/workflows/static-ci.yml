@@ -148,14 +148,8 @@ jobs:
       - name: Schema integrity
         run: pnpm schema:check
 
-      - name: Generated contract artifacts
-        run: pnpm contract:check-generated
-
-      - name: Contract manifest
-        run: pnpm contract:check-manifest
-
-      - name: Contract and profile drift
-        run: pnpm contract:check-drift
+      - name: Contract suite validation
+        run: pnpm contract:check
 
       - name: Repository governance
         run: pnpm governance:check
@@ -183,6 +177,9 @@ jobs:
 
       - name: Desktop foundation contract
         run: pnpm desktop:foundation:check
+
+      - name: Desktop security contract
+        run: pnpm desktop:security:check
 
       - name: Architecture enforcement
         run: pnpm architecture:check

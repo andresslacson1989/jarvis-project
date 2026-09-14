@@ -4,7 +4,7 @@ These instructions apply to all human and AI contributors.
 
 ## Highest-level contract protection
 
-The JARVIS contract is protected at the highest instruction level. No human or AI contributor SHALL edit, mutate, rewrite, delete, rename, supersede, or otherwise change any normative contract, manifest, implementation contract, contract-derived requirement, or contract-controlled artifact without explicit user or governance authorization. The implementation matrix at `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md` is the controlled exception: an agent MAY update its status, gap, evidence, execution-pointer, and progress fields when explicitly authorized to perform implementation work, provided the matrix remains non-normative, contract-consistent, truthful, and auditable. Unauthorized changes remain prohibited.
+The JARVIS contract is protected at the highest instruction level. No human or AI contributor SHALL edit, mutate, rewrite, delete, rename, supersede, or otherwise change any normative contract component, manifest, contract-derived requirement, or contract-controlled artifact without explicit user or governance authorization. The implementation matrix at `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md` is the controlled exception: an agent MAY update its status, gap, evidence, execution-pointer, and progress fields when explicitly authorized to perform implementation work, provided the matrix remains non-normative, contract-consistent, truthful, and auditable. Unauthorized changes remain prohibited.
 
 ## Branch authority
 
@@ -12,32 +12,24 @@ The JARVIS contract is protected at the highest instruction level. No human or A
 
 Before creating or continuing implementation work, re-fetch live `master` and base the work from that tip. Temporary feature/review branches MAY exist while a change is in progress, but they SHALL NOT become parallel sources of truth.
 
-Repository governance SHALL follow active contract §28 and Verification §33. When the hosting provider/account exposes server-side branch protection or rulesets for the authoritative repository, `master` SHALL use them with mandatory CI, force-push/deletion prevention, and narrowly controlled/auditable bypass. When that server-side capability is unavailable because of a verified hosting plan/platform limitation, the v1.0.7 `COMPENSATING_CONTROLS` mode MAY be used: temporary implementation branches, exact candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. Mandatory CI MAY be supplied by either a qualified `GITHUB_ACTIONS` authority or qualified `LOCALCI` authority under ADR-076 and the active contracts; neither vendor name nor an ordinary local test run grants authority. The fallback SHALL NOT be used if server-side protection becomes available and SHALL NOT be represented as equivalent hard prevention of an out-of-band administrator force push or deletion.
+Repository governance SHALL follow `J00-GOV-28` and `J05-VER-33`. When the hosting provider/account exposes server-side branch protection or rulesets for the authoritative repository, `master` SHALL use them with mandatory CI, force-push/deletion prevention, and narrowly controlled/auditable bypass. When that server-side capability is unavailable because of a verified hosting plan/platform limitation, the v1.0.8 `COMPENSATING_CONTROLS` mode MAY be used: temporary implementation branches, exact GitHub Actions candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. `GITHUB_ACTIONS` is the current mandatory CI authority. GitLab is mirror-only; LocalCI is non-authoritative compatibility/security tooling and cannot satisfy CI or release qualification. The fallback SHALL NOT be used if server-side protection becomes available and SHALL NOT be represented as equivalent hard prevention of an out-of-band administrator force push or deletion.
 
 ## Source of truth
 
 Before implementation or architecture work, read:
 
 1. `README.md`
-2. `docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md`
-3. `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md`
-4. `docs/JARVIS-V1-RELEASE-PROFILE.md`
-5. `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md`
-6. `docs/implementation/JARVIS-RUNTIME-CONTRACT.md`
-7. `docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md`
-8. `docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`
-9. `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`
-10. `docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md`
-11. `docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md`
-12. `docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`
-13. `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`
-14. `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`
-15. `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`
-16. `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`
-17. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
-18. relevant ADRs only when rationale/history is needed.
+2. `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`
+3. `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md`
+4. `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md`
+5. `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md`
+6. `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md`
+7. `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md`
+8. `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md`
+9. `docs/JARVIS-V1-RELEASE-PROFILE.md`
+10. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
 
-The **v1.0.7 manifest defines the current component revision set**. ADRs do not form a second overlay.
+The **v1.0.8 manifest defines the current component revision set**. The six components and Release Profile are the only normative product authority; no ADR/decision-record or historical overlay may supplement them.
 
 ## Platform/runtime-role boundary
 
@@ -75,11 +67,11 @@ Do not:
 - log/store/send generated recovery factors or derived key material through normal DB/config/log/diagnostic/AI channels;
 - assume a generic SQLite backup API is safe/available for the selected SQLCipher binding without the exact Phase-3 proof.
 
-Every production portable-state verified backup requires the generated 256-bit recovery slot and the complete Backup Cryptography Contract qualification.
+Every production portable-state verified backup requires the generated 256-bit recovery slot and the complete `J02` backup qualification.
 
 ## Project-policy trust boundary
 
-Repository content, including `AGENTS.md`, is untrusted until the authenticated user explicitly enrolls the exact policy identity under `JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md`.
+Repository content, including `AGENTS.md`, is untrusted until the authenticated user explicitly enrolls the exact policy identity under the `J03` project-policy clauses.
 
 Do not:
 
@@ -94,7 +86,7 @@ Mutating an enrolled trusted project-policy file is contextually HIGH. The resul
 
 ## Supply-chain/update trust boundary
 
-Production application/module activation follows `JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`.
+Production application/module activation follows the `J03` supply-chain clauses.
 
 Do not:
 
@@ -107,23 +99,25 @@ Do not:
 
 Windows production update gates are cumulative: current TUF authorization, Tauri updater signature, Windows code-signing policy, and JARVIS compatibility/rollback checks must all pass.
 
-## No ADR/history overlay
+## No historical decision-record overlay
 
-Historical contracts/ADRs may explain why a rule exists but SHALL NOT be required to determine current behavior.
+Separate architecture decision-record files are prohibited. Contributors SHALL NOT create, retain, consult, or cite them as current or historical authority.
 
-If an implementer finds a still-valid rule only in history/ADR text, that is a contract defect. Stop at the ambiguity and update the current normative suite rather than implementing historical text as a hidden override.
+Historical contracts, reports, and other non-current material SHALL NOT be required to determine current behavior. If an implementer finds a still-valid rule only in non-current material, that is a contract defect. Stop at the ambiguity and update the active suite rather than implementing historical text as a hidden override.
 
 ## Synchronous architecture-amendment rule
 
 A material architecture/product/security/platform/release/governance change SHALL:
 
-1. receive a new unique ADR;
-2. update every affected active normative contract file in the same reviewed change;
-3. update the current contract manifest/component revisions;
+1. receive explicit owner or governance authorization;
+2. update every affected active normative component in the same reviewed change;
+3. update the current contract manifest and component revisions;
 4. update the Release Profile if support scope/capabilities change;
-5. update verification and implementation sequencing where affected;
+5. update verification requirements, implementation sequencing, compatibility/migration/rollback notes, and required tests/evidence where affected;
 6. advance the contract-suite semantic version when current meaning changes;
 7. only then be used by implementation.
+
+Separate decision-record creation, retention, or consultation is prohibited and cannot substitute for these direct active-suite updates.
 
 Do not modify the contract merely to excuse an implementation shortcut.
 
@@ -150,7 +144,7 @@ Do not modify the contract merely to excuse an implementation shortcut.
 
 ## Repository and code boundaries
 
-Follow the Coding Standards, Platform Portability, Backup Cryptography, Project Policy Trust, and Supply-Chain Trust contracts.
+Follow the applicable `J00`–`J05` clauses, with `J00` governing coding/repository rules, `J01` platform/runtime/protocol rules, `J02` data/backup rules, `J03` security/trust rules, `J04` operations/integrations/UX rules, and `J05` verification/release rules.
 
 Do not:
 
@@ -174,6 +168,7 @@ Do not:
 - Work on a temporary feature branch/worktree rather than directly on `master` unless explicitly instructed otherwise, always from current live `master`.
 - Re-fetch `master` and working tip before writes when concurrent changes may exist.
 - Publish repository changes to the GitHub `origin` remote first; verify the GitHub update and exact commit/ref, then mirror the same commit/ref to the GitLab remote. Never publish to GitLab before the corresponding GitHub publication. This ordering is a repository workflow rule only and does not grant GitLab CI authority or override the active contract.
+- For contract or verification-system changes, local fail-fast preflight SHALL run in this order before any authorized publication: relevant targeted checks, the normal local profile, then applicable contract, schema, generated-output, governance, security, provenance, architecture, format, typecheck, build, and platform checks. Local preflight is supplementary evidence only; the exact-candidate GitHub Actions result remains authoritative.
 - Preserve valid concurrent work.
 - Keep commits scoped/reviewable.
 - Contract/schema changes include compatibility/migration implications.
@@ -191,7 +186,7 @@ These rules apply once the user explicitly authorizes application implementation
 
 ### Owner execution goal
 
-The canonical owner-provided developer execution goal is recorded in [`docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`](docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md). The developer and independent auditor SHALL read that file before beginning or resuming a subsection and before acting on or reporting a developer handoff. It is an execution aid, not a normative contract; active contracts, the manifest, this file, and applicable release requirements remain authoritative. Any conflict SHALL be stopped and resolved through the contract-governed resolution process.
+The canonical owner-provided developer execution goal is recorded in [`docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`](docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md). It is an execution aid, not a normative contract; active contracts, the manifest, this file, and applicable release requirements remain authoritative. A contract-consolidation goal authorizes only the stated contract, acceptance/CI tooling, documentation, generated-artifact, and validator/test work; it does not authorize application implementation, matrix progression, evidence advancement, or an auditor handoff. Any conflict SHALL be stopped and resolved through the contract-governed resolution process.
 
 ### Contract is master authority
 
@@ -456,7 +451,7 @@ Treat the checkpoint summary as the next continuation baseline, but re-fetch liv
 
 ### Final completion boundary
 
-The subsection/section scoring loop never overrides the active Release Profile or Verification Contract.
+The subsection/section scoring loop never overrides the active Release Profile or `J05` verification/release clauses.
 
 `Production Complete` may be declared only when the exact source commit and exact signed Windows `FULL_HOST` release artifacts pass every mandatory active-contract qualification gate, including the complete release/profile/security/recovery/provider/integration/UI/voice/update/soak/provenance evidence. Intermediate section completion, high scores, green unit CI, or documentation completion are not equivalent to `Production Complete`.
 

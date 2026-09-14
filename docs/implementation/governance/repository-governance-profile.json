@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "governanceMode": "COMPENSATING_CONTROLS",
   "provider": "GITHUB",
   "repository": "andresslacson1989/jarvis-project",
@@ -15,16 +15,20 @@
   "mandatoryCi": {
     "pipelineIdentity": "static-ci",
     "eligibleAuthorityTypes": [
-      "GITHUB_ACTIONS",
-      "LOCALCI"
+      "GITHUB_ACTIONS"
     ],
     "selectedAuthority": {
       "type": "GITHUB_ACTIONS",
       "workflow": ".github/workflows/static-ci.yml",
       "job": "static-ci",
       "qualificationScope": "JARVIS_REPOSITORY_CI",
-      "qualificationStatus": "QUALIFIED",
-      "lastObservedRun": {
+      "qualificationStatus": "QUALIFIED_AUTHORITY_CAPABILITY_BASELINE",
+      "authorityCapabilityBaseline": {
+        "status": "QUALIFIED",
+        "contractSuiteVersion": "1.0.7",
+        "scope": "HISTORICAL_AUTHORITY_CAPABILITY_BASELINE",
+        "doesNotQualifyCurrentSuite": "1.0.8",
+        "lastObservedRun": {
         "runId": "33934840029",
         "runAttempt": "1",
         "candidateSha": "052902bfc52e676910d287e13fbf8a026915efe0",
@@ -46,17 +50,16 @@
           "arch": "X64"
         },
         "evidence": "PHASE_0_STATIC_CI status=PASS; exact checkout and git rev-parse HEAD matched candidateSha"
-      },
-      "qualificationBlockers": [],
-      "evidenceRevisionValidation": {
+        },
+        "evidenceRevisionValidation": {
         "commitSha": "a077dfdacd80f7ef5ef48d64f5cc61cec4fae70d",
         "runId": "33938490684",
         "status": "SUCCESS",
         "windowsJobId": "101231030877",
         "staticCiJobId": "101232608613",
         "purpose": "GOVERNANCE_EVIDENCE_REVISION_CONSISTENCY"
-      },
-      "authoritativeMasterVerification": {
+        },
+        "authoritativeMasterVerification": {
         "commitSha": "2cfcca9f2f7ee0faf334223b659e94ab410f5acd",
         "runId": "33950976184",
         "status": "SUCCESS",
@@ -65,7 +68,14 @@
         "staticCiJobId": "101267451179",
         "artifactCount": 0,
         "cosignTransparencyLogVerification": "NOT_CLAIMED_OFFLINE"
-      }
+        }
+      },
+      "currentCandidateEvidence": {
+        "contractSuiteVersion": "1.0.8",
+        "status": "NOT_RECORDED",
+        "reason": "EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED"
+      },
+      "qualificationBlockers": []
     },
     "commonRequirements": {
       "exactResolvedCommitRequired": "REQUIRED",
@@ -78,17 +88,8 @@
       "idempotentSubmission": "REQUIRED",
       "durableAuditableEvidence": "REQUIRED"
     },
-    "localCiRequirements": {
-      "authenticatedTls": "REQUIRED",
-      "nonAdministratorApiClient": "REQUIRED",
-      "repositoryProfileRefAllowlist": "REQUIRED",
-      "serverSideRevisionResolution": "REQUIRED",
-      "rootlessJobIsolation": "REQUIRED",
-      "arbitraryExecutionSurfacesDenied": "REQUIRED",
-      "controlledUpgradeAndClock": "REQUIRED",
-      "evidenceRetentionExport": "REQUIRED",
-      "cancellationRecoveryTested": "REQUIRED"
-    }
+    "gitlabRole": "REPOSITORY_MIRROR_ONLY",
+    "localCiRole": "NON_AUTHORITATIVE_COMPATIBILITY_OR_SECURITY_TOOLING"
   },
   "controls": {
     "temporaryImplementationBranches": true,

@@ -1,12 +1,12 @@
 # Authoritative `master` Repository Governance
 
-**Contract suite:** JARVIS v1.0.7
-**Decisions:** ADR-074, ADR-076
+**Contract suite:** JARVIS v1.0.8
+**Governing clauses:** J00-GOV-28; J05-VER-33
 **Authoritative branch:** `master`  
 **Mandatory CI pipeline:** `static-ci`
 **Selected CI authority:** `GITHUB_ACTIONS` (QUALIFIED; exact candidate run `33934840029` passed)
 
-This document is an operational implementation aid for the repository-governance requirements in the active top-level contract §28, Verification Contract §33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
+This document is an operational implementation aid for the repository-governance requirements in J00-GOV-28, J05-VER-33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
 ## Current effective mode
 
@@ -39,7 +39,7 @@ OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED
 While server-side protection is unavailable, normal implementation integration SHALL satisfy every control below:
 
 1. Perform implementation work on a temporary implementation branch rather than routine direct implementation writes to `master`.
-2. Require the complete `static-ci` pipeline to pass for the exact candidate commit on either qualified `GITHUB_ACTIONS` or qualified `LOCALCI`; the selected authority and evidence identity must be recorded.
+2. Require the complete `static-ci` GitHub Actions pipeline to pass for the exact candidate commit; GitLab mirroring and LocalCI tooling cannot substitute for that authority.
 3. Re-fetch the live `master` tip immediately before integration.
 4. If `master` moved unexpectedly, stop the integration attempt, inspect/reconcile the intervening change, rebuild/reverify the candidate as required, and do not overwrite the new tip.
 5. Integrate only with a non-force operation. Force-push/ref rewriting is not an accepted implementation workflow.
@@ -94,7 +94,7 @@ The machine-readable governance profile SHALL be updated to `SERVER_ENFORCED` on
 
 ## What this exception does not permit
 
-The v1.0.7 exception does not permit:
+The v1.0.8 exception does not permit:
 
 - claiming `master` is protected when GitHub reports it is not;
 - disabling an available server-side protection feature to remain in fallback mode;
@@ -122,7 +122,7 @@ The authoritative CI pipeline identity remains exactly:
 static-ci
 ```
 
-The intended selected authority is GitHub Actions. GitHub Actions and LocalCI are equal alternatives only after authority-specific qualification; neither is required to run in addition to a complete pass from the other. The machine-readable profile selects the immutable `static-ci` workflow/job and records GitHub Actions as `QUALIFIED` from run `33934840029` for candidate `052902bfc52e676910d287e13fbf8a026915efe0`. The Windows Tauri job `101220622635` and static job `101222623099` both completed successfully. The pull-request merge ref is metadata context only: checkout logs show the explicit candidate SHA was fetched and checked out, and the independent `git rev-parse HEAD` check matched it exactly. The generated Phase 0 evidence was `status=PASS` and included the complete named gate set. The earlier failed run `33818720345` remains historical negative evidence only.
+GitHub Actions is the sole selected CI authority. GitLab is repository mirror-only and LocalCI is non-authoritative compatibility/security tooling. The machine-readable profile records the immutable `static-ci` workflow/job and historical GitHub Actions run `33934840029` for candidate `052902bfc52e676910d287e13fbf8a026915efe0`; that historical run does not qualify a later v1.0.8 consolidation commit. The Windows Tauri job `101220622635` and static job `101222623099` both completed successfully. The pull-request merge ref is metadata context only: checkout logs show the explicit candidate SHA was fetched and checked out, and the independent `git rev-parse HEAD` check matched it exactly. The generated Phase 0 evidence was `status=PASS` and included the complete named gate set. The earlier failed run `33818720345` remains historical negative evidence only.
 
 The documentation-only reconciliation revision `1f99f53c10ce0d406429f9888c763e27359260ee` is also retained as negative evidence: run `33936789279` failed in the static job `101228227719` with `PHASE0_CANDIDATE_MISMATCH`. Its cause was a machine-bound `implementationCandidateSha`/matrix binding added to documentation while CI supplied the current revision through `JARVIS_CANDIDATE_SHA`; no implementation bytes were changed. The corrective documentation revision `a077dfdacd80f7ef5ef48d64f5cc61cec4fae70d` removed that self-referential binding and passed consistency run `33938490684` (Windows `101231030877`, static `101232608613`).
 
@@ -137,13 +137,6 @@ authoritative tip. Current post-integration run `33950976184` passed on exact
 (`artifact_count=0`);
 offline Cosign/transparency-log verification is not claimed.
 
-The owner-authorized, one-run CT107 testing exception is recorded at
-`docs/implementation/governance/LOCALCI-CT107-QUALIFICATION-EXCEPTION-2026-09-04.md`.
-It permits only the explicitly bounded non-mutating qualification scope for
-candidate `0fc861f...`; it does not change CT107's protected production role,
-does not authorize setup/configuration/registration changes, and does not make
-LocalCI qualified.
-
-Every LocalCI submission must preserve the repository owner/name, full `refs/heads/...` ref, `tauri2418` pipeline profile, optional requested SHA, and a unique idempotency key. The worker must separately record the server-resolved repository/ref/SHA and attestation identity, verify the real Git remote and checkout SHA, and support a detached HEAD when it equals the server-resolved commit. Exit 78 after `PENDING_AUTHORITY_FINALIZATION` is a non-success pending state; the control plane must reconcile it explicitly before recording a terminal result.
+LocalCI compatibility/security tooling may retain its own bounded operational controls, but its results are not CI or release evidence and are not consulted to qualify the active suite.
 
 Final Phase-0 evidence SHALL also record the observed live `master` protection state, the hosting limitation evidence, exact candidate/source commit, exact CI run, selected governance mode, residual risk, and the post-integration verification result when authoritative integration occurs.

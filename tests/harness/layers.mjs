@@ -34,7 +34,7 @@ export async function loadLayerManifest(rootDir) {
   const ids = parsed.layers.map((layer) => layer?.id);
   assert(new Set(ids).size === ids.length, "test-layer ids must be unique");
   assert(JSON.stringify(ids) === JSON.stringify(CANONICAL_TEST_LAYER_IDS),
-    "test-layer ids/order must match the canonical Verification Contract taxonomy");
+    "test-layer ids/order must match the canonical J05-VER-07 taxonomy");
 
   for (const layer of parsed.layers) {
     assert(typeof layer.directory === "string", `layer ${layer.id} directory missing`);

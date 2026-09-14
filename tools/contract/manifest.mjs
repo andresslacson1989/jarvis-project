@@ -1,25 +1,71 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { CANONICAL_VALUES_PATH, MANIFEST_PATH, readCanonical, stablePretty, violation } from "./lib.mjs";
 
 const COMPONENT_KEY_BY_FILE = Object.freeze({
-  "JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md": "implementationContract",
+  "JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md": "scopeGovernanceCoding",
+  "JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md": "runtimePlatformProtocol",
+  "JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md": "dataStateBackup",
+  "JARVIS-03-SECURITY-TRUST-CONTRACT.md": "securityTrust",
+  "JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md": "operationsIntegrationsUx",
+  "JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md": "verificationRelease",
   "JARVIS-V1-RELEASE-PROFILE.md": "releaseProfile",
-  "JARVIS-PLATFORM-PORTABILITY-CONTRACT.md": "platformPortability",
-  "JARVIS-RUNTIME-CONTRACT.md": "runtime",
-  "JARVIS-PROTOCOL-SCHEMA-CONTRACT.md": "protocolSchema",
-  "JARVIS-DATA-STATE-CONTRACT.md": "dataState",
-  "JARVIS-SECURITY-HARDENING-CONTRACT.md": "securityHardening",
-  "JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md": "backupCryptography",
-  "JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md": "projectPolicyTrust",
-  "JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md": "supplyChainTrust",
-  "JARVIS-CODING-STANDARDS-CONTRACT.md": "codingStandards",
-  "JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md": "operationsUxGovernance",
-  "JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md": "uiIdentityDesignSystem",
-  "JARVIS-VERIFICATION-RELEASE-CONTRACT.md": "verificationRelease",
-  "JARVIS-IMPLEMENTATION-PLAN.md": "implementationPlan",
 });
+
+const TEXT_EXTENSIONS = new Set([".json", ".md", ".mjs", ".ts", ".tsx", ".js", ".jsx", ".yml", ".yaml", ".toml", ".sh", ".ps1", ".txt"]);
+const DECISION_RECORD_REFERENCE_EXEMPTIONS = new Set([
+  "tools/contract/manifest.mjs",
+  "tools/checkpoints/phase0-checkpoint-profile.json",
+  "tests/layers/unit/contract-drift.test.mjs",
+  "tests/layers/unit/phase0-checkpoint.test.mjs",
+  // The owner goal is non-authoritative enforcement text and must name the prohibited paths it governs.
+  "docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md",
+]);
+const ADR_REFERENCE_PATTERN = /(?:^|[-_.\s/\\])adr(?:\.[A-Za-z0-9]+|[-_ ](?:[A-Za-z0-9][A-Za-z0-9._-]*)?\.[A-Za-z0-9]+|[-_ ]?\d+(?:[-_.\s]|$))/i;
+const DECISION_RECORD_FILENAME_PATTERN = /(?:^|[-_. ])decision[-_ ]?records?(?:[-_. ]|$)/i;
+
+function extension(path) {
+  const name = basename(path);
+  const index = name.lastIndexOf(".");
+  return index < 0 ? "" : name.slice(index).toLowerCase();
+}
+
+export function validateTrackedDecisionRecordPaths(paths) {
+  const violations = [];
+  for (const path of [...paths].sort((a, b) => a.localeCompare(b, "en"))) {
+    const normalizedPath = path.replaceAll("\\", "/");
+    const segments = normalizedPath.split("/");
+    if (segments.some((segment) => /^(?:adr|adrs|decision|decisions|history)$/i.test(segment))) {
+      violations.push(violation("MANIFEST_DECISION_RECORD_PATH", path, "tracked ADR/decision/history directories are prohibited, including nested and case variants"));
+    }
+    const name = segments.at(-1) ?? "";
+    if (ADR_REFERENCE_PATTERN.test(normalizedPath) || DECISION_RECORD_FILENAME_PATTERN.test(name)) {
+      violations.push(violation("MANIFEST_DECISION_RECORD_FILENAME", path, "tracked ADR-like or decision-like filenames are prohibited"));
+    }
+  }
+  return violations;
+}
+
+export function hasForbiddenDecisionRecordReference(text) {
+  const value = String(text);
+  return ADR_REFERENCE_PATTERN.test(value) ||
+    /(?:^|[\s`"'(])docs[\\/](?:adr|adrs|decision|decisions|history)(?=$|[\\/\s`"')])/im.test(value) ||
+    /(?:^|[\s`"'(])(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]*decision[-_ ]?record[A-Za-z0-9_.-]*\.[A-Za-z0-9]+(?=$|[\s`"')])/im.test(value) ||
+    /(?:^|[\s`"'(])(?:[A-Za-z0-9_.-]+[-_])*(?:decision[-_ ]?record)(?:[-_][A-Za-z0-9_.-]+)*(?:\.[A-Za-z0-9]+)(?=$|[\s`"')])/im.test(value);
+}
+
+function trackedPaths(rootDir) {
+  try {
+    return execFileSync("git", ["ls-files", "-z"], { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+      .split("\0")
+      .filter(Boolean)
+      .map((path) => path.replaceAll("\\", "/"));
+  } catch {
+    return null;
+  }
+}
 
 function basename(path) {
   return path.split("/").at(-1);
@@ -27,7 +73,7 @@ function basename(path) {
 
 export function parseManifestRows(text) {
   const rows = [];
-  for (const match of text.matchAll(/^\|\s*(\d+)\s*\|\s*`([^`]+)`\s*\|\s*([0-9]+\.[0-9]+\.[0-9]+)\s*\|/gm)) {
+  for (const match of text.matchAll(/^\|\s*(\d+)\s*\|\s*`([^`]+)`\s*\|\s*`[^`]+`\s*\|\s*([0-9]+\.[0-9]+\.[0-9]+)\s*\|/gm)) {
     rows.push({ index: Number(match[1]), path: match[2], revision: match[3] });
   }
   return rows;
@@ -48,6 +94,19 @@ export function componentFooterRevision(text) {
 
 export async function validateContractManifest(rootDir) {
   const violations = [];
+  const tracked = trackedPaths(rootDir);
+  if (tracked === null) {
+    violations.push(violation("MANIFEST_TRACKED_TREE_UNAVAILABLE", rootDir, "tracked repository enumeration is required for decision-record enforcement"));
+  } else {
+    violations.push(...validateTrackedDecisionRecordPaths(tracked));
+    for (const path of tracked) {
+      if (DECISION_RECORD_REFERENCE_EXEMPTIONS.has(path) || !TEXT_EXTENSIONS.has(extension(path))) continue;
+      const text = await readFile(resolve(rootDir, path), "utf8");
+      if (hasForbiddenDecisionRecordReference(text)) {
+        violations.push(violation("MANIFEST_DECISION_RECORD_REFERENCE", path, "tracked content must not reference deleted ADR/decision/history source paths"));
+      }
+    }
+  }
   const { values: canonical } = await readCanonical(rootDir);
   const manifestText = await readFile(resolve(rootDir, MANIFEST_PATH), "utf8");
   const suiteVersion = manifestText.match(/\*\*Suite Version:\*\*\s*([0-9.]+)/)?.[1];
@@ -63,6 +122,7 @@ export async function validateContractManifest(rootDir) {
 
   const seenKeys = new Set();
   const components = [];
+  const activeTexts = [manifestText];
   for (const row of rows) {
     const key = componentKeyForPath(row.path);
     if (!key || !(key in canonical.contractComponentRevisions)) {
@@ -81,6 +141,7 @@ export async function validateContractManifest(rootDir) {
       continue;
     }
     const content = await readFile(absolute, "utf8");
+    activeTexts.push(content);
     const headerRevision = componentHeaderRevision(content);
     if (headerRevision !== expectedRevision) {
       violations.push(violation("MANIFEST_COMPONENT_HEADER_DRIFT", row.path, `expected internal revision ${expectedRevision}, got ${headerRevision ?? "<missing>"}`));
@@ -101,6 +162,13 @@ export async function validateContractManifest(rootDir) {
     violations.push(violation("MANIFEST_RELEASE_PROFILE_VERSION", MANIFEST_PATH, `release profile must be ${canonical.releaseProfileVersion}`));
   }
 
+  for (const path of ["AGENTS.md", "README.md"]) {
+    if (existsSync(resolve(rootDir, path))) activeTexts.push(await readFile(resolve(rootDir, path), "utf8"));
+  }
+  if (activeTexts.some((text) => /docs\/(?:adr|decisions)\b|ADR-\d{2,}/i.test(text))) {
+    violations.push(violation("MANIFEST_ADR_AUTHORITY_REFERENCE", MANIFEST_PATH, "active authority files must not cite ADR/decision-record source paths or identifiers"));
+  }
+
   const referencePath = "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md";
   const referenceAbsolute = resolve(rootDir, referencePath);
   if (existsSync(referenceAbsolute)) {
@@ -108,8 +176,17 @@ export async function validateContractManifest(rootDir) {
     if (!reference.includes(`**Contract suite:** JARVIS v${canonical.contractSuiteVersion}`)) {
       violations.push(violation("MANIFEST_REFERENCE_SUITE_DRIFT", referencePath, `reference matrix must identify suite ${canonical.contractSuiteVersion}`));
     }
-    if (!reference.includes(`docs/JARVIS-CONTRACT-MANIFEST-v${canonical.contractSuiteVersion}.md`) || !reference.includes(`docs/JARVIS-IMPLEMENTATION-CONTRACT-v${canonical.contractSuiteVersion}.md`)) {
-      violations.push(violation("MANIFEST_REFERENCE_PATH_DRIFT", referencePath, "reference matrix must point to the active manifest and implementation contract"));
+    const requiredReferencePaths = [
+      `docs/JARVIS-CONTRACT-MANIFEST-v${canonical.contractSuiteVersion}.md`,
+      "docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md",
+      "docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md",
+      "docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md",
+      "docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md",
+      "docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md",
+      "docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md",
+    ];
+    if (requiredReferencePaths.some((requiredPath) => !reference.includes(requiredPath))) {
+      violations.push(violation("MANIFEST_REFERENCE_PATH_DRIFT", referencePath, "reference matrix must point to the active manifest and all six consolidated components"));
     }
     if (!reference.includes("Current status and execution authority exist only in `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md`")) {
       violations.push(violation("MANIFEST_REFERENCE_ROLE_DRIFT", referencePath, "reference matrix must deny current status authority"));

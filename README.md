@@ -10,35 +10,29 @@ Windows is the V1 production full-host platform. The architecture deliberately p
 
 Temporary feature/review branches MAY exist while work is in progress, but they SHALL start from the current live `master` and SHALL NOT become parallel implementation sources of truth. After accepted work is incorporated into `master`, the temporary branch is historical/disposable and must not be used as the base for new work.
 
-Before Phase 0 implementation is considered complete, repository governance must be qualified against the actual hosting capability. If server-side branch protection/rulesets are available, `master` must use them to block force pushes/deletion and require designated CI with narrowly controlled/auditable bypass. If the hosting plan/platform does not expose that capability, v1.0.7 permits the explicit `COMPENSATING_CONTROLS` mode: temporary implementation branches, exact candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. Mandatory CI may be supplied by either qualified GitHub Actions or qualified LocalCI; one complete exact-SHA result is sufficient and both are not required. The fallback does not claim hard prevention of an out-of-band administrator force push/deletion and expires when server protection becomes available.
+Before Phase 0 implementation is considered complete, repository governance must be qualified against the actual hosting capability. If server-side branch protection/rulesets are available, `master` must use them to block force pushes/deletion and require designated CI with narrowly controlled/auditable bypass. If the hosting plan/platform does not expose that capability, v1.0.8 permits the explicit `COMPENSATING_CONTROLS` mode: temporary implementation branches, exact GitHub Actions candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. GitHub Actions is the mandatory CI authority; GitLab is a repository mirror only, and LocalCI cannot substitute for CI or release qualification. The fallback does not claim hard prevention of an out-of-band administrator force push/deletion and expires when server protection becomes available.
 
 ## Current implementation source of truth
 
-**There is one current contract suite: JARVIS v1.0.7.**
+**There is one current contract suite: JARVIS v1.0.8.**
 
-Start with [`docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md`](docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md). It is the authoritative index of the current suite and records each component revision.
+Start with [`docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`](docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md). It is the authoritative index of the current suite and records the exact component revision set.
 
-Read the active suite in this order:
+Read the normative suite in this order:
 
-1. [`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md`](docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md) — canonical product, architecture, security, operations, platform-role, repository-governance, and production contract.
-2. [`docs/JARVIS-V1-RELEASE-PROFILE.md`](docs/JARVIS-V1-RELEASE-PROFILE.md) — exact Windows V1 production support/capability/release target.
-3. [`docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md`](docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md) — Windows/Linux full-host boundaries and future companion role.
-4. [`docs/implementation/JARVIS-RUNTIME-CONTRACT.md`](docs/implementation/JARVIS-RUNTIME-CONTRACT.md) — current Windows V1 runtime specialization, secure IPC, provider setup, worker/provider supervision, scheduling, cancellation, and recovery.
-5. [`docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md`](docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md) — canonical V1 protocol/domain/KDF/provider/integration/platform schemas.
-6. [`docs/implementation/JARVIS-DATA-STATE-CONTRACT.md`](docs/implementation/JARVIS-DATA-STATE-CONTRACT.md) — SQLite/SQLCipher state, KDF metadata, state machines, budgets, broad backup/restore semantics, and migrations.
-7. [`docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`](docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md) — threat model, permission precedence, Windows V1 security mechanisms, worker/provider/tool/module/integration security, and broad recovery-key rules.
-8. [`docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md`](docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md) — exact `JARVIS_BACKUP_V1` cryptographic format, chunk/AAD/nonce/key-slot rules, generated recovery factor, and restore qualification.
-9. [`docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md`](docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md) — deterministic `AGENTS.md` candidate/enrollment/hash-change/nesting/revocation trust boundary.
-10. [`docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`](docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md) — TUF-based update/module trust roots, rotation/revocation, expiration, delegations, anti-rollback and cumulative signing gates.
-11. [`docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md`](docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md) — normative coding/package/platform-boundary/validation/testing/CI rules.
-12. [`docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`](docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md) — queue/dashboard truth, recovery visibility, notification/focus behavior, module/integration UX, voice responsiveness, diagnostics, and governance.
-13. [`docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`](docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md) — canonical brand, dark-theme Mission Control, adaptive/reflow behavior, accessibility, and UI qualification.
-14. [`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md) — central Definition of Done and Windows V1 release qualification; all specialized mandatory verification rules in the active v1.0.7 contracts are cumulative.
-15. [`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — ordered implementation and exit criteria, including hosting-capability-aware repository governance and the early voice feasibility spike. It does not authorize implementation to begin by itself.
+1. [`docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md`](docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md) — product scope, authority, repository governance, and coding standards.
+2. [`docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md`](docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md) — runtime roles, platform boundaries, process lifecycle, IPC, and schemas.
+3. [`docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md`](docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md) — persistence, state, exact values, backup format, restore, and recovery.
+4. [`docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md`](docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md) — security hardening, project-policy trust, and supply-chain trust.
+5. [`docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md`](docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md) — operations, integrations, voice, visual identity, adaptive UX, and accessibility.
+6. [`docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md`](docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md) — definition of done, qualification, release evidence, and Production Complete.
+7. [`docs/JARVIS-V1-RELEASE-PROFILE.md`](docs/JARVIS-V1-RELEASE-PROFILE.md) — exact Windows V1 production support/capability/release target.
+
+[`docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) remains the non-authoritative dependency/sequencing aid and does not add requirements or authorize implementation by itself.
 
 Canonical vector brand assets live under [`assets/brand/`](assets/brand/).
 
-Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. [`docs/JARVIS-CONTRACT-LINEAGE.md`](docs/JARVIS-CONTRACT-LINEAGE.md) explains historical contract evolution.
+Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. No ADR/decision record or historical document supplements, is cited by, or is consulted as authority for the active suite.
 
 ## Platform/runtime model
 
@@ -54,43 +48,21 @@ A future Linux release must independently qualify its native secure storage, IPC
 
 A future companion remains non-authoritative and may only reach a host through a separately designed/qualified remote-access boundary. V1 still exposes no privileged LAN/Internet Core API.
 
-## v1.0.5 security closure
+## Current contract guarantees
 
-v1.0.5 does not redesign the architecture or reduce V1 scope. It closes the remaining pre-implementation security ambiguities:
+The v1.0.8 active suite keeps the product scope and exact safeguards in the
+manifest and six consolidated components. In particular:
 
-- `JARVIS_BACKUP_V1` is a fixed production backup cryptographic format with AES-256-GCM chunk/AAD/nonce rules, strict ordering/truncation protection, fresh per-backup keys, and a mandatory JARVIS-generated 256-bit portable recovery factor; a user passphrase is optional additional recovery, not the sole production portability anchor;
-- repository `AGENTS.md` is untrusted until the authenticated user enrolls an exact canonical project/path/scope/content hash; changed policy requires review and worker edits do not auto-trust new policy;
-- application updates and supported module catalog use TUF trust metadata with threshold offline root trust, rotation/revocation/expiration/delegation/anti-rollback, plus cumulative Tauri and Windows signing gates;
-- the implementation plan measures voice/AEC/barge-in feasibility immediately after the early persistence/recovery proof rather than discovering voice-stack infeasibility late;
-- SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding post-V1 targets but may ship independently when individually production-qualified;
-- Phase 0 adds machine-readable repeated contract values and CI drift checks where practical;
-- SQLite qualification is tied to the exact embedded build and fix evidence, not numerical version comparison alone.
-
-## v1.0.6 repository-governance closure
-
-v1.0.6 does not change the V1 platform, runtime, provider, integration, voice, backup, UI, or product capability scope. It makes repository governance truthful to the hosting capability:
-
-- server-side branch protection/rulesets remain mandatory whenever the authoritative repository's hosting plan exposes them;
-- a verified plan/platform limitation may use `COMPENSATING_CONTROLS` rather than making a paid hosting feature a hidden JARVIS prerequisite;
-- compensating governance still requires exact candidate CI, stale-tip-safe non-force integration, and post-integration verification/audit;
-- the residual inability to hard-block an out-of-band administrator force push/deletion is recorded explicitly rather than represented as equivalent protection;
-- server-enforced protection becomes mandatory again if the hosting capability later becomes available.
-
-## v1.0.7 qualified CI authority closure
-
-v1.0.7 makes CI authority vendor-neutral without weakening the gate:
-
-- qualified GitHub Actions and qualified LocalCI are equal alternative authorities;
-- either may independently provide the complete mandatory exact-SHA result;
-- common qualification requires complete repository-owned pipeline execution, pinned inputs, least privilege, isolation, cancellation/recovery, and durable audit evidence;
-- authority-specific gates remain mandatory, and demo, stale, unknown, or materially changed LocalCI instances are not automatically trusted;
-- GitHub Actions may be disabled while qualified LocalCI is selected without treating CI as skipped.
+- J02 fixes the `JARVIS_BACKUP_V1` envelope, key separation, recovery slots, and restore gates;
+- J03 fixes project-policy enrollment, PermissionEngine/security boundaries, and TUF-backed update/module trust;
+- J01 fixes the Windows `FULL_HOST` target and all platform/capability boundaries;
+- J04 fixes truthful operations, voice behavior, UI identity, adaptive layout, and accessibility;
+- J05 fixes the complete test, evidence, CI-authority, qualification, and signed-release gates;
+- J00 fixes scope, governance, direct amendment, coding, and repository-boundary rules.
 
 ## No overlay interpretation
 
-Accepted ADRs preserve decision history and rationale. **They are not a second implementation layer.** Their still-valid effects are incorporated into the v1.0.7 suite.
-
-If an ADR/history file and the active suite appear to conflict, the current manifest and normative documents govern; a suspected missing still-valid requirement is treated as a contract defect and corrected in the current suite rather than silently inferred from history.
+Historical documents do not supplement the active suite. If any non-current document appears to contain a missing requirement, treat that as a contract defect and restore the requirement directly into the active suite before implementation.
 
 ## Governing principles
 
