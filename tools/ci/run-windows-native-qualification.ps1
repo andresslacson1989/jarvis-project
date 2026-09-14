@@ -236,9 +236,23 @@ if (Test-Path -LiteralPath $log_path) {
     # Integration tests launch child test processes whose stdout is interleaved
     # with the parent libtest line. Capture the parent test header separately;
     # the aggregate Cargo exit code remains authoritative for an unqualified
-    # header, while explicit FAILED/ignored results remain negative.
+    # header, while explicit FAILED/ignored results remain negative. Cargo can
+    # also emit a failed test's result as a separate `---- <name> stdout ----`
+    # failure block after the interleaved child output. Capture that block so a
+    # failed test cannot be misreported as OK merely because a child invocation
+    # with the same filter later printed `... ok`.
     $test_pattern = '^\s*test\s+(?<name>\S+)\s+\.\.\.(?:\s+(?<result>ok|FAILED|ignored))?\s*$'
+    $failure_header_pattern = '^\s*----\s+(?<name>\S+)\s+stdout\s+----\s*$'
+    $expected_names_for_parser = @($expected_tests | ForEach-Object { $_.name })
     foreach ($line in $log_lines) {
+        $failure_header_match = [regex]::Match($line, $failure_header_pattern)
+        if ($failure_header_match.Success) {
+            $failed_name = $failure_header_match.Groups['name'].Value
+            if ($failed_name -in $expected_names_for_parser) {
+                $observed_tests[$failed_name] = 'FAILED'
+            }
+            continue
+        }
         $test_match = [regex]::Match($line, $test_pattern)
         if (-not $test_match.Success) {
             continue
