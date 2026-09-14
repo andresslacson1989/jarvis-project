@@ -31,7 +31,6 @@ export const LOCALCI_GATE_COMMANDS = Object.freeze([
   ["rust-windows-target-build", "cargo check --locked --workspace --target x86_64-pc-windows-msvc"],
   ["windows-tauri-production-build", "pnpm --dir apps/desktop tauri build --no-bundle --target x86_64-pc-windows-msvc --ci"],
   ["phase0-section-checkpoint", "pnpm phase0:check"],
-  ["static-ci-evidence", "pnpm ci:evidence"],
 ]);
 
 export const LOCALCI_GATES = Object.freeze(LOCALCI_GATE_COMMANDS.map(([gate]) => gate));
@@ -48,6 +47,13 @@ export function validateLocalCiGateScript(scriptText) {
   }
 
   const observed = [...text.matchAll(/^run_gate ([a-z0-9-]+) (.+)$/gm)].map((match) => [match[1], match[2]]);
+  const terminalEvidence = ["static-ci-evidence", "pnpm ci:evidence"];
+  const terminalEvidenceIndexes = observed.flatMap(([gate], index) => gate === terminalEvidence[0] ? [index] : []);
+  if (terminalEvidenceIndexes.length !== 1 || observed.at(-1)?.[0] !== terminalEvidence[0] || observed.at(-1)?.[1] !== terminalEvidence[1]) {
+    violations.push(violation("LOCALCI_TERMINAL_EVIDENCE_ORDER", "static-ci evidence must remain the single final command after the canonical gate sequence"));
+  } else {
+    observed.pop();
+  }
   const expected = new Map(LOCALCI_GATE_COMMANDS);
   const seen = new Set();
   for (const [gate, command] of observed) {
@@ -58,6 +64,16 @@ export function validateLocalCiGateScript(scriptText) {
   }
   for (const gate of LOCALCI_GATES) {
     if (!seen.has(gate)) violations.push(violation("LOCALCI_GATE_MISSING", `${gate} is missing from .localci/ci.sh`));
+  }
+  if (observed.length !== LOCALCI_GATE_COMMANDS.length) {
+    violations.push(violation("LOCALCI_GATE_SEQUENCE_LENGTH", "LocalCI must contain exactly the canonical number of gates plus one terminal evidence command"));
+  }
+  for (let index = 0; index < Math.max(observed.length, LOCALCI_GATE_COMMANDS.length); index += 1) {
+    const actual = observed[index]?.[0];
+    const expectedGate = LOCALCI_GATES[index];
+    if (actual !== expectedGate) {
+      violations.push(violation("LOCALCI_GATE_ORDER", `gate position ${index + 1} must be ${expectedGate ?? "<end>"}, got ${actual ?? "<missing>"}`));
+    }
   }
   if (!/printf 'LOCALCI_JOB_RESULT=PENDING_AUTHORITY_FINALIZATION\\n' >&2\nexit 78\s*$/m.test(text)) {
     violations.push(violation("LOCALCI_FAIL_CLOSED_EXIT", "LocalCI runner must terminate non-authoritatively and fail closed"));

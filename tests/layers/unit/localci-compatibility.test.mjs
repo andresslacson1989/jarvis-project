@@ -13,7 +13,7 @@ const codes = (violations) => violations.map(({ code }) => code);
 
 test("LocalCI compatibility runner exactly matches its non-authoritative gate manifest", () => {
   assert.deepEqual(codes(validateLocalCiGateScript(ciScript)), []);
-  assert.equal(LOCALCI_GATE_COMMANDS.length, 33);
+  assert.equal(LOCALCI_GATE_COMMANDS.length, 32);
 });
 
 test("LocalCI rejects omitted, duplicate, and mutated compatibility gates", () => {
@@ -21,6 +21,18 @@ test("LocalCI rejects omitted, duplicate, and mutated compatibility gates", () =
   assert.ok(codes(validateLocalCiGateScript(ciScript.replace(`run_gate ${gate} ${command}\n`, ""))).includes("LOCALCI_GATE_MISSING"));
   assert.ok(codes(validateLocalCiGateScript(ciScript.replace(`run_gate ${gate} ${command}\n`, `run_gate ${gate} ${command}\nrun_gate ${gate} ${command}\n`))).includes("LOCALCI_GATE_DUPLICATE"));
   assert.ok(codes(validateLocalCiGateScript(ciScript.replace("pnpm toolchain:verify", "pnpm toolchain:verify:metadata"))).includes("LOCALCI_GATE_COMMAND_DRIFT"));
+  assert.ok(codes(validateLocalCiGateScript(ciScript.replace("--audit-level high", "--audit-level low"))).includes("LOCALCI_GATE_COMMAND_DRIFT"));
+});
+
+test("LocalCI rejects reordered gates even when every gate and command remains present", () => {
+  const [, firstGate, firstCommand, secondGate, secondCommand] = ciScript.match(/run_gate ([a-z0-9-]+) ([^\n]+)\nrun_gate ([a-z0-9-]+) ([^\n]+)/) ?? [];
+  assert.ok(firstGate && firstCommand && secondGate && secondCommand);
+  const reordered = ciScript.replace(
+    `run_gate ${firstGate} ${firstCommand}\nrun_gate ${secondGate} ${secondCommand}`,
+    `run_gate ${secondGate} ${secondCommand}\nrun_gate ${firstGate} ${firstCommand}`,
+  );
+  const result = validateLocalCiGateScript(reordered);
+  assert.ok(codes(result).includes("LOCALCI_GATE_ORDER"));
 });
 
 test("LocalCI runner remains fail closed and non-authoritative", () => {

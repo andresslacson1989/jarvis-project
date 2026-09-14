@@ -34,7 +34,8 @@ test("0.12 package and CI gates are wired", () => {
   assert.match(workflow, /pnpm contract:check-drift/);
 });
 
-import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { checkContractDriftFromTexts } from "../../../tools/contract/check-drift.mjs";
 import { checkGeneratedArtifacts, writeGeneratedArtifacts } from "../../../tools/contract/generate-contract-artifacts.mjs";
@@ -52,10 +53,15 @@ test("tracked ADR/decision/history paths are rejected globally, including nested
 });
 
 test("tracked content cannot cite deleted ADR, decision, or history source paths", () => {
-  assert.equal(hasForbiddenDecisionRecordReference("See docs/architecture/ADR-099.md"), false);
+  assert.equal(hasForbiddenDecisionRecordReference("See ADR-099"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See ADR_099"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See adr-099"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See docs/architecture/ADR-099.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/adr/ADR-099.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/DECISIONS/legacy.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/history/legacy.md"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See archive/renamed-decision-record.md"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("ADR/decision-record material is prohibited by policy."), false);
 });
 
 const canonical = JSON.parse(readFileSync(resolve(root, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"), "utf8"));
@@ -134,6 +140,8 @@ async function manifestFixture() {
   }
   const manifest = `# Manifest\n**Suite Version:** ${canonical.contractSuiteVersion}\n\n| # | Document | Component | Current component revision | Role |\n|---|---|---|---:|---|\n${rows.join("\n")}\n`;
   await writeFile(resolve(dir, "docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md"), manifest);
+  execFileSync("git", ["init", "--quiet"], { cwd: dir, stdio: "ignore" });
+  execFileSync("git", ["add", "."], { cwd: dir, stdio: "ignore" });
   return dir;
 }
 
@@ -142,6 +150,43 @@ test("manifest validator proves all canonical components, files, rows, and inter
   const result = await validateContractManifest(dir);
   assert.equal(result.components.length, 7);
   assert.deepEqual(result.violations, []);
+});
+
+test("manifest validation scans only tracked repository content end to end", async () => {
+  const dir = await manifestFixture();
+  try {
+    execFileSync("git", ["init", "--quiet"], { cwd: dir, stdio: "ignore" });
+    execFileSync("git", ["config", "user.email", "test@example.invalid"], { cwd: dir, stdio: "ignore" });
+    execFileSync("git", ["config", "user.name", "Manifest Test"], { cwd: dir, stdio: "ignore" });
+    execFileSync("git", ["add", "."], { cwd: dir, stdio: "ignore" });
+
+    const forbiddenPath = resolve(dir, "docs/architecture/ADR-099.md");
+    await mkdir(dirname(forbiddenPath), { recursive: true });
+    await writeFile(forbiddenPath, "forbidden tracked decision material\n");
+    execFileSync("git", ["add", "docs/architecture/ADR-099.md"], { cwd: dir, stdio: "ignore" });
+    assert.match(execFileSync("git", ["ls-files"], { cwd: dir, encoding: "utf8" }), /docs\/architecture\/ADR-099\.md/);
+    let result = await validateContractManifest(dir);
+    assert.ok(result.violations.some(({ code }) => code === "MANIFEST_DECISION_RECORD_FILENAME"));
+
+    await rm(forbiddenPath);
+    const cleanReference = resolve(dir, "docs/architecture/notes.md");
+    await writeFile(cleanReference, "See ADR_099 for the historical decision.\n");
+    execFileSync("git", ["add", "-A"], { cwd: dir, stdio: "ignore" });
+    result = await validateContractManifest(dir);
+    assert.ok(result.violations.some(({ code }) => code === "MANIFEST_DECISION_RECORD_REFERENCE"));
+
+    await writeFile(cleanReference, "This clean tracked note has no historical source reference.\n");
+    execFileSync("git", ["add", "-A"], { cwd: dir, stdio: "ignore" });
+    result = await validateContractManifest(dir);
+    assert.deepEqual(result.violations, []);
+
+    const untrackedForbiddenPath = resolve(dir, "docs/architecture/ADR-100.md");
+    await writeFile(untrackedForbiddenPath, "untracked forbidden material\n");
+    result = await validateContractManifest(dir);
+    assert.deepEqual(result.violations, []);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("manifest revision/header drift is rejected", async () => {

@@ -15,6 +15,12 @@ const COMPONENT_KEY_BY_FILE = Object.freeze({
 });
 
 const TEXT_EXTENSIONS = new Set([".json", ".md", ".mjs", ".ts", ".tsx", ".js", ".jsx", ".yml", ".yaml", ".toml", ".sh", ".ps1", ".txt"]);
+const DECISION_RECORD_REFERENCE_EXEMPTIONS = new Set([
+  "tools/contract/manifest.mjs",
+  "tools/checkpoints/phase0-checkpoint-profile.json",
+  "tests/layers/unit/contract-drift.test.mjs",
+  "tests/layers/unit/phase0-checkpoint.test.mjs",
+]);
 
 function extension(path) {
   const name = basename(path);
@@ -29,7 +35,8 @@ export function validateTrackedDecisionRecordPaths(paths) {
     if (segments.some((segment) => /^(?:adr|adrs|decision|decisions|history)$/i.test(segment))) {
       violations.push(violation("MANIFEST_DECISION_RECORD_PATH", path, "tracked ADR/decision/history directories are prohibited, including nested and case variants"));
     }
-    if (/(?:^|\/)(?:adr|decision)[-_]?\d+(?:[-_.]|$)/i.test(path)) {
+    const name = segments.at(-1) ?? "";
+    if (/(?:^|\/)(?:adr|decision)[-_]?\d+(?:[-_.]|$)/i.test(path) || /(?:^|[-_.])decision[-_]?records?(?:[-_.]|$)/i.test(name)) {
       violations.push(violation("MANIFEST_DECISION_RECORD_FILENAME", path, "tracked ADR-like or decision-like filenames are prohibited"));
     }
   }
@@ -37,7 +44,11 @@ export function validateTrackedDecisionRecordPaths(paths) {
 }
 
 export function hasForbiddenDecisionRecordReference(text) {
-  return /(?:^|[\s`"'(])docs[\\/](?:adr|adrs|decision|decisions|history)(?=$|[\\/\s`"')])/im.test(String(text));
+  const value = String(text);
+  return /\badr[-_]\d+\b/i.test(value) ||
+    /(?:^|[\s`"'(])docs[\\/](?:adr|adrs|decision|decisions|history)(?=$|[\\/\s`"')])/im.test(value) ||
+    /(?:^|[\s`"'(])(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]*(?:decision[-_ ]record|adr[-_]\d+)[A-Za-z0-9_.-]*\.[A-Za-z0-9]+(?=$|[\s`"')])/im.test(value) ||
+    /(?:^|[\s`"'(])(?:[A-Za-z0-9_.-]+[-_])*(?:decision[-_ ]record|adr[-_]\d+)(?:[-_][A-Za-z0-9_.-]+)*(?:\.[A-Za-z0-9]+)(?=$|[\s`"')])/im.test(value);
 }
 
 function trackedPaths(rootDir) {
@@ -79,10 +90,12 @@ export function componentFooterRevision(text) {
 export async function validateContractManifest(rootDir) {
   const violations = [];
   const tracked = trackedPaths(rootDir);
-  if (tracked !== null) {
+  if (tracked === null) {
+    violations.push(violation("MANIFEST_TRACKED_TREE_UNAVAILABLE", rootDir, "tracked repository enumeration is required for decision-record enforcement"));
+  } else {
     violations.push(...validateTrackedDecisionRecordPaths(tracked));
     for (const path of tracked) {
-      if (path.startsWith("tools/") || path.startsWith("tests/") || !TEXT_EXTENSIONS.has(extension(path))) continue;
+      if (DECISION_RECORD_REFERENCE_EXEMPTIONS.has(path) || !TEXT_EXTENSIONS.has(extension(path))) continue;
       const text = await readFile(resolve(rootDir, path), "utf8");
       if (hasForbiddenDecisionRecordReference(text)) {
         violations.push(violation("MANIFEST_DECISION_RECORD_REFERENCE", path, "tracked content must not reference deleted ADR/decision/history source paths"));
