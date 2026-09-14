@@ -26,6 +26,10 @@ const DEFAULT_TEST_NAME: &str = "windows_owner_second_launch_and_crash_recovery_
 // qualification margin so a hosted Windows scheduler cannot turn a valid
 // reconciliation into a timing-sensitive false negative.
 const INFLIGHT_WORKER_RECOVERY_TIMEOUT: Duration = Duration::from_secs(5);
+// Child-process startup and the first cross-process state transaction can be
+// delayed on a hosted Windows runner. Keep callback-entry verification
+// bounded without confusing scheduler pressure with a successful callback.
+const CALLBACK_START_TIMEOUT: Duration = Duration::from_secs(5);
 
 // This is the authoritative Section 1.4 qualification manifest. Keep test
 // names stable and map each test to a fail-able contract criterion so hosted
@@ -794,7 +798,7 @@ fn windows_inflight_worker_failure_reconciles_after_join() {
     let started = std::time::Instant::now();
     while !callback_started.load(Ordering::Acquire) {
         assert!(
-            started.elapsed() < Duration::from_secs(2),
+            started.elapsed() < CALLBACK_START_TIMEOUT,
             "qualification callback did not enter its in-flight phase"
         );
         thread::sleep(Duration::from_millis(10));

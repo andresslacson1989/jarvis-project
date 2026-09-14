@@ -11,7 +11,7 @@ $authority_policy = $null
 $authority_policy_text = $null
 $authority_policy_path = Join-Path $repository_root 'tools\ci\section-1-4-authority-policy.json'
 $expected_authority_policy_sha256 = '0f9f6b228c3e8ac231644b1c07a4090c0aff398de6db94482008bb461386b0fe'
-$expected_manifest_sha256 = '3f4e7c55eea615c34fa0867d671db9affcf29d87e5545b3a76f15a20d3663ae0'
+$expected_manifest_sha256 = '394b010abc21e57f2f7da890a6a97849fe539863c51fbe5b91d6fd7eee154f20'
 try {
     $authority_policy_text = Get-Content -LiteralPath $authority_policy_path -Raw
     $authority_policy = $authority_policy_text | ConvertFrom-Json
