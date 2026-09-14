@@ -13,7 +13,8 @@ const codes = (violations) => violations.map(({ code }) => code);
 
 test("LocalCI compatibility runner exactly matches its non-authoritative gate manifest", () => {
   assert.deepEqual(codes(validateLocalCiGateScript(ciScript)), []);
-  assert.equal(LOCALCI_GATE_COMMANDS.length, 32);
+  assert.equal(LOCALCI_GATE_COMMANDS.length, 30);
+  assert.deepEqual(LOCALCI_GATE_COMMANDS[4], ["contract-suite-valid", "pnpm contract:check"]);
 });
 
 test("LocalCI rejects omitted, duplicate, and mutated compatibility gates", () => {

@@ -21,16 +21,8 @@
       "run": "pnpm schema:check"
     },
     {
-      "name": "Generated contract artifacts",
-      "run": "pnpm contract:check-generated"
-    },
-    {
-      "name": "Contract manifest",
-      "run": "pnpm contract:check-manifest"
-    },
-    {
-      "name": "Contract and profile drift",
-      "run": "pnpm contract:check-drift"
+      "name": "Contract suite validation",
+      "run": "pnpm contract:check"
     },
     {
       "name": "Repository governance",

@@ -29,9 +29,10 @@ test("0.12 package and CI gates are wired", () => {
   const tsconfig = JSON.parse(readFileSync(resolve(root, "tsconfig.json"), "utf8"));
   assert.ok(tsconfig.include?.includes("generated/**/*.ts"), "generated TypeScript must be part of strict typecheck/build");
   const workflow = readFileSync(resolve(root, ".github/workflows/static-ci.yml"), "utf8");
-  assert.match(workflow, /pnpm contract:check-generated/);
-  assert.match(workflow, /pnpm contract:check-manifest/);
-  assert.match(workflow, /pnpm contract:check-drift/);
+  assert.match(workflow, /- name: Contract suite validation\s+run: pnpm contract:check/);
+  assert.doesNotMatch(workflow, /run: pnpm contract:check-generated/);
+  assert.doesNotMatch(workflow, /run: pnpm contract:check-manifest/);
+  assert.doesNotMatch(workflow, /run: pnpm contract:check-drift/);
 });
 
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
@@ -98,6 +99,15 @@ test("tracked content cannot cite deleted ADR, decision, or history source paths
   assert.equal(hasForbiddenDecisionRecordReference("See archive\\decision-record.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See archive\\renamed-DecisionRecord.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("ADRs are prohibited by policy; ADR/decision-record material is prohibited by policy."), false);
+});
+
+test("the non-authoritative owner goal may name prohibited paths to enforce their removal", async () => {
+  const goal = readFileSync(resolve(root, "docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md"), "utf8");
+  assert.match(goal, /`docs\/adr\//);
+  assert.equal(hasForbiddenDecisionRecordReference(goal), true);
+  const result = await validateContractManifest(root);
+  assert.equal(result.violations.some(({ code, path }) => code === "MANIFEST_DECISION_RECORD_REFERENCE" && path === "docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md"), false);
+  assert.equal(result.violations.some(({ code }) => code === "MANIFEST_ADR_AUTHORITY_REFERENCE"), false);
 });
 
 const canonical = JSON.parse(readFileSync(resolve(root, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"), "utf8"));

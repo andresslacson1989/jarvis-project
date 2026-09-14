@@ -595,6 +595,8 @@ A pull-request requirement is strongly preferred once implementation changes beg
 
 Phase 0 SHALL also create machine-readable canonical profile/capability definitions and CI drift checks for repeated normative constants/matrices where practical.
 
+Before an authorized candidate publication, contract or verification-system changes SHALL pass local fail-fast preflight in this order: relevant targeted checks, the normal local profile, and applicable contract, schema, generated-output, governance, security, provenance, architecture, format, typecheck, build, and platform checks. Local preflight is supplementary evidence only and cannot qualify a release. Only after the local preflight is clean may the exact candidate be published for authoritative GitHub Actions verification; GitLab remains a repository mirror only and LocalCI remains non-authoritative tooling.
+
 The mandatory `static-ci` pipeline result SHALL come from qualified `GITHUB_ACTIONS` for the exact candidate or resulting authoritative commit. GitLab is repository mirror-only and SHALL NOT qualify CI or release evidence. LocalCI may run compatibility/security tooling but cannot satisfy this gate. Qualification SHALL prove exact-SHA, complete-pipeline, pinned-input, least-privilege, timeout/cancellation, idempotency, durable-evidence, and audit requirements in `J00-GOV-28`.
 
 ---

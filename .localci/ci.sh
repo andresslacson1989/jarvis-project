@@ -110,9 +110,7 @@ run_gate dependencies-frozen pnpm install --frozen-lockfile --ignore-scripts
 run_gate toolchain-exact pnpm toolchain:verify
 run_gate format-hygiene pnpm format:check
 run_gate schema-integrity pnpm schema:check
-run_gate contract-generated-reproducible pnpm contract:check-generated
-run_gate contract-manifest-valid pnpm contract:check-manifest
-run_gate contract-profile-drift pnpm contract:check-drift
+run_gate contract-suite-valid pnpm contract:check
 run_gate repository-governance pnpm governance:check
 run_gate secret-scan pnpm security:secrets
 run_gate dependency-inventory pnpm dependency:check

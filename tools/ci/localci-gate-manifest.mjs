@@ -1,11 +1,9 @@
-export const LOCALCI_GATE_COMMANDS = Object.freeze([
+export const ACCEPTANCE_GATE_COMMANDS = Object.freeze([
   ["dependencies-frozen", "pnpm install --frozen-lockfile --ignore-scripts"],
   ["toolchain-exact", "pnpm toolchain:verify"],
   ["format-hygiene", "pnpm format:check"],
   ["schema-integrity", "pnpm schema:check"],
-  ["contract-generated-reproducible", "pnpm contract:check-generated"],
-  ["contract-manifest-valid", "pnpm contract:check-manifest"],
-  ["contract-profile-drift", "pnpm contract:check-drift"],
+  ["contract-suite-valid", "pnpm contract:check"],
   ["repository-governance", "pnpm governance:check"],
   ["secret-scan", "pnpm security:secrets"],
   ["dependency-inventory", "pnpm dependency:check"],
@@ -33,7 +31,10 @@ export const LOCALCI_GATE_COMMANDS = Object.freeze([
   ["phase0-section-checkpoint", "pnpm phase0:check"],
 ]);
 
-export const LOCALCI_GATES = Object.freeze(LOCALCI_GATE_COMMANDS.map(([gate]) => gate));
+export const ACCEPTANCE_GATES = Object.freeze(ACCEPTANCE_GATE_COMMANDS.map(([gate]) => gate));
+
+export const LOCALCI_GATE_COMMANDS = ACCEPTANCE_GATE_COMMANDS;
+export const LOCALCI_GATES = ACCEPTANCE_GATES;
 
 function violation(code, detail) {
   return Object.freeze({ code, detail });
@@ -54,7 +55,7 @@ export function validateLocalCiGateScript(scriptText) {
   } else {
     observed.pop();
   }
-  const expected = new Map(LOCALCI_GATE_COMMANDS);
+  const expected = new Map(ACCEPTANCE_GATE_COMMANDS);
   const seen = new Set();
   for (const [gate, command] of observed) {
     if (seen.has(gate)) violations.push(violation("LOCALCI_GATE_DUPLICATE", `${gate} is declared more than once`));
@@ -62,15 +63,15 @@ export function validateLocalCiGateScript(scriptText) {
     if (!expected.has(gate)) violations.push(violation("LOCALCI_GATE_UNKNOWN", `${gate} is not in the approved gate manifest`));
     else if (expected.get(gate) !== command) violations.push(violation("LOCALCI_GATE_COMMAND_DRIFT", `${gate} must run ${expected.get(gate)}`));
   }
-  for (const gate of LOCALCI_GATES) {
+  for (const gate of ACCEPTANCE_GATES) {
     if (!seen.has(gate)) violations.push(violation("LOCALCI_GATE_MISSING", `${gate} is missing from .localci/ci.sh`));
   }
-  if (observed.length !== LOCALCI_GATE_COMMANDS.length) {
+  if (observed.length !== ACCEPTANCE_GATE_COMMANDS.length) {
     violations.push(violation("LOCALCI_GATE_SEQUENCE_LENGTH", "LocalCI must contain exactly the canonical number of gates plus one terminal evidence command"));
   }
-  for (let index = 0; index < Math.max(observed.length, LOCALCI_GATE_COMMANDS.length); index += 1) {
+  for (let index = 0; index < Math.max(observed.length, ACCEPTANCE_GATE_COMMANDS.length); index += 1) {
     const actual = observed[index]?.[0];
-    const expectedGate = LOCALCI_GATES[index];
+    const expectedGate = ACCEPTANCE_GATES[index];
     if (actual !== expectedGate) {
       violations.push(violation("LOCALCI_GATE_ORDER", `gate position ${index + 1} must be ${expectedGate ?? "<end>"}, got ${actual ?? "<missing>"}`));
     }

@@ -20,6 +20,8 @@ const DECISION_RECORD_REFERENCE_EXEMPTIONS = new Set([
   "tools/checkpoints/phase0-checkpoint-profile.json",
   "tests/layers/unit/contract-drift.test.mjs",
   "tests/layers/unit/phase0-checkpoint.test.mjs",
+  // The owner goal is non-authoritative enforcement text and must name the prohibited paths it governs.
+  "docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md",
 ]);
 const ADR_REFERENCE_PATTERN = /(?:^|[-_.\s/\\])adr(?:\.[A-Za-z0-9]+|[-_ ](?:[A-Za-z0-9][A-Za-z0-9._-]*)?\.[A-Za-z0-9]+|[-_ ]?\d+(?:[-_.\s]|$))/i;
 const DECISION_RECORD_FILENAME_PATTERN = /(?:^|[-_. ])decision[-_ ]?records?(?:[-_. ]|$)/i;
@@ -160,7 +162,7 @@ export async function validateContractManifest(rootDir) {
     violations.push(violation("MANIFEST_RELEASE_PROFILE_VERSION", MANIFEST_PATH, `release profile must be ${canonical.releaseProfileVersion}`));
   }
 
-  for (const path of ["AGENTS.md", "README.md", "docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md"]) {
+  for (const path of ["AGENTS.md", "README.md"]) {
     if (existsSync(resolve(rootDir, path))) activeTexts.push(await readFile(resolve(rootDir, path), "utf8"));
   }
   if (activeTexts.some((text) => /docs\/(?:adr|decisions)\b|ADR-\d{2,}/i.test(text))) {

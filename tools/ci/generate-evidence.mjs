@@ -3,41 +3,9 @@ import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMain } from "./lib.mjs";
+import { ACCEPTANCE_GATES as GATES } from "./localci-gate-manifest.mjs";
 
-export const GATES = Object.freeze([
-  "dependencies-frozen",
-  "toolchain-exact",
-  "format-hygiene",
-  "schema-integrity",
-  "contract-generated-reproducible",
-  "contract-manifest-valid",
-  "contract-profile-drift",
-  "repository-governance",
-  "secret-scan",
-  "dependency-inventory",
-  "license-provenance",
-  "typescript-strict",
-  "typescript-build",
-  "core-build",
-  "desktop-ui-build",
-  "desktop-foundation-contract",
-  "desktop-security-contract",
-  "architecture-enforcement",
-  "normal-tests",
-  "dependency-vulnerability-high-plus",
-  "cargo-audit-install",
-  "cargo-audit-version",
-  "rust-dependency-vulnerability-rustsec",
-  "rustsec-audit-json",
-  "cargo-metadata-windows",
-  "rustsec-informational-warning-review",
-  "rustfmt",
-  "rust-clippy-warnings-as-errors",
-  "rust-host-build",
-  "rust-windows-target-build",
-  "windows-tauri-production-build",
-  "phase0-section-checkpoint",
-]);
+export { GATES };
 
 const GOVERNANCE_MODES = new Set(["SERVER_ENFORCED", "COMPENSATING_CONTROLS"]);
 

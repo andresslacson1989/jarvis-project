@@ -168,6 +168,7 @@ Do not:
 - Work on a temporary feature branch/worktree rather than directly on `master` unless explicitly instructed otherwise, always from current live `master`.
 - Re-fetch `master` and working tip before writes when concurrent changes may exist.
 - Publish repository changes to the GitHub `origin` remote first; verify the GitHub update and exact commit/ref, then mirror the same commit/ref to the GitLab remote. Never publish to GitLab before the corresponding GitHub publication. This ordering is a repository workflow rule only and does not grant GitLab CI authority or override the active contract.
+- For contract or verification-system changes, local fail-fast preflight SHALL run in this order before any authorized publication: relevant targeted checks, the normal local profile, then applicable contract, schema, generated-output, governance, security, provenance, architecture, format, typecheck, build, and platform checks. Local preflight is supplementary evidence only; the exact-candidate GitHub Actions result remains authoritative.
 - Preserve valid concurrent work.
 - Keep commits scoped/reviewable.
 - Contract/schema changes include compatibility/migration implications.
@@ -185,7 +186,7 @@ These rules apply once the user explicitly authorizes application implementation
 
 ### Owner execution goal
 
-The canonical owner-provided developer execution goal is recorded in [`docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`](docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md). It is an execution aid, not a normative contract; active contracts, the manifest, this file, and applicable release requirements remain authoritative. A contract-consolidation goal authorizes only the stated documentation, generated-artifact, and validator work; it does not authorize application implementation, matrix progression, evidence advancement, or an auditor handoff. Any conflict SHALL be stopped and resolved through the contract-governed resolution process.
+The canonical owner-provided developer execution goal is recorded in [`docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`](docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md). It is an execution aid, not a normative contract; active contracts, the manifest, this file, and applicable release requirements remain authoritative. A contract-consolidation goal authorizes only the stated contract, acceptance/CI tooling, documentation, generated-artifact, and validator/test work; it does not authorize application implementation, matrix progression, evidence advancement, or an auditor handoff. Any conflict SHALL be stopped and resolved through the contract-governed resolution process.
 
 ### Contract is master authority
 

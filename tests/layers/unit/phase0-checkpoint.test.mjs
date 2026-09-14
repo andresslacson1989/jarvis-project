@@ -169,8 +169,8 @@ test("conditional native production Tauri gate fails closed", () => {
 
 test("conditional mandatory Phase 0 gate fails closed", () => {
   const workflow = workflowFromProfile().replace(
-    "      - name: Contract and profile drift\n        run: pnpm contract:check-drift",
-    "      - name: Contract and profile drift\n        if: false\n        run: pnpm contract:check-drift",
+    "      - name: Contract suite validation\n        run: pnpm contract:check",
+    "      - name: Contract suite validation\n        if: false\n        run: pnpm contract:check",
   );
   assert.ok(codes({ workflow }).includes("PHASE0_GATE_SKIPPABLE"));
 });
