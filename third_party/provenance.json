@@ -5446,6 +5446,13 @@
       "commit": "84cb39b217b10273981911c288cd62326dc7c6d2",
       "license": "MIT",
       "reviewStatus": "APPROVED"
+    },
+    {
+      "repository": "actions/upload-artifact",
+      "release": "v4.6.2",
+      "commit": "ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "license": "MIT",
+      "reviewStatus": "APPROVED"
     }
   ],
   "toolchains": [

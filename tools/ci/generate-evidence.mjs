@@ -238,8 +238,23 @@ export function buildLocalCiExecutionEvidence({ env, versions, contractSuiteVers
   });
 }
 
+export function versionProbeInvocation(
+  command,
+  args,
+  windowsCommandProcessor = process.env.ComSpec ?? process.env.COMSPEC,
+) {
+  if (windowsCommandProcessor && command === "pnpm") {
+    return {
+      command: windowsCommandProcessor,
+      args: ["/d", "/s", "/c", [command, ...args].join(" ")],
+    };
+  }
+  return { command, args };
+}
+
 function runVersion(command, args, parser = (value) => value.trim()) {
-  const result = spawnSync(command, args, {
+  const invocation = versionProbeInvocation(command, args);
+  const result = spawnSync(invocation.command, invocation.args, {
     encoding: "utf8",
     shell: false,
     windowsHide: true,

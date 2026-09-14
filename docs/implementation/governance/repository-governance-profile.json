@@ -1,16 +1,44 @@
 {
   "schemaVersion": 3,
-  "governanceMode": "COMPENSATING_CONTROLS",
+  "governanceMode": "SERVER_ENFORCED",
   "provider": "GITHUB",
   "repository": "andresslacson1989/jarvis-project",
   "authoritativeBranch": "master",
   "serverSideProtection": {
-    "available": false,
-    "active": false,
-    "reason": "HOSTING_PLAN_LIMITATION",
-    "observationSource": "USER_SUPPLIED_GITHUB_ADMIN_ATTEMPT",
-    "observedHttpStatus": 403,
-    "observedMessage": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    "available": true,
+    "active": true,
+    "mechanism": "CLASSIC_BRANCH_PROTECTION",
+    "observationSource": "AUTHENTICATED_GITHUB_API",
+    "observedAt": "2026-09-12T22:26:31Z",
+    "repositoryVisibility": "public",
+    "repositoryEndpointHttpStatus": 200,
+    "rulesetsEndpointHttpStatus": 200,
+    "rulesetCount": 0,
+    "branchProtectionEndpoint": "https://api.github.com/repos/andresslacson1989/jarvis-project/branches/master/protection",
+    "preConfigurationObservation": {
+      "branchProtectionHttpStatus": 404,
+      "masterProtected": false
+    },
+    "postConfigurationObservation": {
+      "branchProtectionHttpStatus": 200,
+      "masterProtected": true,
+      "masterSha": "bb59c13d99c8b472de0dbe08b8f5ce59cf50e705",
+      "requiredStatusCheckContexts": ["static-ci"],
+      "strictRequiredChecks": true,
+      "forcePushBlocked": true,
+      "deletionBlocked": true,
+      "administratorsCovered": true,
+      "bypassNarrowAndAuditable": true,
+      "requiredPullRequestApprovals": 1,
+      "dismissStaleReviews": true,
+      "requiredConversationResolution": true,
+      "restrictions": null
+    },
+    "forcePushBlocked": true,
+    "deletionBlocked": true,
+    "administratorsCovered": true,
+    "strictRequiredChecks": true,
+    "bypassNarrowAndAuditable": true
   },
   "mandatoryCi": {
     "pipelineIdentity": "static-ci",
@@ -98,6 +126,5 @@
     "nonForceIntegrationOnly": true,
     "postIntegrationVerification": true
   },
-  "residualRisk": "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED",
   "serverModeRequiredWhenAvailable": true
 }

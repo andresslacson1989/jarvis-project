@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["tools/toolchain/rust-smoke", "apps/desktop/src-tauri"]
+members = ["tools/toolchain/rust-smoke", "apps/desktop/src-tauri", "platform/windows/native"]
 default-members = ["tools/toolchain/rust-smoke", "apps/desktop/src-tauri"]
 
 [workspace.package]
