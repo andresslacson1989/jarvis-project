@@ -173,7 +173,8 @@ Do not:
 
 - Work on a temporary feature branch/worktree rather than directly on `master` unless explicitly instructed otherwise, always from current live `master`.
 - Re-fetch `master` and working tip before writes when concurrent changes may exist.
-- Publish repository changes to the GitHub `origin` remote first; verify the GitHub update and exact commit/ref, then mirror the same commit/ref to the GitLab remote. Never publish to GitLab before the corresponding GitHub publication. This ordering is a repository workflow rule only and does not grant GitLab CI authority or override the active contract.
+- Publish to the GitHub `origin` remote first. Unless the owner/governance records an explicit exclusion, this repository's publication scope is every GitHub branch and tag; verify each GitHub ref and exact commit, then mirror the same ref and SHA to the GitLab remote with non-force, non-delete pushes.
+- Never publish to GitLab before the corresponding GitHub publication, and never force-update, delete, or rewrite a conflicting GitLab ref; stop and obtain owner/governance resolution instead. Mirroring is mandatory repository synchronization only: it is separate from GitLab runner registration, project/variable/configuration changes, and CI qualification, and it does not grant GitLab CI authority or override the active contract. An operational hold that explicitly prohibits mirroring remains binding until its resolution is recorded; it must not be silently waived or replaced with local/CI evidence.
 - Preserve valid concurrent work.
 - Keep commits scoped/reviewable.
 - Contract/schema changes include compatibility/migration implications.
