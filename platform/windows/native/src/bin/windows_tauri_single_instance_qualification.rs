@@ -50,6 +50,12 @@ mod qualification {
         running: bool,
     }
 
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    enum OwnerProcessLiveness {
+        Running,
+        Exited(String),
+    }
+
     struct WindowSearch {
         pid: u32,
         snapshot: Option<WindowSnapshot>,
@@ -738,11 +744,9 @@ mod qualification {
         let hidden_deadline = Instant::now() + Duration::from_secs(5);
         let owner_hidden = loop {
             let owner = context.owner.as_mut().expect("owner was stored");
-            if let Some(status) = owner.try_wait().map_err(|error| error.to_string())? {
-                return Err(format!("owner exited while hiding: {status}"));
-            }
             pump_messages();
-            if let Some(snapshot) = snapshot_for_pid(owner_pid, true)
+            if let Some(snapshot) = snapshot_for_live_child(owner, owner_pid)
+                .map_err(|error| format!("owner exited while hiding: {error}"))?
                 && hidden_snapshot_is_valid(&snapshot, owner_pid, std::process::id())
             {
                 break snapshot;
@@ -781,9 +785,11 @@ mod qualification {
 
         let final_deadline = Instant::now() + Duration::from_secs(3);
         let owner_final = loop {
-            let snapshot = snapshot_for_pid(owner_pid, true)
+            let owner = context.owner.as_mut().expect("owner was stored");
+            let snapshot = snapshot_for_live_child(owner, owner_pid)
+                .map_err(|error| format!("owner exited after second launch: {error}"))?
                 .ok_or_else(|| "owner window disappeared after second launch".to_owned())?;
-            if snapshot.visible && snapshot.foreground_owner {
+            if final_snapshot_is_valid(&snapshot) {
                 break snapshot;
             }
             if Instant::now() >= final_deadline {
@@ -817,12 +823,9 @@ mod qualification {
         let pid = child.id();
         let deadline = Instant::now() + timeout;
         loop {
-            if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
-                return Err(format!(
-                    "owner exited before its JARVIS window was ready: {status}"
-                ));
-            }
-            if let Some(snapshot) = snapshot_for_pid(pid, true) {
+            if let Some(snapshot) = snapshot_for_live_child(child, pid).map_err(|error| {
+                format!("owner exited before its JARVIS window was ready: {error}")
+            })? {
                 return Ok(snapshot);
             }
             if Instant::now() >= deadline {
@@ -901,7 +904,39 @@ mod qualification {
             .to_owned()
     }
 
-    fn snapshot_for_pid(pid: u32, running: bool) -> Option<WindowSnapshot> {
+    fn observe_process_liveness(child: &mut Child) -> Result<OwnerProcessLiveness, String> {
+        match child.try_wait().map_err(|error| error.to_string())? {
+            Some(status) => Ok(OwnerProcessLiveness::Exited(status.to_string())),
+            None => Ok(OwnerProcessLiveness::Running),
+        }
+    }
+
+    fn snapshot_for_process_liveness(
+        liveness: OwnerProcessLiveness,
+        snapshot: Option<WindowSnapshot>,
+    ) -> Result<Option<WindowSnapshot>, String> {
+        match liveness {
+            OwnerProcessLiveness::Running => Ok(snapshot.map(|mut snapshot| {
+                snapshot.running = true;
+                snapshot
+            })),
+            OwnerProcessLiveness::Exited(status) => Err(format!("owner process exited: {status}")),
+        }
+    }
+
+    fn snapshot_for_live_child(
+        child: &mut Child,
+        pid: u32,
+    ) -> Result<Option<WindowSnapshot>, String> {
+        let liveness = observe_process_liveness(child)?;
+        let snapshot = match &liveness {
+            OwnerProcessLiveness::Running => snapshot_for_pid(pid),
+            OwnerProcessLiveness::Exited(_) => None,
+        };
+        snapshot_for_process_liveness(liveness, snapshot)
+    }
+
+    fn snapshot_for_pid(pid: u32) -> Option<WindowSnapshot> {
         let mut search = WindowSearch {
             pid,
             snapshot: None,
@@ -925,8 +960,11 @@ mod qualification {
         }
         snapshot.foreground_pid = foreground_pid;
         snapshot.foreground_owner = foreground_pid == pid;
-        snapshot.running = running;
         Some(snapshot)
+    }
+
+    fn final_snapshot_is_valid(snapshot: &WindowSnapshot) -> bool {
+        snapshot.running && snapshot.visible && snapshot.foreground_owner
     }
 
     fn hidden_snapshot_is_valid(
@@ -990,7 +1028,7 @@ mod qualification {
                 visible: unsafe { IsWindowVisible(hwnd) != 0 },
                 foreground_pid: 0,
                 foreground_owner: false,
-                running: true,
+                running: false,
             });
             return 0;
         }
@@ -1554,6 +1592,81 @@ mod qualification {
             let mut zero_foreground = valid;
             zero_foreground.foreground_pid = 0;
             assert!(!hidden_snapshot_is_valid(&zero_foreground, 10, 20));
+        }
+
+        #[cfg(feature = "qualification-focused-tests")]
+        #[test]
+        fn final_snapshot_rejects_exited_owner_even_with_valid_window_state() {
+            let mut snapshot = WindowSnapshot {
+                pid: 10,
+                handle: ptr::null_mut(),
+                title: "JARVIS".to_owned(),
+                visible: true,
+                foreground_pid: 10,
+                foreground_owner: true,
+                running: true,
+            };
+
+            let result = snapshot_for_process_liveness(
+                OwnerProcessLiveness::Exited("exit status: 1".to_owned()),
+                Some(snapshot.clone()),
+            );
+            assert_eq!(
+                result.expect_err("an exited owner must never produce a snapshot"),
+                "owner process exited: exit status: 1"
+            );
+
+            snapshot.running = false;
+            assert!(
+                !final_snapshot_is_valid(&snapshot),
+                "a snapshot without a positive process observation cannot pass"
+            );
+        }
+
+        #[cfg(feature = "qualification-focused-tests")]
+        #[test]
+        fn final_snapshot_accepts_visible_focused_owner_after_live_observation() {
+            let snapshot = WindowSnapshot {
+                pid: 10,
+                handle: ptr::null_mut(),
+                title: "JARVIS".to_owned(),
+                visible: true,
+                foreground_pid: 10,
+                foreground_owner: true,
+                running: false,
+            };
+
+            let observed =
+                snapshot_for_process_liveness(OwnerProcessLiveness::Running, Some(snapshot))
+                    .expect("a running owner observation should succeed")
+                    .expect("the owner window should be retained");
+            assert!(observed.running);
+            assert!(final_snapshot_is_valid(&observed));
+        }
+
+        #[cfg(feature = "qualification-focused-tests")]
+        #[test]
+        fn final_snapshot_rejects_live_owner_when_focus_timeout_expires() {
+            let snapshot = WindowSnapshot {
+                pid: 10,
+                handle: ptr::null_mut(),
+                title: "JARVIS".to_owned(),
+                visible: true,
+                foreground_pid: 20,
+                foreground_owner: false,
+                running: false,
+            };
+
+            let observed =
+                snapshot_for_process_liveness(OwnerProcessLiveness::Running, Some(snapshot))
+                    .expect("a running owner observation should succeed")
+                    .expect("the owner window should be retained");
+            assert!(observed.running);
+            assert!(!observed.foreground_owner);
+            assert!(
+                !final_snapshot_is_valid(&observed),
+                "a live owner that never regains focus must fail the final qualification"
+            );
         }
     }
 }
