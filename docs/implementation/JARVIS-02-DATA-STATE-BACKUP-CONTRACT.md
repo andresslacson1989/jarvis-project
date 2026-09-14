@@ -1,7 +1,7 @@
 # JARVIS Data, State & Backup Contract
 
-**Contract Suite Version:** 1.0.7
-**Version:** 1.0.7
+**Contract Suite Version:** 1.0.8
+**Version:** 1.0.8
 **Component:** `J02`
 **Status:** Canonical normative component
 **Scope:** authoritative persistence, state machines, events, exact values, budgets, SQLite/SQLCipher operation, backup cryptography, restore, and recovery
@@ -1341,4 +1341,4 @@ A standards update does not silently mutate an already-defined backup format. Fu
 
 ---
 
-**END — JARVIS DATA, STATE & BACKUP CONTRACT v1.0.7**
+**END — JARVIS DATA, STATE & BACKUP CONTRACT v1.0.8**

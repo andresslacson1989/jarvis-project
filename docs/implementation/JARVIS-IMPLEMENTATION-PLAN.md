@@ -1,7 +1,7 @@
 # JARVIS Production Implementation Plan
 
-**Status:** Non-authoritative dependency/sequencing aid for v1.0.7
-**Version:** 1.0.7
+**Status:** Non-authoritative dependency/sequencing aid for v1.0.8
+**Version:** 1.0.8
 **Date:** August 12, 2026  
 **Release target:** `docs/JARVIS-V1-RELEASE-PROFILE.md`
 
@@ -65,7 +65,7 @@ The active security closures remain cross-cutting: the J02 backup-format cryptog
 - root `AGENTS.md`;
 - current contract manifest validation in CI;
 - authoritative-`master` governance profile: server-side GitHub ruleset/branch protection when the hosting capability exists, otherwise the verified compensating-control mode defined by J00/J05;
-- provider-neutral mandatory CI authority profile selecting either a qualified `GITHUB_ACTIONS` authority or qualified `LOCALCI` authority with exact-SHA, complete-pipeline, least-privilege, isolation, cancellation/recovery, and durable-evidence qualification;
+- GitHub Actions mandatory CI authority profile with exact-SHA, complete-pipeline, least-privilege, cancellation/recovery, and durable-evidence qualification; GitLab mirror-only and LocalCI non-authoritative tooling;
 - machine-readable canonical definitions or generated equivalents for repeated contract values including KDF profiles, backup format profile identifiers/limits, platform/runtime enums, GitHub/Proxmox capability matrices, provider setup states, and security/release constants where practical;
 - CI checks that compare generated/machine-readable definitions against the normative profile and fail on semantic drift.
 
@@ -117,7 +117,7 @@ In either mode:
 - pull-request review is strongly preferred for implementation changes;
 - no second long-lived authoritative branch exists;
 - mandatory CI is never waived as a substitute for hosting limitations.
-- either qualified `GITHUB_ACTIONS` or qualified `LOCALCI` MAY independently supply the complete mandatory CI result; both are not required, partial results are not composable, and the selected authority/instance/pipeline identity is recorded;
+- qualified `GITHUB_ACTIONS` SHALL supply the complete mandatory CI result; GitLab mirror and LocalCI tooling cannot substitute, partial results are not composable, and the selected workflow/job identity is recorded;
 
 ## Exit
 
@@ -715,7 +715,7 @@ Full Windows local + portable restore drills pass; generated recovery secret alo
 
 # 21. PHASE 19 — WINDOWS V1 PRODUCTION QUALIFICATION
 
-Run the full v1.0.7 active contract suite on exact signed Windows FULL_HOST Release Candidate artifacts:
+Run the full v1.0.8 active contract suite on exact signed Windows FULL_HOST Release Candidate artifacts:
 
 - contract manifest / Release Profile;
 - authoritative repository/CI governance evidence for the verified hosting capability;
@@ -749,7 +749,7 @@ Linux runtime and Android companion tests are explicitly outside this V1 qualifi
 
 ## Exit
 
-Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys and all active v1.0.7 specialized security/governance-contract gates pass; rollback/recovery verified; Production Complete evidence references exact Windows artifacts/source/profile/contract/platform/trust identity.
+Zero P0/P1; Critical/High vulnerability policy passes; all V1 journeys and all active v1.0.8 specialized security/governance-contract gates pass; rollback/recovery verified; Production Complete evidence references exact Windows artifacts/source/profile/contract/platform/trust identity.
 
 ---
 
@@ -862,4 +862,4 @@ Only final checkpoint is Production Complete.
 
 ---
 
-**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.7**
+**END — JARVIS PRODUCTION IMPLEMENTATION PLAN v1.0.8**

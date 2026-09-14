@@ -101,9 +101,9 @@ export function buildCiEvidence({
       "JARVIS_RUSTSEC_REVIEW_PASSED=1 is required for PASS evidence",
     );
   }
-  if (contractSuiteVersion !== "1.0.7") {
+  if (contractSuiteVersion !== "1.0.8") {
     throw new Error(
-      `contractSuiteVersion evidence mismatch: expected 1.0.7, got ${contractSuiteVersion ?? "<missing>"}`,
+      `contractSuiteVersion evidence mismatch: expected 1.0.8, got ${contractSuiteVersion ?? "<missing>"}`,
     );
   }
   if (!GOVERNANCE_MODES.has(governanceMode)) {
@@ -176,7 +176,7 @@ function validateLocalCiGateResults(gateResults) {
 
 export function buildLocalCiExecutionEvidence({ env, versions, contractSuiteVersion, governanceMode, gateResults }) {
   const commitSha = resolveCandidateSha(env);
-  if (contractSuiteVersion !== "1.0.7") throw new Error(`contractSuiteVersion evidence mismatch: expected 1.0.7, got ${contractSuiteVersion ?? "<missing>"}`);
+  if (contractSuiteVersion !== "1.0.8") throw new Error(`contractSuiteVersion evidence mismatch: expected 1.0.8, got ${contractSuiteVersion ?? "<missing>"}`);
   if (!GOVERNANCE_MODES.has(governanceMode)) throw new Error(`invalid governanceMode ${governanceMode ?? "<missing>"}`);
   const expectedCommit = requireValue(env.LOCALCI_EXPECTED_COMMIT, "LOCALCI_EXPECTED_COMMIT");
   const resolvedCommit = requireValue(env.LOCALCI_RESOLVED_COMMIT, "LOCALCI_RESOLVED_COMMIT");
@@ -299,7 +299,7 @@ if (isMain(import.meta.url)) {
     readFile(
       resolve(
         rootDir,
-        "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
+        "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json",
       ),
       "utf8",
     ).then(JSON.parse),

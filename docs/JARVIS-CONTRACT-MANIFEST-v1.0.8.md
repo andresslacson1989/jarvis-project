@@ -1,6 +1,6 @@
-# JARVIS Contract Manifest v1.0.7
+# JARVIS Contract Manifest v1.0.8
 
-**Suite Version:** 1.0.7
+**Suite Version:** 1.0.8
 **Status:** Canonical current contract manifest
 **Date:** September 14, 2026
 
@@ -20,13 +20,13 @@ The current suite is governed by the six consolidated components below plus `doc
 
 | # | Document | Component | Current revision | Role |
 |---|---|---|---:|---|
-| 1 | `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` | `J00` | 1.0.7 | product scope, authority, repository governance, and coding standards |
-| 2 | `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md` | `J01` | 1.0.7 | runtime roles, platform boundaries, process lifecycle, IPC, and schemas |
-| 3 | `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md` | `J02` | 1.0.7 | persistence, state, exact values, backup format, restore, and recovery |
-| 4 | `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md` | `J03` | 1.0.7 | security hardening, project-policy trust, and supply-chain trust |
-| 5 | `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md` | `J04` | 1.0.7 | operations, integrations, voice, UX, identity, and accessibility |
-| 6 | `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md` | `J05` | 1.0.7 | verification, qualification, release evidence, and Production Complete |
-| 7 | `docs/JARVIS-V1-RELEASE-PROFILE.md` | `RELEASE_PROFILE` | 1.0.7 | exact Windows V1 production support target |
+| 1 | `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` | `J00` | 1.0.8 | product scope, authority, repository governance, and coding standards |
+| 2 | `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md` | `J01` | 1.0.8 | runtime roles, platform boundaries, process lifecycle, IPC, and schemas |
+| 3 | `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md` | `J02` | 1.0.8 | persistence, state, exact values, backup format, restore, and recovery |
+| 4 | `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md` | `J03` | 1.0.8 | security hardening, project-policy trust, and supply-chain trust |
+| 5 | `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md` | `J04` | 1.0.8 | operations, integrations, voice, UX, identity, and accessibility |
+| 6 | `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md` | `J05` | 1.0.8 | verification, qualification, release evidence, and Production Complete |
+| 7 | `docs/JARVIS-V1-RELEASE-PROFILE.md` | `RELEASE_PROFILE` | 1.0.8 | exact Windows V1 production support target |
 
 `README.md` and `AGENTS.md` are contributor/governance entry points and SHALL point to this same suite. The implementation plan, execution matrix, developer execution goal, evidence records, and audit reports are non-authoritative execution aids.
 
@@ -34,11 +34,11 @@ The current suite is governed by the six consolidated components below plus `doc
 
 # MAN-03 — SINGLE AUTHORITY AND AMENDMENT BOUNDARY
 
-Every current normative rule has one canonical home in the six components, this manifest, or the Release Profile. Cross-component references use the stable clause identifiers defined by `J00` through `J05`; they do not rely on historical filenames or external decision records.
+Every current normative rule has one canonical home in the six components, this manifest, or the Release Profile. Cross-component references use the stable clause identifiers defined by `J00` through `J05`; they SHALL NOT cite, retain, or consult ADR/decision-record material as authority.
 
 The current components preserve the complete existing product, security, platform, protocol, state, recovery, integration, UX, verification, and release requirements. Consolidation changes document ownership and traceability, not behavior.
 
-A future material product, architecture, security, platform, release, trust, or governance amendment SHALL be made directly in the affected active clauses under the owner/governance amendment process. The same reviewed change SHALL update affected components, this manifest, the Release Profile when applicable, verification requirements, implementation sequencing, compatibility/migration/rollback notes, and required tests/evidence before implementation depends on the amendment. A separate decision record is neither required nor authoritative.
+A future material product, architecture, security, platform, release, trust, or governance amendment SHALL be made directly in the affected active clauses under the owner/governance amendment process. The same reviewed change SHALL update affected components, this manifest, the Release Profile when applicable, verification requirements, implementation sequencing, compatibility/migration/rollback notes, and required tests/evidence before implementation depends on the amendment. ADR/decision-record files SHALL NOT be created, retained, cited, or used as current or historical authority.
 
 If active normative text conflicts or omits a mandatory requirement, implementation SHALL stop at that ambiguity until the active suite is reconciled. Later documents, branches, reports, or historical material cannot silently override it.
 
@@ -64,7 +64,7 @@ Production update/catalog metadata uses the fixed TUF 1.0.35 profile in `J03`, i
 
 ## 4.5 Qualified CI authority
 
-`GITHUB_ACTIONS` and `LOCALCI` are equal eligible authority types after qualification. Either may independently provide the complete mandatory exact-SHA result. The selected authority and instance/pipeline identity are machine-readable and auditable; an unknown, stale, demo, or materially changed LocalCI instance is not authoritative without qualification.
+`GITHUB_ACTIONS` is the sole eligible authority for the mandatory `static-ci` result. Its selected workflow/job identity and exact-candidate evidence are machine-readable and auditable. GitLab is repository mirror-only and SHALL NOT qualify CI or release evidence. LocalCI may provide compatibility or security tooling only; no LocalCI result can satisfy the current mandatory CI authority gate.
 
 ---
 
@@ -98,9 +98,9 @@ Repository server-side protection SHALL be activated when available, but an unav
 
 # MAN-07 — HISTORICAL MATERIAL
 
-Historical contracts, superseded manifests, reconciliation audits, deleted branch names, older examples, and earlier schema forms are non-current provenance. They SHALL NOT override or fill gaps in this suite.
+Historical contracts, superseded manifests, reconciliation audits, deleted branch names, older examples, and earlier schema forms are non-current provenance. They SHALL NOT override, fill gaps in, or be consulted as authority for this suite.
 
-The repository does not retain historical decision records as implementation sources. If a required rule appears to exist only in removed or historical material, that is a contract defect and implementation SHALL stop until the requirement is restored directly into the active suite.
+ADR/decision-record files and citations are prohibited. If a required rule is absent from the active suite, that is a contract defect and implementation SHALL stop until the requirement is restored directly into the active suite.
 
 ---
 
@@ -122,6 +122,8 @@ The suite version advances when a material current rule changes in areas such as
 - core UI identity/interaction behavior.
 
 Individual component revisions advance when the corresponding component's normative content changes. The manifest records the exact current component revision set.
+
+This v1.0.8 suite advances v1.0.7 because mandatory CI authority changed from a qualified-authority alternative to GitHub Actions only. That is a material repository-governance qualification change; this consolidation does not weaken any other active requirement.
 
 Every production release records at least:
 
@@ -152,4 +154,4 @@ Generated platform assets derive from these sources.
 
 ---
 
-**END — JARVIS CONTRACT MANIFEST v1.0.7**
+**END — JARVIS CONTRACT MANIFEST v1.0.8**

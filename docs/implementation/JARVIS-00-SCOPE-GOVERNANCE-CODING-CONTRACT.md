@@ -1,7 +1,7 @@
 # JARVIS Scope, Governance & Coding Contract
 
-**Contract Suite Version:** 1.0.7
-**Version:** 1.0.7
+**Contract Suite Version:** 1.0.8
+**Version:** 1.0.8
 **Component:** `J00`
 **Status:** Canonical normative component
 **Scope:** product scope, contract authority, repository governance, direct amendment process, and production coding standards
@@ -49,7 +49,7 @@ USER
 
 ## J00-SCOPE-02 — ONE CURRENT NORMATIVE SUITE
 
-The current production contract consists of the six consolidated normative components and the separate Release Profile listed in `docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md`.
+The current production contract consists of the six consolidated normative components and the separate Release Profile listed in `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`.
 
 The six components are:
 
@@ -120,13 +120,13 @@ JARVIS SHALL NOT be implemented as a single LLM session with broad shell access,
 
 Before Phase 0 is complete, the authoritative repository governance mode SHALL be determined from verified hosting/account capability.
 
-The designated mandatory CI authority SHALL be selected from the qualified authority types `GITHUB_ACTIONS` and `LOCALCI`. These types have equal eligibility: one complete passing result from either qualified authority independently satisfies an ordinary mandatory CI gate. Both authorities are not required unless a narrower active requirement explicitly requires independent dual execution, and partial results from multiple authorities SHALL NOT be combined into a pass.
+`GITHUB_ACTIONS` is the sole designated mandatory CI authority. A complete GitHub Actions result for the exact candidate or resulting authoritative commit is required; partial results cannot be combined and a LocalCI result cannot substitute.
 
-Regardless of authority type, authoritative CI evidence SHALL bind the approved repository and server-resolved immutable 40-hex commit exactly to the candidate; execute the complete repository-owned pipeline at that commit; use pinned/frozen toolchains and dependencies; fail closed on every mandatory gate; use authenticated least-privilege submission and retrieval; isolate jobs from control-plane credentials/state and unapproved host resources/networking; implement bounded timeout/cancellation/cleanup/idempotency behavior; and retain or export independently auditable job, pipeline, per-gate, log/artifact identity, timestamp, and final-status evidence.
+Authoritative GitHub Actions evidence SHALL bind the approved repository and server-resolved immutable 40-hex commit exactly to the candidate; execute the complete repository-owned pipeline at that commit; use pinned/frozen toolchains and dependencies; fail closed on every mandatory gate; use immutable action pins and least-privilege workflow permissions; implement bounded timeout/cancellation/cleanup/idempotency behavior; and retain or export independently auditable run, workflow/job, per-gate, log/artifact identity, timestamp, and final-status evidence.
 
-`GITHUB_ACTIONS` qualification additionally requires immutable action pins, least-privilege workflow permissions, the approved workflow/job identity, and live exact-candidate run evidence. `LOCALCI` qualification additionally requires an explicitly identified production-qualified instance, authenticated TLS, non-administrator API-client authentication, repository/profile/ref allowlists, server-side revision resolution, rootless isolated jobs, denial of arbitrary clone/command/image/mount/path/device/network requests, non-exposure of control-plane secrets, controlled upgrades, clock integrity, evidence retention/export, and tested cancellation/recovery. Demo, unknown, stale, or materially changed instances are not authoritative until qualified or requalified.
+LocalCI may run compatibility or security tooling under its own controls, but it is unselected and non-authoritative: it SHALL NOT be described as a qualified alternative, selected authority, CI authority, or release qualifier.
 
-The selected authority and instance/pipeline identity SHALL be machine-readable and auditable. GitHub Actions MAY be disabled when qualified LocalCI is selected; this is an authority substitution, not a CI waiver. If no qualified authority can execute the complete required pipeline, the gate remains unsatisfied.
+The selected GitHub Actions workflow/job identity SHALL be machine-readable and auditable. GitHub Actions SHALL remain enabled for mandatory CI. GitLab is repository mirror-only and SHALL NOT qualify CI or release evidence. If GitHub Actions cannot execute the complete required pipeline, the gate remains unsatisfied.
 
 When the hosting provider/account exposes enforceable server-side branch protection or repository rulesets for the authoritative repository, `master` SHALL use that capability and the effective policy SHALL at minimum:
 
@@ -157,7 +157,7 @@ Phase 0 SHALL also establish machine-readable canonical definitions/checks for r
 
 ## J00-GOV-29 — FUTURE ARCHITECTURE AMENDMENTS
 
-A future material amendment SHALL be made directly in the affected active contract clauses under the owner/governance amendment process; it SHALL NOT create or rely on a separate decision record. Before implementation depends on it, the same reviewed change SHALL update every affected active normative file, the current contract manifest, the Release Profile when applicable, verification requirements, implementation sequencing, compatibility/migration/rollback notes, and required tests/evidence.
+A future material amendment SHALL be made directly in the affected active contract clauses under the owner/governance amendment process; it SHALL NOT create, retain, cite, or rely on ADR/decision-record material. Before implementation depends on it, the same reviewed change SHALL update every affected active normative file, the current contract manifest, the Release Profile when applicable, verification requirements, implementation sequencing, compatibility/migration/rollback notes, and required tests/evidence.
 
 Material changes to product scope, runtime roles/platform intent, trust boundaries, release gates, authentication/recovery, backup cryptographic format, project-policy admission, supply-chain trust root, required capabilities, UI identity, or repository-governance qualification SHALL advance the contract-suite semantic version rather than silently changing the meaning of an existing suite version.
 
@@ -903,9 +903,9 @@ license/provenance checks for packaged dependencies/assets
 stale generated-code detection
 ```
 
-The mandatory pipeline SHALL be executable without weakening its gate set by either qualified authority type: `GITHUB_ACTIONS` or `LOCALCI`. Authority adapters MAY differ, but the repository-owned checks, exact candidate SHA, pinned/frozen inputs, aggregate fail-closed semantics, and evidence fields SHALL remain semantically equivalent. One qualified authority's complete pass is sufficient; two partial runs are not.
+The mandatory pipeline SHALL execute in `GITHUB_ACTIONS` without weakening its gate set. It SHALL bind the exact candidate SHA, use pinned/frozen inputs, aggregate failures fail-closed, and retain the required evidence. LocalCI tooling may exercise compatibility or security checks, but no result from it can satisfy this mandatory CI gate.
 
-GitHub Actions workflows SHALL retain immutable action pins and least-privilege permissions while selected. LocalCI pipelines SHALL use a repository-owned script/profile, authenticated allowlisted submission, server-side commit resolution, isolated rootless execution, and no arbitrary command/image/mount/path/device/network authority. CI control-plane credentials SHALL never enter job containers. Material authority or pipeline changes require requalification.
+GitHub Actions workflows SHALL retain immutable action pins and least-privilege permissions. GitLab is mirror-only. CI control-plane credentials SHALL never enter job containers. Material GitHub Actions authority or pipeline changes require requalification.
 
 CI SHALL detect direct imports of Windows native implementations from shared Core/domain/policy/protocol packages where practical.
 
@@ -1027,4 +1027,4 @@ Production code/CI SHALL make these statements true:
 
 ---
 
-**END — JARVIS SCOPE, GOVERNANCE & CODING CONTRACT v1.0.7**
+**END — JARVIS SCOPE, GOVERNANCE & CODING CONTRACT v1.0.8**

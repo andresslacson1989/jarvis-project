@@ -10,13 +10,13 @@ Windows is the V1 production full-host platform. The architecture deliberately p
 
 Temporary feature/review branches MAY exist while work is in progress, but they SHALL start from the current live `master` and SHALL NOT become parallel implementation sources of truth. After accepted work is incorporated into `master`, the temporary branch is historical/disposable and must not be used as the base for new work.
 
-Before Phase 0 implementation is considered complete, repository governance must be qualified against the actual hosting capability. If server-side branch protection/rulesets are available, `master` must use them to block force pushes/deletion and require designated CI with narrowly controlled/auditable bypass. If the hosting plan/platform does not expose that capability, v1.0.7 permits the explicit `COMPENSATING_CONTROLS` mode: temporary implementation branches, exact candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. Mandatory CI may be supplied by either qualified GitHub Actions or qualified LocalCI; one complete exact-SHA result is sufficient and both are not required. The fallback does not claim hard prevention of an out-of-band administrator force push/deletion and expires when server protection becomes available.
+Before Phase 0 implementation is considered complete, repository governance must be qualified against the actual hosting capability. If server-side branch protection/rulesets are available, `master` must use them to block force pushes/deletion and require designated CI with narrowly controlled/auditable bypass. If the hosting plan/platform does not expose that capability, v1.0.8 permits the explicit `COMPENSATING_CONTROLS` mode: temporary implementation branches, exact GitHub Actions candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. GitHub Actions is the mandatory CI authority; GitLab is a repository mirror only, and LocalCI cannot substitute for CI or release qualification. The fallback does not claim hard prevention of an out-of-band administrator force push/deletion and expires when server protection becomes available.
 
 ## Current implementation source of truth
 
-**There is one current contract suite: JARVIS v1.0.7.**
+**There is one current contract suite: JARVIS v1.0.8.**
 
-Start with [`docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md`](docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md). It is the authoritative index of the current suite and records the exact component revision set.
+Start with [`docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`](docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md). It is the authoritative index of the current suite and records the exact component revision set.
 
 Read the normative suite in this order:
 
@@ -32,7 +32,7 @@ Read the normative suite in this order:
 
 Canonical vector brand assets live under [`assets/brand/`](assets/brand/).
 
-Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. No historical document or decision record supplements the active suite.
+Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. No ADR/decision record or historical document supplements, is cited by, or is consulted as authority for the active suite.
 
 ## Platform/runtime model
 
@@ -50,7 +50,7 @@ A future companion remains non-authoritative and may only reach a host through a
 
 ## Current contract guarantees
 
-The v1.0.7 active suite keeps the product scope and exact safeguards in the
+The v1.0.8 active suite keeps the product scope and exact safeguards in the
 manifest and six consolidated components. In particular:
 
 - J02 fixes the `JARVIS_BACKUP_V1` envelope, key separation, recovery slots, and restore gates;

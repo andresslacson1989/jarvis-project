@@ -1,7 +1,7 @@
 # JARVIS Operations, Integrations & UX Contract
 
-**Contract Suite Version:** 1.0.7
-**Version:** 1.0.7
+**Contract Suite Version:** 1.0.8
+**Version:** 1.0.8
 **Component:** `J04`
 **Status:** Canonical normative component
 **Scope:** operational truth, queue and recovery UX, integrations, voice operations, diagnostics, governance UX, visual identity, adaptive layout, and accessibility
@@ -272,9 +272,13 @@ Credential import, if ever implemented, remains a separate high-risk encrypted/c
 
 JARVIS SHALL retrieve memory through scoped, ranked, metadata-aware policy rather than unrestricted history retrieval or raw semantic similarity alone.
 
+Context SHALL distinguish verified live state, persisted fact/memory, and AI inference. For current-state questions or actions, verified live state overrides persisted fact/memory, which overrides AI inference.
+
 Ranking SHOULD consider applicable scope match, memory type, confidence/provenance, verification/staleness, recency, semantic relevance, importance, and relationship to the authoritative current project/environment/task.
 
 Confirmed decisions and verified facts SHOULD rank above weak inference when otherwise relevant.
+
+Memory records SHALL carry applicable scope, project identity, type, importance, confidence, provenance, timestamp, and source metadata. Memory remains bounded to applicable global-user, project, mission, session, or task scope; unrestricted conversation history SHALL NOT be supplied by default.
 
 Context Manager SHALL provide the smallest useful context/memory set for the current interaction.
 
@@ -303,6 +307,8 @@ Where a qualified provider requires explicit setup/repair:
 - normal workers SHALL not inherit setup elevation.
 
 Where safely supported, provider contracts SHOULD expose normalized lifecycle/capabilities for discovery, setup/repair, readiness/health, start/warm, execute/submit, streaming events, cancellation/interruption, restart, and stop/unload.
+
+The centralized Provider Supervisor SHALL isolate provider process/lifecycle failure and manage discovery, health, capability detection, restart, and approved capability-based fallback. Outage, authentication, quota, rate-limit, or unavailable-model state SHALL remain explicit. Repeated failures SHALL use bounded retry/backoff rather than aggressive retry loops. A fallback SHALL preserve required capability, locality, privacy, permission, and provider policy; local reflex controls remain available when remote AI is unavailable where they need no AI reasoning.
 
 Latency-critical lightweight components SHOULD remain warm while their feature is active where resource policy permits. Heavy RAM/VRAM/CPU/GPU providers SHOULD be warmed/unloaded according to measured resource pressure and latency requirements rather than assuming every provider can remain resident.
 
@@ -562,7 +568,7 @@ Escalation is required when a decision materially requires user preference/conse
 
 Internal package factoring, retry mechanics, routing implementation, schemas, state-machine implementation, observability mechanics, and equivalent choices SHOULD normally be resolved without interruption when accepted behavior/safety is preserved.
 
-Significant non-critical architecture decisions made autonomously SHALL be documented directly in the applicable active contract clause when they change normative meaning, or in non-normative implementation evidence when they do not, as required by J00-GOV-28. The user SHOULD receive a concise summary rather than being asked to approve every implementation detail or being left unaware of a material decision.
+Significant non-critical architecture choices made autonomously SHALL be documented directly in the applicable active contract clause when they change normative meaning, or in non-normative implementation evidence when they do not, as required by J00-GOV-29. ADR/decision-record creation, retention, citation, or use is prohibited. The user SHOULD receive a concise summary rather than being asked to approve every implementation detail or being left unaware of a material decision.
 
 > **Escalate product judgment. Resolve engineering judgment.**
 
@@ -1674,4 +1680,4 @@ UI identity implementation is complete only when:
 
 ---
 
-**END — JARVIS OPERATIONS, INTEGRATIONS & UX CONTRACT v1.0.7**
+**END — JARVIS OPERATIONS, INTEGRATIONS & UX CONTRACT v1.0.8**

@@ -91,7 +91,7 @@ const packageJson = {
 };
 
 const canonicalValues = {
-  contractSuiteVersion: "1.0.7",
+  contractSuiteVersion: "1.0.8",
   v1RuntimeTarget: {
     platform: "WINDOWS",
     runtimeRole: "FULL_HOST",
@@ -100,7 +100,7 @@ const canonicalValues = {
 };
 
 const matrix =
-  `| Contract suite | JARVIS v1.0.7 |\n` +
+  `| Contract suite | JARVIS v1.0.8 |\n` +
   childIds
     .map((id) => `| ↳ **${id}** x | **VERIFIED** |`)
     .join("\n") +
@@ -227,7 +227,7 @@ test("unverified child subsection fails checkpoint", () => {
 
 test("verified Section 0 summary permits completed child rows to be compacted later", () => {
   const compactMatrix =
-    "| Contract suite | JARVIS v1.0.7 |\n" +
+    "| Contract suite | JARVIS v1.0.8 |\n" +
     "| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFIED** | — |\n";
   assert.deepEqual(codes({ matrix: compactMatrix }), []);
 });
@@ -235,14 +235,14 @@ test("verified Section 0 summary permits completed child rows to be compacted la
 test("live matrix suite drift fails checkpoint", () => {
   assert.ok(
     codes({
-      matrix: matrix.replace("JARVIS v1.0.7", "JARVIS v1.0.5"),
+      matrix: matrix.replace("JARVIS v1.0.8", "JARVIS v1.0.5"),
     }).includes("PHASE0_MATRIX_SUITE_DRIFT"),
   );
 });
 
-test("current checkpoint evidence cannot remain VERIFIED while LocalCI is VERIFYING", () => {
+test("current checkpoint evidence cannot remain VERIFIED while mandatory GitHub Actions is VERIFYING", () => {
   const matrixWithSection =
-    `| Contract suite | JARVIS v1.0.7 |\n| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFYING** |\n` +
+    `| Contract suite | JARVIS v1.0.8 |\n| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFYING** |\n` +
     childIds.map((id) => `| ↳ **${id}** x | **VERIFIED** |`).join("\n");
   const result = codes({
     matrix: matrixWithSection,
@@ -299,9 +299,15 @@ test("candidate mode does not accept an evidence revision as the exact implement
   }
 });
 
-test("LocalCI exports the explicit candidate before the Phase-0 gate", () => {
-  const script = readFileSync(".localci/ci.sh", "utf8");
-  assert.ok(script.indexOf("export JARVIS_CANDIDATE_SHA=") < script.indexOf("run_gate phase0-section-checkpoint"));
+test("Phase 0 profile rejects retained ADR and decision-source paths", () => {
+  const existingPaths = new Set([...allEvidencePaths, "docs/adr"]);
+  assert.ok(codes({ existingPaths }).includes("PHASE0_SUPERSEDED_ACTIVE_CONTRACT"));
+});
+
+test("canonical CI authority permits GitHub Actions only", () => {
+  const values = JSON.parse(readFileSync("packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json", "utf8"));
+  assert.deepEqual(values.ciAuthorities.eligibleTypes, ["GITHUB_ACTIONS"]);
+  assert.equal(values.ciAuthorities.selectedType, "GITHUB_ACTIONS");
 });
 
 test("candidate CI requires the checked-out SHA to equal the explicit candidate", () => {

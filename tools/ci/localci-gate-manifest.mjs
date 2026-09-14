@@ -31,6 +31,51 @@ export const LOCALCI_GATE_COMMANDS = Object.freeze([
   ["rust-windows-target-build", "cargo check --locked --workspace --target x86_64-pc-windows-msvc"],
   ["windows-tauri-production-build", "pnpm --dir apps/desktop tauri build --no-bundle --target x86_64-pc-windows-msvc --ci"],
   ["phase0-section-checkpoint", "pnpm phase0:check"],
+  ["static-ci-evidence", "pnpm ci:evidence"],
 ]);
 
 export const LOCALCI_GATES = Object.freeze(LOCALCI_GATE_COMMANDS.map(([gate]) => gate));
+
+function violation(code, detail) {
+  return Object.freeze({ code, detail });
+}
+
+export function validateLocalCiGateScript(scriptText) {
+  const text = String(scriptText).replace(/\r\n/g, "\n");
+  const violations = [];
+  if (!text.startsWith("#!/usr/bin/env bash\nset -Eeuo pipefail\n")) {
+    violations.push(violation("LOCALCI_FAIL_CLOSED_PREAMBLE", "LocalCI runner must retain bash strict/fail-closed mode"));
+  }
+
+  const observed = [...text.matchAll(/^run_gate ([a-z0-9-]+) (.+)$/gm)].map((match) => [match[1], match[2]]);
+  const expected = new Map(LOCALCI_GATE_COMMANDS);
+  const seen = new Set();
+  for (const [gate, command] of observed) {
+    if (seen.has(gate)) violations.push(violation("LOCALCI_GATE_DUPLICATE", `${gate} is declared more than once`));
+    seen.add(gate);
+    if (!expected.has(gate)) violations.push(violation("LOCALCI_GATE_UNKNOWN", `${gate} is not in the approved gate manifest`));
+    else if (expected.get(gate) !== command) violations.push(violation("LOCALCI_GATE_COMMAND_DRIFT", `${gate} must run ${expected.get(gate)}`));
+  }
+  for (const gate of LOCALCI_GATES) {
+    if (!seen.has(gate)) violations.push(violation("LOCALCI_GATE_MISSING", `${gate} is missing from .localci/ci.sh`));
+  }
+  if (!/printf 'LOCALCI_JOB_RESULT=PENDING_AUTHORITY_FINALIZATION\\n' >&2\nexit 78\s*$/m.test(text)) {
+    violations.push(violation("LOCALCI_FAIL_CLOSED_EXIT", "LocalCI runner must terminate non-authoritatively and fail closed"));
+  }
+  return violations;
+}
+
+export function validateLocalCiWorkerQualificationScript(scriptText) {
+  const text = String(scriptText).replace(/\r\n/g, "\n");
+  const violations = [];
+  if (!text.includes('[[ ! ${observed_uname} =~ ^(MINGW|MSYS|CYGWIN) ]]')) {
+    violations.push(violation("LOCALCI_WORKER_OS_SPOOF_GUARD_MISSING", "worker qualification must reject Linux/WSL and require an observed native Windows shell"));
+  }
+  if (!text.includes('[[ ${attested_os} != Windows ]]') || !text.includes('[[ ${attested_arch} != X64 ]]')) {
+    violations.push(violation("LOCALCI_WORKER_ATTESTATION_GUARD_MISSING", "worker qualification must require Windows/X64 attestation"));
+  }
+  if (!text.includes("return 78")) {
+    violations.push(violation("LOCALCI_WORKER_FAIL_CLOSED_EXIT", "worker qualification must return fail-closed exit code 78"));
+  }
+  return violations;
+}

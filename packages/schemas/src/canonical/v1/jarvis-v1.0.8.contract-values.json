@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "canonicalValuesId": "jarvis.contract-values.v1.0.7",
-  "contractSuiteVersion": "1.0.7",
-  "releaseProfileVersion": "1.0.7",
+  "canonicalValuesId": "jarvis.contract-values.v1.0.8",
+  "contractSuiteVersion": "1.0.8",
+  "releaseProfileVersion": "1.0.8",
   "contractComponentRevisions": {
-    "scopeGovernanceCoding": "1.0.7",
-    "runtimePlatformProtocol": "1.0.7",
-    "dataStateBackup": "1.0.7",
-    "securityTrust": "1.0.7",
-    "operationsIntegrationsUx": "1.0.7",
-    "verificationRelease": "1.0.7",
-    "releaseProfile": "1.0.7"
+    "scopeGovernanceCoding": "1.0.8",
+    "runtimePlatformProtocol": "1.0.8",
+    "dataStateBackup": "1.0.8",
+    "securityTrust": "1.0.8",
+    "operationsIntegrationsUx": "1.0.8",
+    "verificationRelease": "1.0.8",
+    "releaseProfile": "1.0.8"
   },
   "protocolMajor": 1,
   "v1RuntimeTarget": {
@@ -61,10 +61,9 @@
   ],
   "ciAuthorities": {
     "eligibleTypes": [
-      "GITHUB_ACTIONS",
-      "LOCALCI"
+      "GITHUB_ACTIONS"
     ],
-    "selectedType": "LOCALCI",
+    "selectedType": "GITHUB_ACTIONS",
     "pipelineIdentity": "static-ci"
   },
   "githubCapabilities": {

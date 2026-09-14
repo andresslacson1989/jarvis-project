@@ -12,14 +12,14 @@ The JARVIS contract is protected at the highest instruction level. No human or A
 
 Before creating or continuing implementation work, re-fetch live `master` and base the work from that tip. Temporary feature/review branches MAY exist while a change is in progress, but they SHALL NOT become parallel sources of truth.
 
-Repository governance SHALL follow `J00-GOV-28` and `J05-VER-33`. When the hosting provider/account exposes server-side branch protection or rulesets for the authoritative repository, `master` SHALL use them with mandatory CI, force-push/deletion prevention, and narrowly controlled/auditable bypass. When that server-side capability is unavailable because of a verified hosting plan/platform limitation, the v1.0.7 `COMPENSATING_CONTROLS` mode MAY be used: temporary implementation branches, exact candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. Mandatory CI MAY be supplied by either a qualified `GITHUB_ACTIONS` authority or qualified `LOCALCI` authority under `J00-GOV-28` and `J05-VER-33`; neither vendor name nor an ordinary local test run grants authority. The fallback SHALL NOT be used if server-side protection becomes available and SHALL NOT be represented as equivalent hard prevention of an out-of-band administrator force push or deletion.
+Repository governance SHALL follow `J00-GOV-28` and `J05-VER-33`. When the hosting provider/account exposes server-side branch protection or rulesets for the authoritative repository, `master` SHALL use them with mandatory CI, force-push/deletion prevention, and narrowly controlled/auditable bypass. When that server-side capability is unavailable because of a verified hosting plan/platform limitation, the v1.0.8 `COMPENSATING_CONTROLS` mode MAY be used: temporary implementation branches, exact GitHub Actions candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. `GITHUB_ACTIONS` is the current mandatory CI authority. GitLab is mirror-only; LocalCI is non-authoritative compatibility/security tooling and cannot satisfy CI or release qualification. The fallback SHALL NOT be used if server-side protection becomes available and SHALL NOT be represented as equivalent hard prevention of an out-of-band administrator force push or deletion.
 
 ## Source of truth
 
 Before implementation or architecture work, read:
 
 1. `README.md`
-2. `docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md`
+2. `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`
 3. `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md`
 4. `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md`
 5. `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md`
@@ -29,7 +29,7 @@ Before implementation or architecture work, read:
 9. `docs/JARVIS-V1-RELEASE-PROFILE.md`
 10. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
 
-The **v1.0.7 manifest defines the current component revision set**. The six components and Release Profile are the only normative product authority; no separate historical decision record or overlay is required.
+The **v1.0.8 manifest defines the current component revision set**. The six components and Release Profile are the only normative product authority; no ADR/decision-record or historical overlay may supplement them.
 
 ## Platform/runtime-role boundary
 
@@ -101,7 +101,7 @@ Windows production update gates are cumulative: current TUF authorization, Tauri
 
 ## No historical decision-record overlay
 
-Separate architecture decision-record files are prohibited. Contributors SHALL NOT create, retain, consult, or cite them as current or historical authority. Existing decision-record material is migration input only and must be removed after its still-valid requirements are directly represented in the active suite.
+Separate architecture decision-record files are prohibited. Contributors SHALL NOT create, retain, consult, or cite them as current or historical authority.
 
 Historical contracts, reports, and other non-current material SHALL NOT be required to determine current behavior. If an implementer finds a still-valid rule only in non-current material, that is a contract defect. Stop at the ambiguity and update the active suite rather than implementing historical text as a hidden override.
 
@@ -185,7 +185,7 @@ These rules apply once the user explicitly authorizes application implementation
 
 ### Owner execution goal
 
-The canonical owner-provided developer execution goal is recorded in [`docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`](docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md). The developer and independent auditor SHALL read that file before beginning or resuming a subsection and before acting on or reporting a developer handoff. It is an execution aid, not a normative contract; active contracts, the manifest, this file, and applicable release requirements remain authoritative. Any conflict SHALL be stopped and resolved through the contract-governed resolution process.
+The canonical owner-provided developer execution goal is recorded in [`docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`](docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md). It is an execution aid, not a normative contract; active contracts, the manifest, this file, and applicable release requirements remain authoritative. A contract-consolidation goal authorizes only the stated documentation, generated-artifact, and validator work; it does not authorize application implementation, matrix progression, evidence advancement, or an auditor handoff. Any conflict SHALL be stopped and resolved through the contract-governed resolution process.
 
 ### Contract is master authority
 

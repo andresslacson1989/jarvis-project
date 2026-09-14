@@ -1,7 +1,7 @@
 # JARVIS Security & Trust Contract
 
-**Contract Suite Version:** 1.0.7
-**Version:** 1.0.7
+**Contract Suite Version:** 1.0.8
+**Version:** 1.0.8
 **Component:** `J03`
 **Status:** Canonical normative component
 **Scope:** security hardening, threat boundaries, project-policy enrollment, supply-chain trust, update/module authorization, and security verification
@@ -1489,4 +1489,4 @@ Tauri/Windows signing remains an additional artifact/platform integrity layer, n
 
 ---
 
-**END — JARVIS SECURITY & TRUST CONTRACT v1.0.7**
+**END — JARVIS SECURITY & TRUST CONTRACT v1.0.8**

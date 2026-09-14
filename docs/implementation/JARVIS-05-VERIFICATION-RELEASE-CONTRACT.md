@@ -1,7 +1,7 @@
 # JARVIS Verification & Release Contract
 
-**Contract Suite Version:** 1.0.7
-**Version:** 1.0.7
+**Contract Suite Version:** 1.0.8
+**Version:** 1.0.8
 **Component:** `J05`
 **Status:** Canonical normative component
 **Scope:** definition of done, verification layers, qualification gates, release evidence, defect handling, and the Production Complete declaration
@@ -19,7 +19,7 @@ Code existence, model self-report, documentation completion, one happy-path demo
 
 Production is verified behavior under normal success, ambiguity, interruption, crash, stale state, provider setup/repair, provider outage, adversarial input, target race, recovery, update, resource pressure, accessibility modes, adaptive layouts, platform-capability failure, and real release packaging.
 
-V1 production qualification is for a **Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the active v1.0.7 contract suite.
+V1 production qualification is for a **Windows FULL_HOST** artifact. Linux runtime/Android companion are not V1 gates, but architecture tests SHALL prove that Windows implementation preserves the platform boundaries required by the active v1.0.8 contract suite.
 
 ---
 
@@ -35,7 +35,7 @@ RELEASE CANDIDATE
 PRODUCTION
 ```
 
-Only a release satisfying every mandatory v1.0.7-suite gate for the active Release Profile may be labeled `PRODUCTION`/`Production Complete`.
+Only a release satisfying every mandatory v1.0.8-suite gate for the active Release Profile may be labeled `PRODUCTION`/`Production Complete`.
 
 Qualification SHALL bind to one source commit, contract manifest, Release Profile, PlatformFamily/RuntimeRole/backend profile, exact protocol/schema versions, and exact signed installer/update artifacts.
 
@@ -629,7 +629,9 @@ No V1 test opens a general remote companion Core API.
 
 ## J05-VER-30 — VOICE QUALIFICATION
 
-V1 Windows voice tests cover microphone selection/reconnect, VAD, STT partial/final/cancel, AEC using exact TTS render reference, barge-in/double-talk, stop/mute/cancel, device removal, STT/TTS failure, half-duplex degradation, locked privacy, exact one-approval voice confirmation, persistent voice identity, and DataLocality.
+V1 Windows voice tests cover microphone selection/reconnect, VAD, STT partial/final/cancel, the normalized TTS request/event contract, provider identity/health/capabilities/voice discovery/streaming/stop, provider-option isolation, persistent provider-independent voice identity, AEC using exact TTS render reference, AEC capability/health including double-talk/noise suppression/gain control/sample-rate/latency/CPU/readiness, Provider Supervisor lifecycle/restart/approved fallback, barge-in/double-talk, stop/mute/cancel, device removal, STT/TTS/AEC failure, half-duplex degradation, locked privacy, exact one-approval voice confirmation, and DataLocality.
+
+Negative conformance tests SHALL fail if normalized TTS/AEC requirements, policy-bound fallback, exact render-reference ordering, or deterministic local reflex behavior are weakened or removed.
 
 Tests use realistic speaker/microphone conditions on target hardware, not only synthetic audio.
 
@@ -698,13 +700,11 @@ The compensating mode SHALL NOT waive CI, authorize force-push implementation wo
 
 Implementation workflow SHOULD require pull-request review once coding work begins. Qualification SHALL also confirm there is no second long-lived authoritative contract/implementation branch.
 
-The designated CI authority type SHALL be `GITHUB_ACTIONS` or `LOCALCI`. They are equal alternatives after qualification: either one complete passing result may satisfy the candidate or post-integration CI gate without also running the other. Evidence SHALL identify the selected authority, authority instance, job/run, pipeline identity, requested revision, server-resolved exact commit, per-gate results, timestamps, logs/artifact identities or hashes, and terminal status.
+The designated CI authority is `GITHUB_ACTIONS` only. A complete exact-candidate or post-integration GitHub Actions result is required. Evidence SHALL identify the workflow/job, run, pipeline identity, requested revision, server-resolved exact commit, per-gate results, timestamps, logs/artifact identities or hashes, and terminal status. GitLab is repository mirror-only and SHALL NOT qualify CI or release evidence. LocalCI may demonstrate compatibility/security tooling but SHALL NOT satisfy this authority gate.
 
 Common qualification SHALL test exact-SHA mismatch rejection, unapproved repository/profile/ref rejection, malformed or duplicate submission handling, timeout/cancellation/cleanup, failed-step aggregate failure, credential non-exposure, prohibited host/control-plane access, evidence integrity/retention, and recovery after runner/control-plane interruption.
 
-GitHub Actions qualification SHALL additionally prove immutable action pins, least-privilege permissions, approved workflow/job identity, and live exact-candidate run evidence. LocalCI qualification SHALL additionally prove authenticated TLS, non-administrator least-privilege API clients, repository/profile/ref allowlists, server-side revision resolution, rootless isolation, denial of arbitrary clone URLs/commands/images/mounts/paths/devices/networks, controlled upgrades and clock integrity, and tested evidence export/retention. A demo or materially changed instance remains unqualified until these gates pass.
-
-Disabling GitHub Actions while qualified LocalCI is selected does not waive CI. If no qualified authority completes the whole mandatory pipeline, qualification fails.
+GitHub Actions qualification SHALL prove immutable action pins, least-privilege permissions, approved workflow/job identity, and live exact-candidate run evidence. Disabling GitHub Actions, selecting LocalCI, or presenting a GitLab pipeline as an equivalent result fails this gate.
 
 ---
 
@@ -821,4 +821,4 @@ The production question is:
 
 ---
 
-**END — JARVIS VERIFICATION & RELEASE CONTRACT v1.0.7**
+**END — JARVIS VERIFICATION & RELEASE CONTRACT v1.0.8**

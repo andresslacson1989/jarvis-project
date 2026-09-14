@@ -2,23 +2,23 @@
   "_generated": {
     "schemaVersion": 1,
     "doNotEdit": true,
-    "source": "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
-    "sourceSha256": "ad1c44d47e56598a6ad3d1d48720d2ee153a4b90fa5526fd4c104b4a57b9feb3",
-    "canonicalValuesId": "jarvis.contract-values.v1.0.7"
+    "source": "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json",
+    "sourceSha256": "96ee63f00d62d5c4e9943ed38a5fdd02e1be120c3386de8f5db236defb721cf7",
+    "canonicalValuesId": "jarvis.contract-values.v1.0.8"
   },
   "values": {
     "schemaVersion": 1,
-    "canonicalValuesId": "jarvis.contract-values.v1.0.7",
-    "contractSuiteVersion": "1.0.7",
-    "releaseProfileVersion": "1.0.7",
+    "canonicalValuesId": "jarvis.contract-values.v1.0.8",
+    "contractSuiteVersion": "1.0.8",
+    "releaseProfileVersion": "1.0.8",
     "contractComponentRevisions": {
-      "scopeGovernanceCoding": "1.0.7",
-      "runtimePlatformProtocol": "1.0.7",
-      "dataStateBackup": "1.0.7",
-      "securityTrust": "1.0.7",
-      "operationsIntegrationsUx": "1.0.7",
-      "verificationRelease": "1.0.7",
-      "releaseProfile": "1.0.7"
+      "scopeGovernanceCoding": "1.0.8",
+      "runtimePlatformProtocol": "1.0.8",
+      "dataStateBackup": "1.0.8",
+      "securityTrust": "1.0.8",
+      "operationsIntegrationsUx": "1.0.8",
+      "verificationRelease": "1.0.8",
+      "releaseProfile": "1.0.8"
     },
     "protocolMajor": 1,
     "v1RuntimeTarget": {
@@ -69,10 +69,9 @@
     ],
     "ciAuthorities": {
       "eligibleTypes": [
-        "GITHUB_ACTIONS",
-        "LOCALCI"
+        "GITHUB_ACTIONS"
       ],
-      "selectedType": "LOCALCI",
+      "selectedType": "GITHUB_ACTIONS",
       "pipelineIdentity": "static-ci"
     },
     "githubCapabilities": {

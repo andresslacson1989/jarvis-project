@@ -1,7 +1,7 @@
 # JARVIS Runtime, Platform & Protocol Contract
 
-**Contract Suite Version:** 1.0.7
-**Version:** 1.0.7
+**Contract Suite Version:** 1.0.8
+**Version:** 1.0.8
 **Component:** `J01`
 **Protocol Major:** 1
 **Status:** Canonical normative component
@@ -1323,6 +1323,24 @@ Full-duplex keeps microphone available for barge-in when AEC is healthy. AEC fai
 Stale/cancelled transcripts cannot submit after cancel/lock/session reset.
 
 Speech provider routing obeys the same DataLocality policy as AI providers.
+
+---
+
+---
+
+## J01-RT-26A — NORMALIZED TTS AND AUDIO-PROCESSING PROVIDERS
+
+JARVIS owns voice capability; TTS and audio-processing providers are replaceable adapters. Core, conversation state, UI, mission logic, and permission policy SHALL NOT depend on provider-native APIs, voice identifiers, request options, or event structures.
+
+The normalized TTS provider boundary SHALL expose an adapter identity, health, capabilities, logical voice discovery, streaming synthesis, and interrupt/stop behavior. A normalized synthesis request SHALL carry `text`, logical voice identity, language, rate, style/expression, streaming preference, latency preference, quality preference, and applicable conversation/turn identity. Provider-specific options SHALL remain inside the adapter or its attached metadata.
+
+The normalized TTS event vocabulary SHALL include `tts.started`, `tts.audio_chunk`, `tts.completed`, `tts.stopped`, and `tts.error`. Logical JARVIS voice identity is independent of a provider; an adapter maps that identity to its closest qualified provider configuration. Local speech is preferred, cloud TTS is optional and SHALL NOT be required for normal operation, and a fallback SHALL preserve DataLocality, privacy, permission, and approved-provider policy. TTS provider failure SHALL NOT crash Core.
+
+The audio-processing boundary SHALL accept raw microphone input and the exact speaker/TTS render reference, then produce cleaned microphone audio before VAD, barge-in detection, and streaming STT. It SHALL remain provider-neutral. The initial qualified local CPU adapter SHALL use WebRTC APM/AEC3-compatible behavior, or an exact active-Release-Profile equivalent; Core and the realtime conversation engine SHALL NOT depend on WebRTC-native structures.
+
+AEC capability and health reporting SHALL cover AEC, double-talk handling, noise suppression, gain control, supported sample rates, latency, CPU requirements, readiness, and health. The centralized Provider Supervisor owns discovery, lifecycle, readiness, health, restart, failure isolation, and approved fallback routing for AEC as well as AI/STT/TTS/VAD providers. A provider failure SHALL NOT crash Core; fallback occurs only when approved policy and required capability remain satisfied.
+
+Full duplex is preferred whenever AEC is healthy. If AEC is unavailable or unreliable, JARVIS SHALL truthfully use a safe half-duplex fallback while retaining local deterministic stop, cancel, and mute reflexes without remote AI reasoning.
 
 ---
 
@@ -2670,4 +2688,4 @@ CI/release qualification SHALL prove:
 
 ---
 
-**END — JARVIS RUNTIME, PLATFORM & PROTOCOL CONTRACT v1.0.7**
+**END — JARVIS RUNTIME, PLATFORM & PROTOCOL CONTRACT v1.0.8**

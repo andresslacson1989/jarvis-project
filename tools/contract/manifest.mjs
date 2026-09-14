@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { CANONICAL_VALUES_PATH, MANIFEST_PATH, readCanonical, stablePretty, violation } from "./lib.mjs";
 
@@ -12,6 +13,43 @@ const COMPONENT_KEY_BY_FILE = Object.freeze({
   "JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md": "verificationRelease",
   "JARVIS-V1-RELEASE-PROFILE.md": "releaseProfile",
 });
+
+const TEXT_EXTENSIONS = new Set([".json", ".md", ".mjs", ".ts", ".tsx", ".js", ".jsx", ".yml", ".yaml", ".toml", ".sh", ".ps1", ".txt"]);
+
+function extension(path) {
+  const name = basename(path);
+  const index = name.lastIndexOf(".");
+  return index < 0 ? "" : name.slice(index).toLowerCase();
+}
+
+export function validateTrackedDecisionRecordPaths(paths) {
+  const violations = [];
+  for (const path of [...paths].sort((a, b) => a.localeCompare(b, "en"))) {
+    const segments = path.split("/");
+    if (segments.some((segment) => /^(?:adr|adrs|decision|decisions|history)$/i.test(segment))) {
+      violations.push(violation("MANIFEST_DECISION_RECORD_PATH", path, "tracked ADR/decision/history directories are prohibited, including nested and case variants"));
+    }
+    if (/(?:^|\/)(?:adr|decision)[-_]?\d+(?:[-_.]|$)/i.test(path)) {
+      violations.push(violation("MANIFEST_DECISION_RECORD_FILENAME", path, "tracked ADR-like or decision-like filenames are prohibited"));
+    }
+  }
+  return violations;
+}
+
+export function hasForbiddenDecisionRecordReference(text) {
+  return /(?:^|[\s`"'(])docs[\\/](?:adr|adrs|decision|decisions|history)(?=$|[\\/\s`"')])/im.test(String(text));
+}
+
+function trackedPaths(rootDir) {
+  try {
+    return execFileSync("git", ["ls-files", "-z"], { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+      .split("\0")
+      .filter(Boolean)
+      .map((path) => path.replaceAll("\\", "/"));
+  } catch {
+    return null;
+  }
+}
 
 function basename(path) {
   return path.split("/").at(-1);
@@ -40,6 +78,17 @@ export function componentFooterRevision(text) {
 
 export async function validateContractManifest(rootDir) {
   const violations = [];
+  const tracked = trackedPaths(rootDir);
+  if (tracked !== null) {
+    violations.push(...validateTrackedDecisionRecordPaths(tracked));
+    for (const path of tracked) {
+      if (path.startsWith("tools/") || path.startsWith("tests/") || !TEXT_EXTENSIONS.has(extension(path))) continue;
+      const text = await readFile(resolve(rootDir, path), "utf8");
+      if (hasForbiddenDecisionRecordReference(text)) {
+        violations.push(violation("MANIFEST_DECISION_RECORD_REFERENCE", path, "tracked content must not reference deleted ADR/decision/history source paths"));
+      }
+    }
+  }
   const { values: canonical } = await readCanonical(rootDir);
   const manifestText = await readFile(resolve(rootDir, MANIFEST_PATH), "utf8");
   const suiteVersion = manifestText.match(/\*\*Suite Version:\*\*\s*([0-9.]+)/)?.[1];
@@ -55,6 +104,7 @@ export async function validateContractManifest(rootDir) {
 
   const seenKeys = new Set();
   const components = [];
+  const activeTexts = [manifestText];
   for (const row of rows) {
     const key = componentKeyForPath(row.path);
     if (!key || !(key in canonical.contractComponentRevisions)) {
@@ -73,6 +123,7 @@ export async function validateContractManifest(rootDir) {
       continue;
     }
     const content = await readFile(absolute, "utf8");
+    activeTexts.push(content);
     const headerRevision = componentHeaderRevision(content);
     if (headerRevision !== expectedRevision) {
       violations.push(violation("MANIFEST_COMPONENT_HEADER_DRIFT", row.path, `expected internal revision ${expectedRevision}, got ${headerRevision ?? "<missing>"}`));
@@ -91,6 +142,13 @@ export async function validateContractManifest(rootDir) {
   const releaseRow = components.find((item) => item.key === "releaseProfile");
   if (releaseRow?.revision !== canonical.releaseProfileVersion) {
     violations.push(violation("MANIFEST_RELEASE_PROFILE_VERSION", MANIFEST_PATH, `release profile must be ${canonical.releaseProfileVersion}`));
+  }
+
+  for (const path of ["AGENTS.md", "README.md", "docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md"]) {
+    if (existsSync(resolve(rootDir, path))) activeTexts.push(await readFile(resolve(rootDir, path), "utf8"));
+  }
+  if (activeTexts.some((text) => /docs\/(?:adr|decisions)\b|ADR-\d{2,}/i.test(text))) {
+    violations.push(violation("MANIFEST_ADR_AUTHORITY_REFERENCE", MANIFEST_PATH, "active authority files must not cite ADR/decision-record source paths or identifiers"));
   }
 
   const referencePath = "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md";

@@ -1,7 +1,7 @@
 # JARVIS Implementation Execution Matrix
 
 **Document role:** Non-normative stable definition/dependency reference derived from the locked active contract suite. Current status and execution authority exist only in `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md`.
-**Contract suite:** JARVIS v1.0.7
+**Contract suite:** JARVIS v1.0.8
 **Authoritative implementation sequence:** `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`  
 **Contract baseline reviewed before this matrix:** `master` at `5766978576a48165a7ec8013ed6a106b0b0ddd17`  
 **Archived initial planning state:** application implementation had not started when this reference was first created. Status cells and the archived pointer below are historical planning context and SHALL NOT determine current execution state.
@@ -44,7 +44,7 @@ Traceability cells use stable clause/component identifiers. The normative source
 
 | Identifier family | Normative source |
 |---|---|
-| `MAN-xx` | `docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md` |
+| `MAN-xx` | `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md` |
 | `J00-*` | `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` |
 | `J01-*` | `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md` |
 | `J02-*` | `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md` |
@@ -643,7 +643,7 @@ Binding post-V1 integration targets remain SSH, Google Workspace, Microsoft 365,
 ## Fresh matrix design review
 
 **Review date:** August 12, 2026  
-**Contract baseline:** JARVIS v1.0.7 active suite; current source and status identity are resolved through the live matrix and live `master` revalidation.
+**Contract baseline:** JARVIS v1.0.8 active suite; current source and status identity are resolved through the live matrix and live `master` revalidation.
 **Draft reviewed:** initial matrix commit `d937c606785c5b21ddff72ab1ed011dd7c931b11` plus the current hardening amendments in this branch.
 
 The review was performed as a fresh contract/dependency audit rather than a self-approval of the original outline. It re-read `AGENTS.md`, the current manifest, the consolidated active contract suite, Release Profile, every active normative component, the Implementation Plan, and the actual repository copy of this matrix.
@@ -688,4 +688,4 @@ Before this matrix is accepted for implementation, a fresh review must establish
 - [x] The final `Production Complete` declaration binds to one exact source commit and exact signed Windows FULL_HOST artifacts.
 - [x] Fresh review found no known unresolved matrix ordering/coverage/prerequisite defect.
 
-> **Safety statement:** this reference is reconciled to the JARVIS v1.0.7 suite for definitions, dependencies, traceability, and release-gate ownership. It does not claim current implementation status. No planning artifact can guarantee that future implementation code will be bug-free; implementation must still follow the subsection verification loop and exact contract gates. The reference must be revalidated whenever the contract or live repository prerequisites change.
+> **Safety statement:** this reference is reconciled to the JARVIS v1.0.8 suite for definitions, dependencies, traceability, and release-gate ownership. It does not claim current implementation status. No planning artifact can guarantee that future implementation code will be bug-free; implementation must still follow the subsection verification loop and exact contract gates. The reference must be revalidated whenever the contract or live repository prerequisites change.
