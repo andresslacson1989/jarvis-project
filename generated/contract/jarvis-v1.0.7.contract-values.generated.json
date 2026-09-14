@@ -3,7 +3,7 @@
     "schemaVersion": 1,
     "doNotEdit": true,
     "source": "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
-    "sourceSha256": "349d13e86f3c12505284a222415ef480344f36492c83c4be8404272789aba019",
+    "sourceSha256": "ad1c44d47e56598a6ad3d1d48720d2ee153a4b90fa5526fd4c104b4a57b9feb3",
     "canonicalValuesId": "jarvis.contract-values.v1.0.7"
   },
   "values": {
@@ -12,21 +12,13 @@
     "contractSuiteVersion": "1.0.7",
     "releaseProfileVersion": "1.0.7",
     "contractComponentRevisions": {
-      "implementationContract": "1.0.7",
-      "releaseProfile": "1.0.7",
-      "platformPortability": "1.0.4",
-      "runtime": "1.0.3",
-      "protocolSchema": "1.0.4",
-      "dataState": "1.0.3",
-      "securityHardening": "1.0.3",
-      "backupCryptography": "1.0.5",
-      "projectPolicyTrust": "1.0.5",
-      "supplyChainTrust": "1.0.5",
-      "codingStandards": "1.0.6",
-      "operationsUxGovernance": "1.0.3",
-      "uiIdentityDesignSystem": "1.0.3",
-      "verificationRelease": "1.0.6",
-      "implementationPlan": "1.0.7"
+      "scopeGovernanceCoding": "1.0.7",
+      "runtimePlatformProtocol": "1.0.7",
+      "dataStateBackup": "1.0.7",
+      "securityTrust": "1.0.7",
+      "operationsIntegrationsUx": "1.0.7",
+      "verificationRelease": "1.0.7",
+      "releaseProfile": "1.0.7"
     },
     "protocolMajor": 1,
     "v1RuntimeTarget": {

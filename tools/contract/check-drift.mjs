@@ -4,10 +4,10 @@ import { extractFenceAfter, extractTypeUnion, isMain, printViolations, readCanon
 const DOCS = Object.freeze({
   manifest: "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md",
   releaseProfile: "docs/JARVIS-V1-RELEASE-PROFILE.md",
-  portability: "docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md",
-  protocol: "docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md",
-  backup: "docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md",
-  supplyChain: "docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md",
+  portability: "docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md",
+  protocol: "docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md",
+  backup: "docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md",
+  supplyChain: "docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md",
 });
 
 function regexValue(text, regex) {
@@ -87,7 +87,7 @@ export function checkContractDriftFromTexts(canonical, docs) {
   expectSet(violations, "DRIFT_PROVIDER_SETUP_STATES", DOCS.protocol, extractTypeUnion(protocol, "ProviderSetupState"), canonical.providerSetupStates, "ProviderSetupState");
   expectSet(violations, "DRIFT_MODULE_EXECUTION_CLASSES", DOCS.protocol, extractTypeUnion(protocol, "ModuleExecutionClass"), canonical.moduleExecutionClasses, "ModuleExecutionClass");
 
-  const governanceSection = section(releaseProfile, "# 17. REPOSITORY GOVERNANCE GATE", "# 18. PRODUCTION-COMPLETE GATE");
+  const governanceSection = section(releaseProfile, "# RP-17 — REPOSITORY GOVERNANCE GATE", "# RP-18 — PRODUCTION-COMPLETE GATE");
   for (const authority of canonical.ciAuthorities.eligibleTypes) {
     expectRegex(violations, "DRIFT_CI_AUTHORITY_TYPES", DOCS.releaseProfile, governanceSection, new RegExp(`\\b${escapeRegex(authority)}\\b`), `eligible CI authority ${authority} missing`);
   }

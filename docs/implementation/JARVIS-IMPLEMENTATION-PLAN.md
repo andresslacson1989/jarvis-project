@@ -1,6 +1,6 @@
 # JARVIS Production Implementation Plan
 
-**Status:** Authoritative dependency/sequencing plan for v1.0.7
+**Status:** Non-authoritative dependency/sequencing aid for v1.0.7
 **Version:** 1.0.7
 **Date:** August 12, 2026  
 **Release target:** `docs/JARVIS-V1-RELEASE-PROFILE.md`
@@ -39,7 +39,7 @@ The platform boundary is cross-cutting: Phase 0 defines it, Phase 1 composes the
 
 The UI identity/accessibility system is also cross-cutting: Phase 1 establishes it, every later user-facing phase uses it, and final qualification proves the complete product.
 
-The v1.0.5 security closures remain cross-cutting: backup-format cryptography is frozen before persistence depends on it; project-policy trust is explicit before engineering workers consume repository policy; supply-chain trust is established before module/update activation; and voice feasibility is measured early before late product integration. The v1.0.6 repository-governance closure additionally prevents an unavailable paid hosting feature from becoming a hidden implementation prerequisite while preserving stronger server enforcement whenever the hosting capability exists.
+The active security closures remain cross-cutting: the J02 backup-format cryptography is frozen before persistence depends on it; J03 project-policy trust is explicit before engineering workers consume repository policy; J03 supply-chain trust is established before module/update activation; and voice feasibility is measured early before late product integration. The active repository-governance clauses additionally prevent an unavailable paid hosting feature from becoming a hidden implementation prerequisite while preserving stronger server enforcement whenever the hosting capability exists.
 
 ---
 
@@ -47,7 +47,7 @@ The v1.0.5 security closures remain cross-cutting: backup-format cryptography is
 
 ## Deliverables
 
-- monorepo package boundaries from Coding Standards;
+- monorepo package boundaries from the J00 coding clauses;
 - `packages/platform-contracts/` or equivalent semantic native-capability contracts;
 - `platform/windows/` or equivalent Windows backend boundary;
 - future `platform/linux/` namespace reserved/documented without implementing a Linux runtime;
@@ -64,7 +64,7 @@ The v1.0.5 security closures remain cross-cutting: backup-format cryptography is
 - secret/dependency/license scan;
 - root `AGENTS.md`;
 - current contract manifest validation in CI;
-- authoritative-`master` governance profile: server-side GitHub ruleset/branch protection when the hosting capability exists, otherwise the v1.0.7 verified compensating-control mode;
+- authoritative-`master` governance profile: server-side GitHub ruleset/branch protection when the hosting capability exists, otherwise the verified compensating-control mode defined by J00/J05;
 - provider-neutral mandatory CI authority profile selecting either a qualified `GITHUB_ACTIONS` authority or qualified `LOCALCI` authority with exact-SHA, complete-pipeline, least-privilege, isolation, cancellation/recovery, and durable-evidence qualification;
 - machine-readable canonical definitions or generated equivalents for repeated contract values including KDF profiles, backup format profile identifiers/limits, platform/runtime enums, GitHub/Proxmox capability matrices, provider setup states, and security/release constants where practical;
 - CI checks that compare generated/machine-readable definitions against the normative profile and fail on semantic drift.
@@ -209,14 +209,14 @@ This proof occurs before broad stateful feature development.
 - random local `DB_DEK` protected by Windows secure-storage backend;
 - versioned Argon2id profile schema/persistence;
 - production session/general KDF floor enforcement: v0x13, >=64 MiB, >=3 passes, 4 lanes, >=16-byte random salt, >=32-byte output;
-- exact `JARVIS_BACKUP_V1` implementation from the Backup Cryptography Contract;
+- exact `JARVIS_BACKUP_V1` implementation from J02 backup clauses;
 - exact release-qualified SQLCipher-safe snapshot/re-key/export mechanism proven on the selected binding;
 - fresh 256-bit `SnapshotDBKey` per backup;
 - fresh 256-bit `BackupDEK` per backup;
 - AES-256-GCM 4 MiB chunk framing, nonce construction, JCS descriptor/AAD, 128-bit tags, strict count/order/truncation/append validation, and package bounds;
 - Windows local DPAPI/secure-store key slot;
 - mandatory `GENERATED_RECOVERY_V1` slot using a 256-bit OS-CSPRNG recovery secret for production portable-state verification;
-- optional `PASSPHRASE_ARGON2ID_V1` slot using >=256 MiB, >=3 passes, 4 lanes, >=16-byte salt, >=32-byte output and the Backup Cryptography Contract's passphrase admission rules;
+- optional `PASSPHRASE_ARGON2ID_V1` slot using >=256 MiB, >=3 passes, 4 lanes, >=16-byte salt, >=32-byte output and J02 backup-clause passphrase admission rules;
 - clean-profile Windows restore + fresh local DB_DEK re-key;
 - corruption/integrity handling;
 - production-style packaged execution.
@@ -709,7 +709,7 @@ The cryptographic backup proof exists from Phase 3, voice feasibility evidence e
 
 ## Exit
 
-Full Windows local + portable restore drills pass; generated recovery secret alone can restore a clean profile; bad migration/startup recovers a known-good authorized pair; revoked/old unauthorized validly signed updates are rejected; TUF/Tauri/Windows signing gates are cumulative; diagnostics identify common subsystem/platform/policy/trust failures; all UI Identity Contract completion criteria pass; shared UI components remain free of unnecessary Windows-only semantic coupling.
+Full Windows local + portable restore drills pass; generated recovery secret alone can restore a clean profile; bad migration/startup recovers a known-good authorized pair; revoked/old unauthorized validly signed updates are rejected; TUF/Tauri/Windows signing gates are cumulative; diagnostics identify common subsystem/platform/policy/trust failures; all J04 UI completion criteria pass; shared UI components remain free of unnecessary Windows-only semantic coupling.
 
 ---
 
@@ -789,7 +789,7 @@ Re-fetch live `master` before writes when concurrent work is possible and preser
 
 Contract/schema change includes compatibility/migration impact. Security/recovery change includes negative/failure tests. UI identity/accessibility change includes qualification impact. Platform-native change includes capability-contract and platform-support impact. Backup crypto, project-policy trust, supply-chain trust, and repository-governance changes require their specialized contract/versioning implications.
 
-A material implementation-vs-contract conflict is corrected or goes through the synchronous ADR + canonical contract + manifest amendment process. Code never silently becomes the new architecture because it was easier.
+A material implementation-vs-contract conflict is corrected or goes through the synchronous active-contract and manifest amendment process. Code never silently becomes the new architecture because it was easier.
 
 Windows-only dependencies belong in the Windows backend unless the shared layer genuinely requires them. Shared code SHALL not gain OS conditionals as a shortcut around platform composition.
 

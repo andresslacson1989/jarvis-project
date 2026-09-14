@@ -177,8 +177,8 @@ async function main() {
   const [profileRaw, workflow, implementationContract, verificationContract, localCiScript] = await Promise.all([
     readFile(resolve(root, "docs/implementation/governance/repository-governance-profile.json"), "utf8"),
     readFile(resolve(root, ".github/workflows/static-ci.yml"), "utf8"),
-    readFile(resolve(root, "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md"), "utf8"),
-    readFile(resolve(root, "docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md"), "utf8"),
+    readFile(resolve(root, "docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md"), "utf8"),
+    readFile(resolve(root, "docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md"), "utf8"),
     readFile(resolve(root, ".localci/ci.sh"), "utf8"),
   ]);
   const profile = JSON.parse(profileRaw);

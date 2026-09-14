@@ -52,7 +52,7 @@ function humanFixture(values = canonical) {
   const proxmoxOptional = values.proxmoxCapabilities.optional.join("\n");
   return {
     manifest: `# Manifest\n**Suite Version:** ${values.contractSuiteVersion}\n`,
-    releaseProfile: `# Profile\n**Profile Version:** ${values.releaseProfileVersion}\nInitial production target:\n\n\`\`\`text\nPlatformFamily: ${values.v1RuntimeTarget.platform}\nRuntimeRole:    ${values.v1RuntimeTarget.runtimeRole}\nOperating system: ${values.v1RuntimeTarget.operatingSystem}\nMinimum normal release baseline: ${values.v1RuntimeTarget.minimumReleaseBaseline}\nCPU architecture: x86-64 (${values.v1RuntimeTarget.architecture})\n\`\`\`\n## 9.1 GitHub V1 capability matrix\nThe following capability families are mandatory for V1 Production Complete:\n\n\`\`\`text\n${githubMandatory}\n\`\`\`\n${values.githubCapabilities.optional[0]} MAY be supported and qualified but does not block V1 Production Complete.\n## 9.2 Proxmox VE V1 capability matrix\nThe following capabilities are mandatory for V1 Production Complete:\n\n\`\`\`text\n${proxmoxMandatory}\n\`\`\`\nThe following remain modeled but do not block V1 Production Complete:\n\n\`\`\`text\n${proxmoxOptional}\n\`\`\`\n# 17. REPOSITORY GOVERNANCE GATE\nThe mandatory ${values.ciAuthorities.pipelineIdentity} pipeline accepts qualified GITHUB_ACTIONS or qualified LOCALCI. The selected qualified ${values.ciAuthorities.selectedType} authority is active.\n# 18. PRODUCTION-COMPLETE GATE\n---\n`,
+    releaseProfile: `# Profile\n**Profile Version:** ${values.releaseProfileVersion}\nInitial production target:\n\n\`\`\`text\nPlatformFamily: ${values.v1RuntimeTarget.platform}\nRuntimeRole:    ${values.v1RuntimeTarget.runtimeRole}\nOperating system: ${values.v1RuntimeTarget.operatingSystem}\nMinimum normal release baseline: ${values.v1RuntimeTarget.minimumReleaseBaseline}\nCPU architecture: x86-64 (${values.v1RuntimeTarget.architecture})\n\`\`\`\n## 9.1 GitHub V1 capability matrix\nThe following capability families are mandatory for V1 Production Complete:\n\n\`\`\`text\n${githubMandatory}\n\`\`\`\n${values.githubCapabilities.optional[0]} MAY be supported and qualified but does not block V1 Production Complete.\n## 9.2 Proxmox VE V1 capability matrix\nThe following capabilities are mandatory for V1 Production Complete:\n\n\`\`\`text\n${proxmoxMandatory}\n\`\`\`\nThe following remain modeled but do not block V1 Production Complete:\n\n\`\`\`text\n${proxmoxOptional}\n\`\`\`\n# RP-17 — REPOSITORY GOVERNANCE GATE\nThe mandatory ${values.ciAuthorities.pipelineIdentity} pipeline accepts qualified GITHUB_ACTIONS or qualified LOCALCI. The selected qualified ${values.ciAuthorities.selectedType} authority is active.\n# RP-18 — PRODUCTION-COMPLETE GATE\n---\n`,
     portability: `Canonical runtime roles are:\n\n\`\`\`text\n${values.runtimeRoles.join("\n")}\n\`\`\`\n`,
     protocol: `**Protocol Major:** ${values.protocolMajor}\n${union("PlatformFamily", values.platformFamilies)}${union("RuntimeRole", values.runtimeRoles)}\ninterface Argon2idProfile { algorithm: 'ARGON2ID'; version: 0x13; parallelism: 4; }\n\`\`\`text\nmemoryKiB  >= ${values.kdf.sessionAndPortableRecoveryFloor.memoryKiB}\niterations >= ${values.kdf.sessionAndPortableRecoveryFloor.iterations}\nparallelism = ${values.kdf.sessionAndPortableRecoveryFloor.parallelism}\nsaltBytes  >= ${values.kdf.sessionAndPortableRecoveryFloor.saltBytes}\noutputBytes >= ${values.kdf.sessionAndPortableRecoveryFloor.outputBytes}\n\`\`\`\n${union("ProviderSetupState", values.providerSetupStates)}${union("ModuleExecutionClass", values.moduleExecutionClasses)}${union("GitHubCapability", [...values.githubCapabilities.mandatory, ...values.githubCapabilities.optional])}${union("ProxmoxCapability", [...values.proxmoxCapabilities.mandatory, ...values.proxmoxCapabilities.optional])}\nConfiguration domains are typed/versioned and include at least startup, session security, voice, providers, privacy, permissions, budgets, projects, modules, integrations, notifications, retention, updates, platform backend profile, and developer mode. Normal configuration never accepts raw secrets.\n---\ninterface CanonicalActionDescriptorV1 { domain: '${values.approvalCanonicalization.actionDescriptorDomain}'; descriptorVersion: ${values.approvalCanonicalization.descriptorVersion}; }\ninterface ApprovalRequest { actionDigestAlgorithm: 'SHA-256'; actionDigestEncoding: '${values.approvalCanonicalization.digestEncoding}'; }\nRFC 8785 JCS canonical JSON\n→ SHA-256\n→ base64url without padding\n`,
     backup: `The first production format is:\n\n\`\`\`text\nformatId: ${values.backup.formatId}\nformatVersion: ${values.backup.formatVersion}\nouterAead: ${values.backup.outerAead}\nchunkSizeBytes: ${values.backup.chunkSizeBytes}\nmaxPlaintextBytes: ${values.backup.maxPlaintextBytes}\nchunkTagBytes: ${values.backup.chunkTagBytes}\nchunkNonceBytes: ${values.backup.chunkNonceBytes}\nhash: ${values.backup.hash}\ncanonicalMetadata: ${values.backup.canonicalMetadata}\n\`\`\`\nfresh SnapshotDBKey (${values.backup.snapshotDbKeyBits} random bits per backup)\nfresh BackupDEK (${values.backup.backupDekBits} random bits per backup)\nprotectionClass: 'LOCAL_RECOVERY' | 'PORTABLE_STATE';\nV1 SHALL allow at most ${values.backup.maxKeySlots} key slots and a total unencrypted descriptor/key-slot metadata area of ${values.backup.maxUnencryptedMetadataBytes / 1024} KiB.\nnoncePrefix: base64url-no-pad, exactly ${values.backup.noncePrefixBytes} random bytes\nEvery production PORTABLE_STATE backup SHALL contain at least one '${values.backup.mandatoryPortableSlot}' key slot backed by a JARVIS-generated ${values.backup.generatedRecoverySecretBits}-bit recovery secret.\n${values.backup.generatedRecoveryPrefix}<base64url-no-pad of exactly ${values.backup.generatedRecoverySecretBits / 8} random bytes>\nA ${values.backup.optionalPortableSlot} slot MAY be added.\ngenerate a fresh random ${values.backup.wrapNonceBytes * 8}-bit AES-GCM wrap nonce\naccept at least ${values.backup.portableBackupPassphraseAcceptedCodePointsAtLeast} Unicode code points;\nrequire at least ${values.backup.portableBackupPassphraseMinimumCodePoints} Unicode code points\nuse a fresh random salt of at least ${values.kdf.portableBackupPassphraseFloor.saltBytes} bytes per slot.\n\`\`\`text\nmemoryKiB  >= ${values.kdf.portableBackupPassphraseFloor.memoryKiB}\niterations >= ${values.kdf.portableBackupPassphraseFloor.iterations}\nparallelism = ${values.kdf.portableBackupPassphraseFloor.parallelism}\noutputBytes >= ${values.kdf.portableBackupPassphraseFloor.outputBytes}\n\`\`\`\n`,
@@ -90,21 +90,13 @@ for (const [name, mutate, expectedCode] of [
 }
 
 const componentPaths = [
-  ["implementationContract", "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md", "Contract Suite Version"],
+  ["scopeGovernanceCoding", "docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md", "Contract Suite Version"],
+  ["runtimePlatformProtocol", "docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md", "Contract Suite Version"],
+  ["dataStateBackup", "docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md", "Contract Suite Version"],
+  ["securityTrust", "docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md", "Contract Suite Version"],
+  ["operationsIntegrationsUx", "docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md", "Contract Suite Version"],
+  ["verificationRelease", "docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md", "Contract Suite Version"],
   ["releaseProfile", "docs/JARVIS-V1-RELEASE-PROFILE.md", "Profile Version"],
-  ["platformPortability", "docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md", "Version"],
-  ["runtime", "docs/implementation/JARVIS-RUNTIME-CONTRACT.md", "Version"],
-  ["protocolSchema", "docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md", "Contract Version"],
-  ["dataState", "docs/implementation/JARVIS-DATA-STATE-CONTRACT.md", "Version"],
-  ["securityHardening", "docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md", "Version"],
-  ["backupCryptography", "docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md", "Version"],
-  ["projectPolicyTrust", "docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md", "Version"],
-  ["supplyChainTrust", "docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md", "Version"],
-  ["codingStandards", "docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md", "Version"],
-  ["operationsUxGovernance", "docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md", "Version"],
-  ["uiIdentityDesignSystem", "docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md", "Version"],
-  ["verificationRelease", "docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md", "Version"],
-  ["implementationPlan", "docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md", "Version"],
 ];
 
 async function manifestFixture() {
@@ -116,10 +108,10 @@ async function manifestFixture() {
   for (const [key, path, label] of componentPaths) {
     await mkdir(dirname(resolve(dir, path)), { recursive: true });
     await writeFile(resolve(dir, path), `# Component\n**${label}:** ${canonical.contractComponentRevisions[key]}\n\n**END — COMPONENT v${canonical.contractComponentRevisions[key]}**\n`);
-    rows.push(`| ${index} | \`${path}\` | ${canonical.contractComponentRevisions[key]} | role |`);
+    rows.push(`| ${index} | \`${path}\` | \`${key}\` | ${canonical.contractComponentRevisions[key]} | role |`);
     index += 1;
   }
-  const manifest = `# Manifest\n**Suite Version:** ${canonical.contractSuiteVersion}\n\n| # | Document | Current component revision | Role |\n|---|---|---:|---|\n${rows.join("\n")}\n`;
+  const manifest = `# Manifest\n**Suite Version:** ${canonical.contractSuiteVersion}\n\n| # | Document | Component | Current component revision | Role |\n|---|---|---|---:|---|\n${rows.join("\n")}\n`;
   await writeFile(resolve(dir, "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md"), manifest);
   return dir;
 }
@@ -127,7 +119,7 @@ async function manifestFixture() {
 test("manifest validator proves all canonical components, files, rows, and internal revisions", async () => {
   const dir = await manifestFixture();
   const result = await validateContractManifest(dir);
-  assert.equal(result.components.length, 15);
+  assert.equal(result.components.length, 7);
   assert.deepEqual(result.violations, []);
 });
 
@@ -135,16 +127,16 @@ test("manifest revision/header drift is rejected", async () => {
   const dir = await manifestFixture();
   const manifestPath = resolve(dir, "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md");
   const text = await readFile(manifestPath, "utf8");
-  await writeFile(manifestPath, text.replace("| 3 | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | 1.0.4 |", "| 3 | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | 9.9.9 |"));
+  await writeFile(manifestPath, text.replace("| 1 | `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` | `scopeGovernanceCoding` | 1.0.7 |", "| 1 | `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` | `scopeGovernanceCoding` | 9.9.9 |"));
   const result = await validateContractManifest(dir);
   assert.ok(result.violations.some((item) => item.code === "MANIFEST_COMPONENT_REVISION_DRIFT"));
 });
 
 test("manifest component footer drift is rejected", async () => {
   const dir = await manifestFixture();
-  const componentPath = resolve(dir, "docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md");
+  const componentPath = resolve(dir, "docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md");
   const text = await readFile(componentPath, "utf8");
-  await writeFile(componentPath, text.replace("END — COMPONENT v1.0.6", "END — COMPONENT v1.0.5"));
+  await writeFile(componentPath, text.replace("END — COMPONENT v1.0.7", "END — COMPONENT v1.0.6"));
   const result = await validateContractManifest(dir);
   assert.ok(result.violations.some((item) => item.code === "MANIFEST_COMPONENT_FOOTER_DRIFT"));
 });
@@ -153,7 +145,7 @@ test("active matrix reference suite, paths, and non-status role are enforced", a
   const dir = await manifestFixture();
   const referencePath = resolve(dir, "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md");
   await mkdir(dirname(referencePath), { recursive: true });
-  await writeFile(referencePath, "**Contract suite:** JARVIS v1.0.6\n`docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`\n`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`\n");
+  await writeFile(referencePath, "**Contract suite:** JARVIS v1.0.6\n`docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`\n`docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md`\n`docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md`\n`docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md`\n`docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md`\n`docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md`\n`docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md`\n");
   const result = await validateContractManifest(dir);
   const codes = result.violations.map((item) => item.code);
   assert.ok(codes.includes("MANIFEST_REFERENCE_SUITE_DRIFT"));

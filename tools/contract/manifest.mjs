@@ -4,21 +4,13 @@ import { resolve } from "node:path";
 import { CANONICAL_VALUES_PATH, MANIFEST_PATH, readCanonical, stablePretty, violation } from "./lib.mjs";
 
 const COMPONENT_KEY_BY_FILE = Object.freeze({
-  "JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md": "implementationContract",
+  "JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md": "scopeGovernanceCoding",
+  "JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md": "runtimePlatformProtocol",
+  "JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md": "dataStateBackup",
+  "JARVIS-03-SECURITY-TRUST-CONTRACT.md": "securityTrust",
+  "JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md": "operationsIntegrationsUx",
+  "JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md": "verificationRelease",
   "JARVIS-V1-RELEASE-PROFILE.md": "releaseProfile",
-  "JARVIS-PLATFORM-PORTABILITY-CONTRACT.md": "platformPortability",
-  "JARVIS-RUNTIME-CONTRACT.md": "runtime",
-  "JARVIS-PROTOCOL-SCHEMA-CONTRACT.md": "protocolSchema",
-  "JARVIS-DATA-STATE-CONTRACT.md": "dataState",
-  "JARVIS-SECURITY-HARDENING-CONTRACT.md": "securityHardening",
-  "JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md": "backupCryptography",
-  "JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md": "projectPolicyTrust",
-  "JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md": "supplyChainTrust",
-  "JARVIS-CODING-STANDARDS-CONTRACT.md": "codingStandards",
-  "JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md": "operationsUxGovernance",
-  "JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md": "uiIdentityDesignSystem",
-  "JARVIS-VERIFICATION-RELEASE-CONTRACT.md": "verificationRelease",
-  "JARVIS-IMPLEMENTATION-PLAN.md": "implementationPlan",
 });
 
 function basename(path) {
@@ -27,7 +19,7 @@ function basename(path) {
 
 export function parseManifestRows(text) {
   const rows = [];
-  for (const match of text.matchAll(/^\|\s*(\d+)\s*\|\s*`([^`]+)`\s*\|\s*([0-9]+\.[0-9]+\.[0-9]+)\s*\|/gm)) {
+  for (const match of text.matchAll(/^\|\s*(\d+)\s*\|\s*`([^`]+)`\s*\|\s*`[^`]+`\s*\|\s*([0-9]+\.[0-9]+\.[0-9]+)\s*\|/gm)) {
     rows.push({ index: Number(match[1]), path: match[2], revision: match[3] });
   }
   return rows;
@@ -108,8 +100,17 @@ export async function validateContractManifest(rootDir) {
     if (!reference.includes(`**Contract suite:** JARVIS v${canonical.contractSuiteVersion}`)) {
       violations.push(violation("MANIFEST_REFERENCE_SUITE_DRIFT", referencePath, `reference matrix must identify suite ${canonical.contractSuiteVersion}`));
     }
-    if (!reference.includes(`docs/JARVIS-CONTRACT-MANIFEST-v${canonical.contractSuiteVersion}.md`) || !reference.includes(`docs/JARVIS-IMPLEMENTATION-CONTRACT-v${canonical.contractSuiteVersion}.md`)) {
-      violations.push(violation("MANIFEST_REFERENCE_PATH_DRIFT", referencePath, "reference matrix must point to the active manifest and implementation contract"));
+    const requiredReferencePaths = [
+      `docs/JARVIS-CONTRACT-MANIFEST-v${canonical.contractSuiteVersion}.md`,
+      "docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md",
+      "docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md",
+      "docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md",
+      "docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md",
+      "docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md",
+      "docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md",
+    ];
+    if (requiredReferencePaths.some((requiredPath) => !reference.includes(requiredPath))) {
+      violations.push(violation("MANIFEST_REFERENCE_PATH_DRIFT", referencePath, "reference matrix must point to the active manifest and all six consolidated components"));
     }
     if (!reference.includes("Current status and execution authority exist only in `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md`")) {
       violations.push(violation("MANIFEST_REFERENCE_ROLE_DRIFT", referencePath, "reference matrix must deny current status authority"));

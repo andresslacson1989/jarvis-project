@@ -451,7 +451,7 @@ export function validatePhase0Snapshot({
         violation(
           "PHASE0_SUPERSEDED_ACTIVE_CONTRACT",
           path,
-          "superseded top-level contract/manifest must not remain active",
+          "obsolete contract/manifest path must not remain active",
         ),
       );
     }

@@ -322,7 +322,7 @@ test("missing child evidence fails checkpoint", () => {
   );
 });
 
-test("superseded active top-level contract fails checkpoint", () => {
+test("obsolete pre-consolidation top-level contract path fails checkpoint", () => {
   const existingPaths = new Set([
     ...allEvidencePaths,
     "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md",

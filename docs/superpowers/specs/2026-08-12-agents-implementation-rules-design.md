@@ -6,7 +6,7 @@ Add contributor-facing execution rules to `AGENTS.md` so any human or AI impleme
 
 ## Design
 
-The protocol is governance-only. It does not introduce product requirements or change the v1.0.5 architecture. It operationalizes existing contract requirements by requiring one active subsection at a time, a repeat-until-verified implementation loop, hard contract/evidence gates, section integration checkpoints, and truthful status tracking.
+The protocol is governance-only. It does not introduce product requirements or change the current architecture. It operationalizes existing contract requirements by requiring one active subsection at a time, a repeat-until-verified implementation loop, hard contract/evidence gates, section integration checkpoints, and truthful status tracking.
 
 Every subsection receives contract-derived acceptance criteria plus mandatory cross-cutting evaluation for Contract Accuracy, production readiness, production practices, enterprise hardening, atomicity where applicable, idempotency/retry safety where applicable, failure/recovery, security, verification quality, and architecture integrity. Contract Accuracy must be exactly 10/10; ordinary applicable criteria must be at least 8/10. Scores never override failed objective gates.
 

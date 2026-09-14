@@ -4,21 +4,13 @@
   "contractSuiteVersion": "1.0.7",
   "releaseProfileVersion": "1.0.7",
   "contractComponentRevisions": {
-    "implementationContract": "1.0.7",
-    "releaseProfile": "1.0.7",
-    "platformPortability": "1.0.4",
-    "runtime": "1.0.3",
-    "protocolSchema": "1.0.4",
-    "dataState": "1.0.3",
-    "securityHardening": "1.0.3",
-    "backupCryptography": "1.0.5",
-    "projectPolicyTrust": "1.0.5",
-    "supplyChainTrust": "1.0.5",
-    "codingStandards": "1.0.6",
-    "operationsUxGovernance": "1.0.3",
-    "uiIdentityDesignSystem": "1.0.3",
-    "verificationRelease": "1.0.6",
-    "implementationPlan": "1.0.7"
+    "scopeGovernanceCoding": "1.0.7",
+    "runtimePlatformProtocol": "1.0.7",
+    "dataStateBackup": "1.0.7",
+    "securityTrust": "1.0.7",
+    "operationsIntegrationsUx": "1.0.7",
+    "verificationRelease": "1.0.7",
+    "releaseProfile": "1.0.7"
   },
   "protocolMajor": 1,
   "v1RuntimeTarget": {

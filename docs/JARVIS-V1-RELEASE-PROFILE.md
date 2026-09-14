@@ -3,21 +3,21 @@
 **Profile Version:** 1.0.7
 **Status:** Canonical production-support target  
 **Date:** August 18, 2026  
-**Governing contract:** `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md`
+**Governing suite:** `docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md` plus consolidated clauses `J00`–`J05`
 
 ---
 
-# 1. PURPOSE
+# RP-01 — PURPOSE
 
 The architecture describes what JARVIS may support over time. This Release Profile defines what a concrete V1 production release must actually ship, qualify, and support.
 
-A capability that exists only in an ADR, experimental code, historical contract, or unqualified module/platform is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after full qualification.
+A capability that exists only in experimental code, historical material, or an unqualified module/platform is not part of the V1 production guarantee unless this profile requires it or the signed release manifest explicitly promotes it after full qualification.
 
 V1 is intentionally **Windows-only as a production FULL_HOST release**. The v1.0.7 contract suite preserves Linux as a future FULL_HOST target and Android as a future COMPANION direction without adding either to the V1 release burden.
 
 ---
 
-# 2. SUPPORTED PLATFORM AND RUNTIME ROLE
+# RP-02 — SUPPORTED PLATFORM AND RUNTIME ROLE
 
 Initial production target:
 
@@ -44,11 +44,11 @@ ANDROID + COMPANION  → future non-authoritative client, not V1-supported
 
 A Linux build, Tauri launch, Node launch, or provider executable presence SHALL NOT be represented as production support. Linux requires a future Release Profile that selects and qualifies its native secure-storage, IPC, process-supervision, filesystem/path, session, packaging/update, provider, voice, persistence, recovery, and UI runtime behavior.
 
-V1 implementation SHALL preserve the Platform Portability Contract's architecture/import boundaries even though Linux runtime tests are not part of V1 Production Complete.
+V1 implementation SHALL preserve the platform-boundary architecture/import requirements in `J01` even though Linux runtime tests are not part of V1 Production Complete.
 
 ---
 
-# 3. DESKTOP, UI, RUNTIME, AND PLATFORM BACKEND BASELINE
+# RP-03 — DESKTOP, UI, RUNTIME, AND PLATFORM BACKEND BASELINE
 
 V1 Windows topology:
 
@@ -95,7 +95,7 @@ PlatformSystemInfo
 
 Exact interface names may differ. Shared Core/domain/policy code SHALL NOT directly depend on Win32, DPAPI, Windows named-pipe, Job Object, HWND, SID, registry, or UAC implementation APIs.
 
-This abstraction requirement SHALL NOT weaken the Windows backend. V1 Windows still uses the strongest qualified Windows mechanisms required by the Runtime, Security, Data, and Platform Portability contracts.
+This abstraction requirement SHALL NOT weaken the Windows backend. V1 Windows still uses the strongest qualified Windows mechanisms required by `J01` and `J02`–`J03`.
 
 Required V1 UI identity properties:
 
@@ -105,7 +105,7 @@ Required V1 UI identity properties:
 - dedicated primary dashboard window with deterministic `HIDDEN`, `WINDOWED`, `MAXIMIZED`, `FULLSCREEN`, and `FOCUSED_CONTEXT`-equivalent presentation modes;
 - adaptive layout across standard desktop, compact resizable window, ultrawide, high-DPI, text scaling, and multi-monitor conditions;
 - no unrelated per-integration or per-platform visual shell;
-- accessibility and state-language qualification under the UI Identity & Design System Contract;
+- accessibility and state-language qualification under `J04` UI clauses;
 - release-owned/offline-safe primary font and recorded license/provenance for packaged fonts/icons/third-party visual assets.
 
 Mission Control design tokens/component semantics SHALL be reusable by a future Linux full-host UI. Only Windows UI/runtime qualification is required by V1.
@@ -114,7 +114,7 @@ Exact Rust/Node/TypeScript/Tauri/package-manager versions are release-manifest f
 
 ---
 
-# 4. PERSISTENCE AND CRYPTOGRAPHIC BASELINE
+# RP-04 — PERSISTENCE AND CRYPTOGRAPHIC BASELINE
 
 V1 SHALL use:
 
@@ -127,7 +127,7 @@ V1 SHALL use:
 - random local `DB_DEK` protected by the Windows PlatformSecureStorage backend;
 - a release-qualified SQLCipher-safe online snapshot/export/re-key path proven on the exact packaged binding;
 - independent per-backup 256-bit `SnapshotDBKey` and 256-bit `BackupDEK`;
-- production backup format `JARVIS_BACKUP_V1` exactly as defined by `JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md`;
+- production backup format `JARVIS_BACKUP_V1` exactly as defined by `J02` backup clauses;
 - `LOCAL_RECOVERY` and `PORTABLE_STATE` backup classes;
 - DPAPI/current-user Windows local key slot for Windows-local recovery;
 - mandatory `GENERATED_RECOVERY_V1` 256-bit recovery slot for every production `PORTABLE_STATE VERIFIED` backup;
@@ -163,7 +163,7 @@ A specific Node SQLite/SQLCipher binding becomes `SUPPORTED` only after the pers
 
 ---
 
-# 5. REQUIRED AI PROVIDER SUPPORT
+# RP-05 — REQUIRED AI PROVIDER SUPPORT
 
 V1 SHALL production-qualify **Codex/OpenAI on Windows** as the initial AI provider family for at least:
 
@@ -210,12 +210,12 @@ No local LLM is required for V1.
 
 ---
 
-# 6. REQUIRED LOCAL PROJECT/ENGINEERING CAPABILITIES
+# RP-06 — REQUIRED LOCAL PROJECT/ENGINEERING CAPABILITIES
 
 V1 SHALL include production-qualified:
 
 - project registration, aliases, environments, workspaces/worktrees;
-- explicit project-policy candidate detection, user enrollment/disable/revocation, immutable attempt policy snapshots, content-hash change detection, and nested-policy scope under `JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md`;
+- explicit project-policy candidate detection, user enrollment/disable/revocation, immutable attempt policy snapshots, content-hash change detection, and nested-policy scope under `J03` policy clauses;
 - project/system status;
 - Git status/current branch/diff/log;
 - controlled project/folder/file open;
@@ -231,11 +231,11 @@ The orchestrator never gets a generic unrestricted shell.
 
 Filesystem/path handling SHALL go through platform-aware canonical path/resource abstractions. Windows-specific traversal/reparse/UNC/drive behavior remains mandatory for V1 without becoming the universal shared path model.
 
-Project registration/opening SHALL NOT silently trust repository `AGENTS.md` or other policy-looking files. Trusted policy requires the explicit enrolled canonical project/path/scope/content identity defined by the Project Policy Trust Contract.
+Project registration/opening SHALL NOT silently trust repository `AGENTS.md` or other policy-looking files. Trusted policy requires the explicit enrolled canonical project/path/scope/content identity defined by `J03` policy clauses.
 
 ---
 
-# 7. REQUIRED MISSION/WORKER RUNTIME
+# RP-07 — REQUIRED MISSION/WORKER RUNTIME
 
 V1 SHALL ship and qualify:
 
@@ -254,7 +254,7 @@ V1 SHALL ship and qualify:
 
 ---
 
-# 8. REQUIRED SECURITY/AUTHORIZATION RUNTIME
+# RP-08 — REQUIRED SECURITY/AUTHORIZATION RUNTIME
 
 V1 SHALL ship and qualify:
 
@@ -284,7 +284,7 @@ V1 SHALL ship and qualify:
 
 ---
 
-# 9. REQUIRED V1 INTEGRATION SET
+# RP-09 — REQUIRED V1 INTEGRATION SET
 
 JARVIS V1 SHALL NOT be declared Production Complete until these integration families are implemented and production-qualified on the Windows FULL_HOST release:
 
@@ -367,7 +367,7 @@ Proxmox V1 requirements:
 
 ---
 
-# 10. MODULE PROFILE
+# RP-10 — MODULE PROFILE
 
 V1 SHALL implement the module registry and execution classes:
 
@@ -383,11 +383,11 @@ Module support SHALL be platform/runtime-role qualified when native execution or
 
 An open arbitrary third-party executable-module marketplace is **not** a V1 Production Complete requirement. An `EXTERNAL_MANAGED` module is supported only when explicitly present in the current TUF-authorized signed release/catalog support matrix and fully qualified.
 
-Production module catalog authorization SHALL use the dedicated TUF delegated role/profile from `JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`; publisher signature alone does not confer `SUPPORTED` status.
+Production module catalog authorization SHALL use the dedicated TUF delegated role/profile from `J03` supply-chain clauses; publisher signature alone does not confer `SUPPORTED` status.
 
 ---
 
-# 11. REQUIRED VOICE PROFILE
+# RP-11 — REQUIRED VOICE PROFILE
 
 Voice is mandatory for V1 Production Complete and SHALL include:
 
@@ -421,9 +421,9 @@ Before broad feature implementation proceeds beyond the early platform/persisten
 
 ---
 
-# 12. UI IDENTITY / ACCESSIBILITY QUALIFICATION PROFILE
+# RP-12 — UI IDENTITY / ACCESSIBILITY QUALIFICATION PROFILE
 
-V1 Production Complete requires the UI Identity & Design System Contract to pass on the exact Windows Release Candidate.
+V1 Production Complete requires the `J04` UI identity/accessibility clauses to pass on the exact Windows Release Candidate.
 
 Qualification SHALL cover at minimum:
 
@@ -454,7 +454,7 @@ Shared design-system components SHALL avoid unnecessary Windows-only semantics s
 
 ---
 
-# 13. HARDWARE QUALIFICATION BASELINE
+# RP-13 — HARDWARE QUALIFICATION BASELINE
 
 Initial Windows qualification baseline:
 
@@ -472,7 +472,7 @@ The release SHALL remain usable without a permanently loaded large local LLM and
 
 ---
 
-# 14. POST-V1 REQUIRED INTEGRATIONS
+# RP-14 — POST-V1 REQUIRED INTEGRATIONS
 
 The following remain binding product roadmap requirements but do not block V1 Production Complete:
 
@@ -489,7 +489,7 @@ Direct public inbound Internet listeners remain outside the required V1/post-V1 
 
 ---
 
-# 15. FUTURE PLATFORM TARGETS
+# RP-15 — FUTURE PLATFORM TARGETS
 
 ## 15.1 Linux FULL_HOST
 
@@ -521,7 +521,7 @@ Companion networking is not a V1 requirement. It requires a future separately qu
 
 ---
 
-# 16. RELEASE MANIFEST
+# RP-16 — RELEASE MANIFEST
 
 Every production release SHALL record at least:
 
@@ -569,7 +569,7 @@ No raw credentials/private user data/private signing keys/recovery factors appea
 
 ---
 
-# 17. REPOSITORY GOVERNANCE GATE
+# RP-17 — REPOSITORY GOVERNANCE GATE
 
 Before Phase 0 may be declared complete, the effective repository-governance mode SHALL be determined from verified hosting provider/account capability.
 
@@ -595,11 +595,11 @@ A pull-request requirement is strongly preferred once implementation changes beg
 
 Phase 0 SHALL also create machine-readable canonical profile/capability definitions and CI drift checks for repeated normative constants/matrices where practical.
 
-The mandatory `static-ci` pipeline result MAY come from either a qualified `GITHUB_ACTIONS` authority or a qualified `LOCALCI` authority. The two authority types are equal alternatives; one complete exact-candidate result is sufficient, but partial results cannot be combined. Qualification SHALL prove the common exact-SHA, complete-pipeline, pinned-input, least-privilege, isolation, timeout/cancellation, idempotency, durable-evidence, and audit requirements in Implementation Contract §28 plus the selected authority's specific requirements. GitHub Actions need not remain enabled while qualified LocalCI is selected. An unqualified, demo, stale, or materially changed LocalCI instance does not satisfy this gate.
+The mandatory `static-ci` pipeline result MAY come from either a qualified `GITHUB_ACTIONS` authority or a qualified `LOCALCI` authority. The two authority types are equal alternatives; one complete exact-candidate result is sufficient, but partial results cannot be combined. Qualification SHALL prove the common exact-SHA, complete-pipeline, pinned-input, least-privilege, isolation, timeout/cancellation, idempotency, durable-evidence, and audit requirements in `J00-GOV-28` plus the selected authority's specific requirements. GitHub Actions need not remain enabled while qualified LocalCI is selected. An unqualified, demo, stale, or materially changed LocalCI instance does not satisfy this gate.
 
 ---
 
-# 18. PRODUCTION-COMPLETE GATE
+# RP-18 — PRODUCTION-COMPLETE GATE
 
 For this profile, Production Complete requires the same source commit and signed **Windows FULL_HOST** release artifacts to pass:
 
@@ -628,7 +628,7 @@ For this profile, Production Complete requires the same source commit and signed
 - soak/stability;
 - signed installer/update, SBOM, licensing, and provenance;
 - zero open P0/P1 defects;
-- Critical/High vulnerability policy from the Operations Contract satisfied.
+- Critical/High vulnerability policy from `J04` satisfied.
 
 Linux runtime tests and Android/companion networking are not V1 release gates. Their absence SHALL NOT permit violations of the platform-boundary architecture rules.
 
@@ -636,7 +636,7 @@ Documentation completion alone never satisfies this gate.
 
 ---
 
-# 19. GOVERNING DISTINCTION
+# RP-19 — GOVERNING DISTINCTION
 
 > **The contract defines the architecture. The Release Profile defines what V1 guarantees. The qualification report proves that exact signed release.**
 

@@ -19,10 +19,10 @@ export type ConfigurationDomain =
 
 export interface BootstrapConfigurationV1 {
   schemaVersion: 1;
-  contractSuiteVersion: "1.0.5";
-  releaseProfileVersion: "1.0.5";
+  contractSuiteVersion: "1.0.7";
+  releaseProfileVersion: "1.0.7";
   protocolMajor: 1;
-  canonicalValuesId: "jarvis.contract-values.v1.0.5";
+  canonicalValuesId: "jarvis.contract-values.v1.0.7";
   runtime: PlatformRuntimeIdentity & {
     platform: "WINDOWS";
     runtimeRole: "FULL_HOST";

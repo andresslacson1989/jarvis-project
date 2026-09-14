@@ -1,12 +1,12 @@
 # Authoritative `master` Repository Governance
 
 **Contract suite:** JARVIS v1.0.7
-**Decisions:** ADR-074, ADR-076
+**Governing clauses:** J00-GOV-28; J05-VER-33
 **Authoritative branch:** `master`  
 **Mandatory CI pipeline:** `static-ci`
 **Selected CI authority:** `GITHUB_ACTIONS` (QUALIFIED; exact candidate run `33934840029` passed)
 
-This document is an operational implementation aid for the repository-governance requirements in the active top-level contract §28, Verification Contract §33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
+This document is an operational implementation aid for the repository-governance requirements in J00-GOV-28, J05-VER-33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
 ## Current effective mode
 

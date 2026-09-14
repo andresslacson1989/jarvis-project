@@ -2,93 +2,73 @@
 
 **Suite Version:** 1.0.7
 **Status:** Canonical current contract manifest
-**Date:** August 18, 2026
+**Date:** September 14, 2026
 
 ---
 
-# 1. PURPOSE
+# MAN-01 — PURPOSE
 
-This manifest is the authoritative index of the current JARVIS contract suite. It pins which documents define current implementation behavior and prevents historical contracts/ADRs from becoming an implicit overlay.
+This manifest is the authoritative index of the current JARVIS contract suite. It pins the six cohesive normative components and the separate V1 Release Profile so historical material cannot become an implicit overlay.
 
-This manifest contains no independent product behavior. If a rule is needed to implement JARVIS, that rule SHALL exist in one or more listed normative documents.
-
----
-
-# 2. CURRENT NORMATIVE DOCUMENTS
-
-The current suite is governed by `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md`.
-
-Component revisions are explicit; a suite-version change does not require rewriting a component whose normative content remains unchanged.
-
-| # | Document | Current component revision | Role |
-|---|---|---:|---|
-| 1 | `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md` | 1.0.7 | top-level product/architecture/security/production contract |
-| 2 | `docs/JARVIS-V1-RELEASE-PROFILE.md` | 1.0.7 | exact Windows V1 production support target |
-| 3 | `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | 1.0.4 | Windows/Linux full-host portability and future companion boundary |
-| 4 | `docs/implementation/JARVIS-RUNTIME-CONTRACT.md` | 1.0.3 | Windows V1 runtime specialization and process behavior |
-| 5 | `docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md` | 1.0.4 | canonical V1 protocol/domain/platform schemas |
-| 6 | `docs/implementation/JARVIS-DATA-STATE-CONTRACT.md` | 1.0.3 | Windows V1 persistence/state/recovery specialization |
-| 7 | `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md` | 1.0.3 | Windows V1 security specialization and global security invariants |
-| 8 | `docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md` | 1.0.5 | exact backup format, AEAD/chunk/key-slot/recovery-factor semantics |
-| 9 | `docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md` | 1.0.5 | deterministic project-policy candidate/enrollment/change trust boundary |
-| 10 | `docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md` | 1.0.5 | TUF-based update/module trust-root lifecycle, revocation and anti-rollback |
-| 11 | `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md` | 1.0.6 | coding/package/platform-boundary standards |
-| 12 | `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md` | 1.0.3 | operational/user-visible/governance semantics |
-| 13 | `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md` | 1.0.3 | unified Mission Control identity/adaptive design system |
-| 14 | `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md` | 1.0.6 | central release evidence plus all cumulative active-contract gates |
-| 15 | `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` | 1.0.7 | implementation sequencing including hosting-capability-aware repository governance and qualified CI authority equivalence |
-
-`README.md` and `AGENTS.md` are contributor/governance entry points and SHALL point to this same suite.
-
-## 2.1 Inherited component headers
-
-Several unchanged component revisions retain historical header text naming their earlier parent suite. Their inclusion in the current suite is governed exclusively by this manifest and the v1.0.7 top-level contract. Those historical header references do not make superseded top-level contracts current and do not create an overlay.
-
-The specialized security contracts remain cumulative specializations of compatible broad rules in the inherited Data/Security/Operations components. The v1.0.5 security closure remains fully active. Verification 1.0.6 contains the repository-governance capability closure introduced by ADR-074 and the CI-authority closure introduced by ADR-076. Implementation Plan 1.0.7, Release Profile 1.0.7, and Coding Standards 1.0.6 synchronize their active gates with those rules. These current component rules are part of one suite, not ADR overrides.
+This manifest contains no independent product behavior. If a rule is needed to implement JARVIS, that rule SHALL exist in one or more listed normative components or in the separate Release Profile when it defines the exact supported product target.
 
 ---
 
-# 3. CURRENT DECISION BOUNDARY
+# MAN-02 — CURRENT NORMATIVE DOCUMENTS
 
-The suite incorporates the accepted current effects of ADRs through **ADR-076**.
+The current suite is governed by the six consolidated components below plus `docs/JARVIS-V1-RELEASE-PROFILE.md`.
 
-ADR-073 closes the backup cryptographic format/recovery-factor strength, project-policy trust admission, update/module trust-root lifecycle, early voice-feasibility sequencing, post-V1 integration release coupling, and repeated-contract-value drift risks.
+| # | Document | Component | Current revision | Role |
+|---|---|---|---:|---|
+| 1 | `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` | `J00` | 1.0.7 | product scope, authority, repository governance, and coding standards |
+| 2 | `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md` | `J01` | 1.0.7 | runtime roles, platform boundaries, process lifecycle, IPC, and schemas |
+| 3 | `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md` | `J02` | 1.0.7 | persistence, state, exact values, backup format, restore, and recovery |
+| 4 | `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md` | `J03` | 1.0.7 | security hardening, project-policy trust, and supply-chain trust |
+| 5 | `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md` | `J04` | 1.0.7 | operations, integrations, voice, UX, identity, and accessibility |
+| 6 | `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md` | `J05` | 1.0.7 | verification, qualification, release evidence, and Production Complete |
+| 7 | `docs/JARVIS-V1-RELEASE-PROFILE.md` | `RELEASE_PROFILE` | 1.0.7 | exact Windows V1 production support target |
 
-ADR-074 makes repository-governance qualification hosting-capability-aware: server-side protection remains mandatory when the hosting plan exposes it, while an explicitly verified unavailable hosting capability may use auditable compensating integration controls without becoming a paid-plan prerequisite or being misrepresented as protected.
-
-ADR-075 repairs the normative-suite synchronization omission left by ADR-074 by advancing only the Release Profile and Coding Standards component revisions and aligning their stale protected-`master` absolutes with the already-active capability-aware rule. ADR-076 then changes the current suite meaning by qualifying LocalCI as an equal alternative CI authority.
-
-ADR-076 makes qualified GitHub Actions and qualified LocalCI equal alternative CI authorities. It replaces vendor identity as the source of authority with common exact-SHA, complete-pipeline, least-privilege, isolation, recovery, and durable-evidence requirements plus authority-specific qualification.
-
-ADRs are rationale/history, not implementation overrides.
+`README.md` and `AGENTS.md` are contributor/governance entry points and SHALL point to this same suite. The implementation plan, execution matrix, developer execution goal, evidence records, and audit reports are non-authoritative execution aids.
 
 ---
 
-# 4. CURRENT SECURITY / GOVERNANCE CLOSURES
+# MAN-03 — SINGLE AUTHORITY AND AMENDMENT BOUNDARY
+
+Every current normative rule has one canonical home in the six components, this manifest, or the Release Profile. Cross-component references use the stable clause identifiers defined by `J00` through `J05`; they do not rely on historical filenames or external decision records.
+
+The current components preserve the complete existing product, security, platform, protocol, state, recovery, integration, UX, verification, and release requirements. Consolidation changes document ownership and traceability, not behavior.
+
+A future material product, architecture, security, platform, release, trust, or governance amendment SHALL be made directly in the affected active clauses under the owner/governance amendment process. The same reviewed change SHALL update affected components, this manifest, the Release Profile when applicable, verification requirements, implementation sequencing, compatibility/migration/rollback notes, and required tests/evidence before implementation depends on the amendment. A separate decision record is neither required nor authoritative.
+
+If active normative text conflicts or omits a mandatory requirement, implementation SHALL stop at that ambiguity until the active suite is reconciled. Later documents, branches, reports, or historical material cannot silently override it.
+
+---
+
+# MAN-04 — CURRENT SECURITY AND GOVERNANCE CLOSURES
 
 ## 4.1 Portable backup
 
-Production `JARVIS_BACKUP_V1` is no longer an algorithm-neutral envelope. The Backup Cryptography Contract fixes AES-256-GCM framing, nonce/AAD/chunk/order/truncation rules, key hierarchy, generated 256-bit recovery factor, optional stronger Argon2id passphrase slot, and exact restore/tamper qualification requirements.
+Production `JARVIS_BACKUP_V1` is fixed by `J02`: AES-256-GCM framing, nonce/AAD/chunk/order/truncation rules, independent key hierarchy, generated 256-bit recovery factor, optional stronger Argon2id passphrase slot, and exact restore/tamper qualification requirements.
 
 ## 4.2 Project policy
 
 Repository `AGENTS.md` is an untrusted candidate until an authenticated user enrolls an exact canonical project/path/scope/content identity. Content change invalidates trust for new work; workers cannot silently rewrite and auto-trust their own policy.
 
-## 4.3 Update/module trust
+## 4.3 Update and module trust
 
-Production update/catalog metadata uses TUF 1.0.35 semantics with offline threshold root trust, role/delegation separation, expiry, rotation/revocation, rollback/freeze/mix-and-match protection, application `releaseSequence`/`securityEpoch`, and cumulative Tauri/Windows signing gates.
+Production update/catalog metadata uses the fixed TUF 1.0.35 profile in `J03`, including threshold root trust, role/delegation separation, expiry, rotation/revocation, rollback/freeze/mix-and-match protection, application `releaseSequence`/`securityEpoch`, and cumulative Tauri/Windows signing gates.
 
 ## 4.4 Authoritative repository governance
 
-`master` remains the sole authoritative branch. Server-side branch protection/rulesets remain the preferred and required governance mode whenever the hosting provider/account exposes them for the authoritative repository. If that capability is unavailable because of a hosting plan/platform limitation, the active suite permits a truthful compensating-control mode with exact candidate CI, non-force/stale-tip-safe integration, post-integration verification, explicit audit evidence, and no claim of hard server-side protection. The exception ends when server-side protection becomes available.
+`master` remains the sole authoritative branch. Server-side branch protection/rulesets remain required whenever the hosting provider/account exposes them. If the capability is unavailable because of a verified hosting limitation, `J00` and `J05` permit a truthful compensating-control mode with exact candidate CI, non-force/stale-tip-safe integration, post-integration verification, explicit evidence, and no claim of hard server-side protection. The exception ends when server-side protection becomes available.
 
 ## 4.5 Qualified CI authority
 
-`GITHUB_ACTIONS` and `LOCALCI` are equal eligible authority types after qualification. Either may independently provide the complete mandatory exact-SHA result. The selected authority and instance/pipeline identity are machine-readable and auditable; a demo, stale, unknown, or materially changed LocalCI instance is not authoritative without qualification.
+`GITHUB_ACTIONS` and `LOCALCI` are equal eligible authority types after qualification. Either may independently provide the complete mandatory exact-SHA result. The selected authority and instance/pipeline identity are machine-readable and auditable; an unknown, stale, demo, or materially changed LocalCI instance is not authoritative without qualification.
 
 ---
 
-# 5. CURRENT PLATFORM BOUNDARY
+# MAN-05 — CURRENT PLATFORM BOUNDARY
 
 ```text
 Windows → FULL_HOST → V1 production target
@@ -104,29 +84,27 @@ A future companion does not become authoritative and requires a separately quali
 
 ---
 
-# 6. DELIVERY / ROADMAP CLOSURES
+# MAN-06 — DELIVERY AND ROADMAP CLOSURES
 
 Voice remains mandatory V1, but candidate STT/VAD/TTS/AEC/barge-in/device/resource/licensing feasibility is tested immediately after the early persistence/recovery proof rather than waiting until the late voice implementation phases.
 
-SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding post-V1 product targets but may ship independently in production-qualified feature releases; they are no longer artificially coupled into one first feature-bearing release.
+SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding post-V1 product targets but may ship independently in production-qualified feature releases.
 
 Phase 0 SHALL establish machine-readable canonical repeated security/profile/capability values and CI drift checks where practical.
 
-Repository server-side protection SHALL be activated when available, but an unavailable paid/host-gated protection feature is not itself a JARVIS production prerequisite when the v1.0.7 compensating-governance qualification passes.
+Repository server-side protection SHALL be activated when available, but an unavailable paid/host-gated protection feature is not itself a JARVIS production prerequisite when the compensating-governance qualification passes.
 
 ---
 
-# 7. HISTORICAL MATERIAL
+# MAN-07 — HISTORICAL MATERIAL
 
-Documents under `docs/history/` and supersession stubs for earlier top-level suite files are non-current provenance.
+Historical contracts, superseded manifests, reconciliation audits, deleted branch names, older examples, and earlier schema forms are non-current provenance. They SHALL NOT override or fill gaps in this suite.
 
-Historical contracts, reconciliation audits, obsolete manifests, deleted branch names, older examples, and earlier schema forms SHALL NOT override or fill gaps in the current suite.
-
-If an implementer believes a required rule exists only in history/ADR text, that is a contract defect and implementation SHALL stop at the ambiguity until the current suite is corrected.
+The repository does not retain historical decision records as implementation sources. If a required rule appears to exist only in removed or historical material, that is a contract defect and implementation SHALL stop until the requirement is restored directly into the active suite.
 
 ---
 
-# 8. VERSIONING RULE
+# MAN-08 — VERSIONING RULE
 
 The suite version advances when a material current rule changes in areas such as:
 
@@ -143,7 +121,7 @@ The suite version advances when a material current rule changes in areas such as
 - repository-governance qualification;
 - core UI identity/interaction behavior.
 
-Individual component revisions advance only when that component's normative content changes. The manifest records the exact current component revision set.
+Individual component revisions advance when the corresponding component's normative content changes. The manifest records the exact current component revision set.
 
 Every production release records at least:
 
@@ -155,7 +133,7 @@ source_commit_sha
 
 ---
 
-# 9. CURRENT BRAND SOURCES
+# MAN-09 — CURRENT BRAND SOURCES
 
 Canonical JARVIS brand source assets remain:
 
@@ -168,9 +146,9 @@ Generated platform assets derive from these sources.
 
 ---
 
-# 10. GOVERNING RULE
+# MAN-10 — GOVERNING RULE
 
-> **One suite version. One manifest. One current answer. Share product semantics; specialize native mechanisms; freeze security formats that must survive failure and time.**
+> **One suite version. One manifest. Six cohesive normative components. One current answer. Share product semantics; specialize native mechanisms; freeze security formats that must survive failure and time.**
 
 ---
 

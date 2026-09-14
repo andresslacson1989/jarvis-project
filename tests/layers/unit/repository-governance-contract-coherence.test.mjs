@@ -34,18 +34,18 @@ function assertCapabilityAwareGovernance(text, label) {
 
 test("Release Profile repository-governance gate matches the active hosting-capability-aware rule", () => {
   const profile = read("docs/JARVIS-V1-RELEASE-PROFILE.md");
-  const governance = section(profile, "# 17. REPOSITORY GOVERNANCE GATE", "# 18. PRODUCTION-COMPLETE GATE");
+  const governance = section(profile, "# RP-17 — REPOSITORY GOVERNANCE GATE", "# RP-18 — PRODUCTION-COMPLETE GATE");
 
   assert.match(profile, /\*\*Profile Version:\*\*\s*1\.0\.7\b/);
-  assert.match(profile, /\*\*Governing contract:\*\*\s*`docs\/JARVIS-IMPLEMENTATION-CONTRACT-v1\.0\.7\.md`/);
+  assert.match(profile, /\*\*Governing suite:\*\*\s*`docs\/JARVIS-CONTRACT-MANIFEST-v1\.0\.7\.md`/);
   assertCapabilityAwareGovernance(governance, "Release Profile §17");
 });
 
-test("Coding Standards CI gate matches the active hosting-capability-aware rule", () => {
-  const standards = read("docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md");
-  const governance = section(standards, "# 28. STATIC / CI GATES", "# 29. DEPENDENCIES AND THIRD-PARTY ASSETS");
+test("J00-CODE-28 CI gate matches the active hosting-capability-aware rule", () => {
+  const standards = read("docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md");
+  const governance = section(standards, "## J00-CODE-28 — STATIC / CI GATES", "## J00-CODE-29 — DEPENDENCIES AND THIRD-PARTY ASSETS");
 
-  assert.match(standards, /\*\*Normative Appendix to:\*\*\s*`docs\/JARVIS-IMPLEMENTATION-CONTRACT-v1\.0\.7\.md`/);
-  assert.match(standards, /\*\*Version:\*\*\s*1\.0\.6\b/);
-  assertCapabilityAwareGovernance(governance, "Coding Standards §28");
+  assert.match(standards, /\*\*Contract Suite Version:\*\*\s*1\.0\.7/);
+  assert.match(standards, /\*\*Component:\*\*\s*`J00`/);
+  assertCapabilityAwareGovernance(governance, "J00-CODE-28");
 });
