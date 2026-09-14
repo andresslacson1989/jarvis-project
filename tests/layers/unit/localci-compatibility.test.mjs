@@ -24,6 +24,16 @@ test("LocalCI rejects omitted, duplicate, and mutated compatibility gates", () =
   assert.ok(codes(validateLocalCiGateScript(ciScript.replace("--audit-level high", "--audit-level low"))).includes("LOCALCI_GATE_COMMAND_DRIFT"));
 });
 
+test("LocalCI rejects an inserted unknown command in the canonical gate sequence", () => {
+  const injected = ciScript.replace(
+    "run_gate dependencies-frozen pnpm install --frozen-lockfile --ignore-scripts",
+    "run_gate injected-command pnpm unexpected\nrun_gate dependencies-frozen pnpm install --frozen-lockfile --ignore-scripts",
+  );
+  const result = validateLocalCiGateScript(injected);
+  assert.ok(codes(result).includes("LOCALCI_GATE_UNKNOWN"));
+  assert.ok(codes(result).includes("LOCALCI_GATE_ORDER"));
+});
+
 test("LocalCI rejects reordered gates even when every gate and command remains present", () => {
   const [, firstGate, firstCommand, secondGate, secondCommand] = ciScript.match(/run_gate ([a-z0-9-]+) ([^\n]+)\nrun_gate ([a-z0-9-]+) ([^\n]+)/) ?? [];
   assert.ok(firstGate && firstCommand && secondGate && secondCommand);

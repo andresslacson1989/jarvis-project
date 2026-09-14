@@ -61,6 +61,7 @@ test("tracked content cannot cite deleted ADR, decision, or history source paths
   assert.equal(hasForbiddenDecisionRecordReference("See docs/DECISIONS/legacy.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See docs/history/legacy.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("See archive/renamed-decision-record.md"), true);
+  assert.equal(hasForbiddenDecisionRecordReference("See archive/renamed-DecisionRecord.md"), true);
   assert.equal(hasForbiddenDecisionRecordReference("ADR/decision-record material is prohibited by policy."), false);
 });
 
