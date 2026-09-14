@@ -532,78 +532,29 @@ This table is a guard against backward dependencies and premature implementation
 
 ## Contract coverage index
 
-This is a secondary traceability safety net. The subsection's own governing references remain primary. Purpose/governing-principle sections are enforced globally even where they do not create a standalone implementation row.
+This is a secondary traceability safety net. The subsection's own governing references remain primary. Purpose/governing-principle clauses are enforced globally even where they do not create a standalone implementation row. Every entry below names the current stable clause family; no superseded contract filename or decision-record identifier is used.
 
-| Normative source | Matrix ownership / coverage |
+| Current normative source | Matrix ownership / coverage |
 |---|---|
-| `MAN` §§1–10 | Global matrix authority rules; 0.1, 0.7, 0.12, 18.19, 19.1, 19.27 |
-| `IC` §§1–12 | Global guardrails; Sections 0–7 |
-| `IC` §§13–19 | Sections 5, 8, 11; consumed by every consequential feature |
-| `IC` §§20–21 | Sections 3–5, 18, 19.11–19.12 |
-| `IC` §22 | Sections 12, 18.14–18.18, 19.15 |
-| `IC` §23 | Sections 13–14, 19.16–19.17 |
-| `IC` §24 | Section 17, 19.19 |
-| `IC` §25 | 3A, Sections 15–16, 19.18 |
-| `IC` §26 | 1.11–1.13, 18.5, 19.4, 19.25 |
-| `IC` §§27–31 | Section 19 plus global non-goal/amendment/completion rules |
-| `RP` §§1–3 | Global V1 target; Sections 0–2, 18–19 |
-| `RP` §4 | Section 3, 4, 5, 18, 19.11–19.12 |
-| `RP` §5 | Section 7, 19.9 |
-| `RP` §§6–8 | Sections 5–11, 19.7–19.14 |
-| `RP` §9 | Sections 13–14, 19.16–19.17 |
-| `RP` §10 | Section 12, 19.15 |
-| `RP` §§11–13 | 3A, Sections 15–16, 18.1–18.4, 19.4, 19.14, 19.18 |
-| `RP` §§14–15 | Explicitly outside base V1 implementation; tracked under Non-goals / Post-V1 |
-| `RP` §§16–18 | 0.13, 18.19–18.21, 19.1, 19.25–19.27 |
-| `RP` §19 | Global governing distinction |
-| `PP` §§1–12 | Sections 0–2, 7, 12, 19.2 |
-| `PP` §§13–19 | Sections 1–6, 3 backup proof, 18, 19 |
-| `PP` §§20–27 | Sections 12, 15–18; future companion constraints under Non-goals |
-| `PP` §§28–32 | 0.10, 19.2 plus global platform invariants/non-goals |
-| `RT` §§1–12 | Sections 1–5; Phase-2 bootstrap is intentionally partial until Sections 3/7/11 complete the ordered runtime prerequisites |
-| `RT` §§13–18 | Sections 7–9 |
-| `RT` §§19–23 | Sections 9–11 |
-| `RT` §§24–28 | Sections 12–17 plus 18 operations and final qualification |
-| `PS` §§1–10 | 0.3, 0.6, 1–5 |
-| `PS` §§11–18 | Sections 4–10 |
-| `PS` §§19–22 | Sections 7, 11–14 |
-| `PS` §§23–28 | Sections 4, 17, 19.3 plus common schema qualification |
-| `DS` §§1–8 | Sections 3–4 |
-| `DS` §§9–19 | Sections 4–11 |
-| `DS` §§20–25 | Sections 6–14 |
-| `DS` §§26–36 | Sections 3, 18, 19.11–19.13, 19.21 |
-| `DS` §37 | All state-bearing sections; checkpoints enforce invariants |
-| `SEC` §§1–12 | Global security guardrails; Sections 3–7 |
-| `SEC` §§13–18 | Sections 5, 8, 13–14 |
-| `SEC` §§19–23 | Sections 1–2, 7, 19.5–19.9 |
-| `SEC` §§24–27 | Sections 12–14, 18–19 |
-| `SEC` §§28–34 | Every feature’s diagnostics/failure tests; 18.11–18.13, 19 |
-| `BKC` §§1–17 | Section 3 exact implementation/proof; 18.8–18.10 lifecycle UX; 19.12 exact RC drill |
-| `PPT` §§1–16 | 4.10 hooks; Section 6 implementation; consumers 7, 9, 11; 19.8 qualification |
-| `SCT` §§1–11 | 4.11 hooks; Section 12 trust foundation |
-| `SCT` §§12–16 | 18.14–18.19 application update/signing/release metadata |
-| `SCT` §§17–19 | 12.15, 19.15 plus global trust invariants |
-| `CS` §§1–7 | Section 0 foundations; applied to all sections |
-| `CS` §§8–19 | Sections 3–8, 11; applied to all state/security code |
-| `CS` §§20–26 | Sections 7–18 by owning adapter/UI/backup feature |
-| `CS` §§27–33 | 0.9–0.13, every subsection DoD, 18.21, Section 19 |
-| `OPS` §§1–13 | Sections 4–11 and 17–18 |
-| `OPS` §§14–20 | Sections 7, 12–17 |
-| `OPS` §§21–30 | Sections 15–19, especially 18 productization and 19 qualification |
-| `OPS` §31 | Global operational principles |
-| `UI` §§1–9 | Section 1 foundation and all feature UIs |
-| `UI` §§10–19 | Owning feature UIs plus 18.1–18.3 |
-| `UI` §§20–25 | 1.12, feature UI DoD, 18.4, 18.6–18.13 |
-| `UI` §§26–29 | 18.1–18.5 and 19.4 |
-| `VR` §§1–10 | All subsection/section DoD; 0, 4–5, 19.1–19.3 |
-| `VR` §§11–19 | Sections 1–10 and 19.4–19.10 |
-| `VR` §§20–29 | Sections 3, 11–17, 18 updater, 19.11–19.19 |
-| `VR` §§30–39 | Sections 15–19, especially final RC/Production Complete |
-| `PLAN` §§1–27 | Section numbers 0–19 preserve the authoritative macro-order; every Plan phase exit is represented by a `*.CP` checkpoint |
+| `MAN-01`–`MAN-10` | Current suite authority, component set, revision/hash identity, release identity, and manifest governance; 0.1, 0.7, 0.12, 18.19, 19.1, 19.27 |
+| `J00-SCOPE-*`, `J00-GOV-*`, `J00-CODE-*` | Product scope, authority, repository governance, coding standards, dependency direction, failure/observability standards, test standards, and global completion rules; Section 0 and every subsection/release DoD |
+| `J01-PLAT-*` | Platform roles, capability/composition boundaries, Windows/Linux/Android support, native mechanisms, filesystem identity, secure storage, IPC, process supervision, session/window behavior, provider/module/integration platform qualification, and platform diagnostics; Sections 0–2 and all platform-dependent feature/release gates |
+| `J01-RT-*` | Process/runtime lifecycle, Core ownership, bootstrap, IPC, supervision, providers, workers, missions, tools, budgets, recovery, shutdown, integrations, modules, voice, and degraded modes; Sections 1–17 and applicable 18–19 qualification |
+| `J01-PROTO-*` | Typed protocol, schema, data-policy, exact-value, KDF, IPC response, authority, mission/task, tool, permission, approval, provider, module, integration, event, notification, configuration, canonicalization, compatibility, and schema-qualification rules; 0.3, 0.6, Sections 1–17, 18.19, and 19.3 |
+| `J02-DATA-*` | Authoritative persistence, identifiers, state machines, transactions, concurrency, scope, approvals, graph versioning, artifacts, checkpoints, events, leases, memory, provider state, usage, budgets, WAL, migrations, corruption, retention, and data invariants; Sections 3–14 and applicable recovery/update/release gates |
+| `J02-BACKUP-*` | Fixed JARVIS_BACKUP_V1 format, key hierarchy, SQLCipher snapshot proof, descriptor/chunk framing, recovery slots, restore order, rotation, vectors, and cryptographic invariants; 0.7, Section 3, 18.8–18.10, 19.12 |
+| `J03-SEC-*` | Threat model, password/recovery, secure storage, secret boundaries, content authority, context, structured output, PermissionEngine, risk/approval, target identity, TOCTOU, IPC/WebView, worker/provider/module/integration security, updates, diagnostics, rate limits, audit, failure, and security verification; Sections 1–19 wherever consequential behavior is implemented or qualified |
+| `J03-POLICY-*` | Project-policy discovery, explicit enrollment, immutable per-attempt snapshots, change/revocation behavior, nested policy rules, worktree/branch isolation, context packaging, and policy diagnostics/verification; 4.10, Section 6, consumers 7/9/11, 18, and 19.8 |
+| `J03-SUPPLY-*` | TUF profile, signing/thresholds, delegation, rotation/revocation, expiry/freeze/rollback, target integrity, staged activation, trust storage, incidents, release provenance, and qualification; 4.11, Section 12, 18.14–18.19, and 19.15–19.27 |
+| `J04-OPS-*` | Operational truth, dashboard/queue, journals, planning, user control, recovery visibility, permissions, events, notifications, configuration, memory, providers, modules, integrations, budgets, voice, responsiveness, diagnostics, audit retention, vulnerabilities, upgrade/uninstall, governance escalation, autonomy, and qualification; Sections 4–18 and applicable 19 gates |
+| `J04-UI-*` | Product identity, brand assets, typography, tokens, components, Mission Control, window/layout behavior, status language, accessibility, privacy presentation, degraded/setup/recovery/error states, and UI qualification; Section 1, feature UI rows, 18.1–18.13, and 19.4 |
+| `J05-VER-*` | Task/mission/feature definition of done, release classes, test layers, platform/schema/UI/WebView/IPC/KDF/permission/provider/tool/process/data/backup/update/budget/GitHub/Proxmox/module/recovery/voice/performance/install/CI/soak/journey/provenance/defect gates, and Production Complete; every subsection/section checkpoint and Sections 18–19 |
+| `RP-01`–`RP-19` | Exact Windows V1 platform/runtime, desktop, persistence/crypto, provider, project, mission, security, integration, module, voice, UI, hardware, post-V1, release-manifest, repository-governance, Production Complete, and governing-distinction profile; Sections 0–19 as cited by each row |
+| `PLAN` (non-normative) | Sequencing aid only. Its phase/section numbers preserve the macro-order and each phase exit is represented by a `*.CP` checkpoint; it cannot add, waive, or reinterpret a current clause |
 
 ## Central release-gate mapping
 
-Every one of the Verification Contract's 36 central production gates has an explicit final owner. Specialized active-contract gates are cumulative, not replacements for these central gates.
+Every one of the 36 central production gates defined by `J05-VER-06` and its associated `J05-VER-*` qualification clauses has an explicit final owner. Specialized active-contract gates are cumulative, not replacements for these central gates.
 
 | # | Central release gate | Matrix final owner |
 |---:|---|---|
@@ -695,7 +646,7 @@ Binding post-V1 integration targets remain SSH, Google Workspace, Microsoft 365,
 **Contract baseline:** JARVIS v1.0.7 active suite; current source and status identity are resolved through the live matrix and live `master` revalidation.
 **Draft reviewed:** initial matrix commit `d937c606785c5b21ddff72ab1ed011dd7c931b11` plus the current hardening amendments in this branch.
 
-The review was performed as a fresh contract/dependency audit rather than a self-approval of the original outline. It re-read `AGENTS.md`, the current manifest, top-level Implementation Contract, Release Profile, every active normative component, the Implementation Plan, and the actual repository copy of this matrix.
+The review was performed as a fresh contract/dependency audit rather than a self-approval of the original outline. It re-read `AGENTS.md`, the current manifest, the consolidated active contract suite, Release Profile, every active normative component, the Implementation Plan, and the actual repository copy of this matrix.
 
 Material findings corrected before acceptance:
 
@@ -715,7 +666,7 @@ Structural review result:
 - mandatory GitHub capability coverage remains exactly 9 base-V1 capabilities;
 - mandatory Proxmox capability coverage remains exactly 8 base-V1 capabilities;
 - four contract-permitted optional branches remain explicitly `DEFERRED` and non-blocking until enabled;
-- every one of the Verification Contract's 36 central release gates has a final owner;
+- every one of the 36 central release gates defined by `J05-VER-06` and its associated `J05-VER-*` qualification clauses has a final owner;
 - specialized backup-crypto, project-policy, TUF/supply-chain, exact SQLite/WAL, early-voice and repository/drift gates remain cumulative;
 - all child dependencies are backward-looking within the authoritative macro-order; parent-section entry gates are inherited by children;
 - no known circular dependency, later-feature prerequisite, orphan mandatory domain, or support-claim shortcut remains after the corrections above.
