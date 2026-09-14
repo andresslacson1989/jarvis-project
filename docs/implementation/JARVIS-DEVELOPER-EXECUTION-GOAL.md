@@ -9,6 +9,8 @@ Complete a lossless, organized consolidation of the active JARVIS contract suite
 
 This task authorizes contract, canonical-value, generated-artifact, governance-profile, and validator/test work only. It does not authorize JARVIS application implementation, runtime or platform behavior changes, LocalCI behavior changes, matrix subsection work, matrix status/score/pointer/evidence advancement, section checkpoints, integration, publication, or production-completion claims.
 
+Check the changes against the goal, contract, and `AGENTS.md` files before shipping. Fix all issues found. Do not use shortcuts merely to satisfy the goal. Ship only when no issues remain.
+
 ## Required result
 
 - one active manifest, six active consolidated normative components (`J00`–`J05`), and one V1 Release Profile;
