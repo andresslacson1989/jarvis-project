@@ -10,6 +10,8 @@
 
 **New correction candidate containing the corrections:** `85cf875a9a49e9e439b1b5fb2337043780cc3f33`
 
+**Last exact clean candidate before this final record-only update:** `56d5c8b883b4c23c78808d1a2418ddb1481e644d`
+
 **Audited branch:** `codex/contract-consolidation`
 
 **Base / authoritative master at audit start:** `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`
@@ -688,4 +690,4 @@ Before shipping, the final tree must be checked against the supplied owner goal,
 
 ### Final verification record — 2026-09-15
 
-The correction candidate containing the substantive fixes is `85cf875a9a49e9e439b1b5fb2337043780cc3f33`. Its exact clean-checkout official-profile results are recorded above: all 30 canonical gates and the terminal LocalCI evidence command passed with exit code 0; the profile correctly ended in non-authoritative pending finalization. The main worktree remains clean for tracked files, the 98-row retired-path crosswalk matches the 93 deletion/5 rename inventory, and no application or matrix path is part of the correction commit. A final documentation-record commit will update this persistent findings record after the exact evidence pass; that documentation-only follow-up does not alter the correction candidate’s substantive files. This remains contract-only evidence and is not GitHub qualification, release approval, matrix advancement, integration, or `Production Complete`.
+The substantive correction candidate is `85cf875a9a49e9e439b1b5fb2337043780cc3f33`. Its exact clean-checkout official-profile results are recorded above: all 30 canonical gates and the terminal LocalCI evidence command passed with exit code 0; the profile correctly ended in non-authoritative pending finalization. The persistent findings record was then committed as the documentation-only candidate `56d5c8b883b4c23c78808d1a2418ddb1481e644d`, whose exact clean-checkout profile also passed and is identified at the top of this record. This final record-only update changes no contract, governance, acceptance, application, or matrix behavior; its resulting candidate SHA is reported by the shipping report rather than embedded here to avoid self-referential evidence. The main worktree remains clean for tracked files, the 98-row retired-path crosswalk matches the 93 deletion/5 rename inventory, and no application or matrix path is part of the correction commits. This remains contract-only evidence and is not GitHub qualification, release approval, matrix advancement, integration, or `Production Complete`.
