@@ -2,50 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  ACCEPTANCE_GATE_CATALOG,
   LOCALCI_GATE_COMMANDS,
-  validateAcceptanceGateCatalog,
   validateLocalCiGateScript,
   validateLocalCiWorkerQualificationScript,
 } from "../../../tools/ci/localci-gate-manifest.mjs";
 
 const ciScript = readFileSync(new URL("../../../.localci/ci.sh", import.meta.url), "utf8");
 const workerScript = readFileSync(new URL("../../../.localci/worker-qualification.sh", import.meta.url), "utf8");
-const catalogText = readFileSync(new URL("../../../docs/implementation/CONTRACT-ACCEPTANCE-GATE-CATALOG.md", import.meta.url), "utf8");
 const codes = (violations) => violations.map(({ code }) => code);
 
 test("LocalCI compatibility runner exactly matches its non-authoritative gate manifest", () => {
   assert.deepEqual(codes(validateLocalCiGateScript(ciScript)), []);
   assert.equal(LOCALCI_GATE_COMMANDS.length, 30);
   assert.deepEqual(LOCALCI_GATE_COMMANDS[4], ["contract-suite-valid", "pnpm contract:check"]);
-});
-
-test("acceptance catalog covers every canonical gate with ownership, evidence, and distinctness", () => {
-  assert.deepEqual(validateAcceptanceGateCatalog(), []);
-  assert.equal(ACCEPTANCE_GATE_CATALOG.length, 30);
-  assert.deepEqual(ACCEPTANCE_GATE_CATALOG.map(({ gate }) => gate), LOCALCI_GATE_COMMANDS.map(([gate]) => gate));
-  assert.deepEqual(ACCEPTANCE_GATE_CATALOG.map(({ command }) => command), LOCALCI_GATE_COMMANDS.map(([, command]) => command));
-  for (const entry of ACCEPTANCE_GATE_CATALOG) {
-    for (const field of ["contractClause", "evidence", "authority", "purpose", "distinctness"]) {
-      assert.equal(typeof entry[field], "string");
-      assert.notEqual(entry[field].trim(), "");
-    }
-    assert.ok(catalogText.includes(`| ${entry.gate} |`), entry.gate);
-    assert.ok(catalogText.includes(`<code>${entry.command.replaceAll("|", "\\|")}</code>`), entry.gate);
-  }
-});
-
-test("acceptance catalog rejects command, duplicate, and metadata drift", () => {
-  const commandDrift = ACCEPTANCE_GATE_CATALOG.map((entry) => ({ ...entry }));
-  commandDrift[0].command = "pnpm unexpected";
-  assert.ok(codes(validateAcceptanceGateCatalog(commandDrift)).includes("ACCEPTANCE_CATALOG_COMMAND_DRIFT"));
-
-  const duplicate = [...ACCEPTANCE_GATE_CATALOG, { ...ACCEPTANCE_GATE_CATALOG[0] }];
-  assert.ok(codes(validateAcceptanceGateCatalog(duplicate)).includes("ACCEPTANCE_CATALOG_LENGTH"));
-
-  const metadataDrift = ACCEPTANCE_GATE_CATALOG.map((entry) => ({ ...entry }));
-  metadataDrift[0].purpose = "";
-  assert.ok(codes(validateAcceptanceGateCatalog(metadataDrift)).includes("ACCEPTANCE_CATALOG_METADATA_MISSING"));
 });
 
 test("LocalCI rejects omitted, duplicate, and mutated compatibility gates", () => {

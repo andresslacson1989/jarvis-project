@@ -32,7 +32,7 @@ Read the normative suite in this order:
 
 Canonical vector brand assets live under [`assets/brand/`](assets/brand/).
 
-Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. The [acceptance gate catalog](docs/implementation/CONTRACT-ACCEPTANCE-GATE-CATALOG.md) is a non-normative review aid; the executable gate order remains in the canonical LocalCI manifest. No historical document supplements, is cited by, or is consulted as authority for the active suite.
+Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. The executable acceptance gate order is defined by `tools/ci/localci-gate-manifest.mjs`. No historical document supplements, is cited by, or is consulted as authority for the active suite.
 
 ## Platform/runtime model
 

@@ -101,10 +101,10 @@ test("tracked content cannot cite deleted ADR, decision, or history source paths
   assert.equal(hasForbiddenDecisionRecordReference("ADRs are prohibited by policy; ADR/decision-record material is prohibited by policy."), false);
 });
 
-test("the non-authoritative owner goal may name prohibited paths to enforce their removal", async () => {
+test("the non-authoritative owner goal preserves the prohibited ADR rule", async () => {
   const goal = readFileSync(resolve(root, "docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md"), "utf8");
-  assert.match(goal, /`docs\/adr\//);
-  assert.equal(hasForbiddenDecisionRecordReference(goal), true);
+  assert.match(goal, /ADRs are completely prohibited/i);
+  assert.equal(hasForbiddenDecisionRecordReference(goal), false);
   const result = await validateContractManifest(root);
   assert.equal(result.violations.some(({ code, path }) => code === "MANIFEST_DECISION_RECORD_REFERENCE" && path === "docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md"), false);
   assert.equal(result.violations.some(({ code }) => code === "MANIFEST_ADR_AUTHORITY_REFERENCE"), false);

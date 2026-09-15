@@ -124,7 +124,7 @@ A V1 production release SHALL pass at least:
 
 Zero open P0/P1 defects. The Critical/High reachable-vulnerability policy in J04-OPS-26 SHALL pass.
 
-The repository acceptance command sequence is the single 30-gate manifest in `tools/ci/localci-gate-manifest.mjs`. Its non-authoritative review catalog records each gate's owner, command, evidence, authority class, and distinctness; it does not replace this release-gate list or promote LocalCI above GitHub Actions.
+The repository acceptance command sequence is the single 30-gate manifest in `tools/ci/localci-gate-manifest.mjs`; it does not replace this release-gate list or promote LocalCI above GitHub Actions.
 
 ---
 

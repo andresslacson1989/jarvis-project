@@ -96,6 +96,72 @@ function validateServerEnforcedProtection(profile, server) {
   return violations;
 }
 
+function isIsoTimestamp(value) {
+  return /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value ?? "")) && Number.isFinite(Date.parse(value));
+}
+
+function isFullRef(value) {
+  return /^refs\/(?:heads|pull|tags)\/\S+$/.test(String(value ?? ""));
+}
+
+function isPositiveInteger(value) {
+  return /^[1-9][0-9]*$/.test(String(value ?? ""));
+}
+
+function rejectUnexpectedFields(candidate, allowedFields, violations) {
+  for (const field of Object.keys(candidate)) {
+    if (!allowedFields.includes(field)) violations.push(violation("GOVERNANCE_CURRENT_CANDIDATE_EVIDENCE_INVALID", `current candidate evidence contains unexpected field ${field}`));
+  }
+}
+
+function validateCurrentCandidateEvidence(candidate) {
+  const violations = [];
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate) || candidate.contractSuiteVersion !== "1.0.8") {
+    return [violation("GOVERNANCE_CURRENT_CANDIDATE_EVIDENCE_INVALID", "current candidate evidence must identify contract suite 1.0.8")];
+  }
+
+  if (candidate.status === "NOT_RECORDED") {
+    rejectUnexpectedFields(candidate, ["contractSuiteVersion", "status", "reason"], violations);
+    if (candidate.reason !== "EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED") {
+      violations.push(violation("GOVERNANCE_CURRENT_CANDIDATE_EVIDENCE_INVALID", "NOT_RECORDED candidate evidence must state that no exact GitHub Actions run exists"));
+    }
+    return violations;
+  }
+
+  if (candidate.status !== "RECORDED") {
+    return [violation("GOVERNANCE_CURRENT_CANDIDATE_EVIDENCE_INVALID", "current candidate evidence status must be NOT_RECORDED or RECORDED")];
+  }
+
+  const requiredRecordedFields = [
+    ["candidateSha", (value) => /^[0-9a-f]{40}$/.test(String(value ?? ""))],
+    ["repository", (value) => value === EXPECTED_REPOSITORY],
+    ["ref", isFullRef],
+    ["workflow", (value) => value === ".github/workflows/static-ci.yml"],
+    ["job", (value) => value === EXPECTED_CI],
+    ["runId", isPositiveInteger],
+    ["runAttempt", isPositiveInteger],
+    ["startedAt", isIsoTimestamp],
+    ["finishedAt", isIsoTimestamp],
+    ["recordedAt", isIsoTimestamp],
+    ["terminalResult", (value) => value === "SUCCESS"],
+    ["requiredChecksPassed", (value) => value === true],
+    ["evidenceIdentity", (value) => typeof value === "string" && [candidate.candidateSha, candidate.repository, candidate.ref, candidate.workflow, candidate.job, candidate.runId, candidate.runAttempt].every((part) => value.includes(String(part)))],
+    ["artifactEvidenceIdentity", (value) => typeof value === "string" && [candidate.candidateSha, candidate.repository, candidate.ref, candidate.workflow, candidate.job, candidate.runId, candidate.runAttempt].every((part) => value.includes(String(part)))],
+  ];
+  rejectUnexpectedFields(candidate, ["contractSuiteVersion", "status", ...requiredRecordedFields.map(([field]) => field)], violations);
+  for (const [field, predicate] of requiredRecordedFields) {
+    if (!predicate(candidate[field])) violations.push(violation("GOVERNANCE_CURRENT_CANDIDATE_EVIDENCE_INVALID", `RECORDED candidate evidence must contain a valid ${field}`));
+  }
+  if ("reason" in candidate) violations.push(violation("GOVERNANCE_CURRENT_CANDIDATE_EVIDENCE_INVALID", "RECORDED candidate evidence must not retain the NOT_RECORDED reason"));
+  if (isIsoTimestamp(candidate.startedAt) && isIsoTimestamp(candidate.finishedAt) && Date.parse(candidate.finishedAt) < Date.parse(candidate.startedAt)) {
+    violations.push(violation("GOVERNANCE_CURRENT_CANDIDATE_EVIDENCE_INVALID", "RECORDED candidate evidence finishedAt must not precede startedAt"));
+  }
+  if (isIsoTimestamp(candidate.finishedAt) && isIsoTimestamp(candidate.recordedAt) && Date.parse(candidate.recordedAt) < Date.parse(candidate.finishedAt)) {
+    violations.push(violation("GOVERNANCE_CURRENT_CANDIDATE_EVIDENCE_INVALID", "RECORDED candidate evidence recordedAt must not precede finishedAt"));
+  }
+  return violations;
+}
+
 export function validateRepositoryGovernanceProfile(profile, workflowText) {
   const violations = [];
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) return [violation("GOVERNANCE_PROFILE_INVALID", "profile must be an object")];
@@ -132,9 +198,7 @@ export function validateRepositoryGovernanceProfile(profile, workflowText) {
   if (!authoritative || !/^[0-9a-f]{40}$/.test(String(authoritative.commitSha ?? "")) || !/^[0-9]+$/.test(String(authoritative.runId ?? "")) || authoritative.status !== "SUCCESS" || authoritative.ref !== "refs/heads/master" || !/^[0-9]+$/.test(String(authoritative.windowsJobId ?? "")) || !/^[0-9]+$/.test(String(authoritative.staticCiJobId ?? ""))) {
     violations.push(violation("GOVERNANCE_HISTORICAL_MASTER_EVIDENCE_INVALID", "historical authority baseline must retain its exact-master verification identity"));
   }
-  if (!candidate || candidate.contractSuiteVersion !== "1.0.8" || candidate.status !== "NOT_RECORDED" || candidate.reason !== "EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED") {
-    violations.push(violation("GOVERNANCE_CURRENT_CANDIDATE_SCOPE_INVALID", "v1.0.8 candidate evidence must be explicitly not recorded until its immutable candidate SHA has an exact GitHub Actions run"));
-  }
+  violations.push(...validateCurrentCandidateEvidence(candidate));
 
   const server = profile.serverSideProtection ?? {};
   if (profile.governanceMode === "COMPENSATING_CONTROLS") {
@@ -172,7 +236,6 @@ export function validateRepositoryGovernanceDocumentation(profile, documentation
       /deletions?.*blocked|deletions?.*disallowed|deletions?.*not allowed/i,
       /conversation resolution/i,
       /AUTHENTICATED_GITHUB_API/,
-      /EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED/,
       /repository-governance-profile\.json/,
     ];
     for (const pattern of requiredCurrentText) {
@@ -180,6 +243,15 @@ export function validateRepositoryGovernanceDocumentation(profile, documentation
     }
     for (const pattern of [/COMPENSATING_CONTROLS/i, /HTTP\s*403/i, /private repository/i, /not protected/i, /OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED/]) {
       if (pattern.test(current)) violations.push(violation("GOVERNANCE_DOCUMENT_STALE_CURRENT_FACT", `MASTER-PROTECTION.md current section contains stale fallback fact ${pattern}`));
+    }
+    const candidate = profile?.mandatoryCi?.selectedAuthority?.currentCandidateEvidence ?? {};
+    if (candidate.status === "NOT_RECORDED") {
+      if (!/EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED/.test(current)) violations.push(violation("GOVERNANCE_DOCUMENT_CURRENT_FACT_MISSING", "MASTER-PROTECTION.md current section must state that the exact candidate GitHub Actions run is not recorded"));
+    } else if (candidate.status === "RECORDED") {
+      for (const value of ["RECORDED", candidate.candidateSha, candidate.repository, candidate.ref, candidate.workflow, candidate.job, candidate.runId, candidate.runAttempt, candidate.evidenceIdentity, candidate.artifactEvidenceIdentity]) {
+        if (typeof value !== "string" || value.trim() === "" || !current.includes(value)) violations.push(violation("GOVERNANCE_DOCUMENT_CURRENT_FACT_MISSING", "MASTER-PROTECTION.md current section must identify the complete recorded exact-candidate evidence"));
+      }
+      if (/EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED|no exact GitHub Actions run recorded/i.test(current)) violations.push(violation("GOVERNANCE_DOCUMENT_STALE_CURRENT_FACT", "MASTER-PROTECTION.md current section cannot retain NOT_RECORDED candidate wording after exact evidence is recorded"));
     }
   }
   return violations;
