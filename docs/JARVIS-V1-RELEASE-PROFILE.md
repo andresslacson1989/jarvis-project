@@ -77,36 +77,9 @@ Required runtime properties:
 - signed installer/update artifacts;
 - protocol major `1` using the current manifest's protocol/domain schemas.
 
-The implementation SHALL expose native responsibilities through explicit semantic platform-capability/composition boundaries equivalent to:
+The implementation SHALL use the complete semantic platform-capability/composition boundary owned by J01-PLAT-06 through J01-PLAT-09 and J01-PLAT-26. Shared Core/domain/policy code SHALL NOT directly depend on Win32, DPAPI, Windows named-pipe, Job Object, HWND, SID, registry, or UAC implementation APIs. This abstraction requirement SHALL NOT weaken the Windows backend: V1 Windows still uses the strongest qualified mechanisms required by J01 and J02–J03.
 
-```text
-PlatformSecureStorage
-PlatformLocalIpc
-PlatformProcessSupervisor
-PlatformSessionObserver
-PlatformWindowController
-PlatformNotificationBackend
-PlatformPathsAndIdentity
-PlatformAudioBackend
-PlatformUpdateBackend
-PlatformPrivilegeMediator
-PlatformSystemInfo
-```
-
-Exact interface names may differ. Shared Core/domain/policy code SHALL NOT directly depend on Win32, DPAPI, Windows named-pipe, Job Object, HWND, SID, registry, or UAC implementation APIs.
-
-This abstraction requirement SHALL NOT weaken the Windows backend. V1 Windows still uses the strongest qualified Windows mechanisms required by `J01` and `J02`–`J03`.
-
-Required V1 UI identity properties:
-
-- one unified dark-theme **JARVIS Mission Control** shell;
-- canonical brand colors `#2D7BFF`, `#FFFFFF`, and `#0B0F14`;
-- canonical mark, lockup, and application-icon master assets from `assets/brand/`;
-- dedicated primary dashboard window with deterministic `HIDDEN`, `WINDOWED`, `MAXIMIZED`, `FULLSCREEN`, and `FOCUSED_CONTEXT`-equivalent presentation modes;
-- adaptive layout across standard desktop, compact resizable window, ultrawide, high-DPI, text scaling, and multi-monitor conditions;
-- no unrelated per-integration or per-platform visual shell;
-- accessibility and state-language qualification under `J04` UI clauses;
-- release-owned/offline-safe primary font and recorded license/provenance for packaged fonts/icons/third-party visual assets.
+Required V1 UI identity properties are the exact J04-UI-03 through J04-UI-28 and J05-VER-11 requirements: one unified dark-theme **JARVIS Mission Control** shell, canonical brand assets/colors, deterministic window modes, adaptive desktop/high-DPI/multi-monitor behavior, no unrelated visual shell, accessible state language, and release-owned/offline-safe fonts with recorded asset provenance.
 
 Mission Control design tokens/component semantics SHALL be reusable by a future Linux full-host UI. Only Windows UI/runtime qualification is required by V1.
 
@@ -135,15 +108,7 @@ V1 SHALL use:
 - clean-profile Windows restore followed by fresh local `DB_DEK` generation/re-key;
 - forward migrations and paired binary/database rollback.
 
-JARVIS-managed session-password and general portable-recovery KDF profiles SHALL use Argon2id version `0x13` and SHALL NOT fall below:
-
-```text
-memory:      65536 KiB
-passes:      3
-parallelism: 4
-salt:        16 random bytes
-output:      32 bytes
-```
+JARVIS-managed session-password and general portable-recovery KDF profiles SHALL meet the exact J03-SEC-04 and J02-DATA-05 production profile, including its Argon2id version, floor, bounds, verifier/key-slot persistence, and migration rules.
 
 The optional V1 portable-backup passphrase slot SHALL use at least:
 
@@ -237,50 +202,13 @@ Project registration/opening SHALL NOT silently trust repository `AGENTS.md` or 
 
 # RP-07 — REQUIRED MISSION/WORKER RUNTIME
 
-V1 SHALL ship and qualify:
-
-- durable mission/task/attempt state;
-- immutable graph versions and validated dynamic replan;
-- discriminated execution scopes;
-- bounded worker loops and no-progress detection;
-- worker journals/checkpoints without private chain-of-thought;
-- queue transparency;
-- durable `RESUMING` state and live-state/policy revalidation;
-- resource/provider/budget/platform-capability-aware scheduler;
-- exact budget reservations/settlement;
-- provider fallback that preserves policy/platform support;
-- crash recovery and uncertain-side-effect reconciliation;
-- deterministic/live verification before completion.
+V1 SHALL ship and qualify the mission/task/attempt, graph, execution-scope, worker-loop, journal/checkpoint, queue, resume, scheduler, budget, provider-fallback, crash/recovery, uncertain-side-effect, and completion-verification behavior specified by J01-RT-17 through J01-RT-23, J02-DATA-07 through J02-DATA-19, J04-OPS-02 through J04-OPS-07, and J05-VER-03 through J05-VER-08. This profile selects those capabilities for V1; the referenced contracts own their detailed semantics.
 
 ---
 
 # RP-08 — REQUIRED SECURITY/AUTHORIZATION RUNTIME
 
-V1 SHALL ship and qualify:
-
-- start-locked session;
-- versioned Argon2id session-password verifier meeting the production KDF floor;
-- Windows lock/sign-out integration through the platform session observer;
-- explicit portable recovery-factor workflow for session/data recovery;
-- mandatory generated 256-bit portable backup recovery factor for production portable-state verification;
-- Windows PlatformSecureStorage/Credential Broker backend;
-- explicit Windows named-pipe DACL/local-only/bootstrap authentication backend;
-- authoritative local-only WebView/Tauri capability/CSP/navigation boundary;
-- Windows PlatformProcessSupervisor using Job Objects as required;
-- authority envelopes;
-- deterministic PermissionEngine precedence with mandatory safety/deny dominance;
-- standing permission and limited precedent semantics;
-- explicit project-policy trust enrollment; untrusted repository text cannot self-promote to policy;
-- `CanonicalActionDescriptorV1` JCS/SHA-256/base64url approval binding;
-- mandatory final destructive confirmation;
-- independent `DataSensitivity` + `DataLocality`;
-- prompt-injection/content-authority boundary;
-- canonical platform-aware path/resource resolution;
-- conditional external mutation when supported;
-- TUF 1.0.35-based update/module trust lifecycle with current revocation/anti-rollback policy;
-- secret-minimizing logs/journals/diagnostics;
-- explicit same-user-malware limitation;
-- platform-capability failure that blocks/degrades dependent behavior rather than unsafe fallback.
+V1 SHALL ship and qualify the exact security, authorization, trust, recovery, platform, IPC, process, update, and failure behavior specified by J01-RT-05 through J01-RT-09, J01-PROTO-17 through J01-PROTO-21, J02-DATA-03 through J02-BACKUP-15, J03-SEC-04 through J03-SEC-34, J03-POLICY-02 through J03-POLICY-16, J03-SUPPLY-02 through J03-SUPPLY-19, and J05-VER-12 through J05-VER-16. The profile selects the Windows implementations and V1 scope; those contracts own the detailed security semantics.
 
 ---
 
@@ -571,25 +499,7 @@ No raw credentials/private user data/private signing keys/recovery factors appea
 
 # RP-17 — REPOSITORY GOVERNANCE GATE
 
-Before Phase 0 may be declared complete, the effective repository-governance mode SHALL be determined from verified hosting provider/account capability.
-
-When server-side branch protection or repository rulesets are available for the authoritative repository, authoritative `master` SHALL use an active server-enforced equivalent that:
-
-- prevents branch deletion;
-- blocks force pushes;
-- requires the mandatory CI status check/context once that check exists;
-- uses narrowly controlled and auditable bypass permissions.
-
-If server-side protection/rulesets are unavailable because of a verified hosting plan/platform capability limitation, the `COMPENSATING_CONTROLS` mode MAY satisfy this gate only when all of the following hold:
-
-- normal implementation work occurs on temporary implementation branches rather than routine direct writes to `master`;
-- mandatory CI passes for the exact candidate commit before integration;
-- the live `master` tip is revalidated immediately before integration, and unexpected movement is reconciled rather than overwritten;
-- integration is non-force;
-- post-integration verification proves the resulting authoritative tip, intended diff/ancestry, required CI, and audit/evidence state;
-- repository status states truthfully that `master` is not server-protected and preserves the residual risk of an out-of-band administrator force push/deletion.
-
-`COMPENSATING_CONTROLS` SHALL NOT be selected when effective server-side protection is available. If the hosting provider/account later exposes the required protection/ruleset capability, server-enforced mode becomes mandatory.
+Before Phase 0 may be declared complete, the effective repository-governance mode SHALL be determined from verified hosting provider/account capability and recorded in the current governance profile/operational aid. J00-GOV-28 and J05-VER-33 own the complete server-enforced/fallback semantics, including deletion/force-push protection, required CI, bypass control, live `master` tip validation, non-force exact-tip integration, evidence, truthful residual risk, and transition behavior. `COMPENSATING_CONTROLS` SHALL NOT be selected when effective server-side protection is available.
 
 A pull-request requirement is strongly preferred once implementation changes begin. No second long-lived branch becomes an alternate source of truth.
 
@@ -603,34 +513,7 @@ The mandatory `static-ci` pipeline result SHALL come from qualified `GITHUB_ACTI
 
 # RP-18 — PRODUCTION-COMPLETE GATE
 
-For this profile, Production Complete requires the same source commit and signed **Windows FULL_HOST** release artifacts to pass:
-
-- all required functionality and every current mandatory active-contract rule;
-- platform/clean-install qualification;
-- platform-capability/composition/import-boundary architecture checks;
-- Mission Control UI identity/adaptive/accessibility/window-state qualification;
-- Tauri/WebView and named-pipe security gates;
-- self-contained Core/runtime package gate;
-- exact SQLite/SQLCipher/WAL fix, snapshot/re-key, and persistence gates;
-- KDF-profile floor/migration tests;
-- `JARVIS_BACKUP_V1` cryptographic/tamper/order/truncation vectors and generated-recovery clean-profile disaster restore;
-- project-policy trust enrollment/change/nested-policy/worker-mutation conformance;
-- Codex setup/repair + provider/version/sandbox conformance;
-- Local Git + exact GitHub capability-matrix conformance;
-- exact Proxmox capability-matrix conformance;
-- destructive-action/PermissionEngine safety gates;
-- Windows Job Object process containment/orphan cleanup;
-- TUF bootstrap/threshold/root rotation/revocation/expiration/delegation/rollback/freeze/mix-and-match plus Tauri updater and Windows signing gates;
-- module/catalog/update integrity;
-- crash/recovery/uncertain-side-effect tests;
-- budget/resource/performance/voice tests;
-- early voice-feasibility evidence plus final voice production qualification;
-- event/automation tests;
-- upgrade/rollback;
-- soak/stability;
-- signed installer/update, SBOM, licensing, and provenance;
-- zero open P0/P1 defects;
-- Critical/High vulnerability policy from `J04` satisfied.
+For this profile, Production Complete requires the same source commit and signed **Windows FULL_HOST** release artifacts to pass every applicable J05-VER-03 through J05-VER-39 gate and every profile-specific RP-02 through RP-16 support requirement. This includes the platform, UI/accessibility, Tauri/WebView/IPC, Core/runtime, persistence/WAL/SQLCipher, KDF/backup/recovery, policy trust, provider, Git/GitHub, Proxmox, PermissionEngine, process containment, TUF/updater/signing, module, crash/recovery/uncertain, budget/resource/voice, event/automation, upgrade/rollback, soak, SBOM/license/provenance, defect-severity, and vulnerability requirements owned by those clauses. Linux runtime tests and Android/companion networking remain outside V1 release qualification and cannot waive platform-boundary rules. Documentation completion alone never satisfies this gate.
 
 Linux runtime tests and Android/companion networking are not V1 release gates. Their absence SHALL NOT permit violations of the platform-boundary architecture rules.
 

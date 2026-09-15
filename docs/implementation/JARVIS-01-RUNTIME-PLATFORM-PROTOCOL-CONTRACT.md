@@ -563,17 +563,7 @@ Feature/UI code SHALL not parse Win32/Linux human-readable error text to make se
 
 ## J01-PLAT-28 — TESTING AND ARCHITECTURE ENFORCEMENT
 
-Before V1 implementation progresses beyond the foundation, CI SHALL prove at least:
-
-- shared Core/domain/policy packages do not import Windows-native implementation modules;
-- platform-specific code is reachable through explicit platform composition/capability boundaries;
-- Windows native backends still pass all current Windows release gates;
-- unsupported platform capability produces explicit unavailable/degraded behavior rather than unsafe fallback;
-- design-system/shared UI code does not require Windows-only visual components for core semantics;
-- portable backup format does not require DPAPI for the portable recovery slot;
-- provider support remains platform-qualified rather than globally inferred.
-
-Linux runtime tests are not required to pass V1 Production Complete unless a Linux profile is explicitly promoted by a future Release Profile.
+The platform/runtime/protocol invariants in this component are verified through the complete J05-VER-09, J05-VER-10, J05-VER-12, J05-VER-17, J05-VER-18, J05-VER-19, J05-VER-21, J05-VER-24 through J05-VER-26, and J05-VER-37 gates. Those gates cover import/composition boundaries, Windows native backend qualification, truthful unavailable/degraded behavior, portable recovery independence from DPAPI, provider/module platform qualification, and the explicit exclusion of Linux runtime qualification from the V1 claim. This clause defines the invariants; J05 defines their evidence and pass criteria.
 
 ---
 

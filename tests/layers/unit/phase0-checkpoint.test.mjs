@@ -107,6 +107,8 @@ const matrix =
   "\n";
 
 const allEvidencePaths = new Set(profile.requiredEvidencePaths);
+const governanceProfile = JSON.parse(readFileSync("docs/implementation/governance/repository-governance-profile.json", "utf8"));
+const governanceDocument = readFileSync("docs/implementation/governance/MASTER-PROTECTION.md", "utf8");
 
 function codes(overrides = {}) {
   return validatePhase0Snapshot({
@@ -118,6 +120,8 @@ function codes(overrides = {}) {
     linuxSourcePaths: [],
     androidSourcePaths: [],
     existingPaths: allEvidencePaths,
+    governanceProfile,
+    governanceDocument,
     ...overrides,
   }).map((item) => item.code);
 }
@@ -348,4 +352,10 @@ test("unsafe pull_request_target trigger fails checkpoint", () => {
   assert.ok(
     codes({ workflow }).includes("PHASE0_UNSAFE_WORKFLOW_TRIGGER"),
   );
+});
+
+test("Phase 0 rejects stale current repository-governance facts", () => {
+  const staleProfile = JSON.parse(JSON.stringify(governanceProfile));
+  staleProfile.governanceMode = "COMPENSATING_CONTROLS";
+  assert.ok(codes({ governanceProfile: staleProfile }).some((code) => code.startsWith("PHASE0_GOVERNANCE_")));
 });

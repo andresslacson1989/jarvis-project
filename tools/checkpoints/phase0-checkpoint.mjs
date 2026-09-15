@@ -3,6 +3,10 @@ import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  validateRepositoryGovernanceDocumentation,
+  validateRepositoryGovernanceProfile,
+} from "../ci/check-repository-governance.mjs";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".rs"]);
 const REQUIRED_CHILDREN = Object.freeze([
@@ -90,6 +94,8 @@ export function validatePhase0Snapshot({
   linuxSourcePaths = [],
   androidSourcePaths = [],
   existingPaths = new Set(),
+  governanceProfile = null,
+  governanceDocument = null,
   currentEvidenceStatus = null,
   governanceQualificationStatus = null,
   currentCandidateSha = null,
@@ -121,6 +127,16 @@ export function validatePhase0Snapshot({
     );
   }
 
+  if (profile.forbiddenActivePathsRole !== "REJECTION_FIXTURES_ONLY_NON_AUTHORITATIVE") {
+    violations.push(
+      violation(
+        "PHASE0_FORBIDDEN_PATH_ROLE",
+        "tools/checkpoints/phase0-checkpoint-profile.json",
+        "forbidden legacy paths must be labeled as non-authoritative rejection fixtures",
+      ),
+    );
+  }
+
   if (
     profile.checkpointName !==
     "Repository Governance + Platform Boundary + Contract-Drift Protection Ready"
@@ -135,6 +151,16 @@ export function validatePhase0Snapshot({
   }
 
   const workflowText = String(workflow);
+  if (governanceProfile !== null) {
+    for (const item of validateRepositoryGovernanceProfile(governanceProfile, workflowText)) {
+      violations.push(violation(`PHASE0_${item.code}`, "docs/implementation/governance/repository-governance-profile.json", item.detail));
+    }
+  }
+  if (governanceDocument !== null) {
+    for (const item of validateRepositoryGovernanceDocumentation(governanceProfile, governanceDocument)) {
+      violations.push(violation(`PHASE0_${item.code}`, "docs/implementation/governance/MASTER-PROTECTION.md", item.detail));
+    }
+  }
   if (/\bpull_request_target\s*:/.test(workflowText)) {
     violations.push(
       violation(
@@ -494,7 +520,7 @@ export async function checkPhase0(rootDir) {
   );
   const profile = JSON.parse(await readFile(profilePath, "utf8"));
 
-  const [workflow, packageJson, canonicalValues, matrix, checkpointEvidence, governanceProfile, linuxSourcePaths, androidSourcePaths] =
+  const [workflow, packageJson, canonicalValues, matrix, checkpointEvidence, governanceProfile, governanceDocument, linuxSourcePaths, androidSourcePaths] =
     await Promise.all([
       readFile(resolve(rootDir, ".github/workflows/static-ci.yml"), "utf8"),
       readFile(resolve(rootDir, "package.json"), "utf8").then(JSON.parse),
@@ -511,6 +537,7 @@ export async function checkPhase0(rootDir) {
       ),
       readFile(resolve(rootDir, "docs/implementation/evidence/0.CP-phase0-checkpoint.md"), "utf8"),
       readFile(resolve(rootDir, "docs/implementation/governance/repository-governance-profile.json"), "utf8").then(JSON.parse),
+      readFile(resolve(rootDir, "docs/implementation/governance/MASTER-PROTECTION.md"), "utf8"),
       collectRuntimeSources(rootDir, "platform/linux"),
       collectRuntimeSources(rootDir, "platform/android"),
     ]);
@@ -545,6 +572,8 @@ export async function checkPhase0(rootDir) {
     linuxSourcePaths,
     androidSourcePaths,
     existingPaths,
+    governanceProfile,
+    governanceDocument,
     currentEvidenceStatus: /^\*\*Historical verification record/m.test(checkpointEvidence) ? null : checkpointEvidence.match(/^\*\*(VERIFIED|VERIFYING)\b/m)?.[1] ?? null,
     governanceQualificationStatus: governanceProfile?.mandatoryCi?.selectedAuthority?.authorityCapabilityBaseline?.status ?? null,
     checkedOutSha,

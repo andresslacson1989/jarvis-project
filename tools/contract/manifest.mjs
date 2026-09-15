@@ -22,6 +22,8 @@ const DECISION_RECORD_REFERENCE_EXEMPTIONS = new Set([
   "tests/layers/unit/phase0-checkpoint.test.mjs",
   // The owner goal is non-authoritative enforcement text and must name the prohibited paths it governs.
   "docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md",
+  // This non-authoritative audit aid inventories retired source paths so the audit is reproducible.
+  "docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md",
 ]);
 const ADR_REFERENCE_PATTERN = /(?:^|[-_.\s/\\])adr(?:\.[A-Za-z0-9]+|[-_ ](?:[A-Za-z0-9][A-Za-z0-9._-]*)?\.[A-Za-z0-9]+|[-_ ]?\d+(?:[-_.\s]|$))/i;
 const DECISION_RECORD_FILENAME_PATTERN = /(?:^|[-_. ])decision[-_ ]?records?(?:[-_. ]|$)/i;

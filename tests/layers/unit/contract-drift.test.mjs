@@ -110,6 +110,31 @@ test("the non-authoritative owner goal may name prohibited paths to enforce thei
   assert.equal(result.violations.some(({ code }) => code === "MANIFEST_ADR_AUTHORITY_REFERENCE"), false);
 });
 
+test("the non-authoritative consolidation findings aid may inventory retired paths without weakening tracked-source rejection", async () => {
+  const findings = readFileSync(resolve(root, "docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md"), "utf8");
+  assert.match(findings, /docs\/decisions\//);
+  assert.match(findings, /non-normative audit aid/i);
+  assert.equal(hasForbiddenDecisionRecordReference(findings), true);
+  const result = await validateContractManifest(root);
+  assert.equal(result.violations.some(({ code, path }) => code === "MANIFEST_DECISION_RECORD_REFERENCE" && path === "docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md"), false);
+  const temporary = await manifestFixture();
+  try {
+    const findingsPath = "docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md";
+    await writeFile(resolve(temporary, findingsPath), findings);
+    execFileSync("git", ["add", findingsPath], { cwd: temporary });
+    const fixtureResult = await validateContractManifest(temporary);
+    assert.equal(fixtureResult.violations.some(({ code, path }) => code === "MANIFEST_DECISION_RECORD_REFERENCE" && path === findingsPath), false);
+
+    const trackedPath = "docs/implementation/unrelated-audit-note.md";
+    await writeFile(resolve(temporary, trackedPath), "See docs/decisions/retired.md\n");
+    execFileSync("git", ["add", trackedPath], { cwd: temporary });
+    const rejectedResult = await validateContractManifest(temporary);
+    assert.ok(rejectedResult.violations.some(({ code, path }) => code === "MANIFEST_DECISION_RECORD_REFERENCE" && path === trackedPath));
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
+  }
+});
+
 const canonical = JSON.parse(readFileSync(resolve(root, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"), "utf8"));
 
 function union(name, values) {

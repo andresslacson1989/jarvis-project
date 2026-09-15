@@ -1,16 +1,38 @@
 {
   "schemaVersion": 4,
-  "governanceMode": "COMPENSATING_CONTROLS",
+  "governanceMode": "SERVER_ENFORCED",
   "provider": "GITHUB",
   "repository": "andresslacson1989/jarvis-project",
+  "repositoryVisibility": "PUBLIC",
   "authoritativeBranch": "master",
   "serverSideProtection": {
-    "available": false,
-    "active": false,
-    "reason": "HOSTING_PLAN_LIMITATION",
-    "observationSource": "USER_SUPPLIED_GITHUB_ADMIN_ATTEMPT",
-    "observedHttpStatus": 403,
-    "observedMessage": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    "available": true,
+    "active": true,
+    "requiredStatusChecks": {
+      "contexts": [
+        "static-ci"
+      ],
+      "strict": true
+    },
+    "requiredApprovingReviews": 1,
+    "enforceAdministrators": true,
+    "allowForcePushes": false,
+    "allowDeletions": false,
+    "requiredConversationResolution": true,
+    "restrictions": null,
+    "observation": {
+      "source": "AUTHENTICATED_GITHUB_API",
+      "observedAt": "2026-09-15T01:49:15Z",
+      "repository": "andresslacson1989/jarvis-project",
+      "repositoryId": 1330469646,
+      "repositoryVisibility": "public",
+      "defaultBranch": "master",
+      "protectedBranch": "master",
+      "ref": "refs/heads/master",
+      "endpoint": "GET https://api.github.com/repos/andresslacson1989/jarvis-project/branches/master/protection",
+      "evidenceIdentity": "github-api:repo-1330469646:refs/heads/master:protection:static-ci:app-15368",
+      "requiredStatusCheckAppId": 15368
+    }
   },
   "mandatoryCi": {
     "pipelineIdentity": "static-ci",
@@ -91,14 +113,28 @@
     "gitlabRole": "REPOSITORY_MIRROR_ONLY",
     "localCiRole": "NON_AUTHORITATIVE_COMPATIBILITY_OR_SECURITY_TOOLING"
   },
-  "controls": {
-    "temporaryImplementationBranches": true,
-    "candidateCiRequired": true,
-    "liveAuthoritativeTipRevalidation": true,
-    "reconcileUnexpectedMovement": true,
-    "nonForceIntegrationOnly": true,
-    "postIntegrationVerification": true
-  },
-  "residualRisk": "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED",
-  "serverModeRequiredWhenAvailable": true
+  "residualRisk": "SERVER_ENFORCED_PROTECTION_ACTIVE",
+  "serverModeRequiredWhenAvailable": true,
+  "historicalTransition": {
+    "notCurrent": true,
+    "previousGovernanceMode": "COMPENSATING_CONTROLS",
+    "previousRepositoryVisibility": "PRIVATE",
+    "previousServerSideProtection": {
+      "available": false,
+      "active": false,
+      "reason": "HOSTING_PLAN_LIMITATION",
+      "observationSource": "USER_SUPPLIED_GITHUB_ADMIN_ATTEMPT",
+      "observedHttpStatus": 403,
+      "observedMessage": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    },
+    "previousControls": {
+      "temporaryImplementationBranches": true,
+      "candidateCiRequired": true,
+      "liveAuthoritativeTipRevalidation": true,
+      "reconcileUnexpectedMovement": true,
+      "nonForceIntegrationOnly": true,
+      "postIntegrationVerification": true
+    },
+    "previousResidualRisk": "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED"
+  }
 }

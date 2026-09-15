@@ -48,23 +48,23 @@ If active normative text conflicts or omits a mandatory requirement, implementat
 
 ## 4.1 Portable backup
 
-Production `JARVIS_BACKUP_V1` is fixed by `J02`: AES-256-GCM framing, nonce/AAD/chunk/order/truncation rules, independent key hierarchy, generated 256-bit recovery factor, optional stronger Argon2id passphrase slot, and exact restore/tamper qualification requirements.
+Production `JARVIS_BACKUP_V1` is fixed by J02-BACKUP-02 through J02-BACKUP-15 and the linked J03 secret-boundary clauses. Those clauses own the AES-256-GCM framing, nonce/AAD/chunk/order/truncation rules, independent key hierarchy, generated 256-bit recovery factor, optional stronger Argon2id passphrase slot, and exact restore/tamper qualification requirements; this manifest defines no alternative.
 
 ## 4.2 Project policy
 
-Repository `AGENTS.md` is an untrusted candidate until an authenticated user enrolls an exact canonical project/path/scope/content identity. Content change invalidates trust for new work; workers cannot silently rewrite and auto-trust their own policy.
+Repository policy trust is owned by J03-POLICY-02 through J03-POLICY-16. In particular, `AGENTS.md` is an untrusted candidate until an authenticated user enrolls an exact canonical project/path/scope/content identity; content change invalidates trust for new work and workers cannot silently rewrite and auto-trust their own policy.
 
 ## 4.3 Update and module trust
 
-Production update/catalog metadata uses the fixed TUF 1.0.35 profile in `J03`, including threshold root trust, role/delegation separation, expiry, rotation/revocation, rollback/freeze/mix-and-match protection, application `releaseSequence`/`securityEpoch`, and cumulative Tauri/Windows signing gates.
+Production update and module trust is owned by J03-SUPPLY-02 through J03-SUPPLY-19. The fixed TUF 1.0.35 profile, threshold root trust, role/delegation separation, expiry, rotation/revocation, rollback/freeze/mix-and-match protection, application `releaseSequence`/`securityEpoch`, and cumulative Tauri/Windows signing gates remain mandatory.
 
 ## 4.4 Authoritative repository governance
 
-`master` remains the sole authoritative branch. Server-side branch protection/rulesets remain required whenever the hosting provider/account exposes them. If the capability is unavailable because of a verified hosting limitation, `J00` and `J05` permit a truthful compensating-control mode with exact candidate CI, non-force/stale-tip-safe integration, post-integration verification, explicit evidence, and no claim of hard server-side protection. The exception ends when server-side protection becomes available.
+`master` remains the sole authoritative branch. Current observed governance facts and the historical transition record are maintained in `docs/implementation/governance/repository-governance-profile.json` and `MASTER-PROTECTION.md`; J00-GOV-28 and J05-VER-33 own the server-enforced/fallback semantics, exact-tip integration controls, and evidence requirements.
 
 ## 4.5 Qualified CI authority
 
-`GITHUB_ACTIONS` is the sole eligible authority for the mandatory `static-ci` result. Its selected workflow/job identity and exact-candidate evidence are machine-readable and auditable. GitLab is repository mirror-only and SHALL NOT qualify CI or release evidence. LocalCI may provide compatibility or security tooling only; no LocalCI result can satisfy the current mandatory CI authority gate.
+`GITHUB_ACTIONS` is the sole eligible authority for the mandatory `static-ci` result under J00-CODE-28 and J05-VER-06/J05-VER-33. Its selected workflow/job identity and exact-candidate evidence are machine-readable and auditable. GitLab is repository mirror-only and SHALL NOT qualify CI or release evidence. LocalCI may provide compatibility or security tooling only; no LocalCI result can satisfy the current mandatory CI authority gate.
 
 ---
 

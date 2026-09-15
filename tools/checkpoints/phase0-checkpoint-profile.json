@@ -104,6 +104,7 @@
     "docs/implementation/evidence/0.12-contract-reproducibility-and-drift.md",
     "docs/implementation/evidence/0.13-master-protection-blocker.md"
   ],
+  "forbiddenActivePathsRole": "REJECTION_FIXTURES_ONLY_NON_AUTHORITATIVE",
   "forbiddenActivePaths": [
     "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md",
     "docs/JARVIS-CONTRACT-MANIFEST-v1.0.3.md",

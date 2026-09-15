@@ -19,15 +19,16 @@ Repository governance SHALL follow `J00-GOV-28` and `J05-VER-33`. When the hosti
 Before implementation or architecture work, read:
 
 1. `README.md`
-2. `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`
-3. `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md`
-4. `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md`
-5. `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md`
-6. `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md`
-7. `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md`
-8. `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md`
-9. `docs/JARVIS-V1-RELEASE-PROFILE.md`
-10. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
+2. `docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md` (non-normative audit aid; never a source of authority)
+3. `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`
+4. `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md`
+5. `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md`
+6. `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md`
+7. `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md`
+8. `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md`
+9. `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md`
+10. `docs/JARVIS-V1-RELEASE-PROFILE.md`
+11. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
 
 The **v1.0.8 manifest defines the current component revision set**. The six components and Release Profile are the only normative product authority; no ADR/decision-record or historical overlay may supplement them.
 

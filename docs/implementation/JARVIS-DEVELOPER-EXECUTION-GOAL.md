@@ -133,6 +133,165 @@ The final report must include before-and-after counts for:
 - required tests retained;
 - evidence types retained.
 
+## Audit-derived correction baseline
+
+Before changing any file, read `AGENTS.md`, this goal, and `docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md`. The findings file is a non-normative audit aid. It records the manual review of every active normative component and the contract-control files, measured simplification, residual overlap, and required corrections. It must never be treated as a product or security authority.
+
+The previous consolidation candidate is not automatically approved. The next pass must begin from the findings rather than assuming that fewer filenames or a green local test profile proves simplification. The audited baseline is:
+
+- candidate `8d587ae6ac8f34d40bc03a0b205ea3e4dc647281`;
+- base/authoritative `master` at `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`;
+- manifest rows reduced from 15 to 7;
+- canonical acceptance commands reduced from 32 to 30;
+- directly comparable contract/profile text measured at 9,195 lines before and 9,870 lines after;
+- live GitHub `master` is currently server-protected, while the checked-in current governance profile still records the old `COMPENSATING_CONTROLS` state.
+
+The stale current governance profile is a required correction, not an optional documentation cleanup. Do not declare the consolidation complete while current governance facts contradict the authenticated repository state.
+
+## Explicit task boundary
+
+This goal authorizes only contract-document, contract-manifest, contract-derived-output, contract-validation, acceptance-definition, and truthful governance/evidence-record maintenance required by the findings. It does not authorize:
+
+- application runtime, UI, Core, provider, integration, voice, storage, backup, IPC, process, or platform implementation;
+- application behavior changes or contract-behavior implementation;
+- implementation-matrix status, pointer, score, evidence, or section advancement;
+- Section 1.3, Section 1.4, or any later implementation work;
+- new implementation branches/worktrees, publication, merge, rebase, or integration;
+- an auditor-thread report or handoff;
+- treating local tests, LocalCI, GitLab, documentation, or a producer statement as release authority.
+
+All work and generated files for this task must remain inside `G:\Jarvis Project`. Preserve unrelated user work, `.codex-worktrees\`, generated Tauri artifacts, and untracked files. Do not delete outside `G:`.
+
+## Ordered execution checkpoints
+
+### Checkpoint 0 — Freeze and revalidate
+
+1. Read `AGENTS.md`, the findings file, this goal, the active manifest, J00, J01, J02, J03, J04, J05, the Release Profile, the Implementation Plan, and the Matrix.
+2. Record branch, exact `HEAD`, live `origin/master`, merge base, tracked/untracked state, and changed-file scope.
+3. Confirm that the only active task is contract consolidation and that the matrix will not advance.
+4. Do not pull, publish, merge, rebase, delete user files, or edit application source.
+
+### Checkpoint 1 — Establish the requirement ownership map
+
+Create or maintain a reviewable mapping from every current and migrated requirement to one primary normative owner:
+
+- J00 owns scope, repository, package, coding, branch, and CI-authority rules.
+- J01 owns runtime/platform roles, protocol types, capability boundaries, IPC, and runtime semantics.
+- J02 owns authoritative data/state, transactions, migrations, fixed backup format, and recovery.
+- J03 owns security, PermissionEngine, project-policy trust, secrets, TUF/update trust, and security invariants.
+- J04 owns operations, integrations, lifecycle, voice, UI identity, design tokens, and accessibility.
+- J05 owns tests, evidence, qualification, release gates, and Production Complete.
+- The Release Profile owns V1 support scope, artifact boundary, and V1-specific inclusion/exclusion.
+- The manifest owns active component identity and revision only.
+
+For every duplicated clause, classify it as canonical, profile-specific, verification-specific, a concise pointer, or unjustified duplication. Do not remove a clause until its complete conditions and proof are mapped to the retained owner.
+
+### Checkpoint 2 — Correct current governance truth
+
+Update only current operational governance records, not historical facts:
+
+- `docs/implementation/governance/repository-governance-profile.json`: record the authenticated live GitHub repository visibility, default branch, server-enforced protection, required `static-ci`, review, force-push, deletion, administrator, and conversation-resolution settings. Separate current evidence from historical capability baselines.
+- `docs/implementation/governance/MASTER-PROTECTION.md`: make the current section agree with the machine-readable profile and live GitHub facts. Keep old compensating-control observations only under an unmistakable historical transition heading.
+- `docs/implementation/evidence/0.13-master-protection-blocker.md` and `0.CP-phase0-checkpoint.md`: preserve factual historical results, but ensure they cannot be read as current qualification.
+- `tools/ci/check-repository-governance.mjs` and related tests: fail closed on stale or internally contradictory current profile fields without treating ordinary local execution as GitHub authority.
+
+Do not invent a live fact. Record the observation source and timestamp. Do not claim current candidate qualification merely because an older run passed.
+
+### Checkpoint 3 — Consolidate active contract wording
+
+Review every line of these files against the findings record:
+
+- `G:\Jarvis Project\docs\JARVIS-CONTRACT-MANIFEST-v1.0.8.md`
+- `G:\Jarvis Project\docs\implementation\JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md`
+- `G:\Jarvis Project\docs\implementation\JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md`
+- `G:\Jarvis Project\docs\implementation\JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md`
+- `G:\Jarvis Project\docs\implementation\JARVIS-03-SECURITY-TRUST-CONTRACT.md`
+- `G:\Jarvis Project\docs\implementation\JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md`
+- `G:\Jarvis Project\docs\implementation\JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md`
+- `G:\Jarvis Project\docs\JARVIS-V1-RELEASE-PROFILE.md`
+
+For each file, report an explicit edit or no-change decision. Use cross-references to eliminate duplicate normative definitions, not to hide requirements. Preserve exact values, thresholds, state transitions, security boundaries, failure behavior, recovery behavior, and qualification conditions.
+
+### Checkpoint 4 — Retired-source migration and complete prohibition
+
+1. Compare the active suite with every retired contract, manifest, lineage, decision, archive, and history category listed in the findings file.
+2. Maintain a requirement-preservation crosswalk. A deleted filename is not evidence that its valid requirements were migrated.
+3. No prohibited historical source may remain in the tracked tree or be required to understand current behavior.
+4. The findings file and rejection-test fixtures may name prohibited paths only because they are explicitly non-authoritative enforcement/audit material and are covered by the narrow validator exemption.
+5. Do not create, retain, consult, or cite a prohibited historical source as current or historical authority.
+
+### Checkpoint 5 — Simplify acceptance by unique purpose
+
+Review J05, the Release Profile, `.github/workflows/static-ci.yml`, `.localci/ci.sh`, `tools/ci/localci-gate-manifest.mjs`, evidence generation, and related tests.
+
+For each retained gate, record:
+
+- the single contract clause it proves;
+- the canonical command/test;
+- the output/evidence identity;
+- whether it is local preflight, authoritative GitHub Actions, live platform, integration, security/adversarial, recovery/fault, static, or independent evidence;
+- whether a similar-looking gate protects a different trust boundary;
+- why it remains after simplification.
+
+Remove a gate or wrapper only when the same or stronger proof remains, the trust boundary is unchanged, evidence remains attributable, and execution/maintenance cost is actually reduced. Retain all security-negative, adversarial, failure, recovery, cancellation, timeout, stale-state, exact repository/ref/SHA, platform-native, provenance, signing, and release gates.
+
+Do not add a second command manifest. Keep the one canonical 30-command sequence and improve its traceability with the smallest understandable metadata or catalog needed.
+
+### Checkpoint 6 — Align validators, tests, and generated outputs
+
+File-by-file scope:
+
+- `tools/contract/manifest.mjs`: keep tracked path/name/reference rejection fail-closed; exempt only the exact non-authoritative findings path and test that ordinary tracked files still fail.
+- `tools/contract/check-drift.mjs` and `tools/contract/lib.mjs`: preserve deterministic manifest/derived-value checks; remove no security or schema condition.
+- `tools/ci/localci-gate-manifest.mjs`: retain exact order, membership, arguments, terminal evidence, command-mutation rejection, and non-authoritative exit behavior.
+- `tools/ci/generate-evidence.mjs`: preserve strict identity, timestamp, repository/ref/SHA, runner, artifact, and direct-array validation.
+- `tools/checkpoints/phase0-checkpoint.mjs` and profile: keep status/authority/evidence consistency and distinguish current from historical governance.
+- `tests/layers/unit/contract-drift.test.mjs`, `localci-compatibility.test.mjs`, governance, Phase 0, static-CI, provenance, security, and architecture tests: extend existing tests only where a changed rule needs proof; do not create a redundant framework.
+- generated contract/schema/config outputs: regenerate from canonical sources; never hand-edit generated files.
+
+### Checkpoint 7 — Local-first verification
+
+Run relevant targeted checks first, then the normal local profile, then applicable contract, schema, generated-output, governance, security, provenance, architecture, format, typecheck, build, and platform checks. Fix every failure and rerun until clean. Distinguish local evidence from authoritative evidence.
+
+Do not consume GitHub Actions resources before the local preflight is clean. GitHub Actions may be used only after local success and only when publication is separately authorized. GitLab remains mirror-only; LocalCI remains non-authoritative.
+
+### Checkpoint 8 — Final independent self-check before reporting
+
+Before reporting completion, compare the resulting tree against all of the following:
+
+- this goal;
+- the full active manifest and all six active contract components;
+- the Release Profile;
+- `AGENTS.md`;
+- the persistent findings file;
+- the requirement-ownership map;
+- the gate catalog;
+- the no-application-implementation boundary;
+- the exact changed-file list and repository state.
+
+Fix every issue found. Do not classify an unresolved issue as complete merely because tests pass. Ship only when no issue remains. If an issue remains, report `NOT COMPLETE` with the exact file, clause, evidence gap, and next correction.
+
+## Required final report
+
+Report to the main thread only. Include:
+
+- exact candidate SHA, branch, base/master SHA, and repository state;
+- every changed, deleted, and renamed file;
+- findings-file and `AGENTS.md` updates;
+- active contract structure before/after;
+- line-count, manifest-row, gate-count, and duplicate-check measurements, clearly marked verified or reported;
+- the requirement-ownership and retired-source preservation result;
+- current governance facts and historical-evidence separation;
+- security, feature, failure, recovery, and enterprise-control preservation results;
+- local-first commands/results and exact order;
+- GitHub Actions evidence only if publication was separately authorized, and exact candidate identity if so;
+- GitLab mirror result only if the same GitHub publication was authorized and completed;
+- generated-artifact and drift results;
+- explicit confirmation that application sources and matrix progression were not touched;
+- untracked user work and generated artifacts preserved;
+- every remaining limitation;
+- final `COMPLETE` only when the acceptance rule is satisfied with no unresolved issue.
+
 Do not claim simplification based only on fewer filenames. The acceptance workflow itself must become clearer and cheaper to execute.
 
 ## Local-first verification workflow

@@ -10,7 +10,7 @@ Windows is the V1 production full-host platform. The architecture deliberately p
 
 Temporary feature/review branches MAY exist while work is in progress, but they SHALL start from the current live `master` and SHALL NOT become parallel implementation sources of truth. After accepted work is incorporated into `master`, the temporary branch is historical/disposable and must not be used as the base for new work.
 
-Before Phase 0 implementation is considered complete, repository governance must be qualified against the actual hosting capability. If server-side branch protection/rulesets are available, `master` must use them to block force pushes/deletion and require designated CI with narrowly controlled/auditable bypass. If the hosting plan/platform does not expose that capability, v1.0.8 permits the explicit `COMPENSATING_CONTROLS` mode: temporary implementation branches, exact GitHub Actions candidate CI, immediate live-`master` tip revalidation, non-force integration, post-integration tip/diff/evidence verification, and truthful recording that `master` is not server-protected. GitHub Actions is the mandatory CI authority; GitLab is a repository mirror only, and LocalCI cannot substitute for CI or release qualification. The fallback does not claim hard prevention of an out-of-band administrator force push/deletion and expires when server protection becomes available.
+Before Phase 0 implementation is considered complete, repository governance must be qualified against the actual hosting capability. J00-GOV-28 and J05-VER-33 define the server-enforced and verified-unavailable fallback modes, exact-tip/non-force integration controls, and evidence boundary. The current observed mode and protection settings are recorded in [`repository-governance-profile.json`](docs/implementation/governance/repository-governance-profile.json) and [`MASTER-PROTECTION.md`](docs/implementation/governance/MASTER-PROTECTION.md). GitHub Actions is the mandatory CI authority; GitLab is a repository mirror only, and LocalCI cannot substitute for CI or release qualification.
 
 ## Current implementation source of truth
 
@@ -32,7 +32,7 @@ Read the normative suite in this order:
 
 Canonical vector brand assets live under [`assets/brand/`](assets/brand/).
 
-Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. No ADR/decision record or historical document supplements, is cited by, or is consulted as authority for the active suite.
+Root [`AGENTS.md`](AGENTS.md) gives contributor instructions. The [acceptance gate catalog](docs/implementation/CONTRACT-ACCEPTANCE-GATE-CATALOG.md) is a non-normative review aid; the executable gate order remains in the canonical LocalCI manifest. No historical document supplements, is cited by, or is consulted as authority for the active suite.
 
 ## Platform/runtime model
 
@@ -62,7 +62,7 @@ manifest and six consolidated components. In particular:
 
 ## No overlay interpretation
 
-Historical documents do not supplement the active suite. If any non-current document appears to contain a missing requirement, treat that as a contract defect and restore the requirement directly into the active suite before implementation.
+Historical documents do not supplement the active suite. If any non-current document appears to contain a missing requirement, treat that as a contract defect and restore the requirement directly into the active suite before implementation, as required by MAN-03/MAN-07 and J00-GOV-29.
 
 ## Governing principles
 

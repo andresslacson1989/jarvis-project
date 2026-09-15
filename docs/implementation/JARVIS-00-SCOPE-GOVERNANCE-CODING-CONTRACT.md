@@ -438,23 +438,9 @@ One durable `RESUMING` TaskState is canonical. Unknown persisted states fail clo
 
 ## J00-CODE-09 — PERMISSIONENGINE CODE
 
-PermissionEngine SHALL implement J03-SEC-13's exact ordered precedence as deterministic policy code.
+PermissionEngine SHALL implement the exact ordered precedence owned by J03-SEC-13 as deterministic policy code. UI, tool, provider, and platform adapters SHALL call that implementation rather than duplicate or reinterpret its rules.
 
-Rules MUST NOT be duplicated in UI/tool/provider/platform adapters.
-
-Tests SHALL prove:
-
-- hard invariants dominate;
-- explicit DENY dominates grants;
-- current instruction and standing permission are distinguished;
-- precedent never independently authorizes HIGH/CRITICAL;
-- HIGH direct-instruction/standing-permission cases obey policy;
-- CRITICAL/destructive always requires final confirmation;
-- provider setup/elevation/platform state cannot be bypassed by AI/tool policy;
-- platform capability availability is not authorization;
-- AI confidence has no authorization effect.
-
-Policy decisions persist stable reason codes/version references rather than only human prose.
+The J03-SEC-13 negative cases remain mandatory: hard invariants and explicit DENY precedence; separation of current instructions, standing permission, and precedent; HIGH/CRITICAL authorization limits; final confirmation for destructive actions; and rejection of provider setup/elevation, platform availability, or AI confidence as authorization. Tests SHALL prove those cases and policy decisions SHALL persist stable reason-code/version references rather than only human prose.
 
 ---
 
@@ -549,30 +535,9 @@ Changes to KDF profiles/verifiers/key slots, money precision, DataSensitivity/Da
 
 ## J00-CODE-15 — KDF / PASSWORD CODE
 
-JARVIS SHALL have one validated implementation path for production KDF profiles.
+JARVIS SHALL have one validated implementation path for production KDF profiles. The exact Argon2id profile, salt/parameter floor, profile distinction, verifier/key-slot persistence, re-hash/re-wrap rules, comparison/zeroization requirements, and test-only restrictions are owned by J03-SEC-04 and J02-DATA-05 and SHALL be consumed without reinterpretation.
 
-Production profiles use Argon2id version `0x13` with at least:
-
-```text
-memoryKiB >= 65536
-iterations >= 3
-parallelism = 4
-saltBytes >= 16
-outputBytes >= 32
-```
-
-Code SHALL:
-
-- use a maintained reviewed Argon2id implementation rather than custom cryptography;
-- generate salts from the OS CSPRNG through an appropriate qualified runtime/backend;
-- store exact versioned parameters with the verifier/key slot;
-- reject under-floor production profiles;
-- bound accepted parameter values to avoid attacker-controlled resource exhaustion;
-- distinguish `SESSION_PASSWORD` and `PORTABLE_RECOVERY` profiles;
-- allow controlled re-hash/re-wrap after successful use under an older still-supported profile;
-- use constant-time comparison and memory-zeroization facilities where the selected library/runtime reliably provides them.
-
-Test-only reduced parameters SHALL be impossible to activate in a production release/configuration.
+Code SHALL use a maintained reviewed implementation, qualified CSPRNG/backend, bounded accepted parameters, and fail closed on under-floor or malformed production metadata. Test-only reduced parameters SHALL be impossible to activate in a production release/configuration.
 
 ---
 
@@ -600,21 +565,9 @@ Where possible, execution also uses expected file identity/hash/version to fail 
 
 ## J00-CODE-17 — CREDENTIAL / SECRET CODE
 
-Core domain types use opaque credential handles/capabilities, not broad `token: string` fields.
+Credential and secret code SHALL implement the opaque-handle, broker, storage, environment-allowlist, and provider-setup boundaries owned by J03-SEC-06, J03-SEC-07, J03-SEC-23, J03-SEC-24, and the applicable J02 state rules. Core types SHALL not expose broad raw-token fields, resolve credentials directly, or depend on DPAPI.
 
-Only trusted credential/integration adapters resolve handles.
-
-Core depends on a semantic PlatformSecureStorage/Credential Broker boundary, not DPAPI directly.
-
-Windows V1 uses the qualified Windows secure-storage implementation. Future Linux secure storage must be separately qualified and does not justify moving secrets into portable Core state.
-
-Secret wrappers SHOULD avoid ordinary debug/string serialization where language/library supports safer types.
-
-Child environments are constructed from allowlists, not cloned wholesale and redacted afterward.
-
-`WORKSPACE_ENGINEERING` receives no unrelated integration secrets by default.
-
-Provider-owned sandbox-user credentials created by provider setup are not normal JARVIS integration secrets and SHALL NOT be copied into Core/config/logs.
+Windows V1 uses the qualified Windows secure-storage path; future Linux storage is separately qualified and does not move secrets into portable Core state. Secret wrappers avoid ordinary serialization, `WORKSPACE_ENGINEERING` receives no unrelated integration secrets, and provider-owned setup credentials never enter Core/config/logs.
 
 ---
 
@@ -622,7 +575,7 @@ Provider-owned sandbox-user credentials created by provider setup are not normal
 
 ## J00-CODE-18 — APPROVAL CANONICALIZATION CODE
 
-There is one implementation contract for `CanonicalActionDescriptorV1`.
+There is one implementation contract for `CanonicalActionDescriptorV1`, whose exact fields, canonicalization, digest, approval binding, and rejection vectors are owned by J01-PROTO-18, J01-PROTO-25, and J03-SEC-17.
 
 Focused modules expose typed operations equivalent to:
 
@@ -661,33 +614,9 @@ A mismatch maps to typed `PRECONDITION`/`CONFLICT`, triggers re-resolution, and 
 
 ## J00-CODE-20 — PROVIDER ADAPTER / SETUP / PLATFORM STANDARDS
 
-Each provider adapter:
+Provider discovery, compatibility/platform identity, setup/repair, health/auth state, normalized events/errors, capabilities/resources, cancellation, supervisor behavior, routing, and conformance are owned by J01-RT-14/J01-RT-16, J01-PROTO-19, J03-SEC-23, and J04-OPS-14. Adapters SHALL expose those typed semantics and shall not turn provider availability or setup elevation into authority.
 
-- discovers exact executable/distribution/runtime identity/version;
-- declares matching PlatformFamily/RuntimeRole compatibility;
-- implements setup state, compatibility policy, platform support, and health/auth state separately;
-- normalizes native events/errors/output;
-- advertises validated capabilities/locality/resources honestly;
-- defines cancellation/PlatformProcessSupervisor behavior;
-- excludes unsupported/unready/unqualified platform versions from normal routing;
-- passes common + provider/platform-specific conformance.
-
-For Codex Windows engineering:
-
-- use a qualified stable structured/non-interactive surface;
-- model setup states explicitly when setup is required;
-- validate the qualified distribution/setup-helper identity before asking the Rust host to invoke it;
-- expose a bounded typed setup/repair request rather than a generic command/path;
-- never run ordinary workers elevated because setup used UAC;
-- test actual sandbox write and network restrictions;
-- do not claim workspace-only read isolation unless proven;
-- record selected setup/sandbox/profile/platform behavior in qualification evidence;
-- invalidate readiness/conformance after relevant provider updates;
-- prevent provider-native shell/client availability from becoming JARVIS external authority.
-
-A future Linux Codex/provider implementation is a separate platform adapter/conformance target. Windows evidence cannot be reused as Linux sandbox/process evidence merely because provider protocol output is similar.
-
-Provider session resume logic remains adapter metadata; durability logic lives in Core.
+The Windows Codex qualification remains a separate native target: setup-helper identity, actual sandbox restrictions, no workspace-only isolation claim without proof, provider-update invalidation, and evidence identity are required. Future Linux evidence is not reusable for Windows or vice versa. Session-resume metadata stays in the adapter; durability stays in Core.
 
 ---
 
@@ -718,23 +647,7 @@ Split broad multi-purpose tools when broadness materially increases blast radius
 
 ## J00-CODE-22 — GITHUB ADAPTER STANDARDS
 
-GitHub code SHALL expose typed semantic operations mapped to the active Release Profile capability matrix.
-
-V1 mandatory capability types are:
-
-```text
-GITHUB_REPOSITORY_READ
-GITHUB_REF_READ
-GITHUB_REF_WRITE
-GITHUB_PULL_REQUEST_READ
-GITHUB_PULL_REQUEST_WRITE
-GITHUB_ISSUE_READ
-GITHUB_COMMENT_WRITE
-GITHUB_CHECKS_READ
-GITHUB_ACTIONS_READ
-```
-
-`GITHUB_ACTIONS_DISPATCH` is optional for V1. Generic repository administration, secret administration, branch-protection administration, membership administration, repository deletion, and ref deletion SHALL NOT be smuggled through these capabilities.
+GitHub code SHALL expose only the typed semantic operations and exact V1 capability set owned by RP-09.1, J01-PROTO-21, and J05-VER-24. Generic repository/secret/branch-protection/membership administration, repository deletion, and ref deletion SHALL NOT be smuggled through those capabilities; `GITHUB_ACTIONS_DISPATCH` remains optional for V1.
 
 `GITHUB_REF_WRITE` uses canonical repository/ref identity, allowed-target policy, and expected-ref/conditional mutation for create/update where applicable.
 
@@ -748,20 +661,7 @@ Remote GitHub semantic operations SHOULD remain platform-neutral; local Git/file
 
 ## J00-CODE-23 — PROXMOX ADAPTER STANDARDS
 
-Proxmox code SHALL expose typed semantic operations, never a generic arbitrary REST endpoint to AI.
-
-It SHALL:
-
-- use HTTPS REST API normal path;
-- obtain token through Credential Broker;
-- verify TLS/pin policy;
-- resolve connection/environment/node/guestType/vmid identity;
-- enforce active Release Profile capability matrix and node/vmid/pool scope;
-- track asynchronous task identifiers;
-- verify terminal state/postconditions;
-- map ambiguous writes to `UNCERTAIN`;
-- never silently fall back to SSH/`qm`/`pct`/`pvesh`/root/direct `/etc/pve`;
-- keep guest-shell connection separate.
+Proxmox code SHALL expose only the typed semantic operations, exact scope, TLS/credential boundary, asynchronous task/postcondition, and `UNCERTAIN` behavior owned by RP-09.2, J01-PROTO-21, J03-SEC-25, and J05-VER-25. It shall never expose a generic arbitrary REST endpoint to AI or silently fall back to SSH/`qm`/`pct`/`pvesh`/root/direct `/etc/pve`; guest-shell connection remains separate.
 
 Guest-create/config/backup implementations SHALL preserve the narrower semantics defined by the Release Profile and SHALL NOT use those capabilities as aliases for generic datastore/network/PBS administration.
 
@@ -773,19 +673,7 @@ Remote Proxmox API semantics SHOULD remain platform-neutral; platform support st
 
 ## J00-CODE-24 — MODULE CODE
 
-Module execution class is mandatory.
-
-`DATA_ONLY` parsers never eval/execute embedded script/native/WASM/shell content.
-
-`BUILT_IN_TRUSTED` is release-owned first-party code.
-
-`EXTERNAL_MANAGED` uses supervisor IPC and cannot import Core internals/database/secure-store implementation.
-
-Module manifests declare platform/runtime-role compatibility through the canonical protocol rather than a Windows-only compatibility field.
-
-Health checks are typed supervisor operations, not arbitrary executable strings or URLs.
-
-Module support requires authenticated release/catalog metadata and platform-specific conformance where native execution/dependencies differ.
+Module execution classes, manifest compatibility, supervisor/health operations, authenticated catalog metadata, and platform-specific conformance are owned by J01-PROTO-20, J03-SEC-26/J03-SUPPLY, and J05-VER-26. Code SHALL preserve the `DATA_ONLY`, `BUILT_IN_TRUSTED`, and `EXTERNAL_MANAGED` class boundaries, including no execution for data-only content and no Core-internal imports for externally managed modules.
 
 ---
 
@@ -793,33 +681,9 @@ Module support requires authenticated release/catalog metadata and platform-spec
 
 ## J00-CODE-25 — TAURI/REACT / DESIGN-SYSTEM CODE
 
-React is presentation/control, never authority.
+React is presentation/control, never authority. The Tauri/WebView security configuration and negative requirements are owned by J03-SEC-20 and J05-VER-12; the UI identity, design-token, brand-asset, typography, accessibility, state-language, adaptive-layout, and reusable-component requirements are owned by J04-UI-03–J04-UI-28 and J05-VER-11/J05-VER-35.
 
-Production Tauri configuration is code-reviewed/security-tested:
-
-- explicit capability files/allowlists;
-- no privileged remote origins;
-- restrictive CSP;
-- no remote executable script/CDN by default;
-- navigation restrictions;
-- external link handling outside privileged WebView;
-- sanitized inert untrusted HTML/Markdown;
-- production devtools policy;
-- pinned/qualified Tauri/runtime versions.
-
-CI SHOULD statically inspect Tauri config/capability files for prohibited wildcard/remote-origin privilege where practical.
-
-UI handles stale-version/conflict/degraded/recovery/platform-unavailable states explicitly and never reimplements PermissionEngine to improve UX.
-
-Production UI SHALL:
-
-- consume centralized design tokens/components rather than screen-local/platform-local theme systems;
-- consume canonical brand source assets from `assets/brand/` rather than recreate the logo;
-- derive raster/platform icon variants from canonical vector sources;
-- keep primary font available locally/offline;
-- retain source/license/provenance for packaged fonts, icon libraries, and third-party visual assets;
-- support keyboard/semantic accessibility, reduced motion, forced-colors/high-contrast adaptation where applicable, and qualified reflow/scaling rules;
-- keep core Mission Control component semantics reusable for future Linux/companion presentation unless a concrete platform UX difference requires an adapter/component specialization.
+This code boundary SHALL consume those canonical capabilities and components, handle stale/conflict/degraded/recovery/platform-unavailable states, and never reimplement PermissionEngine to improve UX. Platform-native window authority remains behind PlatformWindowController.
 
 Platform-native window behavior remains behind PlatformWindowController; React SHALL NOT own native platform presentation authority.
 
@@ -829,27 +693,7 @@ Platform-native window behavior remains behind PlatformWindowController; React S
 
 ## J00-CODE-26 — BACKUP / RECOVERY CODE
 
-Backup implementation SHALL use J02-DATA-27's exact hierarchy:
-
-```text
-live DB_DEK (local runtime only)
-SQLite-safe snapshot
-fresh SnapshotDBKey for snapshot
-fresh per-backup BackupDEK for outer package
-platform-local and/or portable Argon2id key slots for BackupDEK
-```
-
-On Windows V1 the local slot uses the qualified Windows DPAPI/secure-store path.
-
-No plaintext snapshot key sidecar.
-
-Portable key slots SHALL carry validated versioned KDF profile metadata and meet the production floor when created. Their cryptographic recovery path SHALL NOT require the historical platform-local secure-store key.
-
-Portable Windows restore must work without old DPAPI/live DB_DEK, then re-key restored DB under fresh local DB_DEK.
-
-Cross-platform restore is not a current V1 guarantee.
-
-Backup package parser is bounded/versioned and authenticates before activating contents.
+Backup implementation SHALL use the exact hierarchy, key separation, fixed format, slot rules, restore order, bounded parser, and activation checks owned by J02-DATA-27 through J02-BACKUP-15 and the applicable J03 security clauses. Code SHALL preserve the Windows local secure-store slot, no plaintext snapshot-key sidecar, portable recovery without the historical local key, and the absence of a V1 cross-platform-restore guarantee.
 
 ---
 
@@ -913,11 +757,7 @@ Security-sensitive packages should have strong meaningful branch coverage; targe
 
 Before Phase 0 completes, repository-governance mode SHALL follow the verified hosting provider/account capability.
 
-When server-side branch protection or repository rulesets are available, mandatory CI checks SHALL be attached to protected `master`; force pushes and branch deletion are prohibited and bypass SHALL be narrow/auditable.
-
-If server-side protection/rulesets are unavailable because of a verified hosting plan/platform capability limitation, `COMPENSATING_CONTROLS` MAY be used only with temporary implementation branches, mandatory CI on the exact candidate commit, immediate live `master` tip revalidation and stale-movement reconciliation, non-force integration, post-integration tip/diff/CI/audit verification, and truthful reporting that `master` is not server-protected.
-
-The fallback SHALL NOT weaken or waive mandatory CI and SHALL end when effective server-side protection becomes available.
+The current mode, exact server-side protection facts, fallback transition record, local-first sequence, live `master` tip validation, and non-force integration controls are owned by J00-GOV-28/J05-VER-33 and the current governance profile/operational aid. This coding contract retains both the `SERVER_ENFORCED` and `COMPENSATING_CONTROLS` modes without treating them as equal: GitHub Actions is mandatory CI, GitLab is mirror-only, LocalCI is non-authoritative, exact candidate identity is required, and no local result substitutes for GitHub qualification.
 
 ---
 
