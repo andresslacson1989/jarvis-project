@@ -1,12 +1,12 @@
 # Authoritative `master` Repository Governance
 
-**Contract suite:** JARVIS v1.0.7
-**Governing requirements:** J00-GOV-28, J05-VER-33, RP-17
+**Contract suite:** JARVIS v1.0.8
+**Governing clauses:** J00-GOV-28; J05-VER-33
 **Authoritative branch:** `master`  
 **Mandatory CI pipeline:** `static-ci`
-**Selected CI authority:** `GITHUB_ACTIONS` (QUALIFIED; exact candidate run `33934840029` passed)
+**Selected CI authority:** `GITHUB_ACTIONS` (capability baseline; exact v1.0.8 candidate run not recorded)
 
-This document is an operational implementation aid for the repository-governance requirements in the active top-level contract §28, Verification Contract §33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
+This document is an operational implementation aid for the repository-governance requirements in J00-GOV-28, J05-VER-33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
 ## Current effective mode
 
@@ -16,114 +16,80 @@ The current repository governance mode is:
 SERVER_ENFORCED
 ```
 
-On `2026-09-12T22:26:31Z`, authenticated GitHub API observations established that:
+The live authenticated GitHub observation records a public repository with active server-side protection on the authoritative `master` branch. The current protection requires the strict `static-ci` status check, one approving pull-request review, administrator enforcement, force pushes are blocked, branch deletions are blocked, and required conversation resolution. The current observation identity is:
 
 ```text
+source: AUTHENTICATED_GITHUB_API
+observedAt: 2026-09-15T01:49:15Z
 repository: andresslacson1989/jarvis-project
-visibility: public
-authoritative branch: master
-master SHA: bb59c13d99c8b472de0dbe08b8f5ce59cf50e705
-rulesets endpoint: HTTP 200, 0 rulesets
-branch-protection before configuration: HTTP 404, protected=false
-branch-protection update: HTTP 200
-branch-protection after configuration: HTTP 200, protected=true
+repositoryId: 1330469646
+ref: refs/heads/master
+evidenceIdentity: github-api:repo-1330469646:refs/heads/master:protection:static-ci:app-15368
 ```
 
-The active machine-readable profile is:
+The checked-in profile is:
 
 `docs/implementation/governance/repository-governance-profile.json`
 
-The profile records classic GitHub branch protection as available and active. The old private-repository HTTP `403` and its “Upgrade to GitHub Pro or make this repository public” message are retained only in historical evidence; they are not current capability evidence.
+Its current residual-risk value is:
 
-## Effective server-enforced policy
-
-The post-configuration branch-protection response recorded:
 
 ```text
-required status check: static-ci
-required status checks strict/up-to-date: true
-required pull-request approvals: 1
-dismiss stale reviews: true
-required conversation resolution: true
-administrators covered: true
-force pushes allowed: false
-branch deletion allowed: false
-configured bypass restrictions: none
+SERVER_ENFORCED_PROTECTION_ACTIVE
 ```
 
-The effective API response also reported `restrictions: null`, `allow_force_pushes.enabled=false`, `allow_deletions.enabled=false`, `enforce_admins=true`, and `required_status_checks.checks=[{context:"static-ci",app_id:15368}]`. No broad bypass actor is configured in the returned policy. The repository remains truthful about the distinction between server-enforced branch controls and the separate authority to administer those controls.
+The current v1.0.8 candidate has no exact GitHub Actions run recorded under its immutable candidate SHA. `EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED` remains the truthful candidate-evidence state; this operational profile does not promote local checks or historical runs into current CI qualification.
 
-## Required integration discipline
+GitHub Actions remains the sole CI authority. GitLab is repository mirror-only and LocalCI is non-authoritative compatibility/security tooling. Local preflight is required before publication or candidate qualification, but ordinary local execution is not GitHub authority.
 
-Server enforcement does not waive the implementation workflow requirements. Normal implementation integration still SHALL:
+## Safe integration procedure
 
-1. use a temporary implementation branch;
-2. require the complete `static-ci` pipeline for the exact candidate commit;
-3. re-fetch the live `master` tip immediately before integration;
-4. stop and reconcile if the authoritative tip moved unexpectedly;
-5. use a non-force integration/ref update only; and
-6. re-fetch the resulting authoritative tip and verify the intended diff plus relevant CI/audit evidence.
-
-The safe integration algorithm remains:
+The normal algorithm is:
 
 ```text
 fetch live master M0
 → verify candidate C is based on/reconciled with M0
+→ run the required local preflight
+→ publish only when publication is authorized
 → require qualified-authority static-ci success for exact C
 → fetch live master again as M1
 → if M1 != M0: abort/reconcile/reverify
-→ integrate C using non-force update / reviewed merge path
+→ integrate C using the reviewed non-force path
 → fetch resulting master M2
 → verify intended ancestry/diff and no unrelated overwrite
 → verify required CI/audit evidence for the resulting authoritative state
 → record evidence
 ```
 
-## Current CI and evidence identity
+A stale or moved `master` is a safe retry/reconciliation event, not permission to force-update the branch. A successful historical run cannot qualify a materially changed candidate.
 
-The selected authority remains GitHub Actions. GitHub Actions and LocalCI are equal alternatives only after authority-specific qualification; neither is required in addition to a complete qualified pass from the other. LocalCI remains unselected and unqualified.
+## Idempotency and retry behavior
 
-The profile retains the historical Phase 0 authority record for candidate `052902bfc52e676910d287e13fbf8a026915efe0` and authoritative-master verification `2cfcca9f2f7ee0faf334223b659e94ab410f5acd` / run `33950976184`; those identities remain referenced by the durable Phase 0 evidence set. The current live master observation above is separate and is not silently substituted into that historical qualification record.
+Governance checks are read-only and repeatable. Re-running them against the same profile/workflow produces the same result.
 
-The latest observed successful Static CI run for the current live `master` was run `34198981471` on exact SHA `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705` (push event, completed successfully). This observation records current branch state; it is not the Section 1.4 candidate qualification or its post-integration proof.
+An integration retry must start again from a freshly observed authoritative tip. An ambiguous or failed ref update must be reconciled from live GitHub state before another mutation is attempted.
 
-### Section 1.4 documentation-revision validation
+## Historical transition — non-current
 
-The documentation-only revision that corrected the Section 1.4 evidence record was independently validated before this governance reconciliation:
+The former checked-in profile recorded `COMPENSATING_CONTROLS` while the repository was private and GitHub server-side protection was unavailable under the then-observed hosting limitation. That mode, its HTTP `403` observation, compensating controls, and residual risk are retained only as historical transition data and historical evidence. They are not current governance facts and do not qualify the current v1.0.8 candidate.
 
-```text
-documentation SHA: 367a3bdf8b083084abe9002783ddf9a6a1579bf6
-GitHub Actions run: 34688940911
-windows-tauri-build job: 103540708316 — SUCCESS
-static-ci job: 103541583217 — SUCCESS
-Tauri artifact: 10296976203, sha256:626d75ae94e5de0911bdaf5145f9e4821d225e032307a9f4a30c2d92746ce9c1
-native artifact: 10296786503, sha256:92800513af3496f8baadf6d302ee04ec4c05d105355148d333c309edfa5d28ae
-```
+The historical records retain the prior controls and evidence, including temporary implementation branches, exact candidate CI, live-tip revalidation, non-force integration, post-integration verification, and the former residual risk `OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED`. The historical GitHub Actions run `33934840029` for candidate `052902bfc52e676910d287e13fbf8a026915efe0` remains capability-baseline evidence for the earlier suite only.
 
-The retained downloaded evidence and the repository verifier passed for both qualification scopes. This validation is intentionally separate from the implementation candidate `97a6fc19388f94cd82c65914fd48859b57557e75` and its run `34686091847`; it does not replace the implementation evidence or authorize integration.
+## Historical exception boundaries — non-current
 
-## Idempotency and recovery
+The former v1.0.8 fallback record did not permit:
 
-Governance observations are read-only and repeatable. An integration retry starts from a freshly observed authoritative tip. A prior CI result cannot be silently transferred to a materially changed candidate. An ambiguous or failed ref update must be reconciled from live GitHub state before another mutation is attempted.
+- claiming `master` is protected when GitHub reports it is not;
+- disabling an available server-side protection feature to remain in fallback mode;
+- weakening or skipping `static-ci`;
+- force-push implementation workflow;
+- broad/permanent bypass actors;
+- silently integrating over a moved authoritative tip;
+- treating local process conventions as equivalent technical branch protection;
+- making the repository public merely to satisfy this governance gate;
+- making a paid GitHub plan a hidden JARVIS product prerequisite.
 
-## Fallback rule — the v1.0.7 exception is not active
-
-The v1.0.7 `COMPENSATING_CONTROLS` exception remains defined for a genuinely unavailable hosting capability, but it is not the current mode. It SHALL NOT be selected while the effective server-side protection capability is available and active. If the hosting capability is later removed or becomes unavailable, a fresh observation and a new evidence revision are required before selecting the fallback; the fallback must again record its exact limitation, truthful unprotected state, residual risk, exact candidate CI, stale-tip reconciliation, non-force integration, and post-integration proof.
-
-## What governance does not permit
-
-The active governance profile does not permit:
-
-- claiming an unprotected branch is protected;
-- disabling or weakening the active `static-ci` requirement;
-- force-push implementation workflow or branch deletion;
-- broad or unrecorded bypass actors;
-- integrating over a moved authoritative tip;
-- treating LocalCI as qualified without its complete authority-specific evidence;
-- treating local tests as equivalent to authoritative GitHub Actions evidence; or
-- declaring Section 1.4, Section 1, or Production Complete from governance configuration alone.
-
-## Verification surfaces
+## Verification commands / evidence surfaces
 
 Repository-side verification includes:
 
@@ -133,4 +99,27 @@ pnpm contract:check
 pnpm test
 ```
 
-The exact selected workflow/job identity remains `.github/workflows/static-ci.yml` / `static-ci`. The active profile records the live server-enforced policy observation and preserves the separate exact-CI qualification identities without embedding a self-referential documentation commit hash.
+The authoritative CI pipeline identity remains exactly:
+
+```text
+static-ci
+```
+
+GitHub Actions is the sole selected CI authority. GitLab is repository mirror-only and LocalCI is non-authoritative compatibility/security tooling. The historical profile records the immutable `static-ci` workflow/job and historical GitHub Actions run `33934840029` for candidate `052902bfc52e676910d287e13fbf8a026915efe0`; that historical run does not qualify a later v1.0.8 consolidation commit. The Windows Tauri job `101220622635` and static job `101222623099` both completed successfully. The pull-request merge ref is metadata context only: checkout logs show the explicit candidate SHA was fetched and checked out, and the independent `git rev-parse HEAD` check matched it exactly. The generated Phase 0 evidence was `status=PASS` and included the complete named gate set. The earlier failed run `33818720345` remains historical negative evidence only.
+
+The documentation-only reconciliation revision `1f99f53c10ce0d406429f9888c763e27359260ee` is also retained as negative evidence: run `33936789279` failed in the static job `101228227719` with `PHASE0_CANDIDATE_MISMATCH`. Its cause was a machine-bound `implementationCandidateSha`/matrix binding added to documentation while CI supplied the current revision through `JARVIS_CANDIDATE_SHA`; no implementation bytes were changed. The corrective documentation revision `a077dfdacd80f7ef5ef48d64f5cc61cec4fae70d` removed that self-referential binding and passed consistency run `33938490684` (Windows `101231030877`, static `101232608613`).
+
+The earlier permitted non-force integration advanced `master` to
+`cae911e2bb88e046ae84828bc98a5b484da401d1`; run `33944300852` (Windows
+`101247490538`, static `101249233556`) remains historical and superseded.
+The current documentation/evidence revision advanced `master` non-force to
+`2cfcca9f2f7ee0faf334223b659e94ab410f5acd`. Immediate re-fetch confirmed the
+authoritative tip. Current post-integration run `33950976184` passed on exact
+`refs/heads/master` with Windows job `101265550867` and static job
+`101267451179`, completing at `2026-09-05T07:24:22Z`. It published no artifacts
+(`artifact_count=0`);
+offline Cosign/transparency-log verification is not claimed.
+
+LocalCI compatibility/security tooling may retain its own bounded operational controls, but its results are not CI or release evidence and are not consulted to qualify the active suite.
+
+Future Phase-0 evidence SHALL record the observed live `master` protection state, exact candidate/source commit, exact CI run when candidate qualification is authorized, selected governance mode, residual risk, and the post-integration verification result when authoritative integration occurs. The former hosting-limitation evidence belongs only to the historical transition record above.
