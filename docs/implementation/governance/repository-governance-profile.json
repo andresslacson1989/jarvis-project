@@ -1,56 +1,58 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 3,
   "governanceMode": "SERVER_ENFORCED",
   "provider": "GITHUB",
   "repository": "andresslacson1989/jarvis-project",
-  "repositoryVisibility": "PUBLIC",
   "authoritativeBranch": "master",
   "serverSideProtection": {
     "available": true,
     "active": true,
-    "requiredStatusChecks": {
-      "contexts": [
-        "static-ci"
-      ],
-      "strict": true
+    "mechanism": "CLASSIC_BRANCH_PROTECTION",
+    "observationSource": "AUTHENTICATED_GITHUB_API",
+    "observedAt": "2026-09-12T22:26:31Z",
+    "repositoryVisibility": "public",
+    "repositoryEndpointHttpStatus": 200,
+    "rulesetsEndpointHttpStatus": 200,
+    "rulesetCount": 0,
+    "branchProtectionEndpoint": "https://api.github.com/repos/andresslacson1989/jarvis-project/branches/master/protection",
+    "preConfigurationObservation": {
+      "branchProtectionHttpStatus": 404,
+      "masterProtected": false
     },
-    "requiredApprovingReviews": 1,
-    "enforceAdministrators": true,
-    "allowForcePushes": false,
-    "allowDeletions": false,
-    "requiredConversationResolution": true,
-    "restrictions": null,
-    "observation": {
-      "source": "AUTHENTICATED_GITHUB_API",
-      "observedAt": "2026-09-15T01:49:15Z",
-      "repository": "andresslacson1989/jarvis-project",
-      "repositoryId": 1330469646,
-      "repositoryVisibility": "public",
-      "defaultBranch": "master",
-      "protectedBranch": "master",
-      "ref": "refs/heads/master",
-      "endpoint": "GET https://api.github.com/repos/andresslacson1989/jarvis-project/branches/master/protection",
-      "evidenceIdentity": "github-api:repo-1330469646:refs/heads/master:protection:static-ci:app-15368",
-      "requiredStatusCheckAppId": 15368
-    }
+    "postConfigurationObservation": {
+      "branchProtectionHttpStatus": 200,
+      "masterProtected": true,
+      "masterSha": "bb59c13d99c8b472de0dbe08b8f5ce59cf50e705",
+      "requiredStatusCheckContexts": ["static-ci"],
+      "strictRequiredChecks": true,
+      "forcePushBlocked": true,
+      "deletionBlocked": true,
+      "administratorsCovered": true,
+      "bypassNarrowAndAuditable": true,
+      "requiredPullRequestApprovals": 1,
+      "dismissStaleReviews": true,
+      "requiredConversationResolution": true,
+      "restrictions": null
+    },
+    "forcePushBlocked": true,
+    "deletionBlocked": true,
+    "administratorsCovered": true,
+    "strictRequiredChecks": true,
+    "bypassNarrowAndAuditable": true
   },
   "mandatoryCi": {
     "pipelineIdentity": "static-ci",
     "eligibleAuthorityTypes": [
-      "GITHUB_ACTIONS"
+      "GITHUB_ACTIONS",
+      "LOCALCI"
     ],
     "selectedAuthority": {
       "type": "GITHUB_ACTIONS",
       "workflow": ".github/workflows/static-ci.yml",
       "job": "static-ci",
       "qualificationScope": "JARVIS_REPOSITORY_CI",
-      "qualificationStatus": "QUALIFIED_AUTHORITY_CAPABILITY_BASELINE",
-      "authorityCapabilityBaseline": {
-        "status": "QUALIFIED",
-        "contractSuiteVersion": "1.0.7",
-        "scope": "HISTORICAL_AUTHORITY_CAPABILITY_BASELINE",
-        "doesNotQualifyCurrentSuite": "1.0.8",
-        "lastObservedRun": {
+      "qualificationStatus": "QUALIFIED",
+      "lastObservedRun": {
         "runId": "33934840029",
         "runAttempt": "1",
         "candidateSha": "052902bfc52e676910d287e13fbf8a026915efe0",
@@ -72,16 +74,17 @@
           "arch": "X64"
         },
         "evidence": "PHASE_0_STATIC_CI status=PASS; exact checkout and git rev-parse HEAD matched candidateSha"
-        },
-        "evidenceRevisionValidation": {
+      },
+      "qualificationBlockers": [],
+      "evidenceRevisionValidation": {
         "commitSha": "a077dfdacd80f7ef5ef48d64f5cc61cec4fae70d",
         "runId": "33938490684",
         "status": "SUCCESS",
         "windowsJobId": "101231030877",
         "staticCiJobId": "101232608613",
         "purpose": "GOVERNANCE_EVIDENCE_REVISION_CONSISTENCY"
-        },
-        "authoritativeMasterVerification": {
+      },
+      "authoritativeMasterVerification": {
         "commitSha": "2cfcca9f2f7ee0faf334223b659e94ab410f5acd",
         "runId": "33950976184",
         "status": "SUCCESS",
@@ -90,14 +93,7 @@
         "staticCiJobId": "101267451179",
         "artifactCount": 0,
         "cosignTransparencyLogVerification": "NOT_CLAIMED_OFFLINE"
-        }
-      },
-      "currentCandidateEvidence": {
-        "contractSuiteVersion": "1.0.8",
-        "status": "NOT_RECORDED",
-        "reason": "EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED"
-      },
-      "qualificationBlockers": []
+      }
     },
     "commonRequirements": {
       "exactResolvedCommitRequired": "REQUIRED",
@@ -110,31 +106,25 @@
       "idempotentSubmission": "REQUIRED",
       "durableAuditableEvidence": "REQUIRED"
     },
-    "gitlabRole": "REPOSITORY_MIRROR_ONLY",
-    "localCiRole": "NON_AUTHORITATIVE_COMPATIBILITY_OR_SECURITY_TOOLING"
+    "localCiRequirements": {
+      "authenticatedTls": "REQUIRED",
+      "nonAdministratorApiClient": "REQUIRED",
+      "repositoryProfileRefAllowlist": "REQUIRED",
+      "serverSideRevisionResolution": "REQUIRED",
+      "rootlessJobIsolation": "REQUIRED",
+      "arbitraryExecutionSurfacesDenied": "REQUIRED",
+      "controlledUpgradeAndClock": "REQUIRED",
+      "evidenceRetentionExport": "REQUIRED",
+      "cancellationRecoveryTested": "REQUIRED"
+    }
   },
-  "residualRisk": "SERVER_ENFORCED_PROTECTION_ACTIVE",
-  "serverModeRequiredWhenAvailable": true,
-  "historicalTransition": {
-    "notCurrent": true,
-    "previousGovernanceMode": "COMPENSATING_CONTROLS",
-    "previousRepositoryVisibility": "PRIVATE",
-    "previousServerSideProtection": {
-      "available": false,
-      "active": false,
-      "reason": "HOSTING_PLAN_LIMITATION",
-      "observationSource": "USER_SUPPLIED_GITHUB_ADMIN_ATTEMPT",
-      "observedHttpStatus": 403,
-      "observedMessage": "Upgrade to GitHub Pro or make this repository public to enable this feature."
-    },
-    "previousControls": {
-      "temporaryImplementationBranches": true,
-      "candidateCiRequired": true,
-      "liveAuthoritativeTipRevalidation": true,
-      "reconcileUnexpectedMovement": true,
-      "nonForceIntegrationOnly": true,
-      "postIntegrationVerification": true
-    },
-    "previousResidualRisk": "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED"
-  }
+  "controls": {
+    "temporaryImplementationBranches": true,
+    "candidateCiRequired": true,
+    "liveAuthoritativeTipRevalidation": true,
+    "reconcileUnexpectedMovement": true,
+    "nonForceIntegrationOnly": true,
+    "postIntegrationVerification": true
+  },
+  "serverModeRequiredWhenAvailable": true
 }

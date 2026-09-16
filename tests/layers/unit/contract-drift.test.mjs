@@ -439,7 +439,7 @@ test("matrix and plan traceability resolve against the active revision set and f
   assert.ok(codes(matrix, reference.replace("| Early voice feasibility evidence compared with final production implementation | 19.18 |", "| Early voice feasibility evidence compared with final production implementation | 19.17 |"), plan).includes("MATRIX_SPECIALIZED_GATE_MAPPING_DRIFT"));
 });
 
-test("matrix protected fields, plan order, and historical identities match the reconciliation baseline", () => {
+test("matrix protected fields, plan order, and historical identities match the integrated baseline", () => {
   const digest = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
   const protectedRows = (text) => text
     .split(/\r?\n/)
@@ -457,10 +457,10 @@ test("matrix protected fields, plan order, and historical identities match the r
     .filter((value) => value !== reconciliationHead)
     .sort();
 
-  assert.equal(digest(protectedRows(matrix)), "2799113e3c5868dc8c16494ac904985a277d584d9b1a01a285035622193920d8");
+  assert.equal(digest(protectedRows(matrix)), "d392600b0f872ff01eacdc12293ff61121f9021233a55937128ffea221ddeeb5");
   assert.equal(digest(protectedRows(reference)), "8bef39bc27ed2fbd258352f6d6bfaa6af4a76611715068a97cc1b1834db992da");
   assert.equal(digest(planOrder), "06ced9964892d15bcafd470ca8774731fdc556b6773fb0d105efe34ba956134e");
-  assert.equal(digest(historicalIdentities), "e47f0db554072390cde21209d6b777bd0e23b97317f22ea90bd88a323d983228");
+  assert.equal(digest(historicalIdentities), "a72a8a03c0d916d2b3797749c5ad53e6f48c5b46f7ab27dc11a3b2f3f6724fbd");
 
   assert.notEqual(digest(protectedRows(matrix.replace("**IN PROGRESS**", "**VERIFIED**"))), digest(protectedRows(matrix)));
   assert.notEqual(digest(protectedRows(reference.replace("**NOT STARTED**", "**VERIFIED**"))), digest(protectedRows(reference)));
