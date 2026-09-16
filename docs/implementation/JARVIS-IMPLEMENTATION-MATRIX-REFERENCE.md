@@ -2,8 +2,10 @@
 
 **Document role:** Non-normative stable definition/dependency reference derived from the locked active contract suite. Current status and execution authority exist only in `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md`.
 **Contract suite:** JARVIS v1.0.8
+**Contract component revisions:** J00–J05 and Release Profile 1.0.9
 **Authoritative implementation sequence:** `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`  
-**Contract baseline reviewed before this matrix:** `master` at `5766978576a48165a7ec8013ed6a106b0b0ddd17`  
+**Reconciliation input:** `UNCOMMITTED WORKTREE` at HEAD `e07d0326dde59c0157d70669d97c3eba165b13d8`; this is not a candidate SHA or CI-qualified identity.
+**Original design-review baseline:** `master` at `5766978576a48165a7ec8013ed6a106b0b0ddd17`
 **Archived initial planning state:** application implementation had not started when this reference was first created. Status cells and the archived pointer below are historical planning context and SHALL NOT determine current execution state.
 **Current execution pointer:** see `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md` exclusively.
 
@@ -115,12 +117,12 @@ This table is a guard against backward dependencies and premature implementation
 |---|---|---|---|---:|---|---|
 | **SECTION 1 — Windows Tauri Host / Mission Control Foundation / Application-Owned Core** | **NOT STARTED** | 0.CP | `Phase 1`; checkpoint: Windows Desktop Trust + Mission Control Foundation Ready | — | — | — |
 | ↳ **1.1** Tauri 2 + React desktop workspace with bundled-local authoritative WebView | **NOT STARTED** | 0.CP | PLAN §3; J01-RT-02–J01-RT-05; RP-03; J04-UI-08 | — | — | — |
-| ↳ **1.2** Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security | **NOT STARTED** | 1.1 | PLAN §3; J01-RT-05; J01-RT-05; J03-SEC-20; J00-CODE-25; J05-VER-12 | — | — | — |
+| ↳ **1.2** Tauri capabilities, CSP, navigation, external-link, devtools, and inert-content security | **NOT STARTED** | 1.1 | PLAN §3; J01-RT-05; J03-SEC-20; J00-CODE-25; J05-VER-12 | — | — | — |
 | ↳ **1.3** Rust Windows platform host and deterministic Windows composition wiring | **NOT STARTED** | 1.1, 0.5 | PLAN §3; J01-PLAT-04, J01-RT-10; J01-PLAT-07–J01-PLAT-09; RP-03 | — | — | — |
 | ↳ **1.4** Single-instance ownership, production data-directory layout, and maintenance-lock foundation | **NOT STARTED** | 1.3 | J01-RT-04; J04-UI-09 | — | — | — |
-| ↳ **1.5** Application-owned Node/Core packaging, controlled environment, integrity states, and no PATH fallback | **NOT STARTED** | 1.3, 0.8 | PLAN §3; J01-RT-03; J01-RT-03, J01-RT-06; RP-03; J05-VER-13, J05-VER-32 | — | — | — |
+| ↳ **1.5** Application-owned Node/Core packaging, controlled environment, integrity states, and no PATH fallback | **NOT STARTED** | 1.3, 0.8 | PLAN §3; J01-RT-03, J01-RT-06; RP-03; J05-VER-13, J05-VER-32 | — | — | — |
 | ↳ **1.6** Shared Core bootstrap/service shell with typed UI↔Rust/Core boundary stubs | **NOT STARTED** | 1.5, 0.6 | PLAN §§3,22; J01-RT-10–J01-RT-11; J00-CODE-03, J00-CODE-07 | — | — | — |
-| ↳ **1.7** Initial PlatformProcessSupervisor Windows Job Object containment for Core startup | **NOT STARTED** | 1.5, 0.4 | PLAN §3; J01-RT-06, J01-RT-09; J01-RT-09 | — | — | — |
+| ↳ **1.7** Initial PlatformProcessSupervisor Windows Job Object containment for Core startup | **NOT STARTED** | 1.5, 0.4 | PLAN §3; J01-RT-06, J01-RT-09 | — | — | — |
 | ↳ **1.8** PlatformWindowController Windows backend, deterministic presentation states, multi-monitor recovery, and conservative no-focus-steal/privacy defaults before the later full NotificationPolicyEngine | **NOT STARTED** | 1.3, 0.4 | PLAN §3; J04-UI-09, J04-UI-24; J01-PLAT-18 | — | — | — |
 | ↳ **1.9** Initial PlatformSessionObserver and PlatformSystemInfo Windows backends | **NOT STARTED** | 1.3, 0.4 | PLAN §3; J01-PLAT-17, J01-PLAT-26–J01-PLAT-27; RP-03 | — | — | — |
 | ↳ **1.10** Initial PlatformPathsAndIdentity Windows application/data path backend | **NOT STARTED** | 1.3, 0.4 | PLAN §3; J01-PLAT-13; J00-CODE-16 | — | — | — |
@@ -155,7 +157,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **3.2** Owned DB connection factory: qualified local path, WAL, FULL synchronous, foreign keys, bounded busy/checkpoint diagnostics | **NOT STARTED** | 3.1, 1.10 | PLAN §5; J02-DATA-02, J02-DATA-26; J00-CODE-13; J05-VER-20 | — | — | — |
 | ↳ **3.3** Minimal proof schema/migration and transactional state+causative-event skeleton, including only recovery-compatible credential-handle/integration metadata needed by Phase-3 restore semantics | **NOT STARTED** | 3.2, 0.6 | PLAN §§5,22; J02-DATA-05–J02-DATA-08, J02-DATA-34; J00-CODE-13–J00-CODE-14 | — | — | — |
 | ↳ **3.4** PlatformSecureStorage Windows backend and random local DB_DEK lifecycle using opaque handles | **NOT STARTED** | 2.7, 3.2 | PLAN §5; J01-PLAT-14; J03-SEC-06–J03-SEC-07; J02-DATA-03; RP-04 | — | — | — |
-| ↳ **3.5** Production KDF profile schemas/Argon2id path, parameter bounds, OS-CSPRNG salts, and under-floor rejection | **NOT STARTED** | 3.3, 3.4 | PLAN §5; J03-SEC-04; J01-PROTO-06; J02-DATA-05; J03-SEC-04; J00-CODE-15; J05-VER-14 | — | — | — |
+| ↳ **3.5** Production KDF profile schemas/Argon2id path, parameter bounds, OS-CSPRNG salts, and under-floor rejection | **NOT STARTED** | 3.3, 3.4 | PLAN §5; J03-SEC-04; J01-PROTO-06; J02-DATA-05; J00-CODE-15; J05-VER-14 | — | — | — |
 | ↳ **3.6** Encrypted SQLCipher DB create/open, WAL crash/restart, transaction and corruption/integrity proof | **NOT STARTED** | 3.2–3.5 | PLAN §5 Required proof; J02-DATA-02, J02-DATA-26, J02-DATA-35; J05-VER-20 | — | — | — |
 | ↳ **3.7** Exact SQLCipher-safe snapshot/re-key/export mechanism under fresh SnapshotDBKey | **NOT STARTED** | 3.6 | PLAN §5; J02-BACKUP-04; RP-04; J05-VER-20–J05-VER-21 | — | — | — |
 | ↳ **3.8** JARVIS_BACKUP_V1 bounded descriptor/parser and RFC8785 descriptor digest | **NOT STARTED** | 3.5, 0.7 | J02-BACKUP-02, J02-BACKUP-05; PLAN §5; J00-CODE-26 | — | — | — |
@@ -181,8 +183,8 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **3A.3** Local STT/VAD/TTS identity, latency, device selection/reconnect, and offline behavior spike | **NOT STARTED** | 3A.2 | PLAN §5A Candidate scope; J04-OPS-19–J04-OPS-22 | — | — | — |
 | ↳ **3A.4** AEC exact TTS render reference, double-talk/barge-in, deterministic stop/mute/cancel spike | **NOT STARTED** | 3A.2, 3A.3 | PLAN §5A; J01-RT-26; RP-11; J05-VER-30 | — | — | — |
 | ↳ **3A.5** 16 GB/i7-13th/RTX-4060 resource-contention, acceleration, fallback, and Bluetooth limitation measurements | **NOT STARTED** | 3A.3, 3A.4 | PLAN §5A; RP-13; J05-VER-31 | — | — | — |
-| ↳ **3A.6** Versioned feasibility report with measured limitations and production-candidate viability decision | **NOT STARTED** | 3A.1–3A.5 | PLAN §5A Deliverable/Exit | — | — | — |
-| ↳ **3A.CP** SECTION CHECKPOINT — at least one stack is technically/package/licensing feasible without weakening mandatory privacy/security | **NOT STARTED** | 3A.1–3A.6 | PLAN §5A Exit; PLAN §26 checkpoint | — | — | — |
+| ↳ **3A.6** Versioned feasibility report with measured limitations and production-candidate viability decision | **NOT STARTED** | 3A.1–3A.5 | PLAN §5A Deliverable/Exit; RP-11; J05-VER-30–J05-VER-31 | — | — | — |
+| ↳ **3A.CP** SECTION CHECKPOINT — at least one stack is technically/package/licensing feasible without weakening mandatory privacy/security | **NOT STARTED** | 3A.1–3A.6 | PLAN §5A Exit; PLAN §26 checkpoint; RP-11; J05-VER-30–J05-VER-31 | — | — | — |
 
 ### SECTION 4 — Authoritative State / Events
 
@@ -198,7 +200,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **4.7** DataPolicy, exact MoneyAmount, provider quota/usage/budget-reservation persistence primitives | **NOT STARTED** | 4.1, 0.6 | PLAN §6; J02-DATA-04; J02-DATA-23–J02-DATA-24; J01-PROTO-04–J01-PROTO-05, J01-PROTO-22 | — | — | — |
 | ↳ **4.8** Worker checkpoints, artifacts, workspace/resource leases, and provider-resume metadata structures | **NOT STARTED** | 4.1 | PLAN §6; J02-DATA-16–J02-DATA-19; J01-PROTO-15 | — | — | — |
 | ↳ **4.9** Provider setup/qualification, module, integration, and Proxmox logical state hooks | **NOT STARTED** | 4.1 | PLAN §6; J02-DATA-22, J02-DATA-25; J01-PROTO-19–J01-PROTO-21 | — | — | — |
-| ↳ **4.10** Project-policy trust-record/snapshot state hooks | **NOT STARTED** | 4.1 | PLAN §6; J03-POLICY-02, J03-POLICY-04, J03-POLICY-07; MAN-04.2 | — | — | — |
+| ↳ **4.10** Project-policy trust-record/snapshot state hooks | **NOT STARTED** | 4.1 | PLAN §6; J03-POLICY-02, J03-POLICY-04, J03-POLICY-07 | — | — | — |
 | ↳ **4.11** TUF/update trusted-metadata, release-sequence/security-epoch, backup/update/recovery metadata hooks | **NOT STARTED** | 4.1 | PLAN §6; J03-SUPPLY-10, J03-SUPPLY-14–J03-SUPPLY-16; J02-DATA-06 | — | — | — |
 | ↳ **4.12** Versioned append-oriented domain-event model, correlation/causation, post-commit publication, dedup foundation | **NOT STARTED** | 4.1, 3.3 | PLAN §6; J02-DATA-07, J02-DATA-18; J01-PROTO-23 | — | — | — |
 | ↳ **4.13** Optimistic concurrency and repository transaction pattern: state + causative event/audit + invariant rows atomically | **NOT STARTED** | 4.3–4.12 | PLAN §6; J02-DATA-07–J02-DATA-08; J00-CODE-12–J00-CODE-13 | — | — | — |
@@ -212,16 +214,16 @@ This table is a guard against backward dependencies and premature implementation
 | Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
 |---|---|---|---|---:|---|---|
 | **SECTION 5 — Session Security / PermissionEngine / Approval** | **NOT STARTED** | 4.CP | `Phase 5`; checkpoint: Security/Permission Boundary Ready | — | — | — |
-| ↳ **5.1** Session password creation/unlock/lock state, progressive cooldown, and production KDF verifier | **NOT STARTED** | 4.CP, 3.5 | PLAN §7; J03-SEC-04; J03-SEC-04–J03-SEC-05; J05-VER-14 | — | — | — |
+| ↳ **5.1** Session password creation/unlock/lock state, progressive cooldown, and production KDF verifier | **NOT STARTED** | 4.CP, 3.5 | PLAN §7; J03-SEC-04–J03-SEC-05; J05-VER-14 | — | — | — |
 | ↳ **5.2** Versioned KDF rehash/upgrade and explicit recovery-factor password-reset/recovery workflow | **NOT STARTED** | 5.1, 3.15 | PLAN §7; J03-SEC-04; J02-DATA-33; J05-VER-14 | — | — | — |
 | ↳ **5.3** PlatformSessionObserver lock/sign-out/idle integration and locked UI/voice/notification data suppression | **NOT STARTED** | 5.1, 1.9 | PLAN §7; J03-SEC-05; J01-PLAT-17; J05-VER-14 | — | — | — |
 | ↳ **5.4** Credential Broker over PlatformSecureStorage with context-scoped opaque handles, rotate/revoke/delete lifecycle, and secret-exclusion guarantees | **NOT STARTED** | 3.4, 4.CP | PLAN §7; J03-SEC-06; J00-CODE-17 | — | — | — |
 | ↳ **5.5** DataSensitivity/DataLocality enforcement and deterministic audited declassification boundary | **NOT STARTED** | 4.7 | J02-DATA-04; J03-SEC-08; J01-PROTO-04 | — | — | — |
 | ↳ **5.6** Content-authority/prompt-injection source labeling and structured-AI-output validation foundation | **NOT STARTED** | 5.5, 0.6 | J03-SEC-09–J03-SEC-12; J05-VER-16 | — | — | — |
 | ↳ **5.7** AuthorityEnvelopeService immutable action/scope/system/data/budget containment semantics | **NOT STARTED** | 4.6, 4.4 | PLAN §7; J03-SEC-13; J02-DATA-13; J01-PROTO-12 | — | — | — |
-| ↳ **5.8** PermissionEngine exact deterministic precedence, risk classes, standing permissions, and precedent limits | **NOT STARTED** | 5.7, 5.1 | PLAN §7; J03-SEC-13; J03-SEC-13–J03-SEC-15; J00-CODE-09; J05-VER-15 | — | — | — |
-| ↳ **5.9** Pre-ALLOW gates for platform/setup/integrity/project-policy/supply-chain/locality/budget/resource/precondition facts | **NOT STARTED** | 5.8, 0.4 | J03-SEC-13 step 6; J03-SEC-13; PLAN §7 | — | — | — |
-| ↳ **5.10** CanonicalActionDescriptorV1 single shared builder, RFC8785/SHA-256/base64url Rust+TS golden vectors | **NOT STARTED** | 4.6, 0.6 | PLAN §7; J03-SEC-17; J01-PROTO-18, J01-PROTO-25; J03-SEC-17; J00-CODE-18; J05-VER-10 | — | — | — |
+| ↳ **5.8** PermissionEngine exact deterministic precedence, risk classes, standing permissions, and precedent limits | **NOT STARTED** | 5.7, 5.1 | PLAN §7; J03-SEC-13–J03-SEC-15; J00-CODE-09; J05-VER-15 | — | — | — |
+| ↳ **5.9** Pre-ALLOW gates for platform/setup/integrity/project-policy/supply-chain/locality/budget/resource/precondition facts | **NOT STARTED** | 5.8, 0.4 | J03-SEC-13 step 6; PLAN §7 | — | — | — |
+| ↳ **5.10** CanonicalActionDescriptorV1 single shared builder, RFC8785/SHA-256/base64url Rust+TS golden vectors | **NOT STARTED** | 4.6, 0.6 | PLAN §7; J03-SEC-17; J01-PROTO-18, J01-PROTO-25; J00-CODE-18; J05-VER-10 | — | — | — |
 | ↳ **5.11** ApprovalService issue/decision/expiry/cancel/single-use transactional consumption and replay protection | **NOT STARTED** | 5.8, 5.10, 4.13 | PLAN §7; J03-SEC-17; J02-DATA-14; J05-VER-08, J05-VER-15 | — | — | — |
 | ↳ **5.12** Fresh material target re-resolution and mandatory destructive final confirmation immediately before execution | **NOT STARTED** | 5.11 | J01-RT-18–J03-SEC-17; J03-SEC-16–J03-SEC-18; J04-OPS-23 | — | — | — |
 | ↳ **5.13** Session/approval/permission audit reason codes, adversarial scenarios, and same-user threat-limit wording | **NOT STARTED** | 5.1–5.12 | PLAN §7 Exit; J03-SEC-31–J03-SEC-34; J05-VER-14–J05-VER-16 | — | — | — |
@@ -235,7 +237,7 @@ This table is a guard against backward dependencies and premature implementation
 | **SECTION 6 — Projects / Scopes / Context / Memory / Project-Policy Trust** | **NOT STARTED** | 5.CP | `Phase 6`; checkpoint: Project Policy Trust Boundary Ready | — | — | — |
 | ↳ **6.1** ProjectRegistry aliases/environments/workspaces/worktrees and canonical project identity | **NOT STARTED** | 5.CP, 4.1 | PLAN §8; RP-06; J02-DATA-06 | — | — | — |
 | ↳ **6.2** Full Windows canonical path/security backend: traversal, reparse/junction/symlink, UNC/drive/root/case identity | **NOT STARTED** | 6.1, 1.10 | PLAN §8; J01-PLAT-13; J03-SEC-16; J00-CODE-16 | — | — | — |
-| ↳ **6.3** Execution-scope resolution/membership: PROJECT_WORKSPACE vs INTEGRATION/SYSTEM/GLOBAL with no fake filesystem authority | **NOT STARTED** | 6.1, 6.2, 4.4 | PLAN §8; J01-PROTO-11; J02-DATA-12; J01-PROTO-11 | — | — | — |
+| ↳ **6.3** Execution-scope resolution/membership: PROJECT_WORKSPACE vs INTEGRATION/SYSTEM/GLOBAL with no fake filesystem authority | **NOT STARTED** | 6.1, 6.2, 4.4 | PLAN §8; J01-PROTO-11; J02-DATA-12 | — | — | — |
 | ↳ **6.4** Project registration/open workflow, AGENTS.md candidate discovery without automatic trust, and PROJECT_POLICY_DECISION_REQUIRED before consequential mutation when undecided | **NOT STARTED** | 6.1, 6.2 | J03-POLICY-03, J03-POLICY-05; RP-06 | — | — | — |
 | ↳ **6.5** Canonical project-policy identity: project/path/scope/content hash + Git provenance | **NOT STARTED** | 6.4 | J03-POLICY-03–J03-POLICY-04 | — | — | — |
 | ↳ **6.6** Authenticated project-policy review/enroll/disable/revoke workflow and durable trust records | **NOT STARTED** | 6.5, 5.1, 4.10 | PLAN §8; J03-POLICY-04–J03-POLICY-06, J03-POLICY-13 | — | — | — |
@@ -248,7 +250,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **6.13** Conversation/history separation, retention semantics, and LOCAL_ONLY inheritance | **NOT STARTED** | 6.12, 4.15 | J02-DATA-20; J03-SEC-08 | — | — | — |
 | ↳ **6.14** Project/policy/context/memory UI and authoritative policy-path/hash/revision diagnostics | **NOT STARTED** | 6.6–6.13, 1.13 | J03-POLICY-14; J04-UI-08, J04-UI-15, J04-UI-25 | — | — | — |
 | ↳ **6.15** Project/path/policy/memory adversarial and conformance suite | **NOT STARTED** | 6.2–6.14 | PLAN §8 Exit; J03-POLICY-15; J05-VER-08, J05-VER-16, J05-VER-24 | — | — | — |
-| ↳ **6.CP** SECTION CHECKPOINT — exact scopes, canonical paths, memory/context, and project-policy trust boundary | **NOT STARTED** | 6.1–6.15 | PLAN §8 Exit; PLAN §26 checkpoint | — | — | — |
+| ↳ **6.CP** SECTION CHECKPOINT — exact scopes, canonical paths, memory/context, and project-policy trust boundary | **NOT STARTED** | 6.1–6.15 | PLAN §8 Exit; PLAN §26 checkpoint; J01-PROTO-11; J02-DATA-20; J03-SEC-16; J03-POLICY-15; J05-VER-16A | — | — | — |
 
 ### SECTION 7 — Codex Windows Provider Setup / Sandbox Qualification
 
@@ -266,7 +268,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **7.9** WORKSPACE_ENGINEERING profile: exact worktree, controlled env, no unrelated secrets, network denied by default | **NOT STARTED** | 7.3, 6.3, 6.10 | PLAN §9; J01-RT-13; J03-SEC-21 | — | — | — |
 | ↳ **7.10** Real Codex sandbox conformance: writes, network, honest read-access claim, ordinary-worker non-elevation | **NOT STARTED** | 7.6, 7.9 | PLAN §9 Mandatory proof; J03-SEC-21–J03-SEC-23; J05-VER-17 | — | — | — |
 | ↳ **7.11** Provider process containment, cancellation/timeouts/circuit breaker/crash/restart behavior | **NOT STARTED** | 7.3, 2.4–2.5 | PLAN §9; J01-RT-14, J01-RT-23; J05-VER-17, J05-VER-19 | — | — | — |
-| ↳ **7.12** Provider fallback/routing that cannot weaken setup/locality/permission/budget/platform support | **NOT STARTED** | 7.8, 7.11 | J01-RT-14; J03-SEC-23; J01-RT-14 | — | — | — |
+| ↳ **7.12** Provider fallback/routing that cannot weaken setup/locality/permission/budget/platform support | **NOT STARTED** | 7.8, 7.11 | J01-RT-14; J03-SEC-23 | — | — | — |
 | ↳ **7.13** Provider quota/usage provenance and support/qualification evidence references | **NOT STARTED** | 7.8, 4.7 | PLAN §9; J02-DATA-23; J01-PROTO-22 | — | — | — |
 | ↳ **7.14** Optional provider resume reference plus fresh-session reconstruction from JARVIS-owned state | **NOT STARTED** | 7.11, 4.8 | J01-RT-16; J02-DATA-17 | — | — | — |
 | ↳ **7.15** Immutable trusted project-policy snapshot injection as scoped context; raw candidates remain untrusted | **NOT STARTED** | 7.9, 6.10–6.11 | PLAN §9; J03-POLICY-07, J03-POLICY-12 | — | — | — |
@@ -284,13 +286,13 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **8.3** Permission/authority/locality/budget/resource/platform-capability admission hooks; hard monetary/resource policies activate only when their owning Section-11 services apply | **NOT STARTED** | 8.1, 5.8–5.12 | PLAN §10; J01-RT-18 | — | — | — |
 | ↳ **8.4** Idempotency, conditional mutation/CAS, conflict re-resolution, and UNCERTAIN semantics | **NOT STARTED** | 8.2, 8.3 | PLAN §10; J01-RT-18; J03-SEC-18; J00-CODE-19 | — | — | — |
 | ↳ **8.5** Tool cancellation, stable errors, postcondition truth, audit/domain events, secret-safe diagnostics | **NOT STARTED** | 8.1–8.4, 4.12 | PLAN §10; J00-CODE-10–J00-CODE-12, J00-CODE-21; J05-VER-18 | — | — | — |
-| ↳ **8.6** Typed project/system status tool | **NOT STARTED** | 8.1, 8.3 | PLAN §10 first tools | — | — | — |
+| ↳ **8.6** Typed project/system status tool | **NOT STARTED** | 8.1, 8.3 | PLAN §10 first tools; RP-06; J01-RT-18; J01-PROTO-16 | — | — | — |
 | ↳ **8.7** Controlled open application/project/file operations through platform boundaries | **NOT STARTED** | 8.1, 6.2 | PLAN §10 first tools; RP-06 | — | — | — |
 | ↳ **8.8** Narrow filesystem read/write tools with canonical path identity and expected-state protection | **NOT STARTED** | 8.2–8.5, 6.2 | PLAN §10; RP-06; J00-CODE-16 | — | — | — |
 | ↳ **8.9** Approved project test/build execution under PlatformProcessSupervisor and workspace scope | **NOT STARTED** | 8.3–8.5, 2.4 | PLAN §10; RP-06 | — | — | — |
 | ↳ **8.10** Local Git status/branch/diff/log read tooling foundation through platform process/path boundaries | **NOT STARTED** | 8.1–8.5, 6.1 | PLAN §10; RP-06 | — | — | — |
 | ↳ **8.11** Tool/schema/path/TOCTOU/idempotency/cancellation/postcondition/adversarial conformance suite | **NOT STARTED** | 8.1–8.10 | PLAN §10 Exit; J05-VER-18 | — | — | — |
-| ↳ **8.CP** SECTION CHECKPOINT — safe typed local tool runtime | **NOT STARTED** | 8.1–8.11 | PLAN §10 Exit; PLAN §26 checkpoint | — | — | — |
+| ↳ **8.CP** SECTION CHECKPOINT — safe typed local tool runtime | **NOT STARTED** | 8.1–8.11 | PLAN §10 Exit; PLAN §26 checkpoint; J01-RT-18; J05-VER-18 | — | — | — |
 
 ### SECTION 9 — Bounded Workers
 
@@ -298,7 +300,7 @@ This table is a guard against backward dependencies and premature implementation
 |---|---|---|---|---:|---|---|
 | **SECTION 9 — Bounded Workers** | **NOT STARTED** | 8.CP | `Phase 9`; checkpoint: Worker Runtime Ready | — | — | — |
 | ↳ **9.1** Worker roles, attempts, platform identity, and owning WorkerManager lifecycle | **NOT STARTED** | 8.CP, 4.3, 7.CP | PLAN §11; J01-RT-17; J01-PROTO-13 | — | — | — |
-| ↳ **9.2** Worker launch packet: exact scope/authority/DataPolicy/provider/tools/policy/resources/budget/acceptance | **NOT STARTED** | 9.1, 5.7, 6.10 | J01-RT-13; J01-RT-13 | — | — | — |
+| ↳ **9.2** Worker launch packet: exact scope/authority/DataPolicy/provider/tools/policy/resources/budget/acceptance | **NOT STARTED** | 9.1, 5.7, 6.10 | J01-RT-13 | — | — | — |
 | ↳ **9.3** Isolated engineering worktrees, workspace leases, and parallel-writer exclusion | **NOT STARTED** | 9.2, 6.1, 4.8 | PLAN §11; J01-RT-19 | — | — | — |
 | ↳ **9.4** Bounded iteration/time/resource ceilings plus pre-Phase11 budget-envelope ceilings and no-material-progress detection; no hard-money BudgetService support claim before Section 11 | **NOT STARTED** | 9.1, 7.13 | PLAN §11; J01-RT-17; J03-SEC-30 | — | — | — |
 | ↳ **9.5** Worker journals/checkpoints/artifacts/events with no private chain-of-thought | **NOT STARTED** | 9.1, 4.8, 4.12 | PLAN §11; J02-DATA-16–J02-DATA-17; J04-OPS-04 | — | — | — |
@@ -319,7 +321,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **10.2** Immutable graph versions, real dependency types, acyclicity and scope/data/authority validation | **NOT STARTED** | 10.1, 4.5 | PLAN §12; J02-DATA-15; J01-PROTO-14 | — | — | — |
 | ↳ **10.3** Task and mission acceptance policies with deterministic evidence-backed completion | **NOT STARTED** | 10.2, 9.7 | PLAN §12; J05-VER-03–J05-VER-05 | — | — | — |
 | ↳ **10.4** Validated dynamic replan with historical graph revisions and no worker direct mutation | **NOT STARTED** | 10.2–10.3 | PLAN §12; J01-RT-19 | — | — | — |
-| ↳ **10.5** Fan-out/reduce/verify/synthesize orchestration with bounded worker ownership | **NOT STARTED** | 10.3, 9.CP | PLAN §12 | — | — | — |
+| ↳ **10.5** Fan-out/reduce/verify/synthesize orchestration with bounded worker ownership | **NOT STARTED** | 10.3, 9.CP | PLAN §12; J01-RT-19; J04-OPS-05; J05-VER-04 | — | — | — |
 | ↳ **10.6** Artifact reuse/invalidation and prevention of stale/invalid output feeding active graph | **NOT STARTED** | 10.4, 4.8 | PLAN §12; J02-DATA-15 | — | — | — |
 | ↳ **10.7** Deterministic dependency/lease/provider-readiness scheduler foundation and fair queueing | **NOT STARTED** | 10.2, 9.3, 7.CP | PLAN §12; J01-RT-19 | — | — | — |
 | ↳ **10.8** Queue transparency and truthful blocked/unknown/no-fabricated-progress/ETA semantics | **NOT STARTED** | 10.7 | PLAN §12; J04-OPS-02–J04-OPS-05; J04-UI-13 | — | — | — |
@@ -367,7 +369,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **12.13** Crash-safe durable trusted-metadata state that survives ordinary cache cleanup | **NOT STARTED** | 12.9, 4.11 | J03-SUPPLY-14 | — | — | — |
 | ↳ **12.14** Module/support/trust lifecycle Mission Control states and trust incident diagnostics | **NOT STARTED** | 12.2–12.13, 1.13 | J04-OPS-15–J04-OPS-17; J03-SUPPLY-15; J04-UI-15 | — | — | — |
 | ↳ **12.15** TUF/module negative conformance: threshold, expiry, rotation, revocation, delegation, rollback/freeze/mix-match, cache/crash | **NOT STARTED** | 12.6–12.14 | PLAN §14 Exit; J03-SUPPLY-17; J05-VER-26 | — | — | — |
-| ↳ **12.CP** SECTION CHECKPOINT — credential/module/TUF catalog trust foundation | **NOT STARTED** | 12.1–12.15 | PLAN §14 Exit; PLAN §26 checkpoint | — | — | — |
+| ↳ **12.CP** SECTION CHECKPOINT — credential/module/TUF catalog trust foundation | **NOT STARTED** | 12.1–12.15 | PLAN §14 Exit; PLAN §26 checkpoint; J03-SUPPLY-17; J05-VER-26 | — | — | — |
 
 ### SECTION 13 — Local Git / GitHub Production Integration
 
@@ -434,7 +436,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **15.10** Mission Control voice-state components using canonical identity and continuity with text context | **NOT STARTED** | 15.7–15.9, 1.12 | PLAN §17; J04-UI-16 | — | — | — |
 | ↳ **15.11** Packaged/offline speech models/runtime/assets license/provenance closure | **NOT STARTED** | 15.4–15.6 | PLAN §17; J00-CODE-29 | — | — | — |
 | ↳ **15.12** Real-device production voice-foundation tests and comparison to Phase-3A assumptions | **NOT STARTED** | 15.1–15.11 | PLAN §17 Exit; J05-VER-30 | — | — | — |
-| ↳ **15.CP** SECTION CHECKPOINT — production voice foundation ready for full-duplex integration | **NOT STARTED** | 15.1–15.12 | PLAN §17 Exit | — | — | — |
+| ↳ **15.CP** SECTION CHECKPOINT — production voice foundation ready for full-duplex integration | **NOT STARTED** | 15.1–15.12 | PLAN §17 Exit; RP-11; J01-RT-26; J05-VER-30 | — | — | — |
 
 ### SECTION 16 — Full-Duplex Voice
 
@@ -448,14 +450,14 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **16.5** AEC/device failure safe half-duplex degradation without losing stop/privacy controls | **NOT STARTED** | 16.1–16.4 | PLAN §18; RP-11 | — | — | — |
 | ↳ **16.6** Voice approval maps to exactly one pending approval in unlocked session; UI confirmation remains available | **NOT STARTED** | 16.2, 5.14 | J04-OPS-23; J05-VER-30 | — | — | — |
 | ↳ **16.7** Real-device AEC/barge-in/latency/privacy/resource-pressure qualification | **NOT STARTED** | 16.1–16.6, 11.2 | PLAN §18 Exit; J05-VER-30–J05-VER-31 | — | — | — |
-| ↳ **16.CP** SECTION CHECKPOINT — Voice Runtime Ready | **NOT STARTED** | 16.1–16.7 | PLAN §18 Exit; PLAN §26 checkpoint | — | — | — |
+| ↳ **16.CP** SECTION CHECKPOINT — Voice Runtime Ready | **NOT STARTED** | 16.1–16.7 | PLAN §18 Exit; PLAN §26 checkpoint; RP-11; J01-RT-26; J05-VER-30 | — | — | — |
 
 ### SECTION 17 — Event / Automation / Notification
 
 | Section / Subsection | Status | Depends On | Governing Contract / Traceability | Score | Current Gap | Evidence / Result |
 |---|---|---|---|---:|---|---|
 | **SECTION 17 — Event / Automation / Notification** | **NOT STARTED** | 16.CP | `Phase 17`; checkpoint: Phase 17 Event / Automation / Notification Exit | — | — | — |
-| ↳ **17.1** Normalized Event Gateway schemas, source authentication/signature validation, and event provenance | **NOT STARTED** | 16.CP, 12.CP, 4.12 | PLAN §19; J04-OPS-09; J04-OPS-09 | — | — | — |
+| ↳ **17.1** Normalized Event Gateway schemas, source authentication/signature validation, and event provenance | **NOT STARTED** | 16.CP, 12.CP, 4.12 | PLAN §19; J04-OPS-09 | — | — | — |
 | ↳ **17.2** Durable replay/dedup horizon and restart-safe duplicate consequence prevention | **NOT STARTED** | 17.1, 4.12 | PLAN §19; J02-DATA-18 | — | — | — |
 | ↳ **17.3** Event disposition policy: ignore/record/notify/create-tracked-work/approved-automation | **NOT STARTED** | 17.1–17.2 | J04-OPS-09 | — | — | — |
 | ↳ **17.4** Scheduled/poll/local triggers with bounded backoff/quota/rate behavior | **NOT STARTED** | 17.3, 11.6 | PLAN §19; J04-OPS-09 | — | — | — |
@@ -466,7 +468,7 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **17.9** PlatformNotificationBackend Windows native delivery integration | **NOT STARTED** | 17.7, 0.4 | PLAN §19; J01-PLAT-26 | — | — | — |
 | ↳ **17.10** Mission Control automation/notification/focus UX with authoritative queue states | **NOT STARTED** | 17.3–17.9, 1.13 | PLAN §19; J04-OPS-03, J04-OPS-09–J04-OPS-10 | — | — | — |
 | ↳ **17.11** No privileged public/LAN Core ingress; event-auth/dedup/scope/privacy/storm negative suite | **NOT STARTED** | 17.1–17.10 | PLAN §19 Exit; J04-OPS-09; J03-SEC-29; J05-VER-29 | — | — | — |
-| ↳ **17.CP** SECTION CHECKPOINT — secure deduplicated event/automation/notification runtime | **NOT STARTED** | 17.1–17.11 | PLAN §19 Exit | — | — | — |
+| ↳ **17.CP** SECTION CHECKPOINT — secure deduplicated event/automation/notification runtime | **NOT STARTED** | 17.1–17.11 | PLAN §19 Exit; J02-DATA-18; J04-OPS-09–J04-OPS-10; J03-SEC-29–J03-SEC-30; J05-VER-29 | — | — | — |
 
 ### SECTION 18 — UI / Operations / Backup / Diagnostics / Update Productization
 
@@ -527,8 +529,8 @@ This table is a guard against backward dependencies and premature implementation
 | ↳ **19.24** Zero-P0/P1 gate and reachable Critical/High vulnerability policy | **NOT STARTED** | 19.23, 18.21 | J05-VER-38; J04-OPS-26 | — | — | — |
 | ↳ **19.25** Finalize SBOM/license/provenance/release-manifest/qualification-report evidence for the already frozen 19.1 artifacts; verify exact tested hashes and that no executable/update/trust-metadata byte or trust identity changed after qualification began. Any material change returns affected gates to non-verified state for requalification | **NOT STARTED** | 19.24 | J05-VER-36; RP-16, RP-18; J05-VER-02 | — | — | — |
 | ↳ **19.26** QUALIFICATION CLOSURE — every mandatory central and specialized active-contract gate is evidenced against the same frozen signed RC source/profile/platform/artifact/trust identity, with no unqualified change since 19.1 | **NOT STARTED** | 19.1–19.25 | PLAN §21; J05-VER-02, J05-VER-36 | — | — | — |
-| ↳ **19.27** PRODUCTION COMPLETE declaration with exact supported provider/module/integration capability versions and known limitations | **NOT STARTED** | 19.26 | J05-VER-39; RP-18; J05-VER-39; PLAN §21 Exit | — | — | — |
-| ↳ **19.CP** FINAL SECTION CHECKPOINT — Production Complete | **NOT STARTED** | 19.27 | PLAN §26 final checkpoint; only final checkpoint is Production Complete | — | — | — |
+| ↳ **19.27** PRODUCTION COMPLETE declaration with exact supported provider/module/integration capability versions and known limitations | **NOT STARTED** | 19.26 | J05-VER-39; RP-18; PLAN §21 Exit | — | — | — |
+| ↳ **19.CP** FINAL SECTION CHECKPOINT — Production Complete | **NOT STARTED** | 19.27 | PLAN §26 final checkpoint; J05-VER-39; RP-18; only final checkpoint is Production Complete | — | — | — |
 
 ## Contract coverage index
 

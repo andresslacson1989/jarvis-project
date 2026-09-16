@@ -117,8 +117,8 @@ export function checkContractDriftFromTexts(canonical, docs) {
   const sessionFloor = canonical.kdf.sessionAndPortableRecoveryFloor;
   expectRegex(violations, "DRIFT_KDF_ALGORITHM", DOCS.protocol, protocol, /algorithm:\s*'ARGON2ID'/, "Argon2id algorithm binding missing");
   expectRegex(violations, "DRIFT_KDF_VERSION", DOCS.protocol, protocol, new RegExp(`version:\\s*0x${canonical.kdf.version.toString(16)}`, "i"), `Argon2id version must be 0x${canonical.kdf.version.toString(16)}`);
-  for (const [field, operator, value] of [["memoryKiB", ">=", sessionFloor.memoryKiB], ["iterations", ">=", sessionFloor.iterations], ["parallelism", "=", sessionFloor.parallelism], ["saltBytes", ">=", sessionFloor.saltBytes], ["outputBytes", ">=", sessionFloor.outputBytes]]) {
-    expectRegex(violations, "DRIFT_KDF_SESSION_FLOOR", DOCS.protocol, protocol, new RegExp(`${field}\\s*${escapeRegex(operator)}\\s*${value}`), `${field} ${operator} ${value} missing from production KDF floor`);
+  for (const [label, operator, value] of [["memory", ">=", sessionFloor.memoryKiB], ["passes", ">=", sessionFloor.iterations], ["parallelism", "", sessionFloor.parallelism], ["salt", ">=", sessionFloor.saltBytes], ["output", ">=", sessionFloor.outputBytes]]) {
+    expectRegex(violations, "DRIFT_KDF_SESSION_FLOOR", DOCS.supplyChain, supplyChain, new RegExp(`${label}:\\s*${escapeRegex(operator)}\\s*${value}`, "i"), `${label} ${operator} ${value} missing from production KDF floor`);
   }
 
   const format = colonBlock(extractFenceAfter(backup, "The first production format is:"));

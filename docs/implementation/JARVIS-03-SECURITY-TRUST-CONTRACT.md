@@ -1,7 +1,7 @@
 # JARVIS Security & Trust Contract
 
 **Contract Suite Version:** 1.0.8
-**Version:** 1.0.8
+**Version:** 1.0.9
 **Component:** `J03`
 **Status:** Canonical normative component
 **Scope:** security hardening, threat boundaries, project-policy enrollment, supply-chain trust, update/module authorization, and security verification
@@ -14,8 +14,6 @@ Clause identifiers in this file are stable traceability anchors. Cross-component
 ## J03-SEC-01 — PURPOSE
 
 JARVIS is a high-trust desktop assistant capable of reading private data, modifying repositories, using connected accounts, and managing infrastructure. Security SHALL be implemented by deterministic software/OS boundaries, not by asking AI output to behave safely.
-
----
 
 ---
 
@@ -34,8 +32,6 @@ JARVIS is a high-trust desktop assistant capable of reading private data, modify
 11. Recoverability is part of data-protection correctness.
 12. A provider's technical ability does not expand JARVIS authority.
 13. Setup/install elevation does not become runtime authority.
-
----
 
 ---
 
@@ -72,8 +68,6 @@ V1 does not claim hard protection from:
 - external provider compromise beyond minimizing exposed data/authority.
 
 DPAPI/Credential Manager/ACLs materially protect at rest and across principals but are not represented as a perfect same-user malware sandbox.
-
----
 
 ---
 
@@ -115,8 +109,6 @@ Session-password changes never silently invalidate portable state backups.
 
 ---
 
----
-
 ## J03-SEC-05 — WINDOWS LOCK
 
 Native host observes Windows lock/sign-out and authoritatively drives JARVIS lock state.
@@ -129,8 +121,6 @@ While locked:
 - new consequential work is not accepted from unauthenticated input;
 - already-authorized background work may continue only under its task policy;
 - pending approvals are not silently consumed after unlock without normal revalidation.
-
----
 
 ---
 
@@ -157,8 +147,6 @@ Provider-internal Windows sandbox-account credentials created/managed by a quali
 
 ---
 
----
-
 ## J03-SEC-07 — DATABASE/BACKUP SECRET BOUNDARY
 
 The live database uses a random local `DB_DEK` protected through Windows secure storage.
@@ -171,24 +159,15 @@ Ordinary portable/local state backups do not contain raw integration credentials
 
 ---
 
----
-
 ## J03-SEC-08 — DATA POLICY
 
-Canonical policy is:
-
-```text
-DataSensitivity: PUBLIC | PRIVATE | SENSITIVE | SECRET
-DataLocality:    LOCAL_ONLY | ANY_APPROVED_PROVIDER
-```
+J01-PROTO-04 is the sole canonical definition of `DataSensitivity`, `DataLocality`, and `DataPolicy`. This clause owns their security and routing meaning.
 
 `SECRET` normally remains only in secure store/trusted adapter memory.
 
 `LOCAL_ONLY` prohibits cloud/LAN/remote provider routing.
 
 Derived data inherits the strictest input policy unless deterministic audited declassification/export explicitly changes it. AI summarization never declassifies by itself.
-
----
 
 ---
 
@@ -221,8 +200,6 @@ External text such as `SYSTEM:`/`ADMIN:` remains content, not policy.
 
 ---
 
----
-
 ## J03-SEC-10 — TRUSTED INSTRUCTION SOURCES
 
 Potential scoped instruction sources after deterministic resolution include:
@@ -236,8 +213,6 @@ Potential scoped instruction sources after deterministic resolution include:
 Project policy remains subordinate to global security, locality, permission, budget, destructive-confirmation, credential, provider-setup, and update policy.
 
 Path traversal/reparse behavior cannot make an out-of-root file become trusted project policy.
-
----
 
 ---
 
@@ -261,8 +236,6 @@ No context builder may downgrade locality/sensitivity to obtain a preferred prov
 
 ---
 
----
-
 ## J03-SEC-12 — STRUCTURED AI OUTPUT
 
 AI output is attacker-controlled input to execution.
@@ -272,8 +245,6 @@ Runtime validation rejects malformed/unknown-required fields, invalid enums/IDs,
 A bounded repair/reformat attempt may be requested for syntactic invalidity. Repeated failure blocks rather than enabling permissive parsers.
 
 AI confidence is never an authorization input.
-
----
 
 ---
 
@@ -298,11 +269,9 @@ Mandatory invariants and explicit DENY dominate any grant.
 
 ---
 
----
-
 ## J03-SEC-14 — RISK CLASS AUTHORIZATION
 
-Canonical risk classes are LOW, MODERATE, HIGH, CRITICAL.
+J01-PROTO-16 is the sole canonical definition of `RiskClass`. The authorization behavior for each canonical value follows.
 
 #### LOW
 
@@ -331,8 +300,6 @@ Always requires fresh final confirmation immediately before execution, even if t
 
 ---
 
----
-
 ## J03-SEC-15 — PRECEDENT
 
 Precedent may:
@@ -351,8 +318,6 @@ Precedent SHALL NOT:
 
 ---
 
----
-
 ## J03-SEC-16 — PATH / RESOURCE IDENTITY
 
 Consequential filesystem paths and external resource targets are canonicalized/resolved before authorization.
@@ -365,21 +330,11 @@ If canonical identity cannot be established, JARVIS clarifies/blocks rather than
 
 ---
 
----
-
 ## J03-SEC-17 — APPROVAL ACTION BINDING
 
 Final/high-risk approvals bind exactly to `CanonicalActionDescriptorV1`.
 
-Canonical pipeline:
-
-```text
-schema validation
-→ RFC 8785 JCS
-→ UTF-8
-→ SHA-256
-→ base64url without padding
-```
+The sole canonical approval digest pipeline and rejection rules are defined by J01-PROTO-18/J01-PROTO-25. This clause owns the security binding and revalidation behavior that consumes that pipeline.
 
 Before issuance, resolve all material tool/target/account/environment/scope/arguments/policy identity.
 
@@ -388,8 +343,6 @@ Before consumption, freshly re-resolve and recompute. Any material mismatch requ
 Canonicalization rejects duplicate keys, non-finite numbers, negative zero, invalid Unicode, and unsafe numeric ambiguity.
 
 Approval remains short-lived, single-use, and transactionally protected. Human-readable summaries accurately describe—but do not replace—the canonical authorization object.
-
----
 
 ---
 
@@ -407,8 +360,6 @@ Where the target system supports conditional updates, consequential adapters SHA
 - equivalent conditional mutation primitive.
 
 A condition mismatch means the target changed. JARVIS re-resolves, re-evaluates permission, and obtains new approval if material action changed. It does not silently apply the old authorization to new state.
-
----
 
 ---
 
@@ -431,8 +382,6 @@ This does not claim isolation from arbitrary code already executing under the ex
 
 ---
 
----
-
 ## J03-SEC-20 — TAURI/WEBVIEW SECURITY
 
 The authoritative WebView is a presentation/control boundary, not a trusted browser for arbitrary remote pages.
@@ -451,8 +400,6 @@ Production SHALL:
 - qualify Tauri/runtime versions for relevant security fixes.
 
 Renderer cannot resolve secure-store handles, spawn arbitrary native processes, open privileged Core IPC, invoke arbitrary elevated operations, or make authoritative PermissionDecisions.
-
----
 
 ---
 
@@ -486,8 +433,6 @@ Job Objects are lifecycle/resource containment only; prompts are not a sandbox.
 
 ---
 
----
-
 ## J03-SEC-22 — CODEX WINDOWS SETUP / ELEVATION SECURITY
 
 A qualified Codex Windows sandbox may require one-time or repair-time elevated setup. That setup is a **provider setup operation**, not worker authority.
@@ -510,8 +455,6 @@ Untrusted content/AI cannot directly authorize an elevation helper. The setup wo
 
 ---
 
----
-
 ## J03-SEC-23 — PROVIDER SECURITY AND COMPATIBILITY
 
 A provider is production-supported only after required setup readiness, exact version/interface/sandbox/error/cancellation/conformance qualification, and current health/auth/capability checks.
@@ -528,8 +471,6 @@ No provider fallback may violate setup, `LOCAL_ONLY`, permission, budget, or cap
 
 ---
 
----
-
 ## J03-SEC-24 — CREDENTIAL/INTEGRATION USE
 
 An adapter may obtain a credential only after integration/account/capability identity, action authority, environment/scope, and required credential capability are resolved.
@@ -541,8 +482,6 @@ Connection/authentication does not authorize all supported actions.
 OAuth integrations use PKCE where supported and request minimal capability-driven scopes. Temporary loopback callbacks bind narrowly, validate state/PKCE, accept only expected callback flow, and close after completion.
 
 For GitHub V1, credentials/scopes SHALL be limited to the exact enabled Release Profile capability matrix. Mandatory V1 support does not require repository administration, secret administration, branch-protection administration, membership administration, repository deletion, or ref deletion.
-
----
 
 ---
 
@@ -571,8 +510,6 @@ Direct Proxmox Backup Server administration is a separate connection boundary.
 
 ---
 
----
-
 ## J03-SEC-26 — MODULE SECURITY
 
 A supported module requires authenticated release/catalog provenance, artifact integrity, manifest/schema validation, compatibility, requested-capability review, staged health/conformance, and lifecycle policy.
@@ -595,8 +532,6 @@ V1 need not expose an open arbitrary executable-module marketplace.
 
 ---
 
----
-
 ## J03-SEC-27 — APPLICATION UPDATE / SUPPLY CHAIN
 
 Application updates are signed/integrity-verified, staged, and paired with schema/backup/recovery compatibility.
@@ -606,8 +541,6 @@ Tampered/unverified artifacts are never activated and never trigger fallback to 
 Production pipeline uses pinned lockfiles/toolchains, secret/dependency/vulnerability/license review as appropriate, clean builds, release manifest, SBOM, and provenance linking artifacts to source/CI.
 
 Node Core/runtime assets, canonical brand/font/icon assets, and module catalog trust metadata are part of release integrity. Third-party fonts/icons/visual assets SHALL have recorded source/license/provenance and required notices.
-
----
 
 ---
 
@@ -631,8 +564,6 @@ Full memory dumps are not collected/uploaded automatically. User-requested suppo
 
 ---
 
----
-
 ## J03-SEC-29 — EVENT / NETWORK EXPOSURE
 
 Authenticated external events establish source authenticity, not action authority. They enter Event Gateway and normal permission/locality/budget/resource processing with durable replay/dedup protection.
@@ -642,8 +573,6 @@ V1 exposes no privileged Core LAN/Internet API.
 Direct public inbound Internet webhooks are not required for V1. A future public ingress surface requires a separate relay/gateway or separately approved threat model including auth, replay, rate limiting, DoS, endpoint discovery, secret rotation, and compromised-event handling.
 
 OAuth loopback listeners are temporary/narrow and are not a general network control plane.
-
----
 
 ---
 
@@ -658,8 +587,6 @@ Emergency stop/cancel remains available.
 Workers/providers have bounded time/resource/process policies. Background work cannot consume resources such that user stop/UI/voice control becomes unavailable.
 
 Disk use for logs/artifacts/cache/backups/modules is bounded and disk-full conditions fail safely.
-
----
 
 ---
 
@@ -687,8 +614,6 @@ Audit is append-oriented and sufficient to explain consequential authorization w
 
 ---
 
----
-
 ## J03-SEC-32 — FAILURE BEHAVIOR
 
 Security-critical validation never guesses or silently weakens policy.
@@ -704,41 +629,9 @@ Examples include invalid action digest, changed target/version, permission deny,
 
 ---
 
----
-
 ## J03-SEC-33 — REQUIRED SECURITY VERIFICATION
 
-Production tests SHALL include:
-
-- prompt injection from every major untrusted-content source;
-- attempts to exfiltrate secret/recovery/KDF-derived material;
-- path/reparse/UNC escape;
-- deterministic PermissionEngine conflict/deny/risk scenarios;
-- HIGH precedent proving insufficient authority;
-- CRITICAL explicit instruction still requiring final confirmation;
-- approval replay and material target/account/environment/argument change;
-- Rust/TypeScript canonicalization vector equality;
-- conditional-mutation target-race failure;
-- unauthorized local named-pipe principal/session/remote attempt;
-- wrong bootstrap secret;
-- Tauri remote-origin capability denial;
-- CSP/navigation/untrusted-rendering negative cases;
-- production KDF profile floor/metadata/upgrade tests;
-- Codex setup required/cancel/failure/repair/update invalidation and normal-worker non-elevation;
-- provider/engineering sandbox write/network behavior and honest read-isolation reporting;
-- shell attempt to perform external consequential operation outside typed JARVIS path;
-- provider fallback violating locality/setup;
-- module external-in-process rejection;
-- module/update/catalog tamper;
-- GitHub capability/scope overreach rejection;
-- Proxmox raw API/shell/optional-capability overreach rejection;
-- backup/package tamper and wrong recovery factor;
-- clean-profile portable restore/re-key;
-- integration credentials absent after restore and `REAUTH_REQUIRED` behavior;
-- process-tree containment/breakaway/orphan cleanup;
-- security-sensitive logging/redaction failures.
-
----
+`J05-VER-16B` owns the complete security verification catalog. Failure of any listed case blocks qualification.
 
 ---
 
@@ -780,8 +673,6 @@ Repository content is untrusted data by default. Merely cloning, opening, regist
 
 ---
 
----
-
 ## J03-POLICY-02 — POLICY TRUST STATES
 
 Canonical policy trust states are:
@@ -800,8 +691,6 @@ All other states remain untrusted content for AI/content-authority purposes.
 
 ---
 
----
-
 ## J03-POLICY-03 — CANDIDATE DISCOVERY
 
 V1 SHALL recognize `AGENTS.md` as a project-policy candidate filename. Additional filenames require explicit typed configuration/contract support; arbitrary files SHALL NOT become trusted merely because they contain policy-like prose.
@@ -817,8 +706,6 @@ Candidate discovery SHALL:
 - treat contents as untrusted until enrollment completes.
 
 A newly cloned or unfamiliar repository with an `AGENTS.md` SHALL therefore begin at `UNTRUSTED_CANDIDATE`.
-
----
 
 ---
 
@@ -859,8 +746,6 @@ Display names and raw path strings alone are never policy identity.
 
 ---
 
----
-
 ## J03-POLICY-05 — REGISTRATION/OPENING BEHAVIOR
 
 Project registration SHALL NOT silently accept detected policy candidates.
@@ -874,8 +759,6 @@ Cancel project work
 ```
 
 If the user explicitly disables the candidate, JARVIS may proceed under global/user/task policy while continuing to treat the file as untrusted repository content. The UI SHALL make that choice visible in project policy status.
-
----
 
 ---
 
@@ -907,8 +790,6 @@ A project policy is therefore primarily a scoped constraint/context source, not 
 
 ---
 
----
-
 ## J03-POLICY-07 — IMMUTABLE POLICY SNAPSHOT PER ATTEMPT
 
 Before an engineering attempt starts, Core SHALL resolve the applicable trusted policy set and persist an immutable `ProjectPolicySnapshot` containing the exact trust-record revisions/content hashes applied to that attempt.
@@ -918,8 +799,6 @@ AI/workers receive the snapshot contents/context, not a promise that the on-disk
 A repository file changing mid-attempt does not retroactively rewrite the active attempt's trusted instruction set.
 
 However, before a new attempt, task `RESUMING`, or a consequential action whose safety/acceptance semantics materially depend on project policy, JARVIS SHALL revalidate the applicable policy identities/hashes.
-
----
 
 ---
 
@@ -942,8 +821,6 @@ JARVIS SHALL NOT silently carry trust from hash A to hash B merely because the p
 
 ---
 
----
-
 ## J03-POLICY-09 — MUTATING A TRUSTED POLICY FILE
 
 A write that changes an enrolled trusted project-policy file is contextually HIGH project-policy work.
@@ -955,8 +832,6 @@ The mutation requires exact user authority under the normal HIGH-action rules an
 After the write, the resulting new content enters `CHANGED_REVIEW_REQUIRED`. It SHALL NOT become trusted automatically simply because JARVIS or a trusted worker produced it.
 
 The user may then inspect the diff and explicitly accept the new policy revision.
-
----
 
 ---
 
@@ -976,8 +851,6 @@ An untrusted nested `AGENTS.md` never overrides a trusted parent policy.
 
 ---
 
----
-
 ## J03-POLICY-11 — WORKTREES, BRANCHES, AND COPIES
 
 Policy trust is bound to the registered project identity plus canonical policy identity and content hash.
@@ -990,8 +863,6 @@ Trust SHALL NOT automatically transfer to:
 - a symlink/junction/reparse target outside the enrolled project identity.
 
 Parallel worktrees may reuse a trust record only while canonical policy identity/content/provenance requirements remain satisfied.
-
----
 
 ---
 
@@ -1014,8 +885,6 @@ Workers SHALL NOT be told that an untrusted candidate is authoritative merely to
 
 ---
 
----
-
 ## J03-POLICY-13 — REVOCATION AND DISABLE
 
 The user may disable/revoke a project policy trust record.
@@ -1025,8 +894,6 @@ Revocation/disable prevents the record from entering new policy snapshots immedi
 Existing running work reaches an integrity-safe boundary and SHALL revalidate policy before new consequential actions as required by its task/recovery policy.
 
 Policy trust changes are auditable without storing private chain-of-thought.
-
----
 
 ---
 
@@ -1048,29 +915,9 @@ The UI SHALL expose the exact trusted path/hash/revision and source provenance n
 
 ---
 
----
-
 ## J03-POLICY-15 — REQUIRED VERIFICATION
 
-Production tests SHALL include:
-
-- unfamiliar repository `AGENTS.md` stays untrusted after clone/open/register;
-- policy-looking malicious text cannot self-enroll;
-- explicit enrollment binds canonical path + hash + project identity;
-- path traversal/reparse escape cannot become trusted policy;
-- branch checkout changing policy enters `CHANGED_REVIEW_REQUIRED`;
-- same path/different hash is not trusted;
-- nested untrusted policy cannot override trusted parent;
-- separately enrolled nested policy applies only to its subtree;
-- trusted project policy cannot grant GitHub/Proxmox/deploy/credential/elevation authority;
-- worker attempt to edit trusted policy requires HIGH authority;
-- edited policy does not auto-trust its new content;
-- active attempt uses immutable policy snapshot;
-- `RESUMING`/new attempt detects changed policy;
-- disabled/revoked policy stops entering new context;
-- policy status/explanation derives from authoritative trust records, not AI inference.
-
----
+`J05-VER-16A` owns the complete positive and negative project-policy trust verification catalog. Failure of any listed case blocks qualification.
 
 ---
 
@@ -1099,8 +946,6 @@ JARVIS SHALL use The Update Framework (TUF) trust model rather than inventing an
 
 ---
 
----
-
 ## J03-SUPPLY-02 — TUF PROFILE
 
 The initial production trust-metadata profile SHALL implement TUF specification **1.0.35** semantics for:
@@ -1126,8 +971,6 @@ Changing to a different TUF major/minor semantic profile requires a synchronous 
 
 ---
 
----
-
 ## J03-SUPPLY-03 — SIGNATURE ALGORITHM
 
 The JARVIS TUF V1 role-key profile SHALL use:
@@ -1143,8 +986,6 @@ JARVIS SHALL use a maintained reviewed TUF/Ed25519 implementation and SHALL NOT 
 
 ---
 
----
-
 ## J03-SUPPLY-04 — ROOT TRUST
 
 The production root role SHALL have at least three independently stored root keys and threshold **2-of-3**.
@@ -1154,8 +995,6 @@ Root private keys SHALL be kept offline from ordinary application runtime, devel
 Production clients ship with an authenticated initial trusted root metadata version.
 
 A client SHALL NOT fetch an arbitrary network key and treat it as a new root merely because it signs itself.
-
----
 
 ---
 
@@ -1192,8 +1031,6 @@ Production key custody, key IDs, thresholds, storage class, and rotation procedu
 
 ---
 
----
-
 ## J03-SUPPLY-06 — MODULE CATALOG DELEGATION
 
 Supported externally installable module/catalog targets SHALL be authorized through a dedicated TUF delegated targets role such as:
@@ -1209,8 +1046,6 @@ The production `modules` delegated role SHALL use at least three independent Ed2
 A publisher/self-signature MAY provide additional provenance, but it does not make a module `SUPPORTED` without current TUF catalog authorization, manifest compatibility, integrity, permission review, and conformance.
 
 Revoking the module delegation/key or removing a target from current trusted catalog metadata prevents new installation/activation under normal supported policy.
-
----
 
 ---
 
@@ -1231,8 +1066,6 @@ Compromised/replaced top-level role keys are revoked by trusted root metadata th
 If fewer than the root threshold keys are compromised, normal threshold rotation/revocation is the supported recovery path.
 
 If an attacker compromises a full root threshold, JARVIS SHALL NOT claim that ordinary in-band update metadata can securely self-recover. Recovery requires an out-of-band trusted recovery/reinstall procedure and incident response.
-
----
 
 ---
 
@@ -1259,8 +1092,6 @@ The client persists last-trusted metadata versions and update observation state.
 
 ---
 
----
-
 ## J03-SUPPLY-09 — TARGET INTEGRITY AND CONSISTENT SNAPSHOTS
 
 Application/module targets SHALL be bound by trusted TUF metadata to at least:
@@ -1275,8 +1106,6 @@ Application/module targets SHALL be bound by trusted TUF metadata to at least:
 Downloads are bounded by trusted target length before unbounded storage/allocation.
 
 A hash/length mismatch rejects the target regardless of transport TLS success.
-
----
 
 ---
 
@@ -1314,8 +1143,6 @@ A security response may raise the minimum allowed `securityEpoch` or revoke spec
 
 ---
 
----
-
 ## J03-SUPPLY-11 — MODULE ANTI-ROLLBACK / REVOCATION
 
 Module catalog metadata SHALL identify immutable module version target hashes and catalog sequence/revocation state.
@@ -1323,8 +1150,6 @@ Module catalog metadata SHALL identify immutable module version target hashes an
 A previously valid module artifact SHALL NOT be newly installed/activated when the current trusted catalog metadata revokes its target hash/version or no longer authorizes it for the active JARVIS/platform profile.
 
 Rollback to a retained module version requires that the exact target remains currently authorized by trusted catalog metadata and is compatible with the active release/security policy.
-
----
 
 ---
 
@@ -1350,8 +1175,6 @@ A valid TUF target does not bypass the platform's required artifact signing chec
 
 ---
 
----
-
 ## J03-SUPPLY-13 — STAGED ACTIVATION
 
 Downloaded application/module targets remain staged/untrusted-for-execution until every required trust, compatibility, platform, migration, health, and policy gate passes.
@@ -1364,8 +1187,6 @@ No target is executed from an unverified temporary download path merely to run a
 
 ---
 
----
-
 ## J03-SUPPLY-14 — TRUST METADATA STORAGE
 
 The client SHALL durably retain the minimum trusted TUF state required to detect rollback/freeze/mix-and-match attempts, including current trusted root and the last accepted role metadata versions/hashes as required by the selected implementation.
@@ -1373,8 +1194,6 @@ The client SHALL durably retain the minimum trusted TUF state required to detect
 Trusted update metadata is authoritative security state. It SHALL use crash-safe persistence and SHALL NOT be silently reset because cache cleanup occurred.
 
 Deleting ordinary application cache SHALL NOT reset the trusted-root/version floor.
-
----
 
 ---
 
@@ -1395,8 +1214,6 @@ CATALOG_TRUST_UNAVAILABLE
 ```
 
 Security-sensitive trust failures fail closed for new activation while preserving truthful diagnostics/recovery options.
-
----
 
 ---
 
@@ -1422,43 +1239,13 @@ revocation/minimum-version policy reference
 
 Private signing keys never appear in the release manifest.
 
----
+`RP-16` owns the selected V1 release-manifest field set. `J05-VER-36` owns proof that the exact production artifacts and provenance records satisfy that selection; this clause retains only the security validation requirements above.
 
 ---
 
 ## J03-SUPPLY-17 — REQUIRED QUALIFICATION
 
-Production tests SHALL prove at minimum:
-
-- bootstrap trusted root validation;
-- 2-of-3 root threshold success/failure;
-- top-level targets 2-of-3 threshold success/failure;
-- delegated module-targets 2-of-3 threshold success/failure;
-- root/targets/snapshot/module private keys are unavailable to ordinary runtime/update-server/general CI contexts;
-- timestamp automation works without exposing higher-authority offline keys;
-- root N→N+1 rotation with old+new thresholds;
-- expired current root can participate only in the sequential root-update process and cannot authorize targets unless the resulting final trusted root is unexpired;
-- attempted skipped/untrusted root rejection;
-- revoked role key rejection;
-- expired timestamp/snapshot/targets behavior;
-- stale metadata/freeze detection;
-- metadata rollback rejection;
-- mix-and-match snapshot/targets rejection;
-- target length/hash tamper rejection;
-- target signed by unauthorized delegated role rejection;
-- module delegation cannot authorize application target;
-- application targets cannot be activated from module-only delegation;
-- old validly signed but currently revoked JARVIS release rejected;
-- unauthorized lower releaseSequence rejected;
-- explicitly authorized rollback succeeds only with current trusted metadata and compatible paired state;
-- securityEpoch downgrade rejected;
-- current catalog revocation prevents module activation;
-- Tauri signature failure blocks even when TUF metadata is valid;
-- TUF failure blocks even when Tauri/Authenticode signature is valid;
-- interrupted trust-metadata update does not corrupt the last trusted state;
-- cache cleanup does not reset trusted-root/version floors.
-
----
+`J05-VER-22A` owns the complete supply-chain qualification catalog. Failure of any listed case blocks qualification.
 
 ---
 
@@ -1467,8 +1254,6 @@ Production tests SHALL prove at minimum:
 The trust lifecycle is based on The Update Framework specification 1.0.35. TUF's root, targets, snapshot, timestamp, threshold-signature, expiration, versioning, delegation, offline-key custody, and sequential root-update model is the normative update-metadata foundation for this JARVIS profile.
 
 Tauri/Windows signing remains an additional artifact/platform integrity layer, not a replacement for TUF trust lifecycle semantics.
-
----
 
 ---
 
@@ -1489,4 +1274,4 @@ Tauri/Windows signing remains an additional artifact/platform integrity layer, n
 
 ---
 
-**END — JARVIS SECURITY & TRUST CONTRACT v1.0.8**
+**END — JARVIS SECURITY & TRUST CONTRACT v1.0.9**

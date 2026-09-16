@@ -20,13 +20,13 @@ The current suite is governed by the six consolidated components below plus `doc
 
 | # | Document | Component | Current revision | Role |
 |---|---|---|---:|---|
-| 1 | `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` | `J00` | 1.0.8 | product scope, authority, repository governance, and coding standards |
-| 2 | `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md` | `J01` | 1.0.8 | runtime roles, platform boundaries, process lifecycle, IPC, and schemas |
-| 3 | `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md` | `J02` | 1.0.8 | persistence, state, exact values, backup format, restore, and recovery |
-| 4 | `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md` | `J03` | 1.0.8 | security hardening, project-policy trust, and supply-chain trust |
-| 5 | `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md` | `J04` | 1.0.8 | operations, integrations, voice, UX, identity, and accessibility |
-| 6 | `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md` | `J05` | 1.0.8 | verification, qualification, release evidence, and Production Complete |
-| 7 | `docs/JARVIS-V1-RELEASE-PROFILE.md` | `RELEASE_PROFILE` | 1.0.8 | exact Windows V1 production support target |
+| 1 | `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` | `J00` | 1.0.9 | product scope, authority, repository governance, and coding standards |
+| 2 | `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md` | `J01` | 1.0.9 | runtime roles, platform boundaries, process lifecycle, IPC, and schemas |
+| 3 | `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md` | `J02` | 1.0.9 | persistence, state, exact values, backup format, restore, and recovery |
+| 4 | `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md` | `J03` | 1.0.9 | security hardening, project-policy trust, and supply-chain trust |
+| 5 | `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md` | `J04` | 1.0.9 | operations, integrations, voice, UX, identity, and accessibility |
+| 6 | `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md` | `J05` | 1.0.9 | verification, qualification, release evidence, and Production Complete |
+| 7 | `docs/JARVIS-V1-RELEASE-PROFILE.md` | `RELEASE_PROFILE` | 1.0.9 | exact Windows V1 production support target |
 
 `README.md` and `AGENTS.md` are contributor/governance entry points and SHALL point to this same suite. The implementation plan, execution matrix, developer execution goal, evidence records, and audit reports are non-authoritative execution aids.
 
@@ -44,55 +44,31 @@ If active normative text conflicts or omits a mandatory requirement, implementat
 
 ---
 
-# MAN-04 — CURRENT SECURITY AND GOVERNANCE CLOSURES
+# MAN-04 — CURRENT OWNERSHIP AND DEPENDENCIES
 
-## 4.1 Portable backup
+The manifest indexes authority; it does not restate component behavior. The following clauses are the complete current owners of the named areas.
 
-Production `JARVIS_BACKUP_V1` is fixed by J02-BACKUP-02 through J02-BACKUP-15 and the linked J03 secret-boundary clauses. Those clauses own the AES-256-GCM framing, nonce/AAD/chunk/order/truncation rules, independent key hierarchy, generated 256-bit recovery factor, optional stronger Argon2id passphrase slot, and exact restore/tamper qualification requirements; this manifest defines no alternative.
-
-## 4.2 Project policy
-
-Repository policy trust is owned by J03-POLICY-02 through J03-POLICY-16. In particular, `AGENTS.md` is an untrusted candidate until an authenticated user enrolls an exact canonical project/path/scope/content identity; content change invalidates trust for new work and workers cannot silently rewrite and auto-trust their own policy.
-
-## 4.3 Update and module trust
-
-Production update and module trust is owned by J03-SUPPLY-02 through J03-SUPPLY-19. The fixed TUF 1.0.35 profile, threshold root trust, role/delegation separation, expiry, rotation/revocation, rollback/freeze/mix-and-match protection, application `releaseSequence`/`securityEpoch`, and cumulative Tauri/Windows signing gates remain mandatory.
-
-## 4.4 Authoritative repository governance
-
-`master` remains the sole authoritative branch. Current observed governance facts and the historical transition record are maintained in `docs/implementation/governance/repository-governance-profile.json` and `MASTER-PROTECTION.md`; J00-GOV-28 and J05-VER-33 own the server-enforced/fallback semantics, exact-tip integration controls, and evidence requirements.
-
-## 4.5 Qualified CI authority
-
-`GITHUB_ACTIONS` is the sole eligible authority for the mandatory `static-ci` result under J00-CODE-28 and J05-VER-06/J05-VER-33. Its selected workflow/job identity and exact-candidate evidence are machine-readable and auditable. GitLab is repository mirror-only and SHALL NOT qualify CI or release evidence. LocalCI may provide compatibility or security tooling only; no LocalCI result can satisfy the current mandatory CI authority gate.
+| Area | Complete current owner |
+| --- | --- |
+| product scope, repository governance, coding, dependencies, and canonical drift definitions | J00-SCOPE-01 through J00-CODE-33, especially J00-GOV-28 and J00-GOV-29 |
+| platform roles, capability boundaries, runtime, protocol, provider, and voice interfaces | J01-PLAT-01 through J01-PROTO-28 |
+| persistence, state, transactions, recovery, `JARVIS_BACKUP_V1`, and restore | J02-DATA-01 through J02-BACKUP-17 |
+| authorization, secrets, project-policy trust, supply-chain trust, TUF, update, and module security | J03-SEC-01 through J03-SUPPLY-19 |
+| operations, integrations, voice/UI behavior, identity, and accessibility | J04-OPS-01 through J04-UI-29 |
+| tests, evidence, CI qualification, release decisions, and Production Complete | J05-VER-01 through J05-VER-39 |
+| exact V1 platform, capability, provider, integration, voice, hardware, and release selections | RP-01 through RP-19 |
 
 ---
 
 # MAN-05 — CURRENT PLATFORM BOUNDARY
 
-```text
-Windows → FULL_HOST → V1 production target
-Linux   → FULL_HOST → future production target
-Android → COMPANION → future non-V1 client
-```
-
-Only Windows is required by the current V1 Release Profile.
-
-The architecture SHALL preserve Linux full-host portability through explicit platform capability boundaries without weakening the Windows implementation.
-
-A future companion does not become authoritative and requires a separately qualified Remote Access Gateway before remote control is enabled.
+RP-02 selects Windows `FULL_HOST` as the V1 production target. J01-PLAT-02 through J01-PLAT-26 own runtime roles, capability boundaries, future Linux qualification, and the non-authoritative companion boundary. J01-PLAT-08 requires portability never weaken qualified Windows security.
 
 ---
 
-# MAN-06 — DELIVERY AND ROADMAP CLOSURES
+# MAN-06 — DELIVERY AND ROADMAP DEPENDENCIES
 
-Voice remains mandatory V1, but candidate STT/VAD/TTS/AEC/barge-in/device/resource/licensing feasibility is tested immediately after the early persistence/recovery proof rather than waiting until the late voice implementation phases.
-
-SSH, Google Workspace, Microsoft 365, and Cloudflare remain binding post-V1 product targets but may ship independently in production-qualified feature releases.
-
-Phase 0 SHALL establish machine-readable canonical repeated security/profile/capability values and CI drift checks where practical.
-
-Repository server-side protection SHALL be activated when available, but an unavailable paid/host-gated protection feature is not itself a JARVIS production prerequisite when the compensating-governance qualification passes.
+RP-11 selects mandatory V1 voice and its early feasibility evidence. RP-14 owns binding post-V1 integration targets. J00-GOV-28 owns canonical repeated-value drift definitions and repository-protection fallback; J05-VER-33 owns its qualification evidence.
 
 ---
 
@@ -121,7 +97,7 @@ The suite version advances when a material current rule changes in areas such as
 - repository-governance qualification;
 - core UI identity/interaction behavior.
 
-Individual component revisions advance when the corresponding component's normative content changes. The manifest records the exact current component revision set.
+Individual component revisions advance when the corresponding component's normative content changes. The manifest records the exact current component revision set. The current J00–J05 and Release Profile revisions advance to 1.0.9 for this lossless normative-text simplification; the combined suite remains 1.0.8 because no material current product, security, platform, protocol, release, trust, or governance rule changed.
 
 This v1.0.8 suite advances v1.0.7 because mandatory CI authority changed from a qualified-authority alternative to GitHub Actions only. That is a material repository-governance qualification change; this consolidation does not weaken any other active requirement.
 

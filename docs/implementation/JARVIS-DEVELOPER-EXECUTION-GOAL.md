@@ -1,473 +1,384 @@
-Yes. Below is the agreement we established, followed by a correction goal limited to contract consolidation and acceptance simplification.
+# JARVIS Contract Simplification and Consolidation Execution Goal
 
-## Our agreement
+## 1. Objective
 
-1. The task is to consolidate, update, optimize, and simplify JARVIS’s contract system only.
+Simplify, optimize, and consolidate the active JARVIS contract system without weakening, removing, broadening, or making ambiguous any product feature, security control, reliability guarantee, platform boundary, accessibility requirement, verification gate, or release condition.
 
-2. This task must not implement application behavior, runtime behavior, UI behavior, provider behavior, integrations, or later implementation-matrix sections.
+Use `docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md` as the persistent non-normative findings baseline. The active manifest, six active contract components, Release Profile, and repository instructions remain authoritative.
 
-3. `AGENTS.md`, the active contract manifest, the six active contract components, and the Release Profile remain authoritative.
+This goal authorizes contract-document, contributor-guidance, validator, generated-artifact, and acceptance-command maintenance only. It does not authorize application implementation, business-logic changes, implementation-matrix progression, evidence advancement for application features, publication, integration, release qualification, or an auditor handoff.
 
-4. The implementation matrix and implementation plan remain the execution plan for application work, but they must not be advanced or used to authorize application implementation during this task.
+ADRs are completely prohibited. Do not create, retain, consult, or cite separate architecture decision records or historical overlays. Resolve all authorized contract changes directly and synchronously in the active suite.
 
-5. ADRs are completely prohibited. This includes:
+## 2. Required result
 
-   - new ADRs;
-   - historical ADRs;
-   - archived ADRs;
-   - retained ADRs as source material;
-   - ADRs used as hidden authority or explanatory overlays.
+Deliver a smaller and clearer contract system in which:
 
-6. Any still-valid requirement from removed historical material must be incorporated directly into the appropriate active contract component before that material is removed.
+- each normative requirement has one complete authoritative owner;
+- cross-component references replace repeated behavioral prose without hiding obligations;
+- exact schemas, thresholds, state values, security constructions, matrices, and release gates remain intact;
+- `AGENTS.md` is a concise repository instruction entry point rather than a duplicate contract manual;
+- task-specific reading replaces an unconditional 11,000-line reading burden while preserving applicability;
+- repeated acceptance commands derive from a controlled shared definition where technically safe;
+- no prohibited decision-record terminology or authority is introduced;
+- every removed or rewritten requirement is traceably preserved;
+- all affected validators, tests, generated artifacts, and references agree with the result.
 
-7. The consolidation must not weaken or remove any feature, security control, recovery behavior, failure handling, platform requirement, verification requirement, coverage, or enterprise standard.
+Line-count reduction is evidence of simplification, not the governing objective. Lossless semantics and enforceability are mandatory.
 
-8. Duplicate wording, duplicate metadata, redundant catalogs, and unnecessarily complicated acceptance plumbing may be simplified.
+## 3. Absolute scope boundaries
 
-9. Simplification must reduce duplication and maintenance burden, not reduce substantive security or acceptance coverage.
+### Authorized
 
-10. The acceptance system should have one canonical executable acceptance source. A second independently maintained gate catalog or command list should not remain.
+- Edit `AGENTS.md`, `README.md`, the active manifest, J00–J05, and the Release Profile for the stated simplification.
+- Update the Implementation Plan only where a current reference must follow an authorized clause or file change; do not alter application sequencing or status.
+- Update this goal and the persistent findings file to remain truthful.
+- Update contract validators, schemas, generated contract artifacts, acceptance-command metadata, and tests only as required by the document consolidation.
+- Add preservation-focused tests for changed validator or generated behavior.
 
-11. GitHub Actions is the CI authority.
+### Prohibited
 
-12. GitLab is mirror-only.
+- No application implementation or refactoring.
+- No changes to runtime, desktop, provider, integration, database, security, backup, UI, or release application behavior.
+- No implementation-matrix status, score, evidence, pointer, or progress changes.
+- No claim that documentation completion is application completion or `Production Complete`.
+- No removal or weakening of mandatory tests, evidence, platform-specific jobs, security checks, negative cases, or release vetoes.
+- No creation, restoration, consultation, or citation of architecture decision records, retired contracts, or historical overlays as authority.
+- No publication, push, merge, integration, release, or auditor handoff unless separately and explicitly authorized after this goal is complete.
+- No history rewriting and no deletion of preserved untracked user material.
 
-13. LocalCI is non-authoritative and must not be represented as qualified authority unless its separate qualification contract is satisfied.
+## 4. Mandatory preservation invariants
 
-14. `master` is the authoritative branch.
+The completed change must preserve, at minimum:
 
-15. All JARVIS repository work must remain inside `G:\Jarvis Project`. No JARVIS files, reports, staging files, or worktrees may be created or deleted on `C:`, `F:`, or any other drive.
+1. Windows `FULL_HOST` as the mandatory V1 target; Linux and companion status remain truthful and future-scoped.
+2. Strong platform capability boundaries and qualified Windows mechanisms.
+3. Tauri, IPC, WebView, process ownership, Job Objects, elevation, setup-helper, credential, and secret protections.
+4. PermissionEngine, authority envelopes, risk policy, bound targets, approvals, and final destructive confirmation.
+5. DataPolicy and sensitivity enforcement.
+6. Canonical state machines, atomic commits, post-commit publication, idempotency, retry safety, stale-precondition rejection, `UNCERTAIN`, reconciliation, recovery, and diagnostics.
+7. Exact `JARVIS_BACKUP_V1` algorithms, format, key hierarchy, generated recovery slot, nonce/tag/chunk/AAD rules, restore behavior, and vectors.
+8. Project-policy enrollment, identity binding, trust invalidation, and prohibited authority expansion.
+9. TUF root/role thresholds, expiry, version, revocation, delegation, rollback/freeze/mix-and-match, security epochs, update signatures, and module boundaries.
+10. Provider setup, least privilege, lifecycle, isolation claims, fallback, and platform qualification.
+11. Exact GitHub and Proxmox capability matrices and restrictions.
+12. Voice, TTS, AEC, interruption, normalized fields/events, latency, readiness, restart, and fallback requirements.
+13. Canonical JARVIS visual identity, Mission Control hierarchy, adaptive layouts, and every accessibility value and test.
+14. All mandatory unit, property, schema, integration, security, adversarial, crash/recovery, backup, platform, package, provenance, performance, soak, and live-evidence gates.
+15. GitHub Actions authority, GitLab mirror-only status, LocalCI non-authority, exact-candidate verification, and signed-artifact release qualification.
 
-16. Local tests, validation, and builds must pass before any future GitHub Actions publication or qualification attempt.
+If a proposed simplification conflicts with any invariant, preserve the invariant and leave that text unsimplified until a safe formulation is proven.
 
-17. A missing exact GitHub Actions run must remain truthfully recorded as `NOT_RECORDED`. It must not be fabricated or inferred from local results.
+## 5. Required preparation before edits
 
-18. The persistent findings file must remain non-normative and must record the consolidation findings and retired-path dispositions without becoming a replacement contract or ADR archive.
+1. Fetch current remote refs without pulling or changing the working tree.
+2. Record branch, HEAD, `origin/master`, merge base, tracked status, and preserved untracked paths.
+3. Re-read root and applicable nested `AGENTS.md` files.
+4. Read the current manifest, all six active components, Release Profile, findings file, this goal, and relevant validator/acceptance definitions.
+5. Confirm no other active task owns the same files.
+6. Create a temporary `codex/` feature branch or worktree from current live `origin/master`, preserving valid concurrent work.
+7. Record baseline line counts, file hashes, clause IDs, normative keywords, cross-references, gate IDs/commands, and validator results.
+8. Build the preservation ledger described below before deleting or merging normative text.
 
-19. No auditor-thread handoff is required for this contract-consolidation task. The developer reports the result to the main thread.
+Do not begin rewriting if the branch base, authority set, or concurrent ownership is uncertain.
 
-20. Before shipping, the developer must check the changes against:
+## 6. Preservation ledger
 
-   - the goal;
-   - `AGENTS.md`;
-   - the active manifest;
-   - all active contract components;
-   - the Release Profile;
-   - the persistent findings file.
-
-21. Every issue found must be corrected. No shortcuts may be taken merely to satisfy the goal or produce a green result.
-
-22. The work may be reported complete only when no known issue remains within this contract-consolidation scope.
-
----
-
-# Detailed correction goal
-
-## Goal
-
-Correct candidate `17a6ea1217227ffa28690e6b6d035bb937cd741d` by completing the contract-only consolidation and acceptance simplification.
-
-The resulting candidate must:
-
-- contain the actual corrections described in the report;
-- remove redundant acceptance representations;
-- correctly validate both current and future governance evidence states;
-- accurately record all retired files and revisions;
-- preserve all substantive contract requirements;
-- remain limited to contract, governance, documentation, validation, and test maintenance;
-- contain no application implementation or matrix progression.
-
-Do not publish, merge, integrate, advance the matrix, or claim release qualification during this task.
-
-All writes must remain inside:
+Create a machine-readable or reviewable ledger covering every changed normative clause with these fields:
 
 ```text
-G:\Jarvis Project
+source file
+source clause ID
+requirement summary
+exact values/types/states affected
+change class
+destination owner clause
+references updated
+tests/validators affected
+semantic result: unchanged or material change
+review status
 ```
 
-Do not use or create JARVIS files on `C:`, `F:`, or another drive.
+Allowed change classes are:
+
+- exact-text preservation;
+- reference-only deduplication;
+- merged equivalent wording;
+- non-normative example or boilerplate removal;
+- formatting-only cleanup;
+- material semantic change requiring explicit governance authorization.
+
+Every deleted normative sentence must map to a complete surviving owner. A reference to a partial summary is not preservation. Unmapped requirements are a hard failure.
+
+## 7. Canonical ownership model
+
+Use this ownership model unless the active text proves a more precise existing owner:
+
+| Component | Owner responsibility |
+| --- | --- |
+| Manifest | Active suite identity, revisions, authority, amendment, and version policy |
+| J00 | Scope, repository governance, coding, package, and dependency rules |
+| J01 | Platform, runtime, IPC, process, protocol, schema, and state vocabulary |
+| J02 | Persistence, transitions, transactions, recovery, backup, and restore |
+| J03 | Authorization, secrets, project-policy trust, supply-chain trust, and TUF |
+| J04 | Operations, integrations, provider/voice UX, UI, and accessibility behavior |
+| J05 | Tests, evidence, CI, qualification, and release decisions |
+| Release Profile | Exact V1 support and capability selections |
+
+Cross-references must point to exact clauses where practical. Avoid circular ownership and generic “see elsewhere” language.
+
+## 8. File-by-file instructions
+
+### 8.1 `AGENTS.md`
+
+1. Reduce it from 463 lines to a concise instruction entry point, targeting 100 lines or fewer unless preservation evidence proves a small excess necessary.
+2. Retain unique highest-level contract protection, branch/publication authority, source-of-truth routing, destructive-action safety, no historical decision-record rule, platform/backup/project-policy/supply-chain boundaries, and the prohibition on unauthorized application implementation.
+3. Replace the embedded implementation protocol with references to the owning active contract, Implementation Plan, and matrix only for separately authorized application implementation.
+4. Replace the unconditional source list with task-applicable routing:
+   - manifest first for contract-affecting work;
+   - applicable normative components for the task;
+   - J05 and Release Profile for verification/release work;
+   - Implementation Plan and matrix only for application implementation;
+   - persistent findings only for contract-maintenance work.
+5. Preserve the rule that an implementer must inspect every governing requirement; routing must not waive unread applicable requirements.
+6. Remove duplicated subjective scoring and iteration prose where objective contract gates already determine completion.
+7. Preserve the required acknowledgement sentence if governance still requires it.
+8. Validate every removed instruction against the preservation ledger.
+
+### 8.2 `README.md`
+
+1. Keep repository purpose, orientation, authority links, minimum setup, and basic validation commands.
+2. Remove repeated normative platform, branch, guarantee, and principle prose when the active owner is linked clearly.
+3. Do not turn the README into a competing authority or hide essential contributor entry points.
+
+### 8.3 `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`
+
+1. Preserve active component identities, revisions, authority order, amendment rules, semantic-version rules, and Release Profile relationship.
+2. Replace behavioral restatements in MAN-04 through MAN-06 with a concise component ownership and dependency map.
+3. Keep the no-historical-overlay and no-separate-decision-record policy explicit.
+4. Resolve version and component-revision treatment under MAN-08 before changing normative files. Record the determination; do not silently retain or advance versions.
+5. Update hashes/generated metadata only through the repository’s controlled mechanism.
+
+### 8.4 `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md`
+
+1. Keep product scope, repository governance, coding, packaging, dependency, provenance, and contribution rules complete.
+2. Consolidate SCOPE-04 overlap with the Release Profile and J01/J04 into exact references while retaining J00-specific scope boundaries.
+3. Consolidate CODE-04 overlap with J01 platform capabilities.
+4. Replace CODE-09, CODE-15, CODE-17, CODE-18, and CODE-20 through CODE-26 domain summaries with references to their complete J01–J04 owners, retaining only distinct coding/repository obligations.
+5. Move or reference test-list material in CODE-27 to J05 without dropping required coverage.
+6. Merge GOV-28 and CODE-28 only if their GitHub authority, server protection, compensating controls, exact-candidate, and fallback semantics remain complete.
+7. Consolidate suite-wide summaries in CODE-31 and CODE-32 into a short owner map.
+
+### 8.5 `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md`
+
+1. Preserve all platform capability interfaces, runtime ownership, IPC schemas, process supervision, protocol types, canonical state vocabulary, provider interfaces, voice, TTS, and AEC requirements.
+2. Merge duplicate platform-role material across PLAT-01 through PLAT-03 and PLAT-29 through PLAT-32 without losing future-platform truthfulness or Windows-strength requirements.
+3. Define each state/type once and replace repeated enumerations such as RT-14 versus PROTO-19 with exact references.
+4. Keep DataPolicy data structures here where they are protocol types; reference J03 for policy/security interpretation.
+5. Replace duplicated KDF policy in PROTO-06 with an exact J03 owner reference while preserving the protocol field/validation obligation.
+6. Move qualification-method ownership from PROTO-25 and PROTO-27 to J05 where appropriate, retaining protocol-defining vectors and compatibility semantics.
+
+### 8.6 `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md`
 
-## Checkpoint 1 — Establish the exact baseline
+1. Preserve authoritative persistence, legal transitions, transaction boundaries, event/audit coupling, recovery, backup, and restore behavior.
+2. Make BACKUP-02 through BACKUP-15 the sole complete owner of `JARVIS_BACKUP_V1`.
+3. Replace DATA-27 through DATA-33 summaries with precise BACKUP references where they duplicate the detailed rules.
+4. Remove the “or equally reviewed qualified construction” ambiguity from the V1 path by preserving the fixed AES-256-GCM requirement exactly; do not substitute any algorithm or format.
+5. Reference J03 for KDF security policy instead of repeating its floor in DATA-05, while retaining every J02 application and storage rule.
+6. Reference J01 for state vocabulary and keep J02 ownership of legal transitions and persisted semantics.
+7. Consolidate DATA-30/BACKUP-14/J05-VER-21 verification overlap so J05 owns evidence while J02 retains exact backup vectors and acceptance behavior.
 
-Before editing:
+### 8.7 `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md`
 
-1. Read again:
+1. Preserve the threat model, PermissionEngine, authority, secrets, project-policy trust, provider trust, TUF, module, update, revocation, rollback, and security-epoch rules.
+2. Replace duplicated test catalogs in SEC-33, POLICY-15, and SUPPLY-17 with exact J05 verification references after confirming every positive and negative case remains listed in J05.
+3. Keep behavior and pass/fail security properties in J03; place test procedure and evidence ownership in J05.
+4. Reconcile SUPPLY-16 with Release Profile RP-16 and J05-VER-36: J03 owns security validation, the Release Profile owns selected V1 fields, and J05 owns proof.
 
-   - [`G:\Jarvis Project\AGENTS.md`](G:/Jarvis%20Project/AGENTS.md)
-   - [`G:\Jarvis Project\docs\JARVIS-CONTRACT-MANIFEST-v1.0.8.md`](G:/Jarvis%20Project/docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md)
-   - J00 through J05
-   - [`G:\Jarvis Project\docs\JARVIS-V1-RELEASE-PROFILE.md`](G:/Jarvis%20Project/docs/JARVIS-V1-RELEASE-PROFILE.md)
-   - [`G:\Jarvis Project\docs\implementation\JARVIS-IMPLEMENTATION-PLAN.md`](G:/Jarvis%20Project/docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md)
-   - [`G:\Jarvis Project\docs\implementation\JARVIS-IMPLEMENTATION-MATRIX.md`](G:/Jarvis%20Project/docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md)
-   - [`G:\Jarvis Project\docs\implementation\JARVIS-DEVELOPER-EXECUTION-GOAL.md`](G:/Jarvis%20Project/docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md)
-   - [`G:\Jarvis Project\docs\implementation\JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md`](G:/Jarvis%20Project/docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md)
+### 8.8 `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md`
 
-2. Record before-edit state:
+1. Preserve operational lifecycle, integrations, provider setup, GitHub/Proxmox restrictions, voice behavior, UI behavior, brand identity, and every accessibility threshold.
+2. Replace OPS-30’s duplicated qualification catalog with J05 references while preserving each operational behavior and required evidence.
+3. Consolidate UI-26 and UI-28 test/checklist overlap with J05; J04 remains owner of UI and accessibility behavior and exact values.
+4. Reconcile OPS-26 release vulnerability policy with J05 without weakening either runtime handling or release vetoes.
+5. Remove or clearly mark optional examples as non-normative when they add no unique requirement.
+6. Rename the heading “Architecture Decision Escalation” to “Architecture Change Escalation,” retaining clause ID J04-OPS-28 and its full meaning.
+7. Do not remove normalized TTS fields/events, provider interface behavior, AEC capability fields, supervisor lifecycle/restart/fallback, voice latency, readiness, or interruption requirements.
 
-   - current branch;
-   - current `HEAD`;
-   - `origin/master`;
-   - merge base;
-   - tracked modifications;
-   - staged modifications;
-   - untracked directories;
-   - exact candidate diff;
-   - cumulative branch diff.
+### 8.9 `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md`
 
-3. Explicitly distinguish:
+1. Keep all verification, evidence, CI authority, exact-candidate, platform, negative/adversarial, recovery, performance, soak, signing, and release-decision gates.
+2. Rewrite behavioral restatements as owner-clause references while retaining the exact verification method and pass/fail condition.
+3. Reconcile VER-09, VER-11, VER-14, VER-17, VER-24, VER-25, VER-30, VER-33, and VER-36 with their J01–J04 or Release Profile owners.
+4. Do not remove duplicated values until an automated reference/preservation check proves the owner value and J05 test still agree.
+5. Preserve Contract Accuracy vetoes and the full `Production Complete` boundary if those remain part of current governance.
 
-   - candidate `17a6...`;
-   - uncommitted working-tree corrections;
-   - preserved untracked directories;
-   - cumulative historical changes on the work branch.
+### 8.10 `docs/JARVIS-V1-RELEASE-PROFILE.md`
 
-Do not claim that uncommitted changes belong to candidate `17a6...`.
+1. Keep exact V1 support, platform, capability, provider, integration, voice, hardware, artifact, and post-V1 selections.
+2. Keep capability matrices here as the selected V1 support source.
+3. Replace repeated implementation behavior in RP-03 through RP-05, RP-12, RP-15, RP-17, and RP-18 with exact component references where lossless.
+4. Keep RP-16 as the V1 release-manifest field selection and reference J03 for security meaning and J05 for evidence.
+5. Preserve the signed-artifact and exact-source `Production Complete` definition.
 
-## Checkpoint 2 — Complete the acceptance simplification
+### 8.11 `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
 
-### [`G:\Jarvis Project\docs\implementation\CONTRACT-ACCEPTANCE-GATE-CATALOG.md`](G:/Jarvis%20Project/docs/implementation/CONTRACT-ACCEPTANCE-GATE-CATALOG.md)
+1. Do not alter implementation order, scope, statuses, or application acceptance meaning.
+2. Change only references broken by authorized contract consolidation.
+3. Keep it non-normative and subordinate to the active suite.
 
-Remove this redundant catalog from the correction candidate.
+### 8.12 `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md`
 
-Do not retain it as:
+Do not edit this file during contract simplification. No status, score, evidence, execution pointer, or progress advancement is authorized.
 
-- an active contract;
-- a historical overlay;
-- a second acceptance source;
-- a required documentation authority.
+### 8.13 Persistent findings and developer goal
 
-Do not preserve its old ADR or decision-record content elsewhere.
+1. Keep `JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md` concise, current, non-normative, and free of stale candidate narratives.
+2. Update findings only when measured evidence changes; do not use historical text as authority.
+3. Keep this goal truthful about completed and remaining work.
+4. Do not mark the goal complete merely because documentation was shortened.
 
-### [`G:\Jarvis Project\tools\ci\localci-gate-manifest.mjs`](G:/Jarvis%20Project/tools/ci/localci-gate-manifest.mjs)
+### 8.14 Acceptance-command and validator files
 
-Keep one canonical executable acceptance sequence.
+Review at minimum:
 
-Preserve:
+- `tools/ci/localci-gate-manifest.mjs`;
+- `.localci/ci.sh`;
+- `tools/checkpoints/phase0-checkpoint-profile.json`;
+- `.github/workflows/static-ci.yml`;
+- `tools/contract/manifest.mjs`;
+- contract drift, manifest, governance, and generated-output tests.
 
-- exact gate membership;
-- exact gate order;
-- exact command arguments;
-- duplicate rejection;
-- omission rejection;
-- unknown-command rejection;
-- command mutation rejection;
-- fail-closed behavior;
-- exact evidence identity checks;
-- terminal evidence ordering;
-- exit-78 pending behavior;
-- LocalCI non-authoritative status.
+Instructions:
 
-The current 30 substantive executable gates must not be reduced merely to make the number smaller. The previous 32-to-30 reduction may remain, but any further gate removal requires a genuine contract reason and is outside this correction goal.
+1. Establish one controlled gate metadata model with gate ID, command, execution class, authority, and evidence purpose.
+2. Make LocalCI and Phase 0 consume or derive their overlapping command lists from it where safe.
+3. Keep GitHub Actions job topology explicit when runner/platform isolation requires it; remove only command duplication that can be safely generated or shared.
+4. Preserve all 30 canonical gates and all Phase 0 obligations unless the active contract explicitly proves a gate obsolete.
+5. Preserve LocalCI’s non-authoritative role and exit code 78 semantics.
+6. Preserve separate Windows and general verification, exact checkout, pinned toolchains, artifact/evidence upload, and failure behavior.
+7. Extend existing tests for metadata generation, command parity, forbidden historical-path matching on slash and backslash forms, duplicate IDs, missing commands, and authority classification.
+8. Do not modify application tests or behavior.
 
-Remove:
+## 9. Ordered execution passes
 
-- `ACCEPTANCE_GATE_CATALOG`;
-- catalog-only validation;
-- duplicate command metadata that does not provide operational value;
-- any independently maintained second gate list.
+### Pass 1 — Inventory and lossless map
 
-If metadata is necessary for execution or evidence validation, retain only the minimum required metadata and derive it from the same canonical gate source. Do not create another independently editable acceptance representation.
+- Create the clause-level preservation ledger.
+- Record all cross-references and acceptance-command duplicates.
+- Identify exact owner for every duplicated rule.
+- Decide version treatment under the manifest before normative edits.
+- Call `NEXT PASS` if any rule lacks a complete owner.
 
-### [`G:\Jarvis Project\tests\layers\unit\localci-compatibility.test.mjs`](G:/Jarvis%20Project/tests/layers/unit/localci-compatibility.test.mjs)
+### Pass 2 — Instruction and orientation simplification
 
-Remove tests that only validate the deleted Markdown catalog.
+- Simplify `AGENTS.md` and `README.md`.
+- Verify unique repository protections and contributor routing remain complete.
+- Run targeted instruction/reference checks.
 
-Preserve and extend tests for:
+### Pass 3 — Manifest and ownership normalization
 
-- exact gate order;
-- exact gate membership;
-- duplicate gates;
-- omitted gates;
-- unknown gates;
-- command argument mutation;
-- LocalCI compatibility;
-- LocalCI non-authoritative behavior;
-- exact repository/ref/SHA binding;
-- spoof rejection;
-- fail-closed behavior;
-- terminal evidence ordering.
+- Simplify the manifest to suite identity/governance plus ownership map.
+- Apply the authorized version/revision treatment.
+- Update generated metadata and manifest tests.
 
-Do not remove security or compatibility coverage merely because the catalog is removed.
+### Pass 4 — Component consolidation
 
-### [`G:\Jarvis Project\docs\implementation\JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md`](G:/Jarvis%20Project/docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md)
+- Process J00 through J04 in ownership order.
+- After each file, update the preservation ledger and run targeted contract/reference checks.
+- Never delete source wording before its complete destination is present and verified.
 
-Update references so the contract identifies the executable gate manifest as the sole canonical acceptance source.
+### Pass 5 — Verification and Release Profile consolidation
 
-Retain all named release subjects, required evidence, security gates, recovery gates, platform gates, and Production Complete requirements.
+- Make J05 the verification/evidence owner.
+- Make the Release Profile the V1 selection owner.
+- Reconcile every moved test, exact value, capability matrix, and release field.
 
-Do not convert local results into authoritative CI evidence.
+### Pass 6 — Acceptance-command deduplication
 
-### [`G:\Jarvis Project\README.md`](G:/Jarvis%20Project/README.md)
+- Implement the shared gate metadata model.
+- Update LocalCI, Phase 0, and GitHub consumers without changing authority or gate coverage.
+- Add negative and parity tests.
 
-Remove obsolete catalog references.
+### Pass 7 — Mechanical cleanup
 
-Describe the acceptance system consistently with the active contract:
+- Remove redundant separators and repeated boilerplate.
+- Normalize headings and references.
+- Preserve clause IDs or publish a complete old-to-new mapping.
 
-- one canonical executable acceptance source;
-- GitHub Actions as authority;
-- GitLab as mirror-only;
-- LocalCI as non-authoritative;
-- no exact GitHub evidence claimed for an unpublished candidate.
+### Pass 8 — Full self-audit
 
-## Checkpoint 3 — Correct governance evidence-state validation
+- Re-read the goal and persistent findings from the first line to the last.
+- Compare the final tree to every requirement in this goal.
+- Prove every preservation-ledger row is resolved.
+- Re-run all required validation.
+- Report any unknown or unsupported claim as incomplete.
 
-### [`G:\Jarvis Project\tools\ci\check-repository-governance.mjs`](G:/Jarvis%20Project/tools/ci/check-repository-governance.mjs)
+## 10. Verification requirements
 
-Correct the validator so it supports both valid states.
+Run the repository’s applicable local fail-fast sequence in its required order, including:
 
-### Valid `NOT_RECORDED` state
+1. targeted tests for each changed validator, generator, or gate consumer;
+2. normal local test profile;
+3. contract manifest and drift checks;
+4. schema and generated-output checks;
+5. governance and forbidden historical-path checks;
+6. security, secret, dependency, license, and provenance checks;
+7. architecture and platform-boundary checks;
+8. formatting and strict type checks;
+9. applicable build checks;
+10. LocalCI compatibility/security checks where the environment supports them.
 
-Require:
+Also verify:
 
-- the active contract-suite version;
-- `status: NOT_RECORDED`;
-- the exact approved reason for absent exact GitHub evidence;
-- no contradictory candidate-qualified evidence;
-- no stale or mismatched run records being silently accepted.
+- all active component files remain present and uniquely listed;
+- no separate decision-record or historical-overlay path/reference is tracked as authority;
+- no clause ID is duplicated or orphaned;
+- every internal reference resolves;
+- every exact enum, schema field, threshold, cryptographic value, capability row, and gate remains present at its owner;
+- the preservation ledger has no unmapped deletion;
+- the matrix is byte-for-byte unchanged;
+- application source and application behavior tests are unchanged except where a contract validator necessarily reads them without modifying them;
+- GitHub Actions remains authoritative and LocalCI/GitLab remain non-authoritative.
 
-### Valid `RECORDED` state
+Local green results are supplementary only. Do not claim release qualification without an exact-candidate authoritative GitHub Actions run, and do not seek that run without separate publication authorization.
 
-Require the existing evidence schema to contain, consistently:
+## 11. Hard acceptance criteria
 
-- exact candidate SHA;
-- exact repository;
-- exact full ref;
-- workflow identity;
-- run identity;
-- job identity;
-- timestamps;
-- successful result;
-- required-check identity;
-- artifact/evidence identity;
-- evidence hashes where required;
-- exact relationship between checkout, run, artifact, and candidate;
-- no replayed, stale, partial, or mismatched evidence.
+The goal is complete only when all are true:
 
-Do not create a second governance schema. Use the existing contract-defined fields and validation boundaries.
+1. Every instruction in this goal has been checked explicitly.
+2. The persistent findings are addressed or truthfully marked with a precise remaining reason.
+3. No feature, security control, effectiveness guarantee, threshold, failure behavior, or evidence gate is weakened.
+4. Every changed normative sentence is represented in the preservation ledger.
+5. Each requirement has one complete owner and all dependent references resolve.
+6. The `JARVIS_BACKUP_V1` fixed format is unambiguous and unchanged.
+7. Platform, authorization, trust, update, provider, voice, UI, accessibility, and release boundaries are unchanged.
+8. `AGENTS.md` is concise and reference-driven without losing unique instructions.
+9. Duplicated acceptance commands have one controlled source where safe, with parity tests.
+10. No application code or implementation-matrix progress changed.
+11. No prohibited decision-record artifact or authority exists.
+12. All applicable local verification passes.
+13. The working tree contains only the intended scoped changes and preserved pre-existing untracked material.
+14. The final report distinguishes contract-document completion from application/release completion.
 
-Keep the current unpublished candidate truthfully `NOT_RECORDED`.
+Any failed, unknown, or unproven criterion requires `NEXT PASS`, not completion.
 
-### [`G:\Jarvis Project\tests\layers\unit\repository-governance.test.mjs`](G:/Jarvis%20Project/tests/layers/unit/repository-governance.test.mjs)
+## 12. Required final report
 
-Add or correct tests for:
+Report:
 
-- valid `NOT_RECORDED`;
-- valid complete `RECORDED`;
-- missing candidate SHA;
-- mismatched candidate SHA;
-- wrong repository;
-- wrong full ref;
-- missing workflow/run/job identity;
-- invalid timestamps;
-- unsuccessful result;
-- missing required checks;
-- missing evidence identity;
-- stale evidence;
-- replayed evidence;
-- contradictory `NOT_RECORDED` plus candidate evidence;
-- partial `RECORDED` evidence.
-
-The validator must fail closed for malformed or ambiguous states.
-
-## Checkpoint 4 — Correct the persistent findings record
-
-### [`G:\Jarvis Project\docs\implementation\JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md`](G:/Jarvis%20Project/docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md)
-
-Make the findings record factually accurate.
-
-It must distinguish:
-
-- the earlier baseline candidate `8d587ae6...`;
-- candidate `17a6...`;
-- the new correction candidate that will contain the fixes.
-
-Correct the exact repository measurements:
-
-- 93 deleted paths;
-- 5 renamed paths.
-
-Do not state “93 individually recorded” unless all 93 paths are literally present in the inventory.
-
-Add a simple crosswalk containing one row per retired path with:
-
-- retired path;
-- deleted or renamed status;
-- active destination clause, if applicable;
-- disposition;
-- reason for removal.
-
-The crosswalk must not retain deleted ADRs, decisions, or historical contract text as source material. It may identify retired paths for auditability.
-
-State clearly that this file is:
-
-- persistent;
-- audit-supporting;
-- non-normative;
-- not an ADR;
-- not a contract authority;
-- not a replacement for the active contract suite.
-
-## Checkpoint 5 — Reconcile the developer goal
-
-### [`G:\Jarvis Project\docs\implementation\JARVIS-DEVELOPER-EXECUTION-GOAL.md`](G:/Jarvis%20Project/docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md)
-
-Compare the file with the owner-approved goal.
-
-Because the candidate changed this file while the report described it as preserved, do one of the following:
-
-- restore the exact authorized goal; or
-- explicitly record the approved revision and its purpose.
-
-Do not describe an edited file as preserved verbatim.
-
-Remove duplicated sections and repeated instructions. Keep only one clear statement of each requirement.
-
-The final goal must still state:
-
-- contract consolidation only;
-- no application implementation;
-- no matrix advancement;
-- no publication or integration;
-- local verification before any future GitHub run;
-- GitHub Actions authority;
-- GitLab mirror-only;
-- LocalCI non-authoritative;
-- preservation of all security and feature requirements;
-- G:-only repository work;
-- final comparison against the goal, `AGENTS.md`, manifest, active contracts, and Release Profile;
-- fix every issue before shipping.
-
-## Checkpoint 6 — Validate the active contract suite
-
-Inspect all active normative files:
-
-- J00;
-- J01;
-- J02;
-- J03;
-- J04;
-- J05;
-- the active manifest;
-- the Release Profile.
-
-Confirm that consolidation did not remove or weaken:
-
-- Windows V1 security;
-- process and IPC boundaries;
-- backup cryptography;
-- recovery requirements;
-- PermissionEngine rules;
-- project-policy trust;
-- supply-chain/TUF controls;
-- provider isolation;
-- failure and recovery handling;
-- auditability;
-- accessibility and UI requirements;
-- platform qualification;
-- release qualification;
-- Production Complete requirements.
-
-Do not edit these files merely to reduce line count.
-
-Only modify an active normative component if a real consolidation defect requires it. Any such edit must preserve the requirement’s original security and semantic strength.
-
-## Checkpoint 7 — Validate repository boundaries and historical removal
-
-Confirm:
-
-- no tracked ADR paths;
-- no tracked decision-record paths;
-- no tracked history-overlay paths;
-- no prohibited external-drive evidence paths;
-- no new historical authority files;
-- no application source changes;
-- no implementation-matrix changes;
-- no Release Profile weakening;
-- no generated artifact changes unrelated to this task.
-
-Keep all repository work under `G:\Jarvis Project`.
-
-Preserve existing untracked user directories. Do not delete them as part of this goal.
-
-## Checkpoint 8 — Run local verification first
-
-After the corrections are committed, verify the exact new candidate from a clean working tree.
-
-Run the canonical local sequence, including:
-
-```text
-dependencies-frozen
-toolchain-exact
-format-hygiene
-schema-integrity
-contract-suite-valid
-repository-governance
-secret-scan
-dependency-inventory
-license-provenance
-typescript-strict
-typescript-build
-core-build
-desktop-ui-build
-desktop-foundation-contract
-desktop-security-contract
-architecture-enforcement
-normal-tests
-dependency-vulnerability-high-plus
-cargo-audit-install
-cargo-audit-version
-rust-dependency-vulnerability-rustsec
-rustsec-audit-json
-cargo-metadata-windows
-rustsec-informational-warning-review
-rustfmt
-rust-clippy-warnings-as-errors
-rust-host-build
-rust-windows-target-build
-windows-tauri-production-build
-phase0-section-checkpoint
-```
-
-Also run the targeted contract, LocalCI, governance, and drift tests.
-
-The developer must:
-
-- use the pinned toolchain;
-- run the official local profile;
-- not rely only on a fallback test runner;
-- distinguish exact-candidate results from dirty-tree results;
-- preserve `NOT_RECORDED` for absent GitHub evidence.
-
-Do not publish or trigger GitHub Actions for this contract-only correction unless separately authorized. If a future GitHub run is performed, local verification must already have passed.
-
-## Final acceptance
-
-The correction may be reported complete only when all of these are true:
-
-- The catalog is actually removed from the committed candidate.
-- The executable acceptance manifest is the only canonical acceptance source.
-- No substantive security, recovery, platform, failure, or release gate was removed.
-- Governance accepts valid `NOT_RECORDED` and future valid `RECORDED` states.
-- Governance rejects malformed, stale, replayed, contradictory, or mismatched evidence.
-- The findings file contains the exact candidate identities and complete 93-path/5-rename inventory.
-- The developer goal’s actual edit status is truthful.
-- No tracked ADR, decision, or history-overlay files remain.
-- No prohibited external-drive paths remain in tracked repository evidence.
-- No application or implementation-matrix work was introduced.
-- Local verification passes from the exact clean candidate.
-- No known issue remains.
-
-The final report must include:
-
-- exact candidate SHA;
-- branch and base SHA;
-- exact changed files;
-- exact deleted and renamed files;
-- before/after acceptance measurements;
-- preservation checks;
+- branch, base SHA, final candidate SHA or uncommitted state;
+- exact files changed;
+- before/after line counts and acceptance-command duplication counts;
+- clause preservation ledger location and summary;
+- every owner transfer and notable consolidation;
+- exact version/revision decision and authority for it;
 - targeted and full local verification results;
-- current GitHub evidence state;
-- untracked items preserved;
-- remaining limitations, if any.
+- confirmation that the matrix and application code did not change;
+- confirmation that no decision-record artifacts were created or used;
+- preserved untracked items;
+- authoritative GitHub evidence state;
+- all remaining limitations or unresolved findings.
 
-Do not report “complete” if any correction is uncommitted, any validator state is unsupported, any inventory is inaccurate, or any acceptance claim is based only on a dirty working tree.
+Do not publish, integrate, request an audit, advance the matrix, or claim `Production Complete` as part of this goal.

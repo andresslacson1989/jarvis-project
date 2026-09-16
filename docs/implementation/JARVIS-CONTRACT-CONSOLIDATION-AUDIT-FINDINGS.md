@@ -1,693 +1,303 @@
-# JARVIS Contract Consolidation Audit Findings
+# JARVIS Contract Simplification Findings
 
-**Status:** non-normative audit aid; it is not a contract, authority, approval, implementation plan, matrix, or release qualification record.
+**Status:** Non-normative audit aid and persistent review evidence. This file does not authorize implementation, change contract meaning, supersede the active suite, advance the implementation matrix, or qualify a release.
 
-**Audit date:** 2026-09-15
+**Review date:** 2026-09-15
 
-**Audited candidate:** `8d587ae6ac8f34d40bc03a0b205ea3e4dc647281`
+**Repository:** `G:\Jarvis Project`
 
-**Correction candidate under the current goal:** `17a6ea1217227ffa28690e6b6d035bb937cd741d`
+**Reviewed branch:** `codex/contract-consolidation`
 
-**New correction candidate containing the corrections:** `85cf875a9a49e9e439b1b5fb2337043780cc3f33`
+**Reviewed HEAD:** `e07d0326dde59c0157d70669d97c3eba165b13d8`
 
-**Last exact clean candidate before this final record-only update:** `56d5c8b883b4c23c78808d1a2418ddb1481e644d`
+**Authoritative base:** `origin/master` at `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`
 
-**Audited branch:** `codex/contract-consolidation`
+## Purpose
 
-**Base / authoritative master at audit start:** `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`
+Record the overengineering, duplication, and avoidable maintenance burden that can be removed from the active contract system without weakening product behavior, security, reliability, accessibility, verification, or release qualification.
 
-**Repository boundary:** `G:\Jarvis Project` only. No JARVIS files were read from or written to another drive for this audit.
+This is a contract-document simplification review only. It does not authorize application implementation, matrix progression, publication, integration, or creation or use of architecture decision records.
 
-## Purpose and limits
+The retired `docs/decisions/` path is listed only to preserve validator coverage. It must not exist as tracked authority or content.
 
-This file records the independent audit requested before another optimization pass. It exists so a later consolidation pass can resume from evidence instead of repeating assumptions. It must remain non-normative. The active manifest, J00–J05, Release Profile, and applicable `AGENTS.md` instructions remain authoritative.
+## Review scope
 
-This audit concerns contract organization, contract wording, acceptance design, governance/evidence truth, and the validators that enforce those documents. It does not authorize application implementation, runtime behavior changes, UI feature work, provider integration work, matrix advancement, publication, merge, or release approval.
+The review covered:
 
-The audit distinguishes:
+- `AGENTS.md`;
+- `README.md`;
+- `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`;
+- all six active `JARVIS-00` through `JARVIS-05` normative components;
+- `docs/JARVIS-V1-RELEASE-PROFILE.md`;
+- `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md` as a non-normative sequencing aid;
+- the current developer execution goal and this findings record;
+- contract validation, Phase 0, LocalCI, and GitHub Actions command definitions where duplication affects contract maintenance.
 
-- **Verified:** directly measured or read from the current tree, Git history, or authenticated live repository response.
-- **Reported:** stated by the developer or an earlier report but not independently reproduced in this pass.
-- **Required correction:** a concrete change needed before the consolidation goal can be considered complete.
+## Measured baseline
 
-## Audit method
+- Active normative suite: approximately **9,585 lines**.
+- Root `AGENTS.md`: **463 lines**.
+- Embedded implementation protocol within `AGENTS.md`: approximately **280 lines**.
+- Universal source-reading list excluding `AGENTS.md`: approximately **11,228 lines**.
+- Redundant adjacent Markdown separator patterns in the reviewed documentation: **339**.
+- Exact long duplicate text groups: **5**, including two boilerplate paragraphs repeated in every active component.
+- Canonical LocalCI gate list: **30 commands**.
+- Phase 0 profile: **21 commands**, all duplicated from the canonical gate list.
+- Equivalent acceptance commands are also manually repeated in LocalCI and GitHub workflow definitions.
 
-The following were read and compared manually against the current active suite, the manifest, `AGENTS.md`, the Release Profile, the implementation aids, the current candidate diff, and the live GitHub governance response:
+These counts are navigation and maintenance indicators, not targets to optimize blindly. Semantic duplication is greater than exact-text matching reveals.
 
-1. `AGENTS.md` in full.
-2. `README.md` in full.
-3. `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md` in full.
-4. `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` in full.
-5. `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md` in full.
-6. `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md` in full.
-7. `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md` in full.
-8. `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md` in full.
-9. `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md` in full.
-10. `docs/JARVIS-V1-RELEASE-PROFILE.md` in full.
-11. `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`, `JARVIS-IMPLEMENTATION-MATRIX.md`, and `JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md` as execution aids.
-12. Current governance profile, `MASTER-PROTECTION.md`, the historical LocalCI exception, Phase 0 profile/checker, current evidence records, generated contract outputs, and the contract/CI validation tooling that enforces them.
-13. The current candidate diff against `origin/master`, including the retired contract, decision, lineage, and history inventory.
+## Non-negotiable preservation boundary
 
-The deleted historical source inventory is recorded below so it cannot silently become a second authority. Deleted material is not restored or consulted as current authority by this audit.
+Simplification must preserve every applicable requirement and measurable threshold, including:
 
-## Initial audit decision — historical baseline
+- Windows `FULL_HOST` as the mandatory V1 target and truthful future status for Linux and companion clients;
+- platform capability boundaries and strongest qualified Windows mechanisms;
+- Tauri, IPC, process ownership, Job Object, elevation, WebView, and secret-handling controls;
+- PermissionEngine authorization, risk classification, target binding, and final destructive confirmation;
+- DataPolicy and sensitivity enforcement;
+- authoritative state transitions, atomicity, idempotency, retry safety, `UNCERTAIN`, reconciliation, recovery, and audit evidence;
+- the exact `JARVIS_BACKUP_V1` format, cryptography, key hierarchy, nonce, tag, chunk, AAD, recovery-factor, restore, and vector requirements;
+- project-policy enrollment and trust invalidation rules;
+- TUF, update, module, signature, rollback, freeze, mix-and-match, and security-epoch controls;
+- provider setup, privilege separation, lifecycle, fallback, and qualification behavior;
+- exact GitHub and Proxmox capability boundaries;
+- voice, TTS, AEC, interruption, latency, fallback, and readiness behavior;
+- Mission Control, canonical visual identity, adaptive layout, and accessibility thresholds;
+- all required positive, negative, adversarial, failure, crash/recovery, platform, package, provenance, performance, and soak evidence;
+- GitHub Actions as CI authority, GitLab as mirror-only, and LocalCI as non-authoritative;
+- exact-candidate and signed-artifact requirements for `Production Complete`.
 
-**The candidate is not approved as a finished contract-consolidation result.**
+No reduction in wording is acceptable if it removes, broadens, makes optional, or obscures any of these controls.
 
-The reason is not a demonstrated loss of application security or feature behavior. The blocking issue is contract/evidence truth: the live GitHub repository is public and has active `master` branch protection, while the checked-in current governance profile and current `MASTER-PROTECTION.md` still describe a private repository with unavailable server protection and `COMPENSATING_CONTROLS`. A second issue is that the file count and gate count were reduced, but the active normative text became longer than the directly comparable prior contract set and still repeats substantial requirements across J00–J05, the Release Profile, `AGENTS.md`, the manifest, and J05 acceptance clauses. The next pass must simplify that repetition without deleting security controls.
+## Recommended authority ownership
 
-## Measured simplification versus remaining complexity
+Each rule should have one complete normative owner. Other components should reference that owner and state only their distinct obligation.
 
-### Verified simplification
+| File | Primary normative ownership |
+| --- | --- |
+| Manifest | Suite identity, active revisions, authority, amendment, and version rules |
+| J00 | Product scope, repository governance, coding, dependency, and package rules |
+| J01 | Platform, runtime, IPC, process, protocol, schema, and state vocabulary |
+| J02 | Persistence, legal state transitions, transactions, recovery, backup, and restore |
+| J03 | Authorization, secrets, project-policy trust, supply-chain trust, and TUF |
+| J04 | Operations, integrations, provider UX, voice UX, UI, and accessibility behavior |
+| J05 | Verification methods, evidence, CI, qualification, and release decisions |
+| Release Profile | Exact V1 platform, capability, provider, integration, hardware, and release selections |
 
-| Measure | Before (`origin/master`) | Current candidate | Result |
-|---|---:|---:|---|
-| Manifest rows / listed authority entries | 15 | 7 | 8 fewer rows; 53.3% fewer listed entries |
-| Active component model | one large implementation contract plus 14 additional manifest entries | six J00–J05 components plus one Release Profile | clearer ownership, subject to cross-reference cleanup |
-| Canonical LocalCI acceptance commands | 32 | 30 | 2 command definitions removed; 6.25% reduction |
-| LocalCI script gate invocations excluding terminal evidence | 32 | 30 | sequence is now derived from the 30-command manifest |
-| Deleted tracked ADR/decision/history/legacy-contract paths | none in the current candidate tree | 92 paths deleted in the candidate diff | prohibited source material no longer appears in the tracked candidate tree |
-| Current active contract files, counting manifest, six components, and Release Profile | 16 listed authority files in the old manifest model | 8 current authority files | fewer authority surfaces, not proof by itself of semantic simplification |
+References must remain auditable and must not create circular ownership or require historical material.
 
-The last row is a structural count. It must not be used as a substitute for proving requirement preservation.
+## Findings
 
-### Verified evidence that simplification is incomplete
+### F-01 — `AGENTS.md` is an embedded operating manual
 
-The directly comparable old contract/profile files total **9,195 lines** at `origin/master`. The current manifest, six components, and Release Profile total **9,870 lines**. The current suite therefore contains **675 more lines, approximately 7.34% more**, even though it has fewer authority entries. Line count alone does not prove that a requirement is unnecessary, but it disproves any claim that the consolidation has already simplified the normative prose by volume.
+`AGENTS.md` is 463 lines and contains roughly 280 lines of implementation-loop, scoring, atomicity, retry, evidence, and checkpoint guidance. Much of that repeats J00, J02, J05, the Implementation Plan, and the matrix.
 
-The current suite still contains the following overlapping ownership patterns:
+**Safe simplification:** reduce it to a concise repository entry point, preferably no more than 100 lines. Retain unique instruction-level protections, source authority, branch/publication rules, destructive-action rules, and the prohibition on unauthorized contract or application changes. Replace copied contract behavior with direct references. Remove subjective scoring prose where objective hard gates already decide completion.
 
-- governance and CI authority are stated in the manifest, J00, J05, the Release Profile, `AGENTS.md`, README summaries, the governance profile, and `MASTER-PROTECTION.md`;
-- platform/runtime capability rules appear in J00, J01, J04, J05, and the Release Profile;
-- DataPolicy, KDF floors, state machines, approval canonicalization, provider setup states, and capability boundaries are repeated across J01, J02, J03, J04, J05, and the Release Profile;
-- J05 contains 39 verification subsections and a broad production gate set while J04 and the Release Profile restate many of the same qualification subjects;
-- `AGENTS.md`, the manifest, the goal, tests, and validators each repeat parts of the no-historical-source and CI-authority rules;
-- acceptance tooling is more coherent than before, but its 30-gate sequence still contains many build, audit, evidence, and platform checks whose ownership and evidence reuse must be explicitly documented rather than assumed to be unique.
+**Required safeguard:** build a source-to-destination map for every removed instruction and prove that each unique rule remains either in `AGENTS.md` or in its authoritative active contract owner.
 
-No exact percentage of semantic duplication is claimed. Semantic duplication must be resolved by a clause-to-clause ownership map, not by counting matching words.
+### F-02 — Universal reading requirements impose excessive context cost
 
-### Security-preservation conclusion
+The mandatory source list requires approximately 11,228 lines before implementation or architecture work and includes this non-normative findings file. It applies the same reading burden regardless of task scope.
 
-The audit found no evidence that the current consolidation removed the fixed backup format, key separation, KDF floor, project-policy trust, TUF/update trust, PermissionEngine, IPC, process containment, least-privilege, fail-closed, exact identity, recovery, or Windows qualification requirements. Those controls are still present in the active suite. However, their continued presence is not enough: the next pass must prove that each control has one authoritative owner, complete cross-references, and a retained verification proof. A shorter document is unacceptable if it drops a condition or makes enforcement ambiguous.
+**Safe simplification:** require the manifest first, then task-applicable normative components. Require J05 and the Release Profile when verification or release scope applies. Require the Implementation Plan and matrix only for authorized application implementation. Require this findings file only for contract-maintenance work.
 
-## Blocking and non-blocking findings
+**Required safeguard:** applicability routing cannot make a mandatory requirement optional or permit implementation to rely on an unread governing component.
 
-### P0 — current governance facts are stale and contradict live GitHub
+### F-03 — The manifest repeats product behavior
 
-**Files:**
+Although the manifest says it is not independent product behavior, MAN-04 through MAN-06 restate backup, project-policy, TUF, CI, platform, voice, and roadmap rules.
 
-- `docs/implementation/governance/repository-governance-profile.json`
-- `docs/implementation/governance/MASTER-PROTECTION.md`
-- current governance/evidence references that present the old mode as current
+**Safe simplification:** keep the manifest as the suite identity and governance index: active files/revisions, authority order, amendment/version policy, and a concise ownership map. Move complete behavioral meaning to its owning component and use references from the manifest.
 
-**Verified live facts from authenticated GitHub API:**
+### F-04 — J00 duplicates domain contracts
 
-- repository visibility: `public`;
-- default branch: `master`;
-- required status check: `static-ci` with strict checks;
-- required approving reviews: `1`;
-- administrator enforcement: enabled;
-- force pushes: disallowed;
-- branch deletion: disallowed;
-- required conversation resolution: enabled.
+Examples include scope duplication with the Release Profile and J01/J04; platform capability duplication with J01; project-policy, supply-chain, provider, tool, GitHub, Proxmox, module, UI, backup, and verification summaries that repeat J01 through J05; and overlapping CI-governance clauses.
 
-**Contradictory checked-in current claims:**
+**Safe simplification:** retain J00 ownership of scope, repository governance, coding, package, and dependency controls. Consolidate cross-domain summaries into a short owner/reference table. Merge overlapping CI-governance clauses without changing authority or fallback controls.
 
-- governance mode `COMPENSATING_CONTROLS`;
-- server-side protection unavailable and inactive;
-- private repository under a plan limitation;
-- residual risk that administrator force-push or deletion is not server-blocked.
+### F-05 — J01 mixes canonical interfaces with repeated policy
 
-**Required correction:** update current governance records to the live `SERVER_ENFORCED` state, preserve the prior compensating result only as clearly labeled historical transition evidence, and ensure the validator checks the current profile’s internal consistency. Do not erase factual historical evidence; do not let it remain the current authority.
+The platform-role model is repeated in early and late platform clauses. Runtime state vocabulary is repeated in protocol sections. DataPolicy and KDF details overlap J03. Test-vector and qualification prose overlaps J05.
 
-**Why it matters:** J00-GOV-28, J05-VER-33, and RP-17 require server enforcement when it is available. A green local governance check is not sufficient when the checked-in profile itself contains stale facts.
+**Safe simplification:** keep every canonical schema, interface, state enumeration, runtime, IPC, process, provider, voice, TTS, and AEC requirement in J01. Reference J03 for policy/KDF security meaning and J05 for evidence, while retaining any J01-specific conformance vector needed to define the protocol.
 
-### P1 — normative ownership is not yet sufficiently centralized
+### F-06 — J02 contains duplicate and potentially conflicting backup language
 
-**Affected files:** J00, J01, J02, J03, J04, J05, Release Profile, manifest, `AGENTS.md`, README, and governance aids.
+DATA-27 through DATA-33 summarize behavior later specified in BACKUP-02 through BACKUP-15. Most importantly, DATA-27 permits AES-256-GCM “or equally reviewed qualified construction,” while BACKUP-02 fixes `JARVIS_BACKUP_V1` to AES-256-GCM. The summary creates avoidable ambiguity around a fixed format.
 
-**Finding:** the new six-component structure is clearer, but common requirements are restated with independent normative wording in several components. The most sensitive examples are governance/CI authority, platform support, DataPolicy, KDF floors, approval digest/canonicalization, provider setup, state semantics, capability matrices, and release qualification.
+**Safe simplification:** make the BACKUP clauses the sole complete owner of the fixed format and replace duplicated DATA summaries with precise references. J01 should own state vocabulary; J02 should own persistence and legal transitions. J03 should own KDF security policy; J02 should apply it by reference.
 
-**Required correction:** create a requirement ownership map inside the consolidation work product, then make one file the canonical normative owner for each shared rule. Other files may retain short profile-specific constraints and traceability references, but must not introduce a second conflicting definition. Preserve all exact values and conditions.
+**Required safeguard:** preserve every byte-level, cryptographic, key separation, generated recovery, restore, failure, and test-vector requirement exactly.
 
-### P1 — acceptance simplification is not yet proven at the requirement level
+### F-07 — J03 repeats verification and release-profile material
 
-**Affected files:** J05, Release Profile, `.github/workflows/static-ci.yml`, `.localci/ci.sh`, `tools/ci/localci-gate-manifest.mjs`, evidence generators, and related tests.
+Long test lists in SEC-33, POLICY-15, and SUPPLY-17 overlap J05. SUPPLY-16 repeats release-manifest fields also selected by the Release Profile and verified by J05.
 
-**Finding:** the command manifest is now canonical and has 30 gates, which is a real improvement. The current change does not yet prove, for every gate, a one-to-one requirement, unique evidence purpose, retained trust boundary, and reuse policy. J05, the Release Profile, and CI tooling still describe overlapping acceptance obligations.
+**Safe simplification:** retain complete security behavior and threat controls in J03. Let J05 own how those behaviors are tested and evidenced. Let the Release Profile own exact V1 manifest selections. Use explicit references so no security test disappears.
 
-**Required correction:** produce a compact gate catalog with gate ID, owning contract clause, canonical command, output/evidence, authority class, retained rationale, and whether another gate is only a prerequisite or an independent control. Remove only demonstrably redundant wrappers or duplicate proofs. Retain security-negative, adversarial, failure, recovery, exact-identity, platform-native, provenance, and release gates.
+### F-08 — J04 contains multiple qualification checklists
 
-### P1 — source-of-truth list does not yet point to the persistent findings record
+OPS-30 is a broad qualification list overlapping J05. UI-26 repeats accessibility qualification and UI-28 adds another completion checklist. OPS-26 overlaps release vulnerability policy. Optional examples are often interleaved with normative behavior.
 
-**File:** `AGENTS.md`.
+**Safe simplification:** keep operational, integration, provider, voice, UI, accessibility, and exact threshold behavior in J04. Move test/evidence ownership to J05. Mark examples as non-normative or remove them when they add no unique constraint. Rename the heading “Architecture Decision Escalation” to “Architecture Change Escalation” while preserving its clause identity and meaning, avoiding prohibited decision-record terminology.
 
-**Required correction:** add `docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md` to the first source list immediately after `README.md`, explicitly labeled as a non-normative audit aid. It must not be promoted to contract authority.
+### F-09 — J05 restates behavior instead of testing it
 
-### P2 — validator scope must explicitly handle this non-authoritative audit file
+J05 repeats platform roles, accessibility values, KDF values, provider setup behavior, capability matrices, voice details, branch governance, and release-manifest fields.
 
-**Files:** `tools/contract/manifest.mjs`, `tests/layers/unit/contract-drift.test.mjs`.
+**Safe simplification:** describe the verification method, required evidence, negative cases, and pass/fail decision in J05, referencing the exact behavioral owner clauses. Keep all release vetoes, exact-candidate rules, CI authority, platform qualification, and signed-artifact gates.
 
-**Finding:** this findings record must inventory prohibited retired source names and paths so the audit is reproducible. The tracked-content rejection rule would otherwise treat the audit inventory as an active forbidden reference. That is a tooling-scope issue, not permission to weaken enforcement.
+### F-10 — The Release Profile behaves like another implementation contract
 
-**Required correction:** add this exact non-authoritative findings path to a narrowly documented exemption, and add a regression asserting that the exemption applies only to this audit aid while ordinary tracked files remain rejected. Do not broaden the exemption to a directory, wildcard, or application source.
+Several profile clauses restate platform, integration, accessibility, provider, and qualification behavior from J01 through J05.
 
-### P2 — historical evidence and current operational truth need clearer separation
+**Safe simplification:** retain exact V1 selections: supported platform, enabled capabilities, providers, integrations, voice modes, hardware assumptions, post-V1 commitments, manifest fields, and `Production Complete` boundary. Reference component behavior and J05 verification instead of reproducing them. Capability matrices should remain the selection source here; J01 defines their types and J05 tests the selected values.
 
-**Files:** `docs/implementation/evidence/0.13-master-protection-blocker.md`, `docs/implementation/evidence/0.CP-phase0-checkpoint.md`, `docs/implementation/governance/LOCALCI-CT107-QUALIFICATION-EXCEPTION-2026-09-04.md`, and related evidence.
+### F-11 — Acceptance commands have multiple manually maintained sources
 
-**Finding:** the cited records are labeled historical or non-authoritative in places, but their old governance language can be mistaken for current mode when read beside the stale current governance profile.
+The canonical LocalCI manifest lists 30 commands. Phase 0 repeats 21 of them exactly. LocalCI and GitHub Actions also manually repeat equivalent commands.
 
-**Required correction:** retain factual historical records, add an unmistakable historical/non-current banner where needed, and make current profile and current operational aid reference the live state. Do not rewrite old evidence to make it appear that the old run occurred under today’s governance.
+**Safe simplification:** define reusable gate metadata once, including gate ID, command, execution class, authority, and evidence purpose. Generate or directly consume the LocalCI and Phase 0 views. GitHub workflow topology may remain distinct where runners or job isolation require it, but commands should derive from the shared definition where safe.
 
-## File-by-file findings and required edits
+**Required safeguard:** do not collapse required Windows and general jobs, weaken exact-checkout/toolchain rules, change LocalCI exit code 78 semantics, or promote LocalCI or GitLab to CI authority.
 
-The following list is the review record for every current normative contract file and every contract-control file in scope. “Required edit” means the next consolidation pass must either make the edit or document a technically justified no-change decision in its final report.
+### F-12 — Mechanical repetition obscures meaning
 
-### Authority and entry-point files
+The suite contains 339 redundant adjacent separator patterns, copied boilerplate in all six components, and repeated slogans and invariant summaries.
 
-#### `AGENTS.md`
+**Safe simplification:** remove redundant separators and repeated boilerplate, standardize headings and reference syntax, and keep one canonical statement for each invariant. Preserve clause IDs, tables, code blocks, exact values, and references required by validators.
 
-- **Reviewed:** yes, full file.
-- **Role:** repository instruction and contract entry point; not a product component.
-- **What is simplified:** the authority list now points to the consolidated v1.0.8 suite and states GitHub Actions authority, GitLab mirror-only, and LocalCI non-authority.
-- **Remaining issue:** the source list omits this persistent audit record. Conditional governance wording is valid, but current truth must be taken from the live profile rather than stale evidence.
-- **Required edit:** add the findings file as item 2, labeled non-normative; keep the active manifest/J00–J05/Release Profile hierarchy; avoid duplicating detailed normative rules already owned by J00/J05.
+### F-13 — This findings file had become historical audit baggage
 
-#### `README.md`
+The previous version was 693 lines and embedded old candidate identities, a large retired-path inventory, and prior correction narratives. It was also in the universal reading list, making stale non-authoritative history part of routine context.
 
-- **Reviewed:** yes, full file.
-- **Role:** orientation and authority summary.
-- **What is simplified:** it directs readers toward the v1.0.8 suite and does not claim to be the contract.
-- **Remaining issue:** summary text can drift from J00/J05 and the live governance profile.
-- **Required edit:** keep only concise navigation and non-conflicting summary language; reference the active manifest and current governance aid rather than restating detailed conditional rules. No application behavior edit.
+**Safe simplification applied here:** replace it with the current, persistent findings and measurable baseline. Historical versions remain recoverable through Git history but are not a current authority or required overlay.
 
-#### `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`
+### F-14 — `README.md` repeats governance and product guarantees
 
-- **Reviewed:** yes, full file.
-- **Role:** canonical component index and manifest authority.
-- **What is simplified:** 15 old manifest rows became 7 active component rows; the suite is explicitly v1.0.8.
-- **Remaining issue:** MAN-04 and MAN-07 repeat governance and historical-source prohibitions that are also normative in J00/J03/J05. The repetition is useful as an index, but the wording must not diverge.
-- **Required edit:** retain the seven-row index and exact revisions; reduce detailed normative restatement to concise pointers to the owning clauses; keep manifest drift and fail-closed identity checks.
+The README repeats branch, platform, guarantees, and principles already owned by active contracts.
 
-#### `docs/JARVIS-V1-RELEASE-PROFILE.md`
+**Safe simplification:** keep repository orientation, links to the manifest and contributor instructions, setup essentials, and basic verification commands. Reference authoritative files for normative meaning.
 
-- **Reviewed:** yes, full file.
-- **Role:** V1 support scope and release qualification authority.
-- **What is simplified:** the profile is a single explicit V1 target instead of relying on several older profile/contract overlays.
-- **Remaining issue:** it repeats platform, security, integration, UI, voice, governance, and acceptance requirements owned by J01–J05. RP-17’s conditional fallback is correct, but current governance evidence under it is stale.
-- **Required edit:** retain profile-specific V1 scope, thresholds, exclusions, and release gates; replace duplicated general rules with exact J01–J05 references; update current governance facts and preserve the fallback only as a conditional rule.
+### F-15 — Version treatment must be explicit
 
-### Active normative components
+The manifest requires suite-version advancement when current meaning changes and component revision advancement when normative content changes. Even a semantics-preserving rewrite changes normative files, while a mistaken “cleanup” could accidentally change behavior.
 
-#### `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md`
+**Safe simplification:** create a clause-level preservation map and make an explicit governance decision before editing about the suite and component revisions required by MAN-08. If any meaning changes, follow the synchronous amendment rule. Never silently retain or bump versions.
 
-- **Reviewed:** yes, full 1,030-line file.
-- **Role:** scope, governance, coding, repository, package, and cross-cutting engineering rules.
-- **What is simplified:** coding/package/platform boundaries formerly spread across multiple files have one named home.
-- **Remaining issue:** J00 repeats backup, KDF, provider, UI, platform, and CI details that are more precise in J01–J05. J00-GOV-28 and J00-CODE-28 also overlap internally.
-- **Required edit:** make J00 canonical for repository governance, package boundaries, coding invariants, and cross-cutting engineering rules; move or reference detailed runtime, backup, security, operations, and release semantics instead of repeating them. Preserve the exact GitHub Actions-only authority, GitLab mirror-only rule, LocalCI limitation, branch protection condition, and no-history-source rule.
+## Simplification method
 
-#### `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md`
+For every proposed deletion, merge, or rewrite:
 
-- **Reviewed:** yes, full 2,691-line file.
-- **Role:** platform roles, runtime composition, IPC, protocol types, capability boundaries, and runtime state semantics.
-- **What is simplified:** runtime/platform/protocol requirements formerly split among several contracts now have one principal component.
-- **Remaining issue:** DataPolicy, KDF, approval canonicalization, provider states, capability lists, and some security/release summaries are duplicated in J02, J03, J05, and the Release Profile.
-- **Required edit:** keep J01 canonical for runtime/platform/protocol definitions and exact shared protocol values; replace repeated release-test descriptions with J05 references; do not weaken Windows FULL_HOST, capability boundaries, Job Object limitations, IPC, or degraded-mode truthfulness.
+1. Identify the exact source clause and every normative statement it contains.
+2. Assign one authoritative destination owner.
+3. Classify the change as exact preservation, reference-only deduplication, non-normative example removal, or material semantic change.
+4. Preserve stable clause IDs where practical; otherwise provide an old-to-new mapping.
+5. Search all references, tests, validators, generated files, and evidence before editing.
+6. Update all affected current files synchronously.
+7. Prove that no required behavior, threshold, negative case, or evidence gate was lost.
+8. Stop for explicit governance authorization if a material meaning change is discovered.
 
-#### `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md`
+## Expected outcome
 
-- **Reviewed:** yes, full 1,344-line file.
-- **Role:** authoritative data/state/transaction/backup and recovery contract.
-- **What is simplified:** the data and backup material is grouped into one component rather than separate active authority files.
-- **Remaining issue:** state enums, DataPolicy, KDF profile language, approvals, provider state, and recovery evidence are repeated in J01/J03/J05/RP.
-- **Required edit:** make J02 canonical for SQLite/SQLCipher state, transaction/atomicity, migration, backup classes, fixed `JARVIS_BACKUP_V1`, key separation, recovery slots, restore, rotation, and corruption behavior. Other files must reference J02 rather than restating cryptographic parameters. Do not change AEAD, nonce, tag, framing, AAD, key hierarchy, recovery-factor, or DPAPI requirements.
+A successful pass produces a smaller, navigable, single-owner active suite with fewer duplicated commands and less mandatory reading, while retaining identical or stronger enforceable behavior. Line-count reduction is secondary. The decisive result is lossless traceability plus passing contract, governance, security, schema, architecture, formatting, type, and applicable CI validation.
 
-#### `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md`
+## Second independent review — 2026-09-16
 
-- **Reviewed:** yes, full 1,492-line file.
-- **Role:** security, trust, project-policy, supply-chain, permission, secret, IPC, and update trust authority.
-- **What is simplified:** threat, policy, and supply-chain rules are presented in one security/trust component rather than many active overlays.
-- **Remaining issue:** security summaries and exact values recur in J00/J01/J02/J05/RP. The wording is security-heavy by design; shortening it without a traceability map would be unsafe.
-- **Required edit:** make J03 canonical for threat controls, project-policy enrollment/trust, PermissionEngine/security boundaries, secret handling, TUF/update trust, and security invariants. Remove only duplicate summaries and add references from other files. Preserve every fail-closed, least-privilege, anti-rollback, revocation, approval, TOCTOU, and secret-boundary condition.
+### Decision
 
-#### `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md`
+**NOT COMPLETE.** The current tree is materially simpler and the local checks pass, but the remediation goal's hard acceptance criteria are not fully proven. The prior completion statement was too strong.
 
-- **Reviewed:** yes, full 1,683-line file; 31 OPS and 29 UI subsections.
-- **Role:** operational truth, integrations, lifecycle, voice, notifications, and canonical UI/UX identity/accessibility authority.
-- **What is simplified:** operations, integrations, and UX are grouped in one component.
-- **Remaining issue:** J05 and the Release Profile repeat many operations, integration, UI, voice, accessibility, and qualification lists.
-- **Required edit:** make J04 canonical for user-visible behavior, operational state semantics, integration behavior, UI identity, design tokens, accessibility, and UX non-goals. Keep only profile-specific V1 scope in RP and test/evidence obligations in J05, linked to J04. Do not remove degraded-state, destructive-confirmation, privacy, accessibility, or recovery behavior.
+This decision is limited to contract simplification, optimization, consolidation, and their validation. It does not authorize application implementation, implementation-matrix progression, publication, integration, release qualification, or auditor handoff.
 
-#### `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md`
+### G-01 — Canonical state/type catalogs still have multiple normative owners
 
-- **Reviewed:** yes, full 824-line file; 39 VER subsections.
-- **Role:** verification, evidence, qualification, release, defect handling, and Production Complete authority.
-- **What is simplified:** verification is one named component and the canonical command manifest now has 30 commands instead of 32.
-- **Remaining issue:** J05 restates many J04/RP behavioral requirements and has a broad acceptance surface whose unique evidence purpose is not yet cataloged.
-- **Required edit:** make J05 canonical for what must be tested, what evidence qualifies, release/production gates, and evidence hierarchy. Reference J00–J04 for behavior and exact protocol/security requirements. Build the gate catalog before removing any command. Preserve all negative, adversarial, failure, recovery, cancellation, stale-state, exact-identity, platform, provenance, signing, and release gates.
+The J01 provider-state duplication between J01-RT-14 and J01-PROTO-19 was reduced, but the audit stopped too early. The active suite still repeats canonical vocabularies across components:
 
-### Current governance and evidence aids
+- J01-PROTO-13 defines mission, task, and attempt state types while J02-DATA-09 through J02-DATA-11 repeat their canonical state lists;
+- J01-PROTO-11 defines `ExecutionScope` while J02-DATA-12 repeats its four values;
+- J01-PROTO-18 defines approval states while J02-DATA-14 repeats the list;
+- J01-PROTO-19 defines provider setup states while J02-DATA-22 repeats the full list;
+- J01-PROTO-22 defines budget-reservation states while J02-DATA-24 repeats the list;
+- J02-DATA-25 and J04-OPS-15 repeat the same six module support/installation/authorization/health states;
+- J01-PROTO-24 defines notification severity while J04-OPS-10 repeats the severity catalog.
 
-#### `docs/implementation/governance/repository-governance-profile.json`
+Some repetition may be necessary to state legal transitions or UI behavior, but a second standalone canonical list is not. J01 should own cross-boundary type vocabularies; J02 should own persistence, legal transitions, and atomicity by exact reference; J04 should own presentation and operational behavior by exact reference. The module-state catalog needs one explicitly selected owner before either copy is removed.
 
-- **Reviewed:** yes, full file.
-- **Role:** machine-readable current governance/evidence profile.
-- **Finding:** stale and blocking. It says `COMPENSATING_CONTROLS`, server protection unavailable, private-repository plan limitation, and old residual risk, while authenticated GitHub reports active server protection.
-- **Required edit:** record live `SERVER_ENFORCED` facts, protection settings, required `static-ci`, current repository visibility/default branch, observation timestamp, and exact evidence identity. Preserve old values only under an explicitly historical transition field that cannot be consumed as current state.
+The current test named `provider state vocabulary has one J01 protocol owner` checks only J01-RT-14 and J01-PROTO-19. It does not inspect J02-DATA-22 and therefore gives incomplete single-owner assurance.
 
-#### `docs/implementation/governance/MASTER-PROTECTION.md`
+### G-02 — RP-17 cites a normative preflight owner that no longer contains the requirement
 
-- **Reviewed:** yes, full file.
-- **Finding:** current section is stale for the same reason; the historical run details are not a substitute for current governance facts.
-- **Required edit:** update current effective mode and live settings; retain the old compensating-control narrative only in a clearly labeled historical transition section; make the current operational instructions derive from the machine-readable profile.
+RP-17 says J00-GOV-28 and J05-VER-33 own "preflight." The earlier RP-17 text required an ordered local fail-fast preflight before authorized candidate publication. The current J00-GOV-28 and J05-VER-33 retain exact-candidate and CI-authority rules but do not contain that local preflight sequence. Only non-normative contributor guidance in `AGENTS.md` retains it.
 
-#### `docs/implementation/governance/LOCALCI-CT107-QUALIFICATION-EXCEPTION-2026-09-04.md`
+This is an unresolved semantic deletion and a false owner reference. The requirement must be restored once in an active normative owner, with RP-17 referring to that exact clause.
 
-- **Reviewed:** yes, full file.
-- **Finding:** explicitly historical and non-authoritative. It records a bounded operational exception and does not make LocalCI CI authority.
-- **Required edit:** no deletion is required by this audit. Keep it outside current authority, ensure current docs do not use it as present qualification, and preserve secret/path redaction.
+### G-03 — Acceptance-command consolidation is not yet fail-closed end to end
 
-#### `docs/implementation/evidence/0.13-master-protection-blocker.md`
+The shared 30-gate metadata is useful, but three enforcement gaps remain:
 
-- **Reviewed:** yes, full file.
-- **Finding:** historical v1.0.6 evidence. Its old compensating-control result is factually useful but cannot remain ambiguous beside a current profile.
-- **Required edit:** preserve as historical evidence; strengthen its non-current label if needed; do not change its factual result into present-day server enforcement.
+1. `requiredWorkflowSteps(profile)` derives requirements from whatever IDs the Phase 0 JSON currently contains. Removing a required ID from the profile shrinks the required set instead of failing against a separately controlled canonical Phase 0 ID sequence. Unknown IDs fail, but omission from the profile itself is not independently rejected.
+2. `.localci/ci.sh` uses `source <(node tools/ci/render-localci-gates.mjs)`. Process-substitution producer failure is not proven to propagate as a Bash failure before any gates run. No supported local Bash runtime was available for an execution proof during this review. The validator only searches for the source text, so a commented or unreachable occurrence can satisfy that check.
+3. The GitHub exception exists only as prose in the ledger. Five manifest commands are not exact text matches in `.github/workflows/static-ci.yml` because of shell, working-directory, or evidence-output differences. The metadata and validators do not model and test those consumer-specific variants or a precise technical exception. Therefore one controlled semantic source across LocalCI, Phase 0, and GitHub is not yet demonstrated.
 
-#### `docs/implementation/evidence/0.CP-phase0-checkpoint.md`
+The LocalCI validator also no longer proves that the rendered 30-gate sequence executes before terminal evidence; it proves only that a matching source line exists and that known gates are not inline.
 
-- **Reviewed:** yes, full file.
-- **Finding:** historical checkpoint contains old governance mode and old qualification facts.
-- **Required edit:** preserve historical evidence and clearly separate it from current governance; do not use it to satisfy a current candidate gate.
+### G-04 — Preservation evidence is too coarse and contains unsupported closure claims
 
-#### `tools/checkpoints/phase0-checkpoint-profile.json`
+The remediation goal requires every changed normative sentence to have source text, exact preserved requirement/value, change class, complete owner, references, tests, semantic result, and final status. The ledger mostly maps broad clause ranges and labels them closed using generic "contract checks" or "final-text comparison." That is not clause-level proof for the large normative deletion set.
 
-- **Reviewed:** yes, full file.
-- **Finding:** contains legacy path names as negative/validation data and historical reference expectations. It is not itself a current contract component, but its purpose must remain unmistakable.
-- **Required edit:** retain only if required by current Phase 0 validation; label legacy paths as rejection fixtures or migrate them to a bounded test fixture. Do not turn them into current source references.
+The ledger also says separator lines were reduced from 697 to 358. A current direct count across J00–J05 is 362, so the recorded result and method are not reproducible as written. The findings baseline's 339 value measures redundant separators, not total separator lines; these metrics must not be conflated.
 
-#### `docs/implementation/evidence/0.1-implementation-admission.md`, `0.2-monorepo-boundaries.md`, `0.3-platform-runtime-identity.md`, `0.4-platform-capability-contracts.md`, `0.5-platform-composition-root.md`, `0.6-protocol-schema-foundation.md`, `0.7-canonical-contract-values.md`, `0.8-pinned-toolchain-baseline.md`, `0.9-test-layer-architecture.md`, `0.10-architecture-enforcement.md`, `0.11-static-ci-baseline.md`, `0.12-contract-reproducibility-and-drift.md`, `1.1-rustsec-informational-warning-review.md`, `1.1-tauri-react-desktop-foundation.md`, and `1.3-windows-platform-host-composition.md`
+Because G-01 through G-03 remain open, the ledger statement that it has no open remediation entries and this findings file's previous completion conclusion were false.
 
-- **Reviewed:** current evidence inventory and applicable files.
-- **Finding:** these are evidence records, not normative contract authority. Some are historical or implementation-subsection records and must not be used to advance this contract-only task.
-- **Required edit:** update only stale contract names, authority claims, or links caused by the consolidation; do not rewrite scores/status or add application evidence. Every current claim must distinguish local, GitHub Actions, live platform, and independent evidence.
+### G-05 — MAN-08 version treatment changed governance meaning without durable proof
 
-### Execution aids and reports
+The prior MAN-08 rule said component revisions advance when normative content changes. The current edit says revisions advance only when normative meaning changes and creates a no-bump exception for lossless restructuring supported by a ledger.
 
-#### `docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md`
+That is a normative version-policy change, not merely formatting. The ledger calls it an owner-authorized clarification but contains no durable evidence of the exact authorization or its scope. The closure pass must either restore the prior rule and apply its revision consequences, or obtain explicit governance authorization for the new policy and process it as a material amendment. It must not use the changed rule to justify itself.
 
-- **Reviewed:** yes, full execution aid.
-- **Finding:** it remains a sequencing aid, not normative authority. It contains implementation phases and release checkpoints that must not be pulled into contract consolidation as app work.
-- **Required edit:** only update stale active-contract names/links and clearly preserve the no-implementation boundary.
+### G-06 — Protected-test scope is not truthfully resolved
 
-#### `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md`
+The remediation goal says application behavior tests remain unchanged except an authorized validator read-only dependency, while a hard criterion later says application behavior tests are unchanged without repeating the exception. `tests/layers/unit/desktop-production-tauri-build.test.mjs` changed to consume derived Phase 0 metadata. Its assertions were not intentionally weakened, but the file is not byte-for-byte unchanged.
 
-- **Reviewed:** yes, full matrix.
-- **Finding:** it is the application execution plan and must not advance for this task.
-- **Required edit:** none to status, pointer, score, evidence, or subsection ordering. Only repair a strictly stale contract link if necessary.
+The next goal must resolve this contradiction explicitly: classify the exact edit as a validator-consumer adaptation and prove unchanged application behavior coverage, or restore the file and provide the compatibility boundary elsewhere. It may not simply report that application behavior tests were unchanged.
 
-#### `docs/implementation/JARVIS-IMPLEMENTATION-MATRIX-REFERENCE.md`
+### G-07 — Required closure reporting was not delivered
 
-- **Reviewed:** yes, full reference.
-- **Finding:** it is a non-authoritative reference and must identify the v1.0.8 active suite without becoming a second matrix or contract.
-- **Required edit:** keep links and suite identity synchronized; do not add application progress or normative requirements.
+The previous goal required a detailed final report containing repository identity, file-by-file changes, ownership transfers, independent discoveries, ledger state, measured duplicate counts, full validation, protected-path confirmation, ADR confirmation, and authoritative GitHub evidence state. The completion response did not provide that report. Passing checks do not satisfy a missing required deliverable.
 
-#### `docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`
+### Evidence that does pass
 
-- **Reviewed:** yes, current 351-line goal.
-- **Finding:** it correctly limits the task to contract/verification-system work, but it needs to be regenerated from this findings record. Its file-by-file instructions currently mix preservation requirements with a large acceptance surface without a measured ownership map.
-- **Required edit:** replace it with the detailed contract-only goal below, including the P0 governance correction, requirement ownership map, gate catalog, findings-file reread requirement, local-first sequence, and ship-only-with-no-issues rule. Do not authorize application behavior or matrix work.
+- Active clause IDs are unique and all detected direct clause references resolve.
+- No tracked ADR, decision-record, or historical-overlay path is active authority.
+- The implementation matrix and application source have no tracked diff.
+- Contract generation, manifest, and drift checks pass.
+- The normal local test profile passes 22 files.
+- Governance and formatting checks pass, and `git diff --check` reports no whitespace error.
+- GitHub Actions remains the stated mandatory CI authority; GitLab remains mirror-only and LocalCI remains non-authoritative.
 
-### Contract enforcement, generated outputs, and tests
+These results are necessary but do not close G-01 through G-07.
 
-#### `tools/contract/manifest.mjs`
+## Current conclusion
 
-- **Reviewed:** yes, full file.
-- **Finding:** deterministic tracked-path and forbidden-source validation is valuable and fail-closed, but this new audit record must be a narrowly documented non-authoritative exemption because it inventories retired source names.
-- **Required edit:** add only the exact findings path to the exemption set and explain why; add regression coverage. Keep all ordinary tracked-file path, filename, and reference rejection unchanged.
+The agreement is **not yet fully implemented**, and the existing remediation goal was **not fully completed**. The correct terminal state is `NEXT PASS`, not `COMPLETE`. A new bounded closure goal must address every gap above and repeat an independent final-tree audit until no open, unknown, contradicted, or unproven criterion remains.
 
-#### `tools/contract/check-drift.mjs` and `tools/contract/lib.mjs`
+## Current verification boundary
 
-- **Reviewed:** yes, applicable implementation.
-- **Finding:** generated values and manifest drift are appropriately centralized. No application behavior is involved.
-- **Required edit:** keep source-of-truth and generated-output checks deterministic; simplify only duplicate error/reporting layers if the same failure remains fail-closed and attributable.
+The normal local profile passes. The qualification profile currently stops before execution because required implementation-oriented layers have no tests: provider setup, tools, integrations, UI/accessibility, recovery, persistence/backup/migration, performance, voice, and packaging/update/release. This contract-only goal does not authorize adding application behavior or qualification coverage to resolve that repository-wide implementation gap. The absence of qualification-profile evidence therefore remains explicit and cannot be represented as release qualification.
 
-#### `tools/ci/localci-gate-manifest.mjs`
+## Final-closure remediation outcome — 2026-09-16
 
-- **Reviewed:** yes, full file.
-- **What is simplified:** one frozen 30-command array supplies LocalCI and acceptance membership/order.
-- **Remaining issue:** command membership is canonical, but requirement ownership/evidence reuse is not encoded.
-- **Required edit:** preserve exact order, command arguments, terminal evidence, mutation rejection, and exit-78 non-authority behavior. Add only the minimal metadata or companion catalog needed to explain unique purpose; do not add a second command list.
+The conclusion above records the independent review at the time it was made and is retained rather than rewritten. The bounded final-closure pass subsequently resolved its seven findings:
 
-#### `tools/ci/check-repository-governance.mjs` and `tools/ci/generate-evidence.mjs`
+- G-01: J01 now owns the cross-boundary protocol vocabularies, J02 retains persistence/transitions/atomicity, and J04 owns module lifecycle/support and presentation behavior. Negative drift tests reject relisting.
+- G-02: J00-GOV-28 now owns the ordered local pre-publication preflight; RP-17 references that owner and J05-VER-33 owns qualification evidence.
+- G-03: the Phase 0 subset is canonical and fail-closed; LocalCI renders through a checked temporary file; GitHub command variants are explicit controlled metadata; native Git Bash proves renderer failure exits 78 before sourcing.
+- G-04: the preservation ledger now includes an exact changed-clause index and corrected reproducible separator accounting.
+- G-05: the prior MAN-08 content-change revision rule is restored. J00–J05 and the Release Profile advance to revision 1.0.9 while the unchanged product-rule suite remains 1.0.8.
+- G-06: the desktop test change is explicitly classified as a read-only validator-consumer adaptation; its two application assertions and mutation coverage remain unchanged and pass.
+- G-07: the required persistent closure report is `docs/implementation/JARVIS-CONTRACT-SIMPLIFICATION-FINAL-CLOSURE-REPORT.md`.
 
-- **Reviewed:** yes, applicable files.
-- **Finding:** they validate the checked-in profile and evidence shape, but the current governance check did not detect the live GitHub mismatch.
-- **Required edit:** make the current profile internally truthful and, where contractually required, make live observation fields explicit and non-stale. Do not make ordinary local execution an authority substitute for GitHub Actions.
-
-#### `tools/checkpoints/phase0-checkpoint.mjs`
-
-- **Reviewed:** yes, applicable checker.
-- **Finding:** it correctly protects status/authority/evidence consistency, but historical profile values can pass when represented as current checked-in governance data.
-- **Required edit:** distinguish current live governance from historical evidence and fail closed on stale current profile facts. Do not advance matrix status.
-
-#### `.github/workflows/static-ci.yml` and `.localci/ci.sh`
-
-- **Reviewed:** yes, relevant workflow/script sections.
-- **Finding:** the current candidate has exact-candidate GitHub evidence and the LocalCI sequence is derived from the canonical list. GitHub Actions remains the only CI authority.
-- **Required edit:** retain local-first preflight semantics, exact candidate identity, pinned inputs, evidence identity, and LocalCI non-authority. Remove only wrappers proven to duplicate another canonical gate. No GitLab authority and no LocalCI qualification claim.
-
-#### `tests/layers/unit/contract-drift.test.mjs`, `localci-compatibility.test.mjs`, governance/Phase 0/static-CI tests, and related test harness files
-
-- **Reviewed:** yes, applicable tests.
-- **Finding:** adversarial path, command mutation, duplicate, omission, and drift coverage was strengthened. Some tests necessarily contain prohibited path terms as rejection fixtures.
-- **Required edit:** add the exact findings-file exemption regression and live-governance profile consistency coverage. Retain all negative/adversarial tests. Do not create a new testing framework or count one test as multiple independent proofs without rationale.
-
-## Retired source inventory and migration obligation
-
-The candidate diff records exactly 93 deleted paths and 5 renamed paths, including 11 deleted paths under `docs/adr`, 48 under `docs/decisions`, 10 under `docs/history`, and 24 other legacy contract/manifest/lineage/readiness paths. The abbreviated baseline inventory below is retained for audit context; the complete 98-row retired-path crosswalk later in this record records every deleted path and every rename source path.
-
-- `docs/JARVIS-CONTRACT-LINEAGE.md`;
-- `docs/JARVIS-CONTRACT-MANIFEST-v1.0.3.md`;
-- `docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md`;
-- `docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md`;
-- `docs/JARVIS-CONTRACT-v1.0.3-READINESS-AUDIT.md`;
-- `docs/JARVIS-CONTRACT-v1.0.4-READINESS-AUDIT.md`;
-- `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md`;
-- `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md`;
-- `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md`;
-- `docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md`;
-- `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md`;
-- `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md`;
-- `docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md`;
-- `docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md`;
-- `docs/implementation/JARVIS-RUNTIME-CONTRACT.md`;
-- `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md`;
-- `docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md`;
-- `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`;
-- `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md` before its rename to J05;
-- `docs/decisions/ADR-051-production-implementation-contract-suite.md`;
-- `docs/decisions/ADR-052-protocol-schema-and-production-implementation-plan.md`;
-- `docs/decisions/ADR-054-contract-consistency-and-schema-normalization.md`;
-- `docs/decisions/ADR-067-v1-integration-release-boundary-and-next-update-requirements.md`;
-- `docs/decisions/ADR-069-contract-v1.0.2-canonical-consolidation.md`;
-- `docs/decisions/ADR-071-contract-v1.0.3-production-hardening-and-release-closure.md`;
-- `docs/decisions/ADR-073-contract-v1.0.5-security-closure-and-release-sequencing.md`;
-- `docs/decisions/ADR-074-hosting-capability-aware-repository-governance.md`;
-- `docs/decisions/ADR-075-repository-governance-contract-coherence.md`;
-- `docs/decisions/ADR-076-qualified-ci-authority-equivalence.md`;
-- all remaining files under the retired `docs/adr`, `docs/decisions`, and `docs/history` directories shown by `git diff --name-status origin/master...HEAD`.
-
-The next consolidation pass must maintain a requirement crosswalk for every retired contract/decision/history source category. A filename count is not enough. If a still-valid rule is not represented in an active component, the pass must stop and correct the active suite before claiming completion. No retired file may be restored or cited as current or historical source authority.
-
-## Required requirement-ownership model
-
-The next pass must assign each shared requirement to exactly one primary normative owner:
-
-| Requirement family | Primary owner | Other files may contain |
-|---|---|---|
-| scope, repository, package, coding, branch, CI authority | J00 | short manifest/entry-point pointers and operational evidence |
-| runtime/platform roles, protocol types, capability boundaries, IPC/runtime semantics | J01 | V1 scope narrowing in Release Profile and verification references in J05 |
-| authoritative data/state, transactions, migrations, backup/recovery format | J02 | security references and release-test references |
-| security, PermissionEngine, project policy, secrets, TUF/update trust | J03 | exact V1 scope references and verification references |
-| operations, integrations, lifecycle, voice, UI identity/accessibility | J04 | V1 inclusion/exclusion and verification references |
-| tests, evidence, qualification, release and Production Complete | J05 | profile-specific release gate selection only |
-| exact Windows V1 support scope and release artifact boundary | Release Profile | references to J00–J05, not duplicate general rules |
-| active component identity and revision | manifest | no duplicate component authority |
-
-This table is a review requirement, not a replacement for the active contract.
-
-## Acceptance-preservation requirements
-
-The optimization pass may remove a gate only if its owner proves all of the following in the final report:
-
-1. the removed gate tests exactly the same requirement as a retained gate;
-2. the retained gate runs the same or stronger validation;
-3. the trust boundary and execution authority are unchanged;
-4. negative, adversarial, failure, recovery, cancellation, stale-state, exact-identity, provenance, platform, and release evidence remain covered;
-5. the retained evidence is durable, attributable, and not merely a local or synthetic result;
-6. no command wrapper or report transformation was hiding a distinct failure condition;
-7. the removal lowers execution or maintenance cost without weakening diagnosis.
-
-The following may not be removed merely because they look repetitive: fixed backup cryptography, KDF floors, key separation, project-policy enrollment, TUF thresholds/expiry/anti-rollback, PermissionEngine deny precedence, exact repository/ref/SHA binding, fail-closed status handling, Windows-native qualification, signed/provenance evidence, crash/recovery/uncertain-state tests, and destructive-action confirmation.
-
-## Initial next-pass completion criteria — correction checklist
-
-The initial audit marked the consolidation **NOT READY TO SHIP** until the following correction criteria were satisfied. They are retained here as the audit checklist; the current correction-pass result is recorded below.
-
-- current governance profile and operational aid match live GitHub truth;
-- this record is linked from the first `AGENTS.md` source list and remains non-normative;
-- every active contract has a documented ownership result and required edit/no-change decision;
-- every retired source category has a requirement-preservation crosswalk;
-- duplicate wording is reduced by canonical references without losing conditions;
-- every retained acceptance gate has a unique purpose and evidence type;
-- local preflight passes before any GitHub Actions run;
-- exact-candidate GitHub Actions is used only after local preflight and only when publication is authorized;
-- generated artifacts and drift checks pass;
-- the matrix and application sources remain untouched for this contract-only task;
-- the final audit checks the result against this goal, the active contract, and `AGENTS.md`, fixes every issue found, and ships only when no issue remains.
-
-## Correction-pass record — 2026-09-15
-
-This section records the bounded correction pass after the audit baseline above. It is still a non-normative audit aid. The active manifest, J00–J05, Release Profile, and `AGENTS.md` remain the only normative authority.
-
-### Current governance truth
-
-The authenticated live GitHub observations used for this pass are:
-
-| Fact | Observed value |
-|---|---|
-| repository | `andresslacson1989/jarvis-project` |
-| repository visibility | public |
-| default/authoritative branch | `master` |
-| server protection | available and active |
-| required status check | strict `static-ci` (`app_id=15368`) |
-| approving reviews | 1 |
-| administrator enforcement | enabled |
-| force pushes | disallowed |
-| branch deletion | disallowed |
-| conversation resolution | enabled |
-| observation source | authenticated GitHub API |
-| observation timestamp | `2026-09-15T01:49:15Z` |
-| evidence identity | `github-api:repo-1330469646:refs/heads/master:protection:static-ci:app-15368` |
-
-`docs/implementation/governance/repository-governance-profile.json` now records `SERVER_ENFORCED` with those current facts. The former `COMPENSATING_CONTROLS` values remain only beneath `historicalTransition.notCurrent=true`. `MASTER-PROTECTION.md` has the same current/history boundary. The historical evidence records retain their original results and now carry explicit historical-only banners; no historical run is treated as current v1.0.8 candidate qualification.
-
-### Requirement ownership map
-
-The following map is the reviewable primary-owner result. A requirement family has one normative owner; other files may contain only the stated scope, verification, evidence, or navigation reference.
-
-| Requirement family | Primary normative owner | Allowed references / proof surfaces |
-|---|---|---|
-| scope, repository, package, coding, branch, CI authority | J00 | manifest index, README/AGENTS entry points, governance aid, J05 evidence references |
-| runtime/platform roles, protocol types, capability boundaries, IPC/runtime semantics | J01 | Release Profile V1 narrowing, J05 verification evidence |
-| authoritative data/state, transactions, migrations, fixed backup format, recovery | J02 | J03 secret-boundary references, Release Profile selection, J05 verification evidence |
-| security, PermissionEngine, project-policy trust, secrets, TUF/update trust | J03 | J00/J01/J02/J04 implementation-boundary references, J05 verification evidence |
-| operations, integrations, lifecycle, voice, UI identity, design tokens, accessibility | J04 | Release Profile V1 inclusion/exclusion, J05 behavior/evidence references |
-| tests, evidence, qualification, release gates, Production Complete | J05 | Release Profile applicability and the single executable acceptance-gate manifest |
-| exact Windows V1 support scope and signed release-artifact boundary | Release Profile | references to J00–J05; no duplicate general rule definition |
-| active component identity and revision | manifest | no duplicate component authority |
-
-### Active-file edit/no-change decisions
-
-| Active file | Decision | Result and preservation rationale |
-|---|---|---|
-| `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md` | EDITED | MAN-04 now points to J02/J03/J00/J05 owners while retaining the seven-row active suite, revision identity, and no-overlay boundary. |
-| `docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md` | EDITED | Cross-cutting implementation restatements now point to J01–J05/RP owners; repository/CI authority and fail-closed limits remain explicit. |
-| `docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md` | EDITED | J01-PLAT-28 delegates verification criteria to J05 while retaining the canonical runtime/platform/protocol clauses, including normalized TTS/AEC and provider-supervisor behavior at J01-RT-26A. |
-| `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md` | NO CHANGE | Exact authoritative data, transaction, KDF persistence, fixed backup format, key separation, recovery, restore, and corruption clauses remain canonical and were not shortened. |
-| `docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md` | NO CHANGE | Exact security, PermissionEngine, project-policy, secret, TUF, approval, TOCTOU, and fail-closed clauses remain canonical; shortening them without a stronger proof would be unsafe. |
-| `docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md` | NO CHANGE | Exact operations, integration, lifecycle, voice, UI identity, accessibility, privacy, degraded-state, and destructive-confirmation semantics remain canonical. |
-| `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md` | EDITED | J05 now names only the single 30-gate command manifest while retaining the full release-gate list and evidence hierarchy. |
-| `docs/JARVIS-V1-RELEASE-PROFILE.md` | EDITED | General platform/security/runtime/mission/governance/release repetitions now reference the canonical owners; exact Windows V1 scope, thresholds, capability matrices, voice selection, exclusions, and artifact boundary remain in the profile. |
-| `AGENTS.md` | EDITED | The source-of-truth order, findings-file non-normative label, authority hierarchy, local-first rule, no-implementation boundary, and GitHub/GitLab/LocalCI roles remain explicit; the edit did not authorize application implementation or matrix work. |
-| `README.md` | EDITED | Detailed governance and no-overlay repetition now points to J00/J05 and the current governance aid; navigation and current guarantees remain. |
-| `docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md` | EDITED | The prior matrix-execution text was replaced with the owner-provided contract-only consolidation/correction goal; the supplied goal remains the execution instruction and was not optimized into a shorter substitute. |
-| `docs/implementation/CONTRACT-ACCEPTANCE-GATE-CATALOG.md` | REMOVED | The Markdown catalog duplicated the executable gate manifest and had no independent execution, authority, trust, or failure boundary; no gate or proof was removed with it. |
-| `tools/ci/localci-gate-manifest.mjs` | EDITED | The canonical 30-command manifest and derived gate names remain; duplicate metadata/catalog state and its validator were removed. |
-| `tools/ci/check-repository-governance.mjs` | EDITED | Current candidate evidence now accepts exactly `NOT_RECORDED` or complete `RECORDED` state and rejects incomplete, inconsistent, stale, or unexpected fields fail-closed. |
-| `tests/layers/unit/repository-governance.test.mjs` | EDITED | Tests cover complete future `RECORDED` evidence, documentation transition, missing/wrong fields, stale reason, timestamp ordering, unknown status, and unexpected fields while retaining current-state negative coverage. |
-| `tests/layers/unit/localci-compatibility.test.mjs` | EDITED | Catalog-specific duplicate tests were removed with the duplicate source; exact LocalCI sequence, mutation, terminal-evidence, and non-authority coverage remains. |
-| `docs/implementation/JARVIS-CONTRACT-CONSOLIDATION-AUDIT-FINDINGS.md` | EDITED | This nonnormative record now distinguishes baseline reported results from fresh verified results, enumerates all retired paths, records the catalog removal, and records the exact candidate-evidence state model. |
-
-### Retired-source requirement-preservation crosswalk
-
-| Retired source category | Current owner/crosswalk | Current enforcement or evidence |
-|---|---|---|
-| older manifests and monolithic implementation contracts | manifest identity plus J00–J05 and Release Profile; valid requirements are mapped by family in the owner table above | `pnpm contract:check`, generated-value drift, manifest row/revision checks |
-| standalone backup/data/recovery sources | J02 data/backup clauses, with J03 secret-boundary references and RP V1 selection | schema, backup/restore, recovery, KDF, and J05 release qualification tests |
-| standalone runtime/platform/protocol sources | J01 runtime/platform/protocol clauses | schema/cross-language, architecture/import, platform-boundary, IPC, and native qualification gates |
-| standalone security/policy/supply-chain sources | J03 security, policy, and supply-chain clauses | secret, PermissionEngine, policy-trust, TUF, update, approval, and adversarial tests |
-| standalone operations/integration/voice/UI sources | J04 operations/integration/voice/UI clauses, with RP scope and J05 evidence references | provider/integration, voice, UI/accessibility, degraded/recovery, and release evidence gates |
-| standalone verification/release sources | J05 verification/release clauses and RP applicability | test-layer, qualification, signed-artifact, provenance, and Production Complete gates |
-| retired decision, archive, lineage, and history material | no current owner; valid requirements must enter the active owner above, while source paths remain prohibited | manifest tracked-path/filename/reference rejection, Phase 0 rejection fixtures, and this non-authoritative inventory only |
-| historical governance and LocalCI records | current profile/MASTER-PROTECTION for present facts; historical evidence remains labeled non-current | governance profile/document validators and Phase 0 integration; LocalCI remains non-authoritative |
-| implementation plans, matrices, and evidence reports | execution/evidence aids only; no product authority and no matrix advancement in this task | current suite links, no-application-change check, and status-preservation review |
-
-No retired source was restored or consulted as current authority. The inventory names retired paths only in this non-authoritative findings record and bounded rejection fixtures covered by the exact validator exemptions.
-
-### Acceptance-gate source and duplicate disposition
-
-The correction removed the unnecessary second acceptance representation: the metadata object, derived catalog, Markdown catalog, and catalog validator. The single canonical executable source is the 30-entry `ACCEPTANCE_GATE_COMMANDS` array in `tools/ci/localci-gate-manifest.mjs`; `ACCEPTANCE_GATES` and the LocalCI aliases are derived views of that array, not additional authority. The LocalCI compatibility validator still checks exact membership, order, command arguments, terminal evidence, and fail-closed non-authority. No security, failure, recovery, platform, provenance, exact-identity, or release gate was removed.
-
-| Measure | Before baseline | After correction pass | Result |
-|---|---:|---:|---|
-| active normative authority files | 16 | 8 | 8 fewer files: one manifest, six components, one Release Profile |
-| manifest authority rows | 15 | 7 | 8 fewer rows; active identity remains manifest-derived |
-| canonical acceptance commands | 32 | 30 | 2 duplicate command definitions removed by the original consolidation; 0 acceptance commands removed in this correction pass |
-| acceptance command/metadata/catalog sources | 4 | 1 | metadata, derived catalog, Markdown catalog, and catalog validator removed because they duplicated the executable manifest without a distinct execution or trust boundary |
-| security/qualification checks removed | reported 0 | 0 | no security, recovery, platform-native, provenance, signed-artifact, or release proof was removed |
-| repeated normative restatement blocks replaced by owner references | not separately measured | 25 explicit blocks | J00 10; J01 1; manifest 5; Release Profile 7; README 2 |
-| terminal evidence commands | 1 | 1 | `ci:evidence` remains the single final evidence command and is outside the 30 acceptance gates |
-
-### Direct active-suite line-count measurement
-
-| Measure | Before baseline | After correction pass | Result |
-|---|---:|---:|---|
-| directly comparable active manifest/components/profile text | **9,195 reported** by the initial audit | **9,585 verified** in the corrected tree; the prior audited candidate was **9,870 reported** | line count is reported transparently and is not used as the sole proof of simplification |
-
-The two removed acceptance definitions are the previously audited 32→30 reduction. This correction pass removed no acceptance command or proof; it removed only duplicate representations of the retained commands. The retained gates remain separate where they protect different trust boundaries, such as scanner installation/version/result/report, host versus Windows-target compilation, static governance versus Phase 0 aggregation, and local preflight versus authoritative GitHub execution. The removed catalog did not have a distinct command wrapper, execution authority, trust boundary, or failure condition, so its removal lowers maintenance cost without weakening diagnosis.
-
-### Required tests and evidence retained
-
-- J05-VER-07 retains all **15 named test-layer categories**: unit; property/state-machine; schema/cross-language contract; platform architecture/contracts; provider setup/contract/sandbox; tool contract; integration/module conformance; integration/e2e; UI/accessibility/adaptive; safety/adversarial; recovery/chaos; persistence/backup/migration; performance/resource; voice/audio; and packaging/update/release.
-- The earlier targeted run was **reported** as **84 passing subtests**; the fresh correction-specific targeted run is **verified** at **97/97 passing subtests**, including strict current-candidate state coverage.
-- The existing LocalCI negative suite still covers omission, duplication, unknown insertion, reorder, command mutation, terminal-evidence order, non-authoritative exit 78, and Windows/WSL attestation guards.
-- The retained evidence classes are **10**: deterministic automated checks; local preflight; authoritative GitHub Actions; authenticated live GitHub observation; native Windows platform/build evidence; integration/conformance evidence; security-negative/adversarial evidence; failure/recovery/uncertain-state evidence; signed/provenance/license artifact evidence; and independent review where required.
-
-### Correction-pass completion boundary
-
-The earlier baseline reported that the two Rust dependency report gates had not been rerun. That statement was accurate for the earlier audit, but it is not evidence for this correction pass; the fresh rerun identity and dependent warning review are recorded below. This record remains nonnormative. No completion status is claimed here until the final correction tree passes the required local sequence, fresh report gates, contract/governance checks, and the explicit final goal/contract/`AGENTS.md` comparison.
-### Complete retired-path crosswalk
-
-Relative to `origin/master`, the correction baseline candidate `17a6ea1217227ffa28690e6b6d035bb937cd741d` contains exactly **93 deleted paths** and **5 renamed paths**. The correction commits retain that cumulative inventory; the exact new correction-candidate SHA is recorded after commit. The table below contains one row for each deleted path and one row for each rename source path: **93 DELETED rows + 5 RENAMED rows = 98 rows**.
-
-This persistent record is audit-supporting and non-normative. It is not an ADR, not a contract authority, and not a replacement for the active manifest, J00–J05, or Release Profile. Retired paths are named only for auditability; their contents are not retained, consulted, cited, or treated as current authority.
-
-| Retired path | Status | Active destination clause | Disposition | Reason for removal |
-|---|---|---|---|---|
-| `docs/JARVIS-CONTRACT-LINEAGE.md` | DELETED | Manifest MAN-03/MAN-07 and J00 governance/index ownership | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/JARVIS-CONTRACT-MANIFEST-v1.0.3.md` | DELETED | `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md` MAN-02/MAN-08 | RETIRED_NO_AUTHORITY | Superseded manifest revision removed; the v1.0.8 manifest is the sole active component and revision authority. |
-| `docs/JARVIS-CONTRACT-MANIFEST-v1.0.6.md` | DELETED | `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md` MAN-02/MAN-08 | RETIRED_NO_AUTHORITY | Superseded manifest revision removed; the v1.0.8 manifest is the sole active component and revision authority. |
-| `docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md` | DELETED | `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md` MAN-02/MAN-08 | RETIRED_NO_AUTHORITY | Superseded manifest revision removed; the v1.0.8 manifest is the sole active component and revision authority. |
-| `docs/JARVIS-CONTRACT-v1.0.3-READINESS-AUDIT.md` | DELETED | J05 verification/release evidence and Release Profile; reports do not authorize behavior | RETIRED_NONNORMATIVE_REPORT | Historical non-normative report retired from the active path; J05 governs qualification evidence and reports do not authorize behavior. |
-| `docs/JARVIS-CONTRACT-v1.0.4-READINESS-AUDIT.md` | DELETED | J05 verification/release evidence and Release Profile; reports do not authorize behavior | RETIRED_NONNORMATIVE_REPORT | Historical non-normative report retired from the active path; J05 governs qualification evidence and reports do not authorize behavior. |
-| `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.3.md` | DELETED | Active J00–J05 owner model and Release Profile; no monolithic contract source | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.6.md` | DELETED | Active J00–J05 owner model and Release Profile; no monolithic contract source | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md` | DELETED | Active J00–J05 owner model and Release Profile; no monolithic contract source | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/adr/028-resource-aware-runtime-scheduling.md` | DELETED | J01 runtime scheduling/resource semantics, J04 operations, J05 verification | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/ADR-022-voice-latency-and-instant-response.md` | DELETED | J04-OPS-14 voice behavior and J01-RT-26A protocol/provider path; J05 evidence | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/ADR-023-DUAL-PATH-RESPONSIVENESS.md` | DELETED | J01-RT-26A runtime voice path and J04 lifecycle/UX semantics; J05 evidence | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/ADR-024-realtime-conversation-engine.md` | DELETED | J01 runtime/protocol semantics and J04 operations/voice lifecycle | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/ADR-025-context-authority-and-scoped-memory.md` | DELETED | J02 authoritative data/state and J01 runtime context boundaries | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/ADR-026-provider-supervisor.md` | DELETED | J01 provider-supervisor lifecycle and J04 provider operations | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/ADR-029-persistent-human-voice-and-instant-acknowledgement.md` | DELETED | J04-OPS-14 voice operations and J01-RT-26A voice protocol/provider semantics | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/ADR-030-context-aware-permission-engine.md` | DELETED | J03-SEC-13 PermissionEngine and J03 authorization/fail-closed rules | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/ADR-031-SCOPED-RANKED-MEMORY-RETRIEVAL.md` | DELETED | J02 authoritative data/state and J01 runtime context boundaries | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/ADR-032A-QUEUE-TRANSPARENCY.md` | DELETED | J01 queue/state semantics and J04 operational/UX status language | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/adr/README.md` | DELETED | No normative owner; J00/J05 path and no-overlay enforcement | RETIRED_INDEX | Redundant historical/decision-record index removed so prohibited overlay paths cannot become a source of authority. |
-| `docs/decisions/ADR-021-MODULAR-TTS-PROVIDERS.md` | DELETED | J01-RT-26A normalized voice/provider protocol and J04-OPS-14 provider operations | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-027-modular-acoustic-echo-cancellation.md` | DELETED | J01-RT-26A AEC capability/protocol semantics and J04 voice operations | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-032-mission-planning-and-worker-allocation.md` | DELETED | J01 runtime graph semantics, J02 authoritative state, J04 operations | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-033-AI-Provider-Fallback-and-Continuity.md` | DELETED | J01 provider/runtime continuity and J04 provider lifecycle | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-034-supported-module-registry-and-dashboard.md` | DELETED | J01 module/runtime boundary, J03 trust, J04 operations, J05 qualification | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-035-versioned-staged-module-updates-and-rollback.md` | DELETED | J03 supply-chain/update trust and J05 update qualification | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-036-validated-tool-execution-boundary.md` | DELETED | J00 coding boundary, J03 authorization/trust, J05 verification | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-037-durable-recovery-and-safe-resume.md` | DELETED | J02 recovery/state semantics and J05 recovery evidence | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-038-work-dashboard-worker-journals-auditability.md` | DELETED | J01 runtime ownership, J02 durable state/audit records, J04 operations/UX | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-039-supported-integration-catalog-and-credential-boundaries.md` | DELETED | J03 secrets/trust and J04 integrations/provider lifecycle | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-040-event-gateway-and-triggered-automation.md` | DELETED | J04 operations/integrations and J05 verification evidence | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-041-notification-policy-engine.md` | DELETED | J04 operations, notification policy, and UX state semantics | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-042-project-registry-and-workspace-isolation.md` | DELETED | J02 authoritative project/state data, J03 trust, J04 operations | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-043-budget-and-usage-policy-engine.md` | DELETED | J02 usage/state accounting and J04 operations/policy behavior | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-044-session-password-trust-boundary.md` | DELETED | J03 secret/trust boundary and J02 protected state | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-045-authority-envelope-and-precedent-aware-autonomy.md` | DELETED | J03 authorization/PermissionEngine and fail-closed trust rules | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-046-graph-orchestrated-missions-and-bounded-worker-loops.md` | DELETED | J01 runtime graph, J02 authoritative mission state, J04 operations | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-047-dynamic-mission-graph-revision.md` | DELETED | J01 runtime graph mutation and J02 authoritative state transitions | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-048-task-priority-preemption-and-safe-pause-resume.md` | DELETED | J01 runtime lifecycle/state and J04 operational status behavior | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-049-architecture-decision-escalation-policy.md` | DELETED | J00 repository/coding governance and J05 verification/release escalation | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-050-capability-based-worker-role-and-provider-routing.md` | DELETED | J01 capability/runtime boundary and J04 provider operations | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-051-production-implementation-contract-suite.md` | DELETED | Manifest identity plus active J00–J05/RP suite | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-052-protocol-schema-and-production-implementation-plan.md` | DELETED | J01 protocol/schema authority and J05 verification sequencing | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-053-ai-platform-not-llm.md` | DELETED | J00 scope/governance and J01 runtime/provider boundary | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-054-contract-consistency-and-schema-normalization.md` | DELETED | Manifest/contract checks and J01 schema/protocol authority | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-055-windows-core-ipc-access-control.md` | DELETED | J01 Windows IPC/runtime boundary and J03 access control | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-056-same-user-compromise-boundary.md` | DELETED | J03 security/trust boundary | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-057-module-execution-isolation.md` | DELETED | J01 process/capability boundary and J03 module trust/isolation | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-058-deterministic-approval-action-digests.md` | DELETED | J01 action identity and J03 authorization/approval integrity | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-059-proxmox-ve-integration-boundary.md` | DELETED | J03 credential/trust boundary, J04 integration behavior, J05 qualification | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-060-provider-authoritative-usage-and-exact-budget-accounting.md` | DELETED | J02 authoritative accounting and J04 provider operations | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-061-application-owned-core-runtime.md` | DELETED | J01 Core/runtime ownership, J02 state, J04 operations | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-062-backup-recovery-key-semantics.md` | DELETED | J02 fixed backup cryptography/recovery format | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-063-mandatory-windows-job-object-containment.md` | DELETED | J01 Windows runtime/process-containment semantics | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-064-explicit-ipc-response-error-union.md` | DELETED | J01 IPC/protocol error-union semantics | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-065-provider-version-qualification-and-codex-compatibility.md` | DELETED | J01 provider compatibility, J04 setup/lifecycle, J05 qualification | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-066-provider-session-resume-is-optimization-not-durability.md` | DELETED | J01 provider/runtime lifecycle and J02 durability boundary | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-067-v1-integration-release-boundary-and-next-update-requirements.md` | DELETED | Release Profile V1 scope and J05 release/update qualification | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-068-sqlite-wal-safety-and-operational-diagnostics.md` | DELETED | J02 SQLite/state/recovery semantics and J05 evidence | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-069-contract-v1.0.2-canonical-consolidation.md` | DELETED | Manifest and active J00–J05 ownership model | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-070-jarvis-ui-identity-and-adaptive-dashboard.md` | DELETED | J04 UI identity/accessibility and Release Profile V1 surface scope | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-071-contract-v1.0.3-production-hardening-and-release-closure.md` | DELETED | J03 security hardening, J05 qualification, Release Profile | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-072-platform-runtime-roles-and-portability-boundary.md` | DELETED | J01 platform/runtime roles and Release Profile V1 support scope | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-073-contract-v1.0.5-security-closure-and-release-sequencing.md` | DELETED | J03 security/trust and J05 release sequencing | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-074-hosting-capability-aware-repository-governance.md` | DELETED | J00 repository governance and J05 evidence/release controls | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-075-repository-governance-contract-coherence.md` | DELETED | J00 repository governance and J05 coherence/verification | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/ADR-076-qualified-ci-authority-equivalence.md` | DELETED | J00 CI authority and J05 qualification; LocalCI remains non-authoritative | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/decisions/README.md` | DELETED | No normative owner; J00/J05 path and no-overlay enforcement | RETIRED_INDEX | Redundant historical/decision-record index removed so prohibited overlay paths cannot become a source of authority. |
-| `docs/history/ARCHIVE-MOVE-NOTE.md` | DELETED | No current owner; active manifest and J00 no-overlay boundary | RETIRED_ARCHIVE_NOTE | Archive-transition material removed so obsolete history cannot be consulted as authority. |
-| `docs/history/JARVIS-CONTRACT-MANIFEST-v1.0.4.md` | DELETED | `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md` MAN-02/MAN-08 | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/history/JARVIS-CONTRACT-MANIFEST-v1.0.5.md` | DELETED | `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md` MAN-02/MAN-08 | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/history/JARVIS-CONTRACT-v1.0.2-RECONCILIATION-REPORT.md` | DELETED | J00–J05 and Release Profile; J05 evidence is the only qualification authority | RETIRED_NONNORMATIVE_REPORT | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/history/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.2.md` | DELETED | Active J00–J05 owner model and Release Profile | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/history/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.4.md` | DELETED | Active J00–J05 owner model and Release Profile | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/history/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md` | DELETED | Active J00–J05 owner model and Release Profile | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/history/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.md` | DELETED | Active J00–J05 owner model and Release Profile | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/history/JARVIS-TECHNICAL-CONTRACT-v0.1.md` | DELETED | Active J00–J05 owner model and Release Profile | RETIRED_NO_AUTHORITY | Historical or decision-record overlay removed; any still-valid requirement is represented by the active owner and cannot be sourced from this path. |
-| `docs/history/README.md` | DELETED | No normative owner; J00/J05 path and no-overlay enforcement | RETIRED_INDEX | Redundant historical/decision-record index removed so prohibited overlay paths cannot become a source of authority. |
-| `docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md` | DELETED | J02 fixed backup cryptography/recovery format and J05 qualification evidence | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/implementation/JARVIS-CODING-STANDARDS-CONTRACT.md` | DELETED | J00 coding/repository rules | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/implementation/JARVIS-OPERATIONS-UX-GOVERNANCE-CONTRACT.md` | DELETED | J04 operations/integrations/UX and J05 evidence references | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md` | DELETED | J01 platform/runtime roles and Release Profile V1 scope | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/implementation/JARVIS-PROJECT-POLICY-TRUST-CONTRACT.md` | DELETED | J03 project-policy enrollment/trust boundary | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md` | DELETED | J01 protocol/schema authority | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/implementation/JARVIS-RUNTIME-CONTRACT.md` | DELETED | J01 runtime/process/IPC/capability authority | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/implementation/JARVIS-SECURITY-HARDENING-CONTRACT.md` | DELETED | J03 security/PermissionEngine/secrets authority | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md` | DELETED | J03 TUF/update/supply-chain trust authority | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md` | DELETED | J04 UI identity/accessibility and Release Profile V1 scope | RETIRED_NO_AUTHORITY | Legacy duplicate contract source removed; valid requirements are represented by the active owner suite without a parallel authority. |
-| `docs/superpowers/plans/2026-08-11-contract-v1.0.2-consolidation.md` | DELETED | Current owner goal/Implementation Plan only; no normative authority and no matrix advancement | RETIRED_EXECUTION_AID | Obsolete execution aid removed; current owner goal and active implementation plan remain the only execution aids. |
-| `docs/superpowers/specs/2026-08-11-contract-v1.0.2-consolidation-design.md` | DELETED | Current owner goal/active contracts only; no normative authority and no matrix advancement | RETIRED_EXECUTION_AID | Obsolete execution aid removed; current owner goal and active implementation plan remain the only execution aids. |
-| `generated/contract/jarvis-v1.0.7.contract-values.generated.json` | DELETED | Current v1.0.8 generated artifact derived from the v1.0.8 manifest/source and checked by contract drift | RETIRED_NO_AUTHORITY | Superseded generated revision removed; current generated output is derived from the active v1.0.8 manifest and checked for drift. |
-| `generated/contract/jarvis-v1.0.7.contract-values.generated.ts` | DELETED | Current v1.0.8 generated artifact derived from the v1.0.8 manifest/source and checked by contract drift | RETIRED_NO_AUTHORITY | Superseded generated revision removed; current generated output is derived from the active v1.0.8 manifest and checked for drift. |
-| `packages/schemas/src/canonical/v1/jarvis-v1.0.6.contract-values.json` | DELETED | Current v1.0.8 canonical values/schema and J01 protocol/schema authority | RETIRED_NO_AUTHORITY | Superseded canonical value set removed; the current v1.0.8 schema/value set is authoritative. |
-| `docs/implementation/JARVIS-DATA-STATE-CONTRACT.md` | RENAMED | `docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md` (J02) | RENAMED_ACTIVE_PATH | Renamed to the explicit J02 data/state/backup owner path; the source path is not retained as a parallel authority. |
-| `docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md` | RENAMED | `docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md` (J05) | RENAMED_ACTIVE_PATH | Renamed to the explicit J05 verification/release owner path; the source path is not retained as a parallel authority. |
-| `generated/contract/jarvis-v1.0.6.contract-values.generated.json` | RENAMED | `generated/contract/jarvis-v1.0.8.contract-values.generated.json` (manifest-derived generated output) | RENAMED_ACTIVE_PATH | Renamed to the current v1.0.8 generated revision so generated identity follows the active manifest revision. |
-| `generated/contract/jarvis-v1.0.6.contract-values.generated.ts` | RENAMED | `generated/contract/jarvis-v1.0.8.contract-values.generated.ts` (manifest-derived generated output) | RENAMED_ACTIVE_PATH | Renamed to the current v1.0.8 generated revision so generated identity follows the active manifest revision. |
-| `packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json` | RENAMED | `packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json` (J01 schema/manifest identity) | RENAMED_ACTIVE_PATH | Renamed to the current v1.0.8 canonical value revision so schema identity follows the active manifest revision. |
-
-### Fresh exact-candidate report-gate rerun
-
-The exact correction candidate `85cf875a9a49e9e439b1b5fb2337043780cc3f33` was verified from a clean detached checkout under `G:\Jarvis Project\target\local-acceptance\worktree-85cf875a9a49e9e439b1b5fb2337043780cc3f33` using the official `.localci/ci.sh` profile, Git Bash, and pinned Node `24.18.0`. The preserved main-worktree `G:\Jarvis Project\reports\` directory was not overwritten. The official profile recorded 30 canonical gates plus its terminal LocalCI evidence command; all 31 ledger entries returned exit code 0, and the profile then emitted `LOCALCI_JOB_RESULT=PENDING_AUTHORITY_FINALIZATION` and exited with its intentional non-authoritative status.
-
-The Windows Tauri build temporarily normalized two dependency declarations in the disposable verification checkout. Those generated tracked edits were restored before the checkout was declared clean; no corresponding main-worktree or candidate change exists.
-
-| Gate/evidence | Command or profile | Started | Finished | Exit | Output/evidence identity | Result |
-|---|---|---|---|---:|---|---|
-| `rustsec-audit-json` | `cargo audit --json --file Cargo.lock --target-os windows --target-arch x86_64` | `2026-09-15T08:13:11Z` | `2026-09-15T08:13:14Z` | 0 | `G:\Jarvis Project\target\local-acceptance\worktree-85cf875a9a49e9e439b1b5fb2337043780cc3f33\reports\localci-rustsec-audit.json`; SHA-256 `E68C710010C841C93AC43060D95D0B595ADEB112E0D5F1C3846FE31524A94890` | JSON parsed; vulnerabilities found `false`, count `0`; 7 informational warnings |
-| `cargo-metadata-windows` | `cargo metadata --locked --format-version 1 --all-features --filter-platform x86_64-pc-windows-msvc` | `2026-09-15T08:13:14Z` | `2026-09-15T08:13:15Z` | 0 | `G:\Jarvis Project\target\local-acceptance\worktree-85cf875a9a49e9e439b1b5fb2337043780cc3f33\reports\localci-cargo-metadata-windows.json`; SHA-256 `53B578E8838F5655255293EB27C87418F092D32BAA2375CF595671600F54525B` | locked Windows target metadata produced |
-| `rustsec-informational-warning-review` | `node tools/ci/check-rustsec-advisories.mjs ...` against the two exact-candidate reports and `third_party/rustsec-advisory-review.json` | `2026-09-15T08:13:15Z` | `2026-09-15T08:13:15Z` | 0 | stdout `rustsec-review PASS warnings=7 windowsResolved=5 windowsUnresolved=2` | dependent warning review completed |
-| official LocalCI profile | `.localci/ci.sh` exact canonical sequence | `2026-09-15T08:12:09Z` (queued) / `2026-09-15T08:12:10Z` (started) | `2026-09-15T08:14:23Z` (last canonical gate) | 0 per 30-gate ledger; intentional pending finalization afterward | ledger `G:\Jarvis Project\target\local-acceptance\worktree-85cf875a9a49e9e439b1b5fb2337043780cc3f33\reports\localci-gate-results.jsonl`; SHA-256 `FA4FC72D350156357638CF59377EAFD2993FB0F8E9035FACD2E6C345E5618FE4` | `canonical_gate_count=30`, `nonzero_canonical_gates=0`; terminal evidence also exit 0; profile remains non-authoritative |
-| execution attestation | generated by the official profile for exact candidate `85cf875a9a49e9e439b1b5fb2337043780cc3f33` | `2026-09-15T08:12:09Z` | `2026-09-15T08:14:23Z` | 0 | `G:\Jarvis Project\target\local-acceptance\worktree-85cf875a9a49e9e439b1b5fb2337043780cc3f33\reports\localci-execution-attestation.json`; SHA-256 `228FCA22B0EB74CEEC48487A701CA648BA64CDF622F2FA0A4D47680EC7F1CC19` | `GATES_PASS_PENDING_AUTHORITY_FINALIZATION`; candidate/ref/SHA and pinned toolchain identities match |
-
-The exact-candidate attestation reports Node `24.18.0`, pnpm `11.21.0`, TypeScript `6.0.3`, Rust `1.97.1`, and Cargo `1.97.1`. The current governance profile remains `NOT_RECORDED` because this LocalCI result is not GitHub Actions evidence and cannot qualify the candidate.
-
-### Final correction-pass boundary
-
-Application source, generated runtime behavior, provider behavior, storage/backup implementation, IPC/process/platform behavior, UI behavior, and the implementation matrix were not changed by this correction pass. The active governance roles remain GitHub Actions as sole CI authority, GitLab mirror-only, and LocalCI non-authoritative. The current candidate evidence remains `NOT_RECORDED`; the validator now has a tested future transition to complete `RECORDED` evidence without accepting partial or stale data. No GitHub publication, auditor handoff, merge, matrix advancement, or implementation work is authorized by this record.
-
-Before shipping, the final tree must be checked against the supplied owner goal, the active manifest/J00–J05/Release Profile, and `AGENTS.md`; any issue keeps the result `NOT COMPLETE`. This record does not itself declare completion.
-
-### Final verification record — 2026-09-15
-
-The substantive correction candidate is `85cf875a9a49e9e439b1b5fb2337043780cc3f33`. Its exact clean-checkout official-profile results are recorded above: all 30 canonical gates and the terminal LocalCI evidence command passed with exit code 0; the profile correctly ended in non-authoritative pending finalization. The persistent findings record was then committed as the documentation-only candidate `56d5c8b883b4c23c78808d1a2418ddb1481e644d`, whose exact clean-checkout profile also passed and is identified at the top of this record. This final record-only update changes no contract, governance, acceptance, application, or matrix behavior; its resulting candidate SHA is reported by the shipping report rather than embedded here to avoid self-referential evidence. The main worktree remains clean for tracked files, the 98-row retired-path crosswalk matches the 93 deletion/5 rename inventory, and no application or matrix path is part of the correction commits. This remains contract-only evidence and is not GitHub qualification, release approval, matrix advancement, integration, or `Production Complete`.
+The final hostile audit found 385 unique clause IDs and zero duplicates, no tracked prohibited ADR/decision/history path, no application-source or implementation-plan/matrix edit, and no remaining open ledger item. The normal profile passes 22 files, and all required local contract, schema, governance, security, dependency, provenance, architecture, format, type, build, and Phase 0 checks pass. This changes the bounded contract-simplification conclusion to `COMPLETE`; it does not create exact-candidate GitHub Actions evidence or authorize publication, integration, implementation, matrix advancement, release qualification, or `Production Complete`.

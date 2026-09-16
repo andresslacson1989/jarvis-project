@@ -7,6 +7,10 @@ import {
   validateRepositoryGovernanceDocumentation,
   validateRepositoryGovernanceProfile,
 } from "../ci/check-repository-governance.mjs";
+import {
+  ACCEPTANCE_GATE_BY_ID,
+  PHASE0_REQUIRED_GATE_IDS,
+} from "../ci/localci-gate-manifest.mjs";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".rs"]);
 const REQUIRED_CHILDREN = Object.freeze([
@@ -26,6 +30,15 @@ const REQUIRED_CHILDREN = Object.freeze([
 ]);
 const PRODUCTION_TAURI_COMMAND =
   "pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci";
+
+export function requiredWorkflowSteps(profile) {
+  if (!Array.isArray(profile?.requiredGateIds)) return null;
+  if (profile.requiredGateIds.length !== PHASE0_REQUIRED_GATE_IDS.length) return null;
+  if (profile.requiredGateIds.some((id, index) => id !== PHASE0_REQUIRED_GATE_IDS[index])) return null;
+  const definitions = profile.requiredGateIds.map((id) => ACCEPTANCE_GATE_BY_ID.get(id));
+  if (definitions.some((definition) => definition === undefined)) return null;
+  return definitions;
+}
 
 function violation(code, path, detail) {
   return Object.freeze({ code, path, detail });
@@ -107,7 +120,8 @@ export function validatePhase0Snapshot({
 }) {
   const violations = [];
 
-  if (profile?.schemaVersion !== 1 || profile?.checkpointId !== "0.CP") {
+  const requiredGates = requiredWorkflowSteps(profile);
+  if (profile?.schemaVersion !== 1 || profile?.checkpointId !== "0.CP" || requiredGates === null) {
     return [
       violation(
         "PHASE0_PROFILE_INVALID",
@@ -199,15 +213,15 @@ export function validatePhase0Snapshot({
   let lastIndex = -1;
   const nativeWindowsGateNames = new Set(["Rust Windows-target build"]);
 
-  for (const required of profile.requiredWorkflowSteps ?? []) {
-    if (nativeWindowsGateNames.has(required.name)) continue;
-    const index = steps.findIndex((step) => step.name === required.name);
+  for (const required of requiredGates) {
+    if (nativeWindowsGateNames.has(required.workflowName)) continue;
+    const index = steps.findIndex((step) => step.name === required.workflowName);
     if (index < 0) {
       violations.push(
         violation(
           "PHASE0_REQUIRED_GATE_MISSING",
           ".github/workflows/static-ci.yml",
-          `missing ${required.name}`,
+          `missing ${required.workflowName}`,
         ),
       );
       continue;
@@ -219,18 +233,18 @@ export function validatePhase0Snapshot({
         violation(
           "PHASE0_GATE_ORDER",
           ".github/workflows/static-ci.yml",
-          `${required.name} is out of required order`,
+          `${required.workflowName} is out of required order`,
         ),
       );
     }
     lastIndex = index;
 
-    if (step.run !== required.run) {
+    if (step.run !== required.command) {
       violations.push(
         violation(
           "PHASE0_GATE_COMMAND_DRIFT",
           ".github/workflows/static-ci.yml",
-          `${required.name} must run ${required.run}`,
+          `${required.workflowName} must run ${required.command}`,
         ),
       );
     }
@@ -240,7 +254,7 @@ export function validatePhase0Snapshot({
         violation(
           "PHASE0_GATE_SKIPPABLE",
           ".github/workflows/static-ci.yml",
-          `${required.name} may not use if/continue-on-error`,
+          `${required.workflowName} may not use if/continue-on-error`,
         ),
       );
     }

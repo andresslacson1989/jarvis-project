@@ -106,38 +106,23 @@ run_gate() {
   fi
 }
 
-run_gate dependencies-frozen pnpm install --frozen-lockfile --ignore-scripts
-run_gate toolchain-exact pnpm toolchain:verify
-run_gate format-hygiene pnpm format:check
-run_gate schema-integrity pnpm schema:check
-run_gate contract-suite-valid pnpm contract:check
-run_gate repository-governance pnpm governance:check
-run_gate secret-scan pnpm security:secrets
-run_gate dependency-inventory pnpm dependency:check
-run_gate license-provenance pnpm provenance:check
-run_gate typescript-strict pnpm typecheck
-run_gate typescript-build pnpm build
-run_gate core-build pnpm build:core
-run_gate desktop-ui-build pnpm build:ui
-run_gate desktop-foundation-contract pnpm desktop:foundation:check
-run_gate desktop-security-contract pnpm desktop:security:check
-run_gate architecture-enforcement pnpm architecture:check
-run_gate normal-tests pnpm test
-run_gate dependency-vulnerability-high-plus pnpm audit --audit-level high
-run_gate cargo-audit-install cargo install cargo-audit --locked --version 0.22.2 --no-default-features
-run_gate cargo-audit-version sh -c 'cargo audit --version | grep -Eq "0\\.22\\.2$"'
-run_gate rust-dependency-vulnerability-rustsec cargo audit --file Cargo.lock --target-os windows --target-arch x86_64
-run_gate rustsec-audit-json sh -c 'cargo audit --json --file Cargo.lock --target-os windows --target-arch x86_64 >"$1"' sh reports/localci-rustsec-audit.json
-run_gate cargo-metadata-windows sh -c 'cargo metadata --locked --format-version 1 --all-features --filter-platform x86_64-pc-windows-msvc >"$1"' sh reports/localci-cargo-metadata-windows.json
-run_gate rustsec-informational-warning-review node tools/ci/check-rustsec-advisories.mjs reports/localci-rustsec-audit.json reports/localci-cargo-metadata-windows.json third_party/rustsec-advisory-review.json
-run_gate rustfmt cargo fmt --all -- --check
-run_gate rust-clippy-warnings-as-errors cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
-run_gate rust-host-build cargo check --locked --workspace --all-targets --all-features
-run_gate rust-windows-target-build cargo check --locked --workspace --target x86_64-pc-windows-msvc
-run_gate windows-tauri-production-build pnpm --dir apps/desktop tauri build --no-bundle --target x86_64-pc-windows-msvc --ci
-
 export JARVIS_CANDIDATE_SHA=${LOCALCI_RESOLVED_COMMIT}
-run_gate phase0-section-checkpoint pnpm phase0:check
+readonly rendered_gates=$(mktemp "${TMPDIR:-/tmp}/jarvis-localci-gates.XXXXXX")
+cleanup_rendered_gates() {
+  rm -f -- "${rendered_gates}"
+}
+trap cleanup_rendered_gates EXIT
+if ! node tools/ci/render-localci-gates.mjs >"${rendered_gates}"; then
+  printf 'LocalCI gate renderer failed\n' >&2
+  exit 78
+fi
+if [[ ! -s ${rendered_gates} ]]; then
+  printf 'LocalCI gate renderer produced no commands\n' >&2
+  exit 78
+fi
+source "${rendered_gates}"
+cleanup_rendered_gates
+trap - EXIT
 
 export JARVIS_CI_AUTHORITY=LOCALCI
 export JARVIS_CI_GATE_RESULTS_PATH=${gate_results}

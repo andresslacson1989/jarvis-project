@@ -1,7 +1,7 @@
 # JARVIS Runtime, Platform & Protocol Contract
 
 **Contract Suite Version:** 1.0.8
-**Version:** 1.0.8
+**Version:** 1.0.9
 **Component:** `J01`
 **Protocol Major:** 1
 **Status:** Canonical normative component
@@ -24,8 +24,6 @@ The governing rule is:
 
 ---
 
----
-
 ## J01-PLAT-02 — PRODUCT RUNTIME ROLES
 
 JARVIS distinguishes operating-system/platform identity from runtime responsibility.
@@ -45,25 +43,11 @@ Runtime role SHALL NOT be inferred solely from screen size or operating-system n
 
 ---
 
----
-
 ## J01-PLAT-03 — PLATFORM INTENT
 
-The product direction is:
+J01-PLAT-02 defines the runtime roles. The Release Profile selects the current V1 platform/runtime target: Windows 11 x64 as `FULL_HOST`.
 
-```text
-Windows  → FULL_HOST → mandatory V1 production target
-Linux    → FULL_HOST → explicit future production target
-Android  → COMPANION → future non-V1 interaction client
-```
-
-Only Windows 11 x64 is part of the active V1 Release Profile.
-
-Linux is an architectural preservation target, not a V1 delivery requirement. Android companion capability is also not a V1 delivery requirement.
-
-No current V1 release may claim Linux or Android production support without a future synchronous Release Profile, security, verification, packaging, and compatibility update.
-
----
+Linux remains an architectural full-host target, and Android remains a future `COMPANION` interaction client; neither is a V1 delivery or production-support claim. A current V1 release SHALL NOT claim either until a future synchronous Release Profile, security, verification, packaging, and compatibility update qualifies it. J01-PLAT-10, J01-PLAT-23 through J01-PLAT-25, and J01-PLAT-29 define the applicable future-platform obligations.
 
 ---
 
@@ -86,8 +70,6 @@ Providers / Tools / Workers / Integrations / Managed Modules
 The semantic responsibilities remain the same across full-host platforms. The native mechanisms used to satisfy those responsibilities are platform backends.
 
 Windows-specific mechanisms are therefore V1 backend implementations, not domain concepts.
-
----
 
 ---
 
@@ -126,8 +108,6 @@ Shared Core/domain code SHALL NOT directly depend on Win32, Windows registry, DP
 
 ---
 
----
-
 ## J01-PLAT-06 — PLATFORM CAPABILITY BOUNDARY
 
 Full-host native functionality SHALL be exposed through explicit capability interfaces or equivalent typed service boundaries.
@@ -154,8 +134,6 @@ Capabilities SHALL report availability/qualification honestly. An unsupported ca
 
 ---
 
----
-
 ## J01-PLAT-07 — COMPOSITION ROOT
 
 Operating-system selection SHALL occur at a narrow application/platform composition boundary.
@@ -175,8 +153,6 @@ Platform detection is permitted in:
 - platform adapter factories;
 - packaging/configuration;
 - explicitly platform-specific providers/tools/tests.
-
----
 
 ---
 
@@ -204,8 +180,6 @@ If Linux cannot satisfy a required full-host security or recovery invariant with
 
 ---
 
----
-
 ## J01-PLAT-09 — WINDOWS FULL-HOST BACKEND
 
 For the active V1 Windows full host, the current Runtime, Security, Data, and Release Profile requirements remain binding.
@@ -226,8 +200,6 @@ These mappings are not placeholders. They remain full production requirements fo
 
 ---
 
----
-
 ## J01-PLAT-10 — FUTURE LINUX FULL-HOST BACKEND
 
 Linux is an explicit future full-host target.
@@ -237,8 +209,6 @@ A Linux production release SHALL preserve the same high-level authority, recover
 The current contract intentionally does not prematurely choose exact Linux technologies for every backend. A future Linux Release Profile SHALL select and qualify them based on the actual supported distributions, desktop/session environment, packaging model, provider behavior, and security properties at that time.
 
 Linux production support SHALL NOT be inferred merely because Tauri, Node, Rust, React, SQLite, or a provider can launch on Linux.
-
----
 
 ---
 
@@ -258,8 +228,6 @@ JARVIS release
 A provider/module/tool/integration may be supported on Windows and unsupported on Linux, or vice versa.
 
 UI SHALL expose platform-specific support truthfully where it matters rather than implying that modeled capability equals qualified capability.
-
----
 
 ---
 
@@ -286,8 +254,6 @@ The common Provider interface remains shared.
 
 ---
 
----
-
 ## J01-PLAT-13 — FILESYSTEM AND PATH IDENTITY
 
 Domain code SHALL treat filesystem identity through canonical platform-aware path/resource abstractions.
@@ -300,8 +266,6 @@ Persisted project/workspace records MAY store platform-native path text where re
 
 ---
 
----
-
 ## J01-PLAT-14 — SECURE STORAGE
 
 Core/domain state SHALL use opaque credential/key handles and a semantic secure-storage interface.
@@ -311,8 +275,6 @@ The Windows backend uses the qualified Windows secure-storage design from J03-SE
 A future Linux backend SHALL use a separately qualified local secret-storage/key-protection design appropriate to the supported Linux environment.
 
 Raw secret material SHALL NOT be moved into Core/domain state merely to make storage portable.
-
----
 
 ---
 
@@ -335,8 +297,6 @@ The privileged Core SHALL NOT be converted to localhost HTTP merely to make Wind
 
 ---
 
----
-
 ## J01-PLAT-16 — PROCESS SUPERVISION
 
 `PlatformProcessSupervisor` semantics include:
@@ -355,8 +315,6 @@ Linux later SHALL use separately qualified mechanisms capable of meeting the sam
 
 ---
 
----
-
 ## J01-PLAT-17 — SESSION TRUST
 
 The shared session model is `LOCKED`/`UNLOCKING`/`UNLOCKED`/`LOCKING` and the corresponding privacy/authority behavior.
@@ -364,8 +322,6 @@ The shared session model is `LOCKED`/`UNLOCKING`/`UNLOCKED`/`LOCKING` and the co
 Windows session lock/sign-out is one backend signal source.
 
 A future Linux full host SHALL map supported desktop/session lock/logout behavior into the same JARVIS session-trust semantics and document limitations for each supported environment.
-
----
 
 ---
 
@@ -383,8 +339,6 @@ Platform-native affordances MAY differ; JARVIS SHALL NOT fork into unrelated Win
 
 ---
 
----
-
 ## J01-PLAT-19 — PERSISTENCE AND PORTABLE STATE
 
 Logical persistence/state-machine schemas SHOULD remain platform-neutral unless the stored fact is inherently platform-specific.
@@ -396,8 +350,6 @@ Platform-specific metadata SHALL be typed/namespaced and treated as non-portable
 `PORTABLE_STATE` backup encryption remains independent of the historical live local secure-store key. The current V1 guarantee is Windows clean-profile restore. Cross-platform Windows↔Linux state migration/restore is **not** guaranteed until a future release explicitly qualifies schema, filesystem paths, provider/setup state, artifacts, and platform-specific metadata migration.
 
 The backup format SHALL NOT be redesigned to require Windows-only secret material for its portable recovery slot.
-
----
 
 ---
 
@@ -419,8 +371,6 @@ A future Linux packaging decision SHALL be made through the normal direct active
 
 ---
 
----
-
 ## J01-PLAT-21 — MODULES AND INTEGRATIONS
 
 Integration semantic capabilities SHOULD remain platform-neutral when the remote service semantics are platform-independent.
@@ -433,8 +383,6 @@ A module qualified only for Windows cannot be labeled supported on Linux merely 
 
 ---
 
----
-
 ## J01-PLAT-22 — VOICE AND DEVICES
 
 Conversation/voice state semantics and DataPolicy remain shared.
@@ -442,8 +390,6 @@ Conversation/voice state semantics and DataPolicy remain shared.
 Microphone, speaker, AEC/device APIs, local model packaging, acceleration, and provider availability may be platform-specific.
 
 A future Linux full-host release SHALL separately qualify actual audio-device lifecycle, latency, AEC, STT/TTS, GPU/runtime, privacy, and packaging behavior.
-
----
 
 ---
 
@@ -470,8 +416,6 @@ The authoritative full host evaluates all consequential companion-originated ins
 
 ---
 
----
-
 ## J01-PLAT-24 — ONE AUTHORITATIVE HOST
 
 A companion does not create a second authoritative copy of JARVIS state.
@@ -479,8 +423,6 @@ A companion does not create a second authoritative copy of JARVIS state.
 It MAY cache bounded presentation/read data, but cached companion state is never authoritative for consequential decisions.
 
 Multi-host federation, distributed consensus, automatic host failover, or synchronized multi-master JARVIS state are not implied by companion support and require separate future architecture.
-
----
 
 ---
 
@@ -512,8 +454,6 @@ No current implementation work is authorized to invent this gateway ad hoc.
 
 ---
 
----
-
 ## J01-PLAT-26 — PLATFORM CAPABILITY DISCOVERY
 
 Shared code MAY query semantic platform capability availability, for example:
@@ -537,8 +477,6 @@ A missing capability blocks/degrades the dependent feature truthfully.
 
 ---
 
----
-
 ## J01-PLAT-27 — ERROR AND DIAGNOSTIC MODEL
 
 Platform failures SHALL normalize to stable JARVIS errors/reason codes while retaining sanitized platform-specific diagnostics internally.
@@ -559,13 +497,9 @@ Feature/UI code SHALL not parse Win32/Linux human-readable error text to make se
 
 ---
 
----
-
 ## J01-PLAT-28 — TESTING AND ARCHITECTURE ENFORCEMENT
 
 The platform/runtime/protocol invariants in this component are verified through the complete J05-VER-09, J05-VER-10, J05-VER-12, J05-VER-17, J05-VER-18, J05-VER-19, J05-VER-21, J05-VER-24 through J05-VER-26, and J05-VER-37 gates. Those gates cover import/composition boundaries, Windows native backend qualification, truthful unavailable/degraded behavior, portable recovery independence from DPAPI, provider/module platform qualification, and the explicit exclusion of Linux runtime qualification from the V1 claim. This clause defines the invariants; J05 defines their evidence and pass criteria.
-
----
 
 ---
 
@@ -591,8 +525,6 @@ Until then Linux is an architectural target, not a supported product claim.
 
 ---
 
----
-
 ## J01-PLAT-30 — NON-GOALS
 
 This contract does not require V1 to:
@@ -609,44 +541,27 @@ This contract does not require V1 to:
 
 ---
 
----
-
 ## J01-PLAT-31 — INVARIANTS
 
-1. Windows remains the only mandatory V1 production platform.
-2. Linux remains an explicit future `FULL_HOST` target.
-3. Companion is a different runtime role from full host.
-4. Shared Core/domain/policy code does not depend directly on Windows-native implementation APIs.
-5. Platform-specific mechanisms are isolated behind explicit semantic capabilities/composition boundaries.
-6. Strong Windows primitives are not weakened for portability.
-7. Unsupported platform features fail closed or degrade truthfully.
-8. Provider/module/tool support is platform-qualified where native behavior matters.
-9. Portable recovery does not require the historical platform-local secret-store key.
-10. Future companion control does not expose privileged Core directly and does not become a second authority.
-11. Remote-origin instructions never bypass normal PermissionEngine/approval/DataPolicy rules.
-12. Linux/companion support cannot be claimed without explicit future qualification.
+This clause is an owner map, not a second behavioral catalog:
 
----
+- J01-PLAT-02 through J01-PLAT-03 own runtime-role separation and current V1/future-platform truthfulness.
+- J01-PLAT-05 through J01-PLAT-09 own shared-code boundaries, semantic capabilities, composition, and non-weakened Windows mechanisms.
+- J01-PLAT-10 through J01-PLAT-22 own future-platform qualification, platform-specific support, recovery, provider, path, IPC, process, UI, package, module, and voice boundaries.
+- J01-PLAT-23 through J01-PLAT-25 own companion non-authority and future remote-access restrictions.
+- J01-PLAT-26 through J01-PLAT-30 own truthful availability, enforcement, promotion, and V1 non-goals.
 
 ---
 
 ## J01-PLAT-32 — GOVERNING PRINCIPLES
 
-> **Abstract the capability, not the security away.**
-
-> **Share product semantics; specialize native mechanisms.**
-
-> **Windows production quality now. Linux portability through explicit platform boundaries.**
-
-> **One authoritative host. Multiple interaction surfaces may come later.**
+J01-PLAT-01 through J01-PLAT-31 govern this component. They require semantic capability abstraction without weakening platform security, one authoritative host, and truthful future-platform claims; this heading adds no independent requirement.
 
 ---
 
 ## J01-RT-01 — PURPOSE
 
 This document defines executable runtime ownership: production packaging, Tauri/WebView operation, startup/shutdown, IPC, provider setup/repair, provider/worker/module process supervision, delegated engineering execution, scheduling, cancellation, recovery, and degraded operation.
-
----
 
 ---
 
@@ -670,8 +585,6 @@ jarvis-desktop.exe (Tauri/Rust host)
 Rust is the native root supervisor. Node Core owns authoritative application state/policy. Managed children do not become independent authorities.
 
 The normal app runs non-elevated. A narrowly defined capability requiring elevation needs its own explicit typed path, user-visible reason, bounded lifetime, qualification, and audit. Ordinary provider/worker execution does not inherit elevation from setup/install operations.
-
----
 
 ---
 
@@ -711,8 +624,6 @@ No system-runtime fallback is permitted.
 
 ---
 
----
-
 ## J01-RT-04 — SINGLE INSTANCE AND DATA DIRECTORY
 
 One authoritative desktop/Core pair operates against one production data directory.
@@ -734,8 +645,6 @@ Mutable application state is rooted under a stable per-user location equivalent 
 ```
 
 Maintenance/recovery access requires an exclusive maintenance lock.
-
----
 
 ---
 
@@ -763,8 +672,6 @@ The Rust host owns primary-window native presentation state. Renderer/AI may req
 
 ---
 
----
-
 ## J01-RT-06 — BOOTSTRAP SEQUENCE
 
 Startup SHALL occur in this order:
@@ -789,8 +696,6 @@ Startup SHALL occur in this order:
 18. after native session authentication succeeds, permit authenticated user commands.
 
 Failure of a mandatory step produces explicit recovery/diagnostic state rather than a false ready state.
-
----
 
 ---
 
@@ -824,8 +729,6 @@ OS object security is defense layer one; bootstrap authentication and schema/pro
 
 ---
 
----
-
 ## J01-RT-08 — NATIVE PROCESS/CREDENTIAL/ELEVATION BROKER
 
 The Rust host exposes narrow typed native capabilities such as:
@@ -847,8 +750,6 @@ Elevation mediation SHALL accept only an installed/qualified operation identity 
 
 ---
 
----
-
 ## J01-RT-09 — MANDATORY WINDOWS JOB OBJECT CONTAINMENT
 
 Every JARVIS-managed executable process tree on supported Windows 11 SHALL be assigned to an explicitly owned Job Object hierarchy unless a narrow separately documented/verified incompatibility meets the approved exception criteria.
@@ -866,8 +767,6 @@ Requirements:
 - cancellation escalates cooperative request → bounded grace → job/subtree termination → termination verification.
 
 Job Objects provide lifecycle/resource containment and accounting. They do **not** prove filesystem, network, credential, or same-user memory isolation.
-
----
 
 ---
 
@@ -906,8 +805,6 @@ Direct imports/calls SHALL not bypass owning policy/state services for convenien
 
 ---
 
----
-
 ## J01-RT-11 — INPUT/COMMAND PIPELINE
 
 Authenticated text/voice work flows through:
@@ -933,8 +830,6 @@ No AI confidence or provider capability skips a deterministic gate.
 
 ---
 
----
-
 ## J01-RT-12 — DETERMINISTIC REFLEX PATH
 
 Low-latency reflexes may handle established commands such as:
@@ -948,8 +843,6 @@ Low-latency reflexes may handle established commands such as:
 - unambiguous task pause/cancel after target resolution.
 
 The reflex path does not generate substantive factual answers, broaden authority, authorize tools, or invent completion.
-
----
 
 ---
 
@@ -989,31 +882,17 @@ Provider-native sandbox behavior is tested as an actual technical boundary. Prom
 
 ---
 
----
-
 ## J01-RT-14 — PROVIDER DISCOVERY, SETUP, COMPATIBILITY, AND SUPERVISION
 
 Every provider adapter defines discovery, exact distribution/version identity, setup policy/state, authentication state, compatibility policy, startup timeout, execution timeout, cancel semantics, health probe, capability/locality/resource metadata, output normalization, sanitized errors, and process containment behavior.
 
-States distinguish setup, compatibility, and health:
-
-```text
-NOT_REQUIRED / SETUP_REQUIRED / SETUP_IN_PROGRESS /
-SETUP_READY / REPAIR_REQUIRED / SETUP_FAILED
-
-NOT_DETECTED / VERSION_UNKNOWN / VERSION_UNSUPPORTED /
-CONFORMANCE_UNQUALIFIED / COMPATIBLE
-
-STARTING / READY / DEGRADED / UNAVAILABLE / FAILED
-```
+J01-PROTO-19 is the sole canonical definition of `ProviderSetupState`, `ProviderCompatibilityState`, and `ProviderHealth`. Runtime adapters SHALL expose and use those exact types rather than locally re-enumerating or reinterpreting their values.
 
 A provider becomes production `SUPPORTED` only when the selected version/range has release-time conformance evidence and runtime setup/identity/health/auth/capability checks pass.
 
 A newly released provider version outside the qualified policy is not optimistically trusted. Provider self-update invalidates cached compatibility and any setup/conformance evidence whose applicability is version-sensitive until revalidated.
 
 For Codex, the V1 adapter SHALL prefer the qualified stable non-interactive/structured interface rather than scraping an interactive TUI. Its Windows sandbox conformance tests SHALL observe actual write/network restrictions and SHALL not claim workspace-only read isolation unless technically proven.
-
----
 
 ---
 
@@ -1049,8 +928,6 @@ Rules:
 
 ---
 
----
-
 ## J01-RT-16 — PROVIDER SESSION RESUME
 
 Provider session/conversation resume handles are optional optimizations.
@@ -1071,8 +948,6 @@ remaining work
 Recovery first loads/reconciles JARVIS-owned state. It may attempt provider resume only after compatibility/auth/privacy/authority/setup checks. Resume failure falls back to a fresh provider session reconstructed from durable JARVIS state.
 
 No completion evidence may exist only inside an inaccessible provider session.
-
----
 
 ---
 
@@ -1105,8 +980,6 @@ Three consecutive no-material-progress iterations SHOULD cause reconsideration t
 
 ---
 
----
-
 ## J01-RT-18 — TOOL EXECUTION
 
 All JARVIS typed tools execute through ToolExecutor.
@@ -1133,8 +1006,6 @@ Unverifiable consequence is `UNCERTAIN`.
 
 ---
 
----
-
 ## J01-RT-19 — MISSION GRAPH AND SCHEDULER
 
 A mission points to one active immutable graph version. Only owning mission services activate validated graph revisions.
@@ -1152,8 +1023,6 @@ Scheduler considers:
 AI determines logical parallelism; deterministic scheduling determines actual concurrency.
 
 Parallel writable engineering tasks never share one worktree.
-
----
 
 ---
 
@@ -1181,8 +1050,6 @@ RESUMING → RUNNING | QUEUED | BLOCKED | RECOVERING | FAILED | CANCELLED
 
 ---
 
----
-
 ## J01-RT-21 — BUDGET ADMISSION
 
 Before new chargeable work subject to a hard monetary budget, BudgetService atomically evaluates:
@@ -1199,8 +1066,6 @@ Only after reservation commit may the metered attempt start when a monetary rese
 Provider-reported usage/quota facts retain provenance and may differ from local estimates. Unknown values remain unknown rather than fabricated as zero.
 
 If actual cost exceeds reservation, the actual provider-reported/settled cost is recorded; a hard budget is an admission-control guarantee, not a promise that an external invoice can never exceed an estimate.
-
----
 
 ---
 
@@ -1225,8 +1090,6 @@ Ambiguous consequential/destructive side effects are never blindly replayed. The
 
 ---
 
----
-
 ## J01-RT-23 — SHUTDOWN
 
 Normal shutdown SHALL:
@@ -1245,8 +1108,6 @@ Normal shutdown SHALL:
 Crash semantics assume termination can occur between any two steps.
 
 An active UAC-elevated provider setup helper is not force-killed through an unsafe unrelated handle assumption; its separately qualified setup lifecycle determines cancellation/reconciliation, and JARVIS does not mark setup ready until final verification succeeds.
-
----
 
 ---
 
@@ -1271,8 +1132,6 @@ The V1 Proxmox adapter uses HTTPS REST API as the normal control path. It SHALL:
 
 ---
 
----
-
 ## J01-RT-25 — MODULE RUNTIME
 
 Every module is `DATA_ONLY`, `BUILT_IN_TRUSTED`, or `EXTERNAL_MANAGED`.
@@ -1286,8 +1145,6 @@ Every module is `DATA_ONLY`, `BUILT_IN_TRUSTED`, or `EXTERNAL_MANAGED`.
 Typed health checks are supervisor mechanisms, not arbitrary manifest commands.
 
 Module crash degrades the module, not Core.
-
----
 
 ---
 
@@ -1316,8 +1173,6 @@ Speech provider routing obeys the same DataLocality policy as AI providers.
 
 ---
 
----
-
 ## J01-RT-26A — NORMALIZED TTS AND AUDIO-PROCESSING PROVIDERS
 
 JARVIS owns voice capability; TTS and audio-processing providers are replaceable adapters. Core, conversation state, UI, mission logic, and permission policy SHALL NOT depend on provider-native APIs, voice identifiers, request options, or event structures.
@@ -1331,8 +1186,6 @@ The audio-processing boundary SHALL accept raw microphone input and the exact sp
 AEC capability and health reporting SHALL cover AEC, double-talk handling, noise suppression, gain control, supported sample rates, latency, CPU requirements, readiness, and health. The centralized Provider Supervisor owns discovery, lifecycle, readiness, health, restart, failure isolation, and approved fallback routing for AEC as well as AI/STT/TTS/VAD providers. A provider failure SHALL NOT crash Core; fallback occurs only when approved policy and required capability remain satisfied.
 
 Full duplex is preferred whenever AEC is healthy. If AEC is unavailable or unreliable, JARVIS SHALL truthfully use a safe half-duplex fallback while retaining local deterministic stop, cancel, and mute reflexes without remote AI reasoning.
-
----
 
 ---
 
@@ -1351,8 +1204,6 @@ OFFLINE_CAPABLE_LIMITED
 ```
 
 Failure of one optional/degraded subsystem does not fabricate failure/success in another. UI states what remains usable and why capabilities are blocked.
-
----
 
 ---
 
@@ -1391,8 +1242,6 @@ The schemas below are the effective V1 definitions. Any non-current schema shape
 
 ---
 
----
-
 ## J01-PROTO-02 — SCHEMA POLICY
 
 Canonical validators SHALL live in `packages/schemas`; protocol/domain boundary types SHALL live in `packages/protocol` or generated equivalents.
@@ -1407,8 +1256,6 @@ Rules:
 - Security-material and money fields SHALL not be permissively coerced.
 - Arrays, maps, strings, object depth, frame sizes, and arbitrary JSON fields SHALL be bounded.
 - Shared domain schemas SHALL not encode an OS-native implementation object where a semantic platform-independent identity is sufficient.
-
----
 
 ---
 
@@ -1463,8 +1310,6 @@ V1 production identity is `WINDOWS + FULL_HOST`. Modeling `LINUX`/`ANDROID` does
 
 ---
 
----
-
 ## J01-PROTO-04 — DATA POLICY
 
 Sensitivity and routing locality are independent.
@@ -1496,8 +1341,6 @@ Derived context/artifacts SHALL inherit the strictest applicable policy unless a
 
 ---
 
----
-
 ## J01-PROTO-05 — EXACT MONEY AND QUANTITIES
 
 Authoritative monetary values SHALL not use binary floating point.
@@ -1523,8 +1366,6 @@ TypeScript SHOULD use `bigint` after parsing; Rust SHALL use a checked exact int
 
 ---
 
----
-
 ## J01-PROTO-06 — KDF PROFILES
 
 ```ts
@@ -1543,21 +1384,11 @@ interface Argon2idProfile {
 }
 ```
 
-A production V1 profile SHALL satisfy at least:
-
-```text
-memoryKiB  >= 65536
-iterations >= 3
-parallelism = 4
-saltBytes  >= 16
-outputBytes >= 32
-```
+`J03-SEC-04` owns the Argon2id production floor, purpose separation, recovery semantics, and upgrade/downgrade policy.
 
 Exact parameter metadata used to create a verifier/key slot SHALL be retained with that verifier/key slot so future releases can verify/derive historical values and then upgrade them deliberately.
 
-Schema validation rejects unsupported Argon2 version, under-floor production profile, out-of-range resource values, or missing profile identity. Test/development-only weaker fixtures SHALL never be accepted by production configuration.
-
----
+Schema validation rejects unsupported Argon2 version, a profile below the `J03-SEC-04` production floor, out-of-range resource values, or missing profile identity. Test/development-only weaker fixtures SHALL never be accepted by production configuration.
 
 ---
 
@@ -1600,8 +1431,6 @@ The envelope is transport-neutral. Windows V1 uses it over the qualified local n
 
 ---
 
----
-
 ## J01-PROTO-08 — ERROR MODEL
 
 ```ts
@@ -1641,8 +1470,6 @@ interface JarvisError {
 Raw provider/native/SQLite stack traces or secret-bearing payloads SHALL be normalized before crossing generic boundaries.
 
 Platform errors use stable codes such as `PLATFORM_CAPABILITY_UNAVAILABLE`, `PLATFORM_BACKEND_UNQUALIFIED`, `PLATFORM_IPC_SECURITY_FAILED`, or more specific registered equivalents rather than exposing native error text as policy input.
-
----
 
 ---
 
@@ -1694,8 +1521,6 @@ A future companion origin is deliberately not added in V1. Remote-device instruc
 
 ---
 
----
-
 ## J01-PROTO-10 — ORCHESTRATOR DECISION
 
 ```ts
@@ -1721,8 +1546,6 @@ interface OrchestratorDecision {
 ```
 
 `payload` is validated again against the selected action-specific schema. AI confidence is not an authorization field.
-
----
 
 ---
 
@@ -1787,8 +1610,6 @@ Rules:
 
 ---
 
----
-
 ## J01-PROTO-12 — AUTHORITY ENVELOPE
 
 ```ts
@@ -1818,8 +1639,6 @@ interface AuthorityEnvelope {
 ```
 
 An envelope is immutable for an active attempt. A broader scope requires a new validated authority/revision record.
-
----
 
 ---
 
@@ -1918,8 +1737,6 @@ interface TaskAttempt {
 
 ---
 
----
-
 ## J01-PROTO-14 — ACCEPTANCE AND GRAPH VERSIONING
 
 ```ts
@@ -1980,8 +1797,6 @@ interface MissionGraphVersion {
 ```
 
 Activated graph versions are immutable. Core validates acyclicity, dependencies, scope coherence, acceptance policy, and authority before activation.
-
----
 
 ---
 
@@ -2046,8 +1861,6 @@ interface WorkerResult {
 ```
 
 Provider resume handles are opaque potentially expiring capability material. They are optional continuity optimizations, not durable task truth.
-
----
 
 ---
 
@@ -2137,8 +1950,6 @@ Platform compatibility/technical availability is not action authority.
 
 ---
 
----
-
 ## J01-PROTO-17 — PERMISSION DECISION
 
 ```ts
@@ -2160,8 +1971,6 @@ interface PermissionDecision {
 ```
 
 Only deterministic Core policy produces an authoritative PermissionDecision.
-
----
 
 ---
 
@@ -2230,8 +2039,6 @@ Canonicalization rejects duplicate object keys before materialization, non-finit
 Immediately before approval consumption JARVIS freshly resolves material identities/arguments, rebuilds the descriptor, recomputes the digest, and rejects any mismatch. Digest equality never bypasses expiry, single-use, session/policy, or transactional consumption checks.
 
 Raw credentials never enter the descriptor.
-
----
 
 ---
 
@@ -2317,8 +2124,6 @@ interface ProviderCompatibilityPolicy {
 
 ---
 
----
-
 ## J01-PROTO-20 — MODULE EXECUTION AND MANIFEST
 
 ```ts
@@ -2385,8 +2190,6 @@ interface ModuleCapabilityEnvelope {
 There is no untrusted-in-process execution class. `HTTP_LOCAL_PROBE.endpointId` resolves only to a supervisor-registered local endpoint, never an arbitrary URL.
 
 Platform compatibility does not itself enable/install/authorize a module.
-
----
 
 ---
 
@@ -2458,8 +2261,6 @@ interface ProxmoxGuestIdentity {
 GitHub/Proxmox capability support claims are governed by the active Release Profile and platform support matrix. Modeling a capability does not mean the current release/platform supports it.
 
 Proxmox control-plane identity is separate from guest OS connection/credential identity.
-
----
 
 ---
 
@@ -2541,8 +2342,6 @@ Different currencies SHALL not be added without a separately defined conversion 
 
 ---
 
----
-
 ## J01-PROTO-23 — DOMAIN EVENTS
 
 ```ts
@@ -2567,8 +2366,6 @@ Event payloads are independently versioned. Authoritative events use stable dot-
 
 ---
 
----
-
 ## J01-PROTO-24 — NOTIFICATION AND CONFIGURATION
 
 ```ts
@@ -2590,30 +2387,13 @@ Configuration domains are typed/versioned and include at least startup, session 
 
 ---
 
----
-
 ## J01-PROTO-25 — CRYPTOGRAPHIC CANONICALIZATION RULES
 
 Security-material canonicalization is one shared implementation contract.
 
-Required Rust/TypeScript golden vectors cover:
-
-- property order invariance;
-- Unicode;
-- optional/empty fields;
-- canonical IDs/paths/resources;
-- integration/account bindings;
-- target/environment/argument/tool-version changes;
-- duplicate-key rejection;
-- NaN/infinity/negative-zero rejection;
-- unsafe numeric precision rejection/string representation;
-- expired approval rejection despite matching digest;
-- second consumption/replay rejection;
-- secret exclusion.
+`J05-VER-08` and `J05-VER-10` own the required property, approval, and Rust/TypeScript cross-language vector evidence, including the canonicalization failure cases and release-blocking outcome.
 
 No adapter/tool chooses its own approval material field set.
-
----
 
 ---
 
@@ -2637,32 +2417,9 @@ These pre-production schema changes occur before the first production protocol-m
 
 ---
 
----
-
 ## J01-PROTO-27 — SCHEMA QUALIFICATION
 
-CI/release qualification SHALL prove:
-
-- positive and negative fixtures for every boundary schema;
-- Rust/TypeScript round-trip compatibility;
-- explicit IpcResponse union behavior;
-- PlatformFamily/RuntimeRole/PlatformRuntimeIdentity validation;
-- PlatformPathRef cannot be interpreted by the wrong platform path backend without explicit migration/import;
-- provider/module/tool platform compatibility schemas;
-- one durable `RESUMING` enum meaning;
-- execution-scope enforcement;
-- sensitivity/locality propagation;
-- exact money arithmetic/serialization;
-- Argon2id profile validation and under-floor production rejection;
-- provider setup/compatibility/health/platform separation;
-- module execution-class/health/lifecycle/platform validation;
-- approval canonicalization/digest vectors;
-- GitHub/Proxmox capability schemas;
-- Proxmox identity schemas;
-- unbounded arbitrary AI/external fields are not introduced;
-- secret-bearing fields are absent from AI/UI-safe views.
-
----
+`J05-VER-10A` owns the complete schema qualification catalog. Failure of any listed case blocks qualification.
 
 ---
 
@@ -2678,4 +2435,4 @@ CI/release qualification SHALL prove:
 
 ---
 
-**END — JARVIS RUNTIME, PLATFORM & PROTOCOL CONTRACT v1.0.8**
+**END — JARVIS RUNTIME, PLATFORM & PROTOCOL CONTRACT v1.0.9**

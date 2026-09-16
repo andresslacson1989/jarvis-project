@@ -1,7 +1,7 @@
 # JARVIS Data, State & Backup Contract
 
 **Contract Suite Version:** 1.0.8
-**Version:** 1.0.8
+**Version:** 1.0.9
 **Component:** `J02`
 **Status:** Canonical normative component
 **Scope:** authoritative persistence, state machines, events, exact values, budgets, SQLite/SQLCipher operation, backup cryptography, restore, and recovery
@@ -16,8 +16,6 @@ Clause identifiers in this file are stable traceability anchors. Cross-component
 This document defines authoritative persistence, transactions, state machines, events, scopes, memory, artifacts, approvals, provider setup/usage, budgets, KDF metadata, SQLite/SQLCipher operation, encrypted backups, migrations, restore, and recovery.
 
 UI, providers, workers, tools, integrations, and modules SHALL NOT invent their own authoritative state semantics.
-
----
 
 ---
 
@@ -43,9 +41,9 @@ The production database SHALL:
 
 The production manifest identifies the SQLite/SQLCipher core, binding, build/source identity, and WAL-fix evidence.
 
-The live authoritative database SHALL NOT run from UNC/SMB/NFS/cloud-sync virtual mounts or other unqualified remote/removable paths.
+SQLite `3.51.3` is the first known upstream release containing the WAL-reset fix, but numeric `>= 3.51.3` comparison alone SHALL NOT establish qualification. A specific SQLite/SQLCipher binding becomes `SUPPORTED` only after J05-VER-20 proves the exact packaged build, WAL fix, snapshot, and re-key path.
 
----
+The live authoritative database SHALL NOT run from UNC/SMB/NFS/cloud-sync virtual mounts or other unqualified remote/removable paths.
 
 ---
 
@@ -61,22 +59,13 @@ Normal Core domain state stores only opaque references/metadata needed to use th
 
 ---
 
----
-
 ## J02-DATA-04 — IDENTIFIERS, TIME, EXACT VALUES
 
 New durable entities use UUIDv7 or an equivalently unique/time-sortable opaque identifier.
 
 Durable timestamps use UTC ISO-8601 with millisecond precision or better.
 
-Authoritative money uses J01-PROTO-05's:
-
-```ts
-interface MoneyAmount {
-  currency: string;
-  nanoUnits: string;
-}
-```
+Authoritative money uses the sole canonical `MoneyAmount` definition in J01-PROTO-05.
 
 No database or TypeScript code may round authoritative budget/cost values through binary floating point.
 
@@ -84,21 +73,11 @@ SQLite storage MAY use checked INTEGER only where the full `nanoUnits` range is 
 
 ---
 
----
-
 ## J02-DATA-05 — KDF PROFILE PERSISTENCE
 
 Session-password verifiers and portable-recovery key slots SHALL retain the exact versioned KDF profile required to verify/derive them.
 
-JARVIS-managed V1 production profiles are Argon2id version `0x13` and SHALL meet at least:
-
-```text
-memoryKiB  >= 65536
-iterations >= 3
-parallelism = 4
-saltBytes  >= 16
-outputBytes >= 32
-```
+`J03-SEC-04` owns the Argon2id security construction, production floor, upgrade/downgrade policy, recovery semantics, and secret-handling rules. `J01-PROTO-06` owns the interoperable KDF profile shape and boundary validation. This clause owns durable persistence of the applicable profile with each verifier/key slot.
 
 Persistence SHALL retain, directly or through immutable profile reference:
 
@@ -115,11 +94,7 @@ created/activated timestamps
 replacement/supersession metadata where applicable
 ```
 
-The password/recovery secret itself is never stored.
-
-A later release MAY strengthen parameters. Existing valid verifier/key slots remain interpretable using their recorded profile; after successful authentication/recovery, policy MAY atomically re-hash/re-wrap under the current stronger profile. Downgrade below the current production floor requires an explicit future security-contract revision and is not an automatic compatibility fallback.
-
----
+The password/recovery secret itself is never stored. Persisted metadata SHALL be sufficient for the `J03-SEC-04` upgrade and compatibility rules without turning an older profile into an automatic downgrade fallback.
 
 ---
 
@@ -224,8 +199,6 @@ Exact physical normalization may evolve before first production schema freeze as
 
 ---
 
----
-
 ## J02-DATA-07 — TRANSACTIONAL STATE CHANGES
 
 Authoritative transitions SHALL persist state and causative event/audit evidence atomically where they are within one SQLite transaction boundary.
@@ -249,8 +222,6 @@ SQLite and an external service/provider setup helper are never modeled as one at
 
 ---
 
----
-
 ## J02-DATA-08 — OPTIMISTIC CONCURRENCY
 
 Authoritative mutable records SHALL use a monotonic `version`/equivalent token.
@@ -261,28 +232,9 @@ Consequential policy/action records retain the policy snapshot/version used for 
 
 ---
 
----
-
 ## J02-DATA-09 — MISSION STATE MACHINE
 
-Canonical mission states:
-
-```text
-CREATED
-PLANNING
-QUEUED
-RUNNING
-WAITING_FOR_USER
-WAITING_FOR_APPROVAL
-PAUSING
-PAUSED
-BLOCKED
-VERIFYING
-RECOVERING
-COMPLETED
-FAILED
-CANCELLED
-```
+`J01-PROTO-13` is the sole canonical definition of `MissionState`. This clause owns legal mission transitions and terminal-state persistence for that vocabulary.
 
 Terminal mission states are `COMPLETED`, `FAILED`, `CANCELLED`. A terminal mission does not silently return to running; continuation creates explicit linked work.
 
@@ -306,30 +258,9 @@ Mission resume does not bypass task-level `RESUMING` validation.
 
 ---
 
----
-
 ## J02-DATA-10 — TASK STATE MACHINE
 
-Canonical task states:
-
-```text
-CREATED
-WAITING_FOR_DEPENDENCY
-QUEUED
-STARTING
-RUNNING
-WAITING_FOR_APPROVAL
-PAUSING
-PAUSED
-RESUMING
-BLOCKED
-VERIFYING
-RECOVERING
-COMPLETED
-FAILED
-CANCELLED
-INVALIDATED
-```
+`J01-PROTO-13` is the sole canonical definition of `TaskState`. This clause owns legal task transitions, resume validation, completion, invalidation, and terminal-state persistence for that vocabulary.
 
 `RESUMING` is durable and canonical.
 
@@ -348,26 +279,9 @@ A task becomes `COMPLETED` only when its required acceptance/verification policy
 
 ---
 
----
-
 ## J02-DATA-11 — ATTEMPT STATE MACHINE
 
-Attempt states:
-
-```text
-QUEUED
-STARTING
-RUNNING
-CHECKPOINTING
-WAITING_FOR_APPROVAL
-PAUSING
-PAUSED
-SUCCEEDED
-FAILED
-CANCELLED
-TIMED_OUT
-UNCERTAIN
-```
+`J01-PROTO-13` is the sole canonical definition of `AttemptState`. This clause owns attempt-result meaning, retry identity, recovery policy, and persistence for that vocabulary.
 
 `SUCCEEDED` means the attempt produced its expected attempt result, not that the overall task is semantically complete.
 
@@ -375,18 +289,9 @@ UNCERTAIN
 
 ---
 
----
-
 ## J02-DATA-12 — EXECUTION SCOPE PERSISTENCE
 
-Every executable task stores exactly one:
-
-```text
-PROJECT_WORKSPACE
-INTEGRATION
-SYSTEM
-GLOBAL
-```
+Every executable task stores exactly one `ExecutionScope` defined by J01-PROTO-11. This clause owns durable scope identity and persistence invariants; it does not redefine the scope vocabulary.
 
 `PROJECT_WORKSPACE` persists project/workspace and optional environment IDs and enforces workspace membership.
 
@@ -399,8 +304,6 @@ GLOBAL
 Non-project work SHALL NOT create fake project/workspace rows.
 
 Scope expansion after attempt start requires a new validated authority/revision; a worker cannot mutate its own scope.
-
----
 
 ---
 
@@ -436,20 +339,9 @@ The deterministic precedence itself is defined by J03-SEC-13 and must be reprodu
 
 ---
 
----
-
 ## J02-DATA-14 — APPROVALS AND CANONICAL ACTION MATERIAL
 
-Approval states are exactly:
-
-```text
-PENDING
-APPROVED
-REJECTED
-EXPIRED
-CANCELLED
-CONSUMED
-```
+`J01-PROTO-18` is the sole canonical definition of `ApprovalStatus`. This clause owns durable approval material, state persistence, and transactionally safe consumption for that vocabulary.
 
 An approval stores or integrity-binds:
 
@@ -467,13 +359,11 @@ session/decision metadata
 
 The canonical descriptor contains no raw secrets.
 
-Digest is exactly JCS → UTF-8 → SHA-256 → base64url-no-padding per J01-PROTO-25.
+Digest generation and encoding use the sole canonical pipeline in J01-PROTO-18/J01-PROTO-25.
 
 Immediately before consumption, Core re-resolves material identities/arguments and recomputes the descriptor/digest. Material mismatch invalidates the approval.
 
 Approval is single-use. Approval consumption is transactionally guarded against double use. Crash after consumption with uncertain external execution does not auto-replay a destructive action.
-
----
 
 ---
 
@@ -504,8 +394,6 @@ Bounded iteration belongs inside tasks/workers, not unbounded graph cycles.
 
 ---
 
----
-
 ## J02-DATA-16 — TASK INPUTS, OUTPUTS, ARTIFACTS
 
 Task inputs persist goal, criteria, scope, authority, data policy, context/artifact references, role/capability requirements, and resource/budget policy.
@@ -520,8 +408,6 @@ Artifacts derived from `LOCAL_ONLY` remain `LOCAL_ONLY` absent explicit determin
 
 ---
 
----
-
 ## J02-DATA-17 — WORKER CHECKPOINTS AND PROVIDER RESUME
 
 A checkpoint SHALL be sufficient for a qualified fresh worker to continue without provider-private transcript history. It includes goal summary, completed work, decisions/findings, artifacts, verification state, current activity, next step, blockers, and live-state assumptions.
@@ -529,8 +415,6 @@ A checkpoint SHALL be sufficient for a qualified fresh worker to continue withou
 Private chain-of-thought is not stored.
 
 Provider resume references may be persisted as sensitive opaque metadata when useful, but are never the sole source of material progress or completion evidence.
-
----
 
 ---
 
@@ -546,8 +430,6 @@ A duplicate/replayed event does not create duplicate consequential work.
 
 ---
 
----
-
 ## J02-DATA-19 — RESOURCE/WORKSPACE LEASES
 
 Exclusive resources use durable/recoverable lease records including owner instance/task/attempt, acquisition/heartbeat, resource identity, and lease type.
@@ -557,8 +439,6 @@ Examples include writable worktrees, provider slots, migration/backup/update loc
 A lease is reclaimed only after owner death is established or the resource-specific recovery policy permits reclaim.
 
 `RESUMING` validates/reacquires required leases before `RUNNING`.
-
----
 
 ---
 
@@ -585,8 +465,6 @@ Retrieving stored `LOCAL_ONLY` conversation/memory does not make it remotely rou
 
 ---
 
----
-
 ## J02-DATA-21 — PRECEDENT RECORDS
 
 Precedent records contain action class, scope/environment/target/account class, reversibility, consequence, prior user decision, timestamps, and confidence/relevance metadata.
@@ -595,20 +473,9 @@ Precedent is evidence only. It does not directly authorize HIGH/CRITICAL action,
 
 ---
 
----
-
 ## J02-DATA-22 — PROVIDER SETUP / QUALIFICATION STATE
 
-Provider setup state is durable logical state distinct from compatibility and health:
-
-```text
-NOT_REQUIRED
-SETUP_REQUIRED
-SETUP_IN_PROGRESS
-SETUP_READY
-REPAIR_REQUIRED
-SETUP_FAILED
-```
+`J01-PROTO-19` is the sole canonical definition of `ProviderSetupState`, `ProviderCompatibilityState`, and `ProviderHealth`. This clause owns durable provider setup/qualification persistence and reconciliation while preserving their separation.
 
 Persistence SHALL retain at least provider/distribution/version identity, setup policy/profile identity, current setup state, last setup/repair attempt timestamp/outcome, sanitized failure reason, last setup verification time, and conformance evidence reference where applicable.
 
@@ -620,17 +487,9 @@ Provider-owned internal sandbox credentials are not persisted by JARVIS as gener
 
 ---
 
----
-
 ## J02-DATA-23 — PROVIDER QUOTA AND USAGE FACTS
 
-Provider quota/usage snapshots preserve source provenance:
-
-```text
-PROVIDER_REPORTED
-JARVIS_CALCULATED
-UNKNOWN
-```
+Provider quota/usage snapshots preserve the canonical `ProviderQuotaSource` provenance defined by J01-PROTO-22.
 
 Provider-reported facts are authoritative for what the provider reports and keep observation/reset timestamps. Local estimates may coexist but cannot be relabeled as provider facts.
 
@@ -639,8 +498,6 @@ Unknown cost/quota remains unknown rather than zero.
 Usage records are append-oriented and include provider/model, task context where applicable, units, estimated/actual MoneyAmount, confidence/provenance, pricing snapshot if used, and time.
 
 Deleting a task does not erase accounting facts required for budget/audit history.
-
----
 
 ---
 
@@ -654,15 +511,7 @@ settled spend + outstanding reservations + requested reservation
 
 before new chargeable work begins where expected monetary reservation is determinable.
 
-A reservation state is:
-
-```text
-RESERVED
-SETTLED
-RELEASED
-EXPIRED
-UNCERTAIN
-```
+`J01-PROTO-22` is the sole canonical definition of `BudgetReservationState`. This clause owns atomic admission, settlement, release, expiry, uncertainty, and durable reconciliation for that vocabulary.
 
 Reservation creation/admission is transactionally serialized against the applicable budget state so concurrent workers cannot each spend the same remaining amount.
 
@@ -672,30 +521,17 @@ Different currencies are not added without an explicit versioned FX conversion c
 
 ---
 
----
-
 ## J02-DATA-25 — PROVIDERS, MODULES, INTEGRATIONS
 
 Provider records separate installation/discovery, setup, compatibility, health/auth state, qualification evidence, model/capability availability, and current profile.
 
-Module records separate:
-
-```text
-SUPPORTED
-INSTALLED
-ENABLED
-AUTHORIZED
-PREFERRED
-HEALTHY
-```
+Module records separately persist every module lifecycle/support fact canonically defined by J04-OPS-15.
 
 and store authenticated catalog/provenance metadata. Installed external code does not become `BUILT_IN_TRUSTED` through signature alone.
 
 Integration account rows contain metadata and opaque credential handles only. Enabled/supported capability IDs are explicit. After state restore without local credential-store secrets, affected accounts become `REAUTH_REQUIRED`.
 
 Proxmox connections persist stable connection/environment IDs, endpoint/trust configuration, capability/scope allowlists, status, and opaque credential handle. VM display names are not authoritative target identity.
-
----
 
 ---
 
@@ -718,8 +554,6 @@ The `-wal`/`-shm` files are part of live database state. Backup SHALL use SQLite
 
 ---
 
----
-
 ## J02-DATA-27 — BACKUP CLASSES AND CRYPTOGRAPHIC ENVELOPE
 
 Backup protection classes are:
@@ -731,122 +565,37 @@ PORTABLE_STATE
 
 Credential-bearing export, if later implemented, is a separate explicit workflow.
 
-For every backup:
-
-1. create a consistent SQLite-safe snapshot;
-2. generate a fresh random backup-specific SQLCipher snapshot key (`SnapshotDBKey`);
-3. re-key/export the backup snapshot so it is openable with `SnapshotDBKey`, not the historical live `DB_DEK`;
-4. generate a fresh random 256-bit backup data-encryption key (`BackupDEK`);
-5. build an authenticated backup payload containing the encrypted SQLCipher snapshot, `SnapshotDBKey` wrapped/authenticated as internal secret material, non-secret configuration/registry metadata, required durable JARVIS artifacts, and recovery/update manifests;
-6. encrypt/authenticate the payload with `BackupDEK` using a reviewed AEAD (V1 preference AES-256-GCM or an equally reviewed qualified construction, chunked safely where required);
-7. protect `BackupDEK` using one or more key slots.
-
-The `SnapshotDBKey` SHALL never be emitted as plaintext sidecar or normal manifest data. It exists only inside the authenticated encrypted backup payload and trusted restore memory.
-
-`BackupDEK` SHALL never be the live `DB_DEK`, session password, integration credential, deterministic backup metadata derivative, or long-lived global backup key.
-
----
+J02-BACKUP-02 through J02-BACKUP-06 exclusively define the fixed V1 format, snapshot/re-key process, key hierarchy, payload, AEAD, nonce, AAD, chunking, bounds, and secret-material handling. No alternative construction is permitted under `JARVIS_BACKUP_V1`.
 
 ---
 
 ## J02-DATA-28 — BACKUP KEY SLOTS
 
-`LOCAL_RECOVERY` SHALL contain a Windows current-user DPAPI/local-secure-store key slot suitable for unattended same-profile local restore.
-
-`PORTABLE_STATE` SHALL contain an independent portable key slot based on a user-controlled recovery factor. The V1 passphrase path uses Argon2id version `0x13`, fresh random salt, versioned parameters meeting the current production KDF floor, and preferably a materially stronger memory cost when interactive restore remains practical. The derived key encrypts/wraps `BackupDEK`; it does not directly encrypt the entire package.
-
-The key slot SHALL record its exact KDF profile/parameters needed for future recovery. A portable package MAY contain both local DPAPI and portable key slots.
-
-The portable recovery passphrase/factor is never stored.
-
-A package is labeled portable only after JARVIS verifies a non-DPAPI key slot can unlock its `BackupDEK`.
-
----
+J02-BACKUP-07 through J02-BACKUP-10 exclusively define generated recovery, optional passphrase, and Windows local-recovery slots. A package is portable only when those clauses permit the `PORTABLE_STATE VERIFIED` claim; a DPAPI-only package is never portable.
 
 ---
 
 ## J02-DATA-29 — BACKUP CONTENT POLICY
 
-Normal backups may contain:
-
-- authoritative database snapshot;
-- non-secret validated configuration;
-- module/integration registry metadata;
-- required durable JARVIS-managed artifacts;
-- migration/update/recovery/release metadata.
-
-They SHALL NOT contain raw long-lived integration/provider credentials by default.
-
-External Git repositories are not duplicated by ordinary JARVIS backup unless explicitly selected by a separate feature/policy.
-
-The authenticated backup manifest records format/version, protection class, JARVIS/schema/protocol versions, content identities/hashes/sizes, encryption algorithm metadata, and key-slot/KDF profile metadata without exposing secret key material.
-
----
+J02-BACKUP-05 and J02-BACKUP-11 exclusively define descriptor and encrypted-payload content, including bounded metadata, content identity, secret exclusion, and credential handling. External Git repositories are not duplicated by ordinary JARVIS backup unless explicitly selected by a separate feature/policy.
 
 ---
 
 ## J02-DATA-30 — BACKUP VERIFICATION
 
-A backup is `VERIFIED` only after applicable checks prove:
-
-- bounded/versioned container parses correctly;
-- applicable key slot and recorded KDF profile are valid and unwrap `BackupDEK`;
-- AEAD payload authentication succeeds;
-- content hashes/manifest match;
-- `SnapshotDBKey` can open the SQLCipher snapshot in validation flow;
-- SQLite integrity check passes;
-- required files/metadata exist;
-- application/schema compatibility metadata is valid.
-
-Portable disaster-recovery readiness additionally requires qualification of clean-profile restore using only the declared portable factor and backup package.
-
----
+`VERIFIED` backup requirements are J02-BACKUP-12 and J02-BACKUP-14, with J05-VER-21 owning release evidence. Portable disaster-recovery readiness additionally requires clean-profile restore using only the declared portable factor and backup package.
 
 ---
 
 ## J02-DATA-31 — CLEAN-PROFILE RESTORE
 
-Portable restore follows:
-
-```text
-select package
-→ parse bounded authenticated metadata
-→ choose portable key slot
-→ validate recorded KDF profile
-→ derive/unlock BackupDEK
-→ authenticate/decrypt outer payload
-→ recover SnapshotDBKey transiently
-→ open + integrity-check SQLCipher snapshot
-→ verify schema/application compatibility
-→ preserve current state when possible
-→ restore under exclusive maintenance lock
-→ generate a fresh local DB_DEK
-→ re-key restored database from SnapshotDBKey to new DB_DEK
-→ protect new DB_DEK through current Windows secure storage
-→ mark unavailable integration credentials REAUTH_REQUIRED
-→ restart in recovery mode
-→ reconcile external/live state
-```
-
-The old live `DB_DEK` is not required on a clean machine.
-
-Wrong/unavailable recovery factor fails closed without modifying the only backup or partially activating unauthenticated contents.
-
-After restore, old provider sessions/setup states/approvals/leases/external effects are revalidated/reconciled under normal recovery policy rather than blindly resumed/replayed.
-
----
+J02-BACKUP-12 exclusively defines portable restore order, clean-profile key replacement, credential reauthentication, and reconciliation. The old live `DB_DEK` is not required on a clean machine. Wrong or unavailable recovery factors fail closed without modifying the source backup or activating unauthenticated contents.
 
 ---
 
 ## J02-DATA-32 — LOCAL RESTORE
 
-Local rollback may use a local DPAPI key slot to obtain `BackupDEK` without repeatedly asking for the portable recovery factor.
-
-It still authenticates/decrypts the package, opens/verifies the snapshot, and restores under exclusive maintenance rules.
-
-A local-only backup is never labeled portable merely because its encrypted file can be copied elsewhere.
-
----
+J02-BACKUP-10 and J02-BACKUP-12 define local rollback. A local-only backup is never labeled portable merely because its encrypted file can be copied elsewhere.
 
 ---
 
@@ -861,8 +610,6 @@ Without an applicable recovery factor, the old password is not derived from/reco
 A clean-machine portable restore always creates a new session password after state is authenticated/decrypted/validated, using the current qualified session-password KDF profile.
 
 Integration credentials remain separate and are re-authenticated as needed.
-
----
 
 ---
 
@@ -890,8 +637,6 @@ Migrations affecting KDF profiles/verifiers, money precision, data policy, appro
 
 ---
 
----
-
 ## J02-DATA-35 — CORRUPTION RESPONSE
 
 If database integrity cannot be established:
@@ -908,8 +653,6 @@ WAL-related corruption is a persistence incident even if some higher-level recor
 
 ---
 
----
-
 ## J02-DATA-36 — RETENTION AND EXPORT
 
 Retention distinguishes audit, worker events, conversation, artifacts, logs, backups, and transient cache.
@@ -917,8 +660,6 @@ Retention distinguishes audit, worker events, conversation, artifacts, logs, bac
 Retention SHALL not delete the last known-good backup for a protected state solely to satisfy count/space preferences without an explicit safety policy.
 
 User export/import is versioned and non-secret by default. Credential export, if implemented, is a separate high-risk encrypted/confirmed workflow.
-
----
 
 ---
 
@@ -964,8 +705,6 @@ The governing rule is:
 
 ---
 
----
-
 ## J02-BACKUP-02 — FORMAT IDENTITY
 
 The first production format is:
@@ -985,8 +724,6 @@ canonicalMetadata: RFC_8785_JCS
 `4194304` bytes is exactly 4 MiB. `1099511627776` bytes is exactly 1 TiB.
 
 A package exceeding the V1 bounds SHALL be rejected before unbounded allocation or encryption/decryption. A future format may raise these bounds only through a versioned contract change.
-
----
 
 ---
 
@@ -1014,7 +751,7 @@ recovery/local key slots
 
 `BackupDEK` SHALL be generated from the qualified OS CSPRNG for every backup. BackupDEK reuse across backup IDs is prohibited.
 
----
+`BackupDEK` SHALL never be the live `DB_DEK`, session password, integration credential, deterministic backup-metadata derivative, or long-lived global backup key.
 
 ---
 
@@ -1025,8 +762,6 @@ The database snapshot SHALL be produced through a release-qualified SQLite/SQLCi
 JARVIS SHALL NOT assume that a generic SQLite backup API has identical behavior for every SQLCipher version/binding. Phase 3 qualification SHALL prove the exact selected binding/version and snapshot/re-key/export path on the packaged application.
 
 The release manifest SHALL record the exact SQLCipher/SQLite/binding identities and the tested snapshot mechanism.
-
----
 
 ---
 
@@ -1061,8 +796,6 @@ descriptorDigest = SHA-256(UTF-8(JCS(descriptor)))
 ```
 
 The descriptor and all parser-controlled metadata are bounded. V1 SHALL allow at most 16 key slots and a total unencrypted descriptor/key-slot metadata area of 256 KiB.
-
----
 
 ---
 
@@ -1109,8 +842,6 @@ These checks make reordering, deletion, duplication, truncation, and unauthentic
 
 ---
 
----
-
 ## J02-BACKUP-07 — GENERATED PORTABLE RECOVERY SECRET
 
 Every production `PORTABLE_STATE` backup SHALL contain at least one `GENERATED_RECOVERY_V1` key slot backed by a JARVIS-generated 256-bit recovery secret from the OS CSPRNG.
@@ -1128,8 +859,6 @@ The prefix is presentation/version metadata and is not part of the 32-byte secre
 The generated recovery secret SHALL be shown only through an explicit recovery-setup/export flow. It SHALL NOT be written to normal logs, SQLite domain rows, AI context, ordinary diagnostic exports, or ordinary backup plaintext metadata.
 
 JARVIS MAY offer an explicitly labeled local convenience copy protected by PlatformSecureStorage, but possession of such a local copy does not count as proof that the user has preserved an independent disaster-recovery factor.
-
----
 
 ---
 
@@ -1167,8 +896,6 @@ A slot record stores only the slot ID/type, wrap algorithm, wrap nonce, wrapped 
 
 ---
 
----
-
 ## J02-BACKUP-09 — OPTIONAL PASSPHRASE KEY SLOT
 
 A `PASSPHRASE_ARGON2ID_V1` slot MAY be added in addition to the generated-recovery slot.
@@ -1201,17 +928,13 @@ Wrong passphrase fails authentication without modifying the source backup.
 
 ---
 
----
-
 ## J02-BACKUP-10 — WINDOWS LOCAL-RECOVERY SLOT
 
-`LOCAL_RECOVERY` on Windows V1 SHALL support a current-user Windows PlatformSecureStorage/DPAPI-backed slot for `BackupDEK`.
+Every `LOCAL_RECOVERY` package on Windows V1 SHALL contain a current-user Windows PlatformSecureStorage/DPAPI-backed slot for `BackupDEK` suitable for unattended same-profile local restore.
 
 The local slot SHALL bind to the backup/descriptor identity using the qualified Windows backend's authenticated/additional-entropy facility where the selected implementation safely supports it.
 
 A DPAPI-only package SHALL NOT be labeled portable.
-
----
 
 ---
 
@@ -1229,8 +952,6 @@ The authenticated encrypted payload SHALL contain at least:
 Raw long-lived integration/provider credentials remain excluded from ordinary backups.
 
 The payload manifest SHALL identify every included object by logical type, bounded path/reference, size, and SHA-256 digest as applicable. The descriptor's `payloadManifestSha256` binds the decrypted manifest.
-
----
 
 ---
 
@@ -1262,8 +983,6 @@ No partial decrypted state becomes authoritative before the entire package and d
 
 ---
 
----
-
 ## J02-BACKUP-13 — ROTATION AND RECOVERY-FACTOR LIFECYCLE
 
 Creating a new generated recovery secret SHALL create new key slots for future backups. Historical backup packages are not silently rewritten.
@@ -1273,8 +992,6 @@ JARVIS SHALL clearly identify which verified backups are recoverable by which re
 Removing/losing the only generated-recovery factor for a backup means that backup can no longer satisfy the production `PORTABLE_STATE VERIFIED` claim, even if an optional user passphrase slot remains usable.
 
 Recovery-factor setup/rotation/export is security-sensitive and auditable without recording the secret.
-
----
 
 ---
 
@@ -1302,7 +1019,7 @@ Production qualification SHALL include deterministic cross-language/golden fixtu
 
 At least one full disaster-recovery drill SHALL use the exact signed Release Candidate artifacts and a separately preserved generated recovery secret.
 
----
+A package is labeled portable only after verification proves that its non-DPAPI generated-recovery slot can unlock its `BackupDEK` and complete the required clean-profile restore path.
 
 ---
 
@@ -1314,15 +1031,11 @@ No implementation may substitute an "equivalent" construction under `JARVIS_BACK
 
 ---
 
----
-
 ## J02-BACKUP-16 — STANDARDS BASIS
 
 The production profile is grounded in reviewed standards including NIST SP 800-38D GCM requirements, RFC 5869 HKDF, RFC 9106 Argon2id, RFC 8785 JCS, SHA-256, and the platform-qualified Windows data-protection backend.
 
 A standards update does not silently mutate an already-defined backup format. Future changes are versioned and migration-tested.
-
----
 
 ---
 
@@ -1341,4 +1054,4 @@ A standards update does not silently mutate an already-defined backup format. Fu
 
 ---
 
-**END — JARVIS DATA, STATE & BACKUP CONTRACT v1.0.8**
+**END — JARVIS DATA, STATE & BACKUP CONTRACT v1.0.9**

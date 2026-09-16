@@ -1,6 +1,7 @@
 # JARVIS Production Implementation Plan
 
 **Status:** Non-authoritative dependency/sequencing aid for v1.0.8
+**Contract component revisions reviewed:** J00–J05 and Release Profile 1.0.9
 **Version:** 1.0.8
 **Date:** August 12, 2026  
 **Release target:** `docs/JARVIS-V1-RELEASE-PROFILE.md`

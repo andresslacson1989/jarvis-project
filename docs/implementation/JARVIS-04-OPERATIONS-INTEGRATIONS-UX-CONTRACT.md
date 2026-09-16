@@ -1,7 +1,7 @@
 # JARVIS Operations, Integrations & UX Contract
 
 **Contract Suite Version:** 1.0.8
-**Version:** 1.0.8
+**Version:** 1.0.9
 **Component:** `J04`
 **Status:** Canonical normative component
 **Scope:** operational truth, queue and recovery UX, integrations, voice operations, diagnostics, governance UX, visual identity, adaptive layout, and accessibility
@@ -21,8 +21,6 @@ Requirements in this document are cumulative with the rest of the current normat
 
 ---
 
----
-
 ## J04-OPS-02 — OPERATIONAL TRUTHFULNESS
 
 JARVIS SHALL prefer explicit degraded, queued, blocked, paused, uncertain, setup-required, repair-required, or recovery state over fabricated continuity.
@@ -38,8 +36,6 @@ JARVIS SHALL NOT:
 - reconstruct worker history from AI speculation when authoritative state/events exist.
 
 When accepted work cannot proceed, the user SHALL be able to determine its current state and material reason.
-
----
 
 ---
 
@@ -67,8 +63,6 @@ Queue ordering changes and dependency, workspace, resource, budget, approval, pr
 Routine worker activity SHALL remain available in the dashboard/journal without repetitive spoken interruption.
 
 Questions such as `What is that worker doing?`, `What did it do?`, `What is queued?`, and `Why is this blocked?` SHALL be answered primarily from recorded authoritative state/events rather than model reconstruction.
-
----
 
 ---
 
@@ -100,8 +94,6 @@ Completed worker history remains accessible according to retention policy and ma
 
 ---
 
----
-
 ## J04-OPS-05 — MISSION PLANNING AND CONCURRENCY UX
 
 The planner determines logical decomposition/parallelism; deterministic runtime policy determines actual concurrency.
@@ -113,8 +105,6 @@ Trivial deterministic operations SHALL NOT be decomposed into unnecessary missio
 Excess logical parallelism that cannot run because of resource, provider, budget, workspace, permission, locality, or responsiveness constraints SHALL queue transparently rather than overload the machine or disappear.
 
 Consequential ambiguity in decomposition or material scope expansion SHALL follow clarification/authorization policy rather than guessing.
-
----
 
 ---
 
@@ -136,8 +126,6 @@ After `PAUSED`, all new execution follows canonical durable `RESUMING` validatio
 
 ---
 
----
-
 ## J04-OPS-07 — RECOVERY VISIBILITY
 
 Accepted queued/pending work SHALL survive restart according to durability policy and remain visible after recovery.
@@ -145,8 +133,6 @@ Accepted queued/pending work SHALL survive restart according to durability polic
 After crash/restart/provider/runtime interruption, JARVIS SHALL accurately surface materially interrupted, resumed, queued, blocked, uncertain, setup/repair-required, approval-revalidation-required, or user-action-required work.
 
 Recovery messaging SHALL reflect live reconciliation rather than merely repeating pre-crash assumptions.
-
----
 
 ---
 
@@ -159,8 +145,6 @@ A standing permission SHALL identify sufficient canonical scope to prevent accid
 Revocation SHALL prevent new dependent execution immediately after authoritative policy state is updated. Revoking one capability SHALL NOT implicitly revoke unrelated independent capabilities unless policy explicitly couples them.
 
 A development standing permission SHALL NOT become production authority. No standing permission waives mandatory destructive final confirmation.
-
----
 
 ---
 
@@ -188,22 +172,13 @@ No event path creates direct unrestricted tool authority.
 
 ---
 
----
-
 ## J04-OPS-10 — NOTIFICATION POLICY AND FOCUS MODES
 
 NotificationPolicyEngine is the single policy authority for whether an event is spoken, displayed, grouped, deferred, dashboard-only, or silent.
 
 Decisions SHALL consider relevant severity, source, project/integration scope, DataPolicy, preferences, interaction/focus state, actionability, repetition/grouping, and locked-session privacy.
 
-Severity classes remain equivalent to:
-
-```text
-CRITICAL
-IMPORTANT
-NORMAL
-LOW_VALUE
-```
+Notification severity SHALL use the canonical `NotificationSeverity` vocabulary in J01-PROTO-24 without adding presentation-only severity values.
 
 Voice is reserved for events important enough to interrupt under current policy. Routine worker lifecycle noise defaults to dashboard/journal.
 
@@ -223,8 +198,6 @@ CRITICAL_ONLY
 Focus modes alter delivery, not underlying authoritative/audit events. Critical safety/security events MAY override quiet policy only where deterministic policy explicitly defines the override.
 
 `SENSITIVE` content SHOULD be excluded from verbose/spoken notifications by default unless an explicit trusted delivery policy permits it.
-
----
 
 ---
 
@@ -252,8 +225,6 @@ Dashboard, voice, and other control surfaces SHALL mutate the same underlying co
 
 ---
 
----
-
 ## J04-OPS-12 — IMPORT / MERGE SAFETY
 
 User state import SHALL be versioned, schema-validated, bounded, and staged before mutation.
@@ -263,8 +234,6 @@ Import SHALL NOT silently overwrite existing projects, memories, settings, histo
 Conflicts SHALL use an explicit versioned merge/conflict policy. If deterministic safe merge is undefined, JARVIS SHALL surface the conflict for user resolution instead of guessing.
 
 Credential import, if ever implemented, remains a separate high-risk encrypted/confirmed workflow.
-
----
 
 ---
 
@@ -285,8 +254,6 @@ Context Manager SHALL provide the smallest useful context/memory set for the cur
 For current-state questions/actions, freshly verified live state remains authoritative over memory.
 
 Consequential ambiguity that cannot be resolved reliably SHALL clarify/block rather than cross-project/target guess.
-
----
 
 ---
 
@@ -318,15 +285,13 @@ Streaming SHOULD be used where it improves responsiveness and remains semantical
 
 ---
 
----
-
 ## J04-OPS-15 — MODULE REGISTRY, DASHBOARD, AND STATE SEPARATION
 
 JARVIS SHALL provide one centralized Module Registry and module-management dashboard.
 
 The normal supported catalog/dashboard shows only modules/providers explicitly supported for the applicable JARVIS/platform/release context. Supported modules MAY be visible before installation.
 
-States remain distinct:
+This clause is the sole canonical owner of these distinct module lifecycle/support facts:
 
 ```text
 SUPPORTED
@@ -344,8 +309,6 @@ Applicable actions MAY include Install, Enable/Disable, Configure, Set/Clear Pre
 Unsupported/manual mechanisms, if later permitted, SHALL remain clearly distinguished from officially supported modules.
 
 Controlled installation/update uses defined verified paths, never arbitrary AI-generated shell as the standard installer mechanism.
-
----
 
 ---
 
@@ -369,8 +332,6 @@ Dashboard SHOULD distinguish active, approved-available, staged, previous/rollba
 
 ---
 
----
-
 ## J04-OPS-17 — INTEGRATION CATALOG UX AND REVOCATION
 
 JARVIS SHALL maintain an official Supported Integration Catalog consistent with the V1 Release Profile and binding post-V1 requirements.
@@ -386,8 +347,6 @@ Revoked/expired authentication or removed capability scope SHALL immediately pre
 The dashboard SHALL distinguish support, connection/configuration, enabled capabilities, authorization, and health without exposing secret material.
 
 Manual/unsupported extensions remain clearly distinct from official support.
-
----
 
 ---
 
@@ -414,8 +373,6 @@ Hard limit blocks new governed chargeable work unless explicitly authorized poli
 
 ---
 
----
-
 ## J04-OPS-19 — VOICE IDENTITY AND FALLBACK
 
 JARVIS SHALL maintain one persistent configured human-quality voice identity across normal spoken interaction.
@@ -427,8 +384,6 @@ Latency SHALL NOT be improved by silently switching to a substantially different
 If no policy-compliant TTS can preserve identity adequately, JARVIS SHALL degrade to text/UI with explicit `VOICE_DEGRADED`-equivalent state rather than poorly impersonating the configured voice.
 
 Cloud speech fallback SHALL NOT violate DataLocality.
-
----
 
 ---
 
@@ -446,8 +401,6 @@ After a spoken response, a configurable short conversation window MAY remain act
 
 ---
 
----
-
 ## J04-OPS-21 — SLOW-OPERATION RESPONSIVENESS
 
 AI/provider/network/worker latency SHALL NOT freeze local UI, voice controls, or deterministic safety controls.
@@ -457,8 +410,6 @@ Longer work SHALL remain truthfully visible through `THINKING`, `WORKING`, `QUEU
 JARVIS SHOULD acknowledge accepted longer work promptly, stream meaningful authoritative progress, avoid repetitive verbal chatter, speak useful milestones according to NotificationPolicy, and keep stop/mute/cancel responsive.
 
 Routine deterministic controls SHALL NOT invoke AI unnecessarily after intent is established.
-
----
 
 ---
 
@@ -484,8 +435,6 @@ Telemetry SHALL NOT require retention of sensitive speech content to compute lat
 
 ---
 
----
-
 ## J04-OPS-23 — DESTRUCTIVE APPROVAL USER EXPERIENCE
 
 Final destructive confirmation SHALL present user-understandable exact target, environment where applicable, action, expected destructive/materially unrecoverable consequence, and whether a verified rollback/backup is known to exist when that information is available.
@@ -495,8 +444,6 @@ Voice approval MAY be accepted only in an unlocked authoritative session and onl
 A UI confirmation path SHALL remain available for final destructive approval even when voice confirmation is supported.
 
 Human-readable summaries never replace the canonical action descriptor/digest.
-
----
 
 ---
 
@@ -516,8 +463,6 @@ Secret/recovery-key/credential/KDF-derived/provider-internal sandbox credential 
 
 ---
 
----
-
 ## J04-OPS-25 — AUDIT RETENTION AND INTEGRITY CLAIMS
 
 Audit records SHALL be append-oriented and retained according to policy sufficient to explain recent consequential/security-relevant actions.
@@ -527,8 +472,6 @@ Retention SHALL NOT silently delete evidence still required by the configured se
 Integrity mechanisms SHOULD detect corruption, sequence discontinuity, unexpected truncation, or casual modification to the extent supported and qualified.
 
 JARVIS SHALL NOT claim cryptographically trustworthy local audit history after equivalent same-user compromise with sufficient access or Administrator/kernel compromise. Tamper/corruption diagnostics are defense-in-depth, not an independently trusted remote audit system.
-
----
 
 ---
 
@@ -546,8 +489,6 @@ A Critical finding is not converted into a production pass merely by relabeling 
 
 ---
 
----
-
 ## J04-OPS-27 — UPGRADE / UNINSTALL USER-STATE PRESERVATION
 
 Upgrade qualification SHALL prove preservation or explicit migration of compatible durable user state including applicable projects/workspaces/environments, memories/history policy state, mission/task/worker history, settings, provider setup/qualification state, module/integration metadata, compatible approvals/standing permissions, KDF profile/verifier metadata, and backup/recovery availability.
@@ -558,9 +499,7 @@ Normal uninstall SHALL NOT silently delete durable user data/backups without exp
 
 ---
 
----
-
-## J04-OPS-28 — ARCHITECTURE DECISION ESCALATION
+## J04-OPS-28 — ARCHITECTURE CHANGE ESCALATION
 
 Non-critical engineering choices SHALL be resolved from the current normative suite, production evidence, and established principles without requiring user approval for routine implementation detail.
 
@@ -571,8 +510,6 @@ Internal package factoring, retry mechanics, routing implementation, schemas, st
 Significant non-critical architecture choices made autonomously SHALL be documented directly in the applicable active contract clause when they change normative meaning, or in non-normative implementation evidence when they do not, as required by J00-GOV-29. ADR/decision-record creation, retention, citation, or use is prohibited. The user SHOULD receive a concise summary rather than being asked to approve every implementation detail or being left unaware of a material decision.
 
 > **Escalate product judgment. Resolve engineering judgment.**
-
----
 
 ---
 
@@ -588,52 +525,9 @@ Consequential ambiguity or material expansion of goal, project, environment, tar
 
 ---
 
----
-
 ## J04-OPS-30 — REQUIRED QUALIFICATION
 
-Production qualification SHALL prove at minimum:
-
-1. delayed accepted work is queued visibly and never shown running before start;
-2. dependency/workspace/resource/budget/provider/setup/approval/recovery queue reasons are visible;
-3. replanned queued work is visible;
-4. dashboard worker/current/history answers come from authoritative records;
-5. delayed safe-point pause/cancel is visible and audited;
-6. explicit user reprioritization is not silently overridden by AI priority;
-7. recovery accurately reports interrupted/resumed/blocked/uncertain/setup-required/user-action-required work;
-8. standing permissions are scoped/revocable/non-transitive and revocation blocks new dependent work;
-9. event disposition cannot bypass normal authority and queued event work remains visible;
-10. notification grouping/focus modes behave without deleting authoritative events;
-11. locked/sensitive notification policy prevents protected disclosure;
-12. invalid configuration leaves prior valid configuration active;
-13. conflicting import does not overwrite durable state without merge/conflict policy;
-14. ranked memory retrieval respects scope/confidence/provenance/live-state authority;
-15. trivial deterministic actions are not forced into unnecessary worker missions;
-16. provider abstraction supports qualified setup/warm/persistent/streaming lifecycle without mandating one-shot cold start;
-17. provider setup failure/repair remains explicit and does not silently downgrade sandbox/elevation policy;
-18. resource scheduling can unload/defer heavy providers while preserving interactive controls;
-19. module install does not implicitly enable/authorize/prefer;
-20. module update is staged and rollback does not depend on overwritten files;
-21. module dashboard exposes qualified lifecycle/update state;
-22. integration connection does not imply all capabilities and revocation blocks dependent actions;
-23. integration dashboard distinguishes mandatory vs optional current Release Profile capabilities;
-24. budget/usage UI preserves unknown provenance and queue reason;
-25. TTS fallback does not silently change JARVIS voice identity;
-26. acknowledgement never falsely implies completion;
-27. UI/reflex stop/mute/cancel remains responsive during slow AI/provider work;
-28. destructive approval UI shows target/consequence and UI confirmation remains available;
-29. diagnostic export defaults to excluding conversation/private content and displays included categories;
-30. audit retention preserves required recent consequential evidence;
-31. High reachable vulnerability waiver requires mandatory fields/expiry;
-32. Critical reachable vulnerability blocks release;
-33. upgrade preserves/migrates durable compatible user state without silent disappearance;
-34. uninstall does not silently delete durable user data contrary to explicit policy;
-35. operational explanations identify request/work/provider/setup/authorization/state/verification/recovery without chain-of-thought/secrets;
-36. significant autonomously resolved architecture decisions are documented in the active contract or non-normative implementation evidence as applicable and summarized to the user where appropriate.
-
-Failure of any applicable mandatory production behavior above blocks `Production Complete` for the active Release Profile.
-
----
+J04-OPS-02 through J04-OPS-29 own the operational behavior that must be qualified. J05-VER-03 through J05-VER-39 own verification and release evidence. Failure of any applicable mandatory behavior or evidence gate blocks `Production Complete` for the active Release Profile.
 
 ---
 
@@ -669,8 +563,6 @@ The goal is not maximum visual novelty. The goal is a recognizable, calm, precis
 
 ---
 
----
-
 ## J04-UI-02 — PRODUCT IDENTITY
 
 JARVIS SHALL feel:
@@ -696,8 +588,6 @@ The interface SHALL NOT feel like:
 - a constantly animated AI avatar.
 
 The visual system SHALL communicate controlled intelligence rather than spectacle.
-
----
 
 ---
 
@@ -748,8 +638,6 @@ The dark system SHALL use layered dark surfaces with restrained luminance differ
 Windows High Contrast/forced-colors modes MAY override brand/surface colors when required for platform accessibility. Such override is accessibility behavior, not a second JARVIS theme, and SHALL preserve semantics, focus, control visibility, and action differentiation.
 
 A future light theme requires a deliberate design-system extension and qualification; it is not automatically inherited by inversion.
-
----
 
 ---
 
@@ -824,8 +712,6 @@ Voice/listening animation may appear adjacent to or around a UI instance of the 
 
 ---
 
----
-
 ## J04-UI-05 — TYPOGRAPHY AND FONT PROVENANCE
 
 ### 5.1 Typeface
@@ -878,8 +764,6 @@ state / answer
 ```
 
 Avoid redundant labels where layout/semantics already make meaning obvious, but never sacrifice clarity for minimalism.
-
----
 
 ---
 
@@ -936,8 +820,6 @@ Default UI SHALL NOT rely on:
 
 ---
 
----
-
 ## J04-UI-07 — ICONOGRAPHY
 
 Icons SHALL be geometric, open, and consistent.
@@ -949,8 +831,6 @@ Icons SHALL remain understandable without decorative detail at compact sizes.
 Where an icon represents a consequential action or state, a text/accessible label SHALL exist.
 
 Different integrations MAY use their official marks where permitted by their license/brand terms, but surrounding controls/layout remain JARVIS-native rather than adopting each integration's visual system.
-
----
 
 ---
 
@@ -1051,8 +931,6 @@ Context SHALL track the primary workspace rather than show unrelated dashboard f
 
 ---
 
----
-
 ## J04-UI-09 — DEDICATED WINDOW BEHAVIOR
 
 ### 9.1 Window authority
@@ -1119,8 +997,6 @@ No always-on-top policy is required by default.
 
 ---
 
----
-
 ## J04-UI-10 — ADAPTIVE LAYOUT CONTRACT
 
 JARVIS adapts by available layout width/height and input characteristics rather than hardcoded device identity.
@@ -1181,8 +1057,6 @@ There is no separate tablet/mobile brand.
 
 ---
 
----
-
 ## J04-UI-11 — INFORMATION HIERARCHY
 
 The interface normally prioritizes:
@@ -1197,8 +1071,6 @@ The interface normally prioritizes:
 Secondary metrics SHALL NOT visually outrank a pending approval, blocked mission, failed verification, setup requirement, or active user question.
 
 Dashboards SHALL be contextual, not metric collections built merely because data exists.
-
----
 
 ---
 
@@ -1223,8 +1095,6 @@ Generated content SHALL be visually distinct from authoritative verified state w
 
 ---
 
----
-
 ## J04-UI-13 — WORK AND MISSION COMPONENTS
 
 Mission/task cards SHALL make the following glanceable where applicable:
@@ -1242,8 +1112,6 @@ Mission/task cards SHALL make the following glanceable where applicable:
 Progress percentages/ETA SHALL only appear when they have a defined truthful basis. Fabricated certainty is prohibited.
 
 Queue views SHALL preserve J04-OPS-03's truthful queued/blocked/wait semantics.
-
----
 
 ---
 
@@ -1265,8 +1133,6 @@ It SHALL show, where applicable:
 Critical/destructive actions SHALL not use ambiguous color-only buttons or deceptive emphasis.
 
 Approval language SHALL be plain, candid, and specific.
-
----
 
 ---
 
@@ -1292,8 +1158,6 @@ Mandatory vs optional/unsupported capability status SHALL be explicit rather tha
 
 ---
 
----
-
 ## J04-UI-16 — VOICE PRESENCE
 
 Voice UI SHALL provide immediate visible states equivalent to:
@@ -1315,8 +1179,6 @@ Voice state animation SHALL remain subtle and functional.
 The logo itself SHALL not permanently morph based on voice state.
 
 Voice interaction and text interaction share the same conversational context unless product policy explicitly starts a separate context.
-
----
 
 ---
 
@@ -1353,8 +1215,6 @@ State terms used in UI SHALL map cleanly to canonical domain/runtime state and S
 
 ---
 
----
-
 ## J04-UI-18 — MOTION AND FEEDBACK
 
 Motion SHALL explain change, not decorate idle time.
@@ -1385,8 +1245,6 @@ Default prohibited identity patterns:
 - large cinematic transitions that delay access to information.
 
 Reduced-motion preference SHALL suppress nonessential motion.
-
----
 
 ---
 
@@ -1428,8 +1286,6 @@ Never use confident success language without authoritative evidence.
 
 ---
 
----
-
 ## J04-UI-20 — ACCESSIBILITY
 
 The production UI SHALL target WCAG 2.2 AA-equivalent behavior where applicable to the desktop WebView.
@@ -1460,8 +1316,6 @@ High Contrast/forced-colors qualification SHALL verify focus, disabled/enabled d
 
 ---
 
----
-
 ## J04-UI-21 — SECURITY / PRIVACY PRESENTATION
 
 The UI remains an unprivileged presentation/control surface under J03-SEC-20.
@@ -1483,8 +1337,6 @@ The dashboard SHALL NOT expose:
 External/untrusted HTML remains sanitized/inert under the WebView contract even when displayed in polished cards or previews.
 
 A UAC/provider-setup prompt SHALL identify the provider/setup purpose clearly and SHALL NOT imitate a JARVIS approval for unrelated consequential work.
-
----
 
 ---
 
@@ -1515,8 +1367,6 @@ Changing a brand/design token SHALL be testable across all major surfaces.
 
 ---
 
----
-
 ## J04-UI-23 — COMPONENT OWNERSHIP
 
 Reusable design-system components SHALL own common visual/interaction semantics for:
@@ -1544,8 +1394,6 @@ Exceptions require a concrete product need.
 
 ---
 
----
-
 ## J04-UI-24 — FULLSCREEN AND FOCUSED PRESENTATION
 
 Full-screen mode is a presentation state, not a separate application.
@@ -1563,8 +1411,6 @@ A focused presentation MAY temporarily remove navigation/secondary panels to sho
 Dismissal returns to the previous shell state without losing context.
 
 JARVIS SHALL be able to present requested information visually without forcing the user to navigate manually through unrelated screens.
-
----
 
 ---
 
@@ -1586,37 +1432,9 @@ A polished dark screen with no explanation is not an acceptable failure state.
 
 ---
 
----
-
 ## J04-UI-26 — RELEASE QUALIFICATION MATRIX
 
-A V1 UI release SHALL be exercised at minimum across representative combinations of:
-
-```text
-1920×1080 standard display
-2560×1440 / 4K desktop class
-ultrawide layout
-compact resizable window
-multi-monitor including monitor removal/reconnect
-100% / 125% / 150% / 200% Windows scaling
-200% text resizing
-320 CSS px / 400% zoom-equivalent reflow for primary linear workflows
-keyboard-only primary workflows
-assistive-technology semantic navigation of primary workflows
-Windows High Contrast / forced-colors where supported
-reduced-motion preference
-long text / long IDs / localization-safe expansion behavior
-high mission/queue/notification counts
-empty state
-blocked/waiting/setup-required/uncertain/recovery state
-voice idle/listening/processing/speaking/degraded state
-provider setup/repair flow
-approval states including destructive confirmation
-```
-
-Qualification SHALL verify that adaptive layout changes information density, not product identity.
-
----
+J04-UI-03 through J04-UI-25 own UI behavior. J05-VER-11 and RP-12 own the exact V1 qualification matrix, including the requirement that adaptive layout changes information density rather than product identity.
 
 ---
 
@@ -1640,29 +1458,9 @@ High Contrast/forced-colors is an accessibility adaptation and is not excluded b
 
 ---
 
----
-
 ## J04-UI-28 — DEFINITION OF UI IDENTITY COMPLETE
 
-UI identity implementation is complete only when:
-
-1. canonical mark/lockup/app-icon source assets are used consistently;
-2. generated platform variants derive from canonical sources;
-3. three-color brand identity is preserved outside accessibility/system forced-color overrides;
-4. design tokens are centralized;
-5. Mission Control shell exists and is consistent across major sections;
-6. dedicated window show/hide/windowed/maximized/fullscreen/focused behavior is deterministic and tested;
-7. layouts adapt across required viewport/DPI/zoom/reflow conditions without parallel visual systems;
-8. operational state is glanceable and truthful;
-9. conversation/mission/approval/system/provider-setup views feel like one product;
-10. keyboard/focus/contrast/target-size/reflow/scaling requirements pass;
-11. High Contrast/forced-colors behavior passes where supported;
-12. reduced-motion behavior passes;
-13. destructive/setup/uncertain/degraded states remain visually explicit;
-14. packaged fonts/icons/visual assets have required source/license/provenance;
-15. no major screen requires historical mockups/historical material to infer its design language.
-
----
+UI identity is complete only when J04-UI-03 through J04-UI-25 behavior and J05-VER-11/RP-12 qualification pass for the exact V1 release candidate.
 
 ---
 
@@ -1680,4 +1478,4 @@ UI identity implementation is complete only when:
 
 ---
 
-**END — JARVIS OPERATIONS, INTEGRATIONS & UX CONTRACT v1.0.8**
+**END — JARVIS OPERATIONS, INTEGRATIONS & UX CONTRACT v1.0.9**

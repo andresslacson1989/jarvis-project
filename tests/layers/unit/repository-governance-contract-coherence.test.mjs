@@ -30,8 +30,9 @@ function assertGithubOnlyGovernance(text, label) {
 
 test("Release Profile uses GitHub Actions as the sole mandatory CI authority", () => {
   const profile = read("docs/JARVIS-V1-RELEASE-PROFILE.md");
-  assert.match(profile, /\*\*Profile Version:\*\*\s*1\.0\.8\b/);
-  assert.match(profile, /docs\/JARVIS-CONTRACT-MANIFEST-v1\.0\.8\.md/);
+  const canonical = JSON.parse(read("packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"));
+  assert.match(profile, new RegExp(`\\*\\*Profile Version:\\*\\*\\s*${canonical.releaseProfileVersion.replaceAll(".", "\\.")}\\b`));
+  assert.match(profile, new RegExp(`docs/JARVIS-CONTRACT-MANIFEST-v${canonical.contractSuiteVersion.replaceAll(".", "\\.")}\\.md`));
   assertGithubOnlyGovernance(section(profile, "# RP-17 — REPOSITORY GOVERNANCE GATE", "# RP-18 — PRODUCTION-COMPLETE GATE"), "Release Profile §17");
 });
 

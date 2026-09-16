@@ -1,6 +1,6 @@
 # JARVIS V1 Production Release Profile
 
-**Profile Version:** 1.0.8
+**Profile Version:** 1.0.9
 **Status:** Canonical production-support target  
 **Date:** August 18, 2026  
 **Governing suite:** `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md` plus consolidated clauses `J00`–`J05`
@@ -50,7 +50,7 @@ V1 implementation SHALL preserve the platform-boundary architecture/import requi
 
 # RP-03 — DESKTOP, UI, RUNTIME, AND PLATFORM BACKEND BASELINE
 
-V1 Windows topology:
+V1 selects this Windows `FULL_HOST` topology:
 
 ```text
 Tauri 2 / Rust Windows Platform Host
@@ -62,116 +62,25 @@ restrictive authenticated Windows named pipe
 application-owned Node.js + TypeScript JARVIS Core
 ```
 
-Required runtime properties:
-
-- renderer is unprivileged;
-- authoritative WebView loads local bundled application content;
-- explicit Tauri capabilities and restrictive production CSP;
-- no privileged remote-origin Tauri capability;
-- selected Tauri/runtime build includes relevant upstream security fixes and is explicitly qualified;
-- installer does not require system Node;
-- exact release-owned Node/Core pair is pinned and verified;
-- Windows local Core transport uses restrictive explicit DACL, local-only behavior, unpredictable endpoint, and bootstrap authentication;
-- no privileged localhost/LAN HTTP control plane;
-- Windows Job Object containment is mandatory for managed executable child trees except narrowly qualified exceptions;
-- signed installer/update artifacts;
-- protocol major `1` using the current manifest's protocol/domain schemas.
-
-The implementation SHALL use the complete semantic platform-capability/composition boundary owned by J01-PLAT-06 through J01-PLAT-09 and J01-PLAT-26. Shared Core/domain/policy code SHALL NOT directly depend on Win32, DPAPI, Windows named-pipe, Job Object, HWND, SID, registry, or UAC implementation APIs. This abstraction requirement SHALL NOT weaken the Windows backend: V1 Windows still uses the strongest qualified mechanisms required by J01 and J02–J03.
-
-Required V1 UI identity properties are the exact J04-UI-03 through J04-UI-28 and J05-VER-11 requirements: one unified dark-theme **JARVIS Mission Control** shell, canonical brand assets/colors, deterministic window modes, adaptive desktop/high-DPI/multi-monitor behavior, no unrelated visual shell, accessible state language, and release-owned/offline-safe fonts with recorded asset provenance.
-
-Mission Control design tokens/component semantics SHALL be reusable by a future Linux full-host UI. Only Windows UI/runtime qualification is required by V1.
-
-Exact Rust/Node/TypeScript/Tauri/package-manager versions are release-manifest facts and SHALL be pinned/qualified per release.
+J01-PLAT-04 through J01-PLAT-09 and J01-RT-03 through J01-RT-09 own platform, runtime, IPC, process, WebView, and package behavior. J03-SEC-19 through J03-SEC-20 own IPC/WebView security. J04-UI-03 through J04-UI-28 own Mission Control behavior and accessibility; J05-VER-09 through J05-VER-13 own qualification. V1 selects their qualified Windows implementations; future Linux UI reuse remains architectural only. Exact toolchain versions are release-manifest facts under RP-16.
 
 ---
 
 # RP-04 — PERSISTENCE AND CRYPTOGRAPHIC BASELINE
 
-V1 SHALL use:
-
-- SQLite/SQLCipher-compatible authoritative database;
-- local-filesystem WAL mode unless an explicitly qualified alternative is adopted;
-- an exact embedded SQLite/SQLCipher build proven to contain the upstream WAL-reset corruption fix; SQLite `3.51.3` is the first known fixed upstream point for that defect, but numeric `>= 3.51.3` comparison alone SHALL NOT establish qualification;
-- `synchronous=FULL` for authoritative state by default;
-- foreign keys on every connection;
-- bounded busy handling and WAL/checkpoint diagnostics;
-- random local `DB_DEK` protected by the Windows PlatformSecureStorage backend;
-- a release-qualified SQLCipher-safe online snapshot/export/re-key path proven on the exact packaged binding;
-- independent per-backup 256-bit `SnapshotDBKey` and 256-bit `BackupDEK`;
-- production backup format `JARVIS_BACKUP_V1` exactly as defined by `J02` backup clauses;
-- `LOCAL_RECOVERY` and `PORTABLE_STATE` backup classes;
-- DPAPI/current-user Windows local key slot for Windows-local recovery;
-- mandatory `GENERATED_RECOVERY_V1` 256-bit recovery slot for every production `PORTABLE_STATE VERIFIED` backup;
-- optional additional `PASSPHRASE_ARGON2ID_V1` slot using the stronger portable-backup KDF profile;
-- clean-profile Windows restore followed by fresh local `DB_DEK` generation/re-key;
-- forward migrations and paired binary/database rollback.
-
-JARVIS-managed session-password and general portable-recovery KDF profiles SHALL meet the exact J03-SEC-04 and J02-DATA-05 production profile, including its Argon2id version, floor, bounds, verifier/key-slot persistence, and migration rules.
-
-The optional V1 portable-backup passphrase slot SHALL use at least:
-
-```text
-memory:      262144 KiB
-passes:      3
-parallelism: 4
-salt:        16 random bytes
-output:      32 bytes
-```
-
-Release calibration MAY strengthen these parameters. The exact versioned profile used for each verifier/key slot SHALL be persisted and included in migration/upgrade qualification.
-
-The `PORTABLE_STATE` cryptographic envelope SHALL NOT require the historical Windows DPAPI key. Cross-platform Windows↔Linux state restoration is **not** a V1 guarantee and must later qualify platform-specific path/provider/setup/artifact migration semantics.
-
-A specific Node SQLite/SQLCipher binding becomes `SUPPORTED` only after the persistence/packaging/snapshot/re-key proof passes on the exact packaged Windows application.
+V1 selects an authoritative Windows SQLite/SQLCipher-compatible database, local-filesystem WAL operation, Windows secure storage, `JARVIS_BACKUP_V1`, and the `LOCAL_RECOVERY` and `PORTABLE_STATE` backup classes. J02-DATA-02 through J02-DATA-37 and J02-BACKUP-02 through J02-BACKUP-15 own persistence, KDF application, fixed-format, restore, migration, and rollback behavior; J03-SEC-04 and J03-SEC-06 through J03-SEC-07 own the security meaning. J05-VER-14, J05-VER-20 through J05-VER-22 own qualification. Windows↔Linux restore is not a V1 guarantee.
 
 ---
 
 # RP-05 — REQUIRED AI PROVIDER SUPPORT
 
-V1 SHALL production-qualify **Codex/OpenAI on Windows** as the initial AI provider family for at least:
+V1 selects **Codex/OpenAI on Windows** as the initial production-qualified AI provider family for:
 
 - GENERALIST/orchestrator behavior;
 - SOFTWARE_ENGINEER worker behavior;
 - verifier/synthesis behavior when the selected model/profile satisfies requirements.
 
-The supported Windows Codex adapter SHALL:
-
-- resolve exact executable/distribution identity/version;
-- enforce the release compatibility policy;
-- bind support evidence to `WINDOWS + FULL_HOST`;
-- use a stable structured/non-interactive interface when available;
-- validate structured output;
-- support bounded timeout/cancellation;
-- run ordinary workers non-elevated under mandatory Windows process-tree containment;
-- model provider setup/repair independently from compatibility/health;
-- support explicit first-class elevated Windows sandbox setup/repair when required by the qualified Codex version;
-- verify setup readiness before declaring the engineering profile supported;
-- never silently downgrade to an unqualified or less-restrictive sandbox after setup/repair failure;
-- conformance-test provider-native Windows sandbox behavior, including actual write and network restrictions;
-- never claim workspace-only read isolation unless the qualified provider implementation actually enforces it;
-- treat provider session resume as optional optimization only;
-- expose provider quota/usage provenance where available.
-
-Required setup-state semantics are equivalent to:
-
-```text
-NOT_REQUIRED
-SETUP_REQUIRED
-SETUP_IN_PROGRESS
-SETUP_READY
-REPAIR_REQUIRED
-SETUP_FAILED
-```
-
-If setup needs UAC, elevation is confined to the qualified provider setup/repair helper. Ordinary Codex worker execution SHALL NOT inherit elevation. Provider-internal sandbox-account passwords remain provider-owned and are not imported into JARVIS credential state.
-
-Newer/unqualified Codex versions are not automatically `SUPPORTED` merely because they launch.
-
-Windows Codex qualification does not qualify a future Linux Codex adapter. Linux must independently prove setup, process containment, filesystem behavior, network behavior, environment/credential exposure, cancellation, and provider-specific security limitations.
-
-No local LLM is required for V1.
+J01-RT-13 through J01-RT-16, J01-PROTO-19/J01-PROTO-22, J03-SEC-21 through J03-SEC-24, J04-OPS-14, and J05-VER-17 own provider behavior, isolation, support, and proof. This selection does not qualify a Linux adapter or require a local LLM for V1.
 
 ---
 
@@ -351,34 +260,9 @@ Before broad feature implementation proceeds beyond the early platform/persisten
 
 # RP-12 — UI IDENTITY / ACCESSIBILITY QUALIFICATION PROFILE
 
-V1 Production Complete requires the `J04` UI identity/accessibility clauses to pass on the exact Windows Release Candidate.
+V1 Production Complete requires the exact Windows Release Candidate to satisfy `J04-UI-03` through `J04-UI-25`. `J05-VER-11` owns the complete qualification method, target environments, evidence, and failure conditions.
 
-Qualification SHALL cover at minimum:
-
-- standard 1920×1080 desktop;
-- 2560×1440 and representative 4K class display;
-- ultrawide layout;
-- compact resizable window;
-- multi-monitor with monitor removal/reconnect;
-- Windows scaling at 100%, 125%, 150%, and 200%;
-- keyboard-only primary workflows;
-- assistive-technology semantic names/roles/states for primary workflows;
-- Windows High Contrast / CSS forced-colors behavior where supported by the WebView stack;
-- reduced-motion preference;
-- text resizing to 200% without loss of required functionality;
-- reflow equivalent to a 320 CSS-pixel viewport / 400% zoom for primary linear workflows, excluding content whose meaning intrinsically requires two-dimensional layout;
-- normal text contrast >= 4.5:1 and qualifying large text >= 3:1;
-- meaningful non-text controls/indicators contrast >= 3:1 against adjacent colors where required;
-- pointer target size >= 24×24 CSS px or a WCAG 2.2-equivalent spacing/exception condition;
-- visible focus and focused controls not obscured by sticky UI;
-- no consequential state communicated by color alone;
-- high mission/queue/notification counts;
-- blocked/waiting/uncertain/recovery states;
-- exact destructive approval presentation;
-- voice idle/listening/processing/speaking/degraded states;
-- canonical mark/lockup/icon usage and design-token consistency.
-
-Shared design-system components SHALL avoid unnecessary Windows-only semantics so a future Linux full-host/companion presentation can reuse the JARVIS identity. This is an architecture check, not a V1 Linux UI runtime test.
+Shared design-system components SHALL avoid unnecessary Windows-only semantics so a future Linux full-host/companion presentation can reuse the JARVIS identity. This remains an architecture requirement, not a V1 Linux UI runtime claim.
 
 ---
 
@@ -419,33 +303,7 @@ Direct public inbound Internet listeners remain outside the required V1/post-V1 
 
 # RP-15 — FUTURE PLATFORM TARGETS
 
-## 15.1 Linux FULL_HOST
-
-Linux is an explicit future full-host product target but is **not** a V1 support claim.
-
-Promotion requires a future synchronous contract/Release Profile that defines and qualifies at minimum:
-
-- supported distributions/releases and CPU architectures;
-- supported desktop/session environments where applicable;
-- secure-storage backend;
-- local IPC/peer-identity backend;
-- process-tree containment/resource-control backend;
-- filesystem/path identity and escape protections;
-- installer/package/update model;
-- Tauri/WebView runtime;
-- provider support/setup/sandbox matrices;
-- voice/device/audio behavior;
-- SQLite/SQLCipher/native dependency packaging;
-- tool/module/integration platform differences;
-- clean install, update, rollback, backup/restore, recovery, performance, security, and soak.
-
-## 15.2 Future COMPANION
-
-A future Android or other companion is non-authoritative. It may later provide dashboard/read state, conversation/prompting, notifications, approvals, mission monitoring, and selected policy-permitted controls.
-
-It does not own the authoritative mission database, host credentials, engineering workers, general providers/tools, or infrastructure adapters.
-
-Companion networking is not a V1 requirement. It requires a future separately qualified Remote Access Gateway; direct unrestricted privileged Core exposure is prohibited.
+Linux `FULL_HOST` and Android or other `COMPANION` clients are binding future product targets, not V1 support claims. J01-PLAT-10 through J01-PLAT-25 define the required future platform, companion, and Remote Access Gateway behavior; J01-PLAT-29 defines Linux promotion content; J05-VER-37 defines future qualification. No V1 artifact may claim this support.
 
 ---
 
@@ -495,29 +353,19 @@ rollback pairing information
 
 No raw credentials/private user data/private signing keys/recovery factors appear in the manifest.
 
+`J03-SUPPLY-16` owns the security meaning and validation of TUF/signing provenance fields. `J05-VER-36` owns production evidence and artifact-provenance qualification for this selected V1 manifest.
+
 ---
 
 # RP-17 — REPOSITORY GOVERNANCE GATE
 
-Before Phase 0 may be declared complete, the effective repository-governance mode SHALL be determined from verified hosting provider/account capability and recorded in the current governance profile/operational aid. J00-GOV-28 and J05-VER-33 own the complete server-enforced/fallback semantics, including deletion/force-push protection, required CI, bypass control, live `master` tip validation, non-force exact-tip integration, evidence, truthful residual risk, and transition behavior. `COMPENSATING_CONTROLS` SHALL NOT be selected when effective server-side protection is available.
-
-A pull-request requirement is strongly preferred once implementation changes begin. No second long-lived branch becomes an alternate source of truth.
-
-Phase 0 SHALL also create machine-readable canonical profile/capability definitions and CI drift checks for repeated normative constants/matrices where practical.
-
-Before an authorized candidate publication, contract or verification-system changes SHALL pass local fail-fast preflight in this order: relevant targeted checks, the normal local profile, and applicable contract, schema, generated-output, governance, security, provenance, architecture, format, typecheck, build, and platform checks. Local preflight is supplementary evidence only and cannot qualify a release. Only after the local preflight is clean may the exact candidate be published for authoritative GitHub Actions verification; GitLab remains a repository mirror only and LocalCI remains non-authoritative tooling.
-
-The mandatory `static-ci` pipeline result SHALL come from qualified `GITHUB_ACTIONS` for the exact candidate or resulting authoritative commit. GitLab is repository mirror-only and SHALL NOT qualify CI or release evidence. LocalCI may run compatibility/security tooling but cannot satisfy this gate. Qualification SHALL prove exact-SHA, complete-pipeline, pinned-input, least-privilege, timeout/cancellation, idempotency, durable-evidence, and audit requirements in `J00-GOV-28`.
+J00-GOV-28 owns the ordered local pre-publication preflight, effective governance mode, server-protection/fallback semantics, and exact-candidate integration controls; J05-VER-33 owns their qualification evidence. They require server-side branch protection when available; otherwise `COMPENSATING_CONTROLS` retains exact candidate CI, live `master` tip validation, and non-force integration. The qualified `GITHUB_ACTIONS` authority is mandatory for the `static-ci` pipeline. GitLab is repository mirror-only. LocalCI may run compatibility/security tooling but cannot satisfy this gate.
 
 ---
 
 # RP-18 — PRODUCTION-COMPLETE GATE
 
-For this profile, Production Complete requires the same source commit and signed **Windows FULL_HOST** release artifacts to pass every applicable J05-VER-03 through J05-VER-39 gate and every profile-specific RP-02 through RP-16 support requirement. This includes the platform, UI/accessibility, Tauri/WebView/IPC, Core/runtime, persistence/WAL/SQLCipher, KDF/backup/recovery, policy trust, provider, Git/GitHub, Proxmox, PermissionEngine, process containment, TUF/updater/signing, module, crash/recovery/uncertain, budget/resource/voice, event/automation, upgrade/rollback, soak, SBOM/license/provenance, defect-severity, and vulnerability requirements owned by those clauses. Linux runtime tests and Android/companion networking remain outside V1 release qualification and cannot waive platform-boundary rules. Documentation completion alone never satisfies this gate.
-
-Linux runtime tests and Android/companion networking are not V1 release gates. Their absence SHALL NOT permit violations of the platform-boundary architecture rules.
-
-Documentation completion alone never satisfies this gate.
+Production Complete requires the same source commit and signed **Windows `FULL_HOST`** release artifacts to satisfy every applicable J05-VER-03 through J05-VER-39 gate and every selected RP-02 through RP-16 requirement. Linux runtime tests and companion networking are outside V1 qualification and cannot waive J01 platform-boundary rules. Documentation completion alone never satisfies this gate.
 
 ---
 
@@ -529,4 +377,4 @@ Documentation completion alone never satisfies this gate.
 
 ---
 
-**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.8**
+**END — JARVIS V1 PRODUCTION RELEASE PROFILE v1.0.9**

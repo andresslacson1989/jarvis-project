@@ -1,7 +1,7 @@
 # JARVIS Scope, Governance & Coding Contract
 
 **Contract Suite Version:** 1.0.8
-**Version:** 1.0.8
+**Version:** 1.0.9
 **Component:** `J00`
 **Status:** Canonical normative component
 **Scope:** product scope, contract authority, repository governance, direct amendment process, and production coding standards
@@ -45,8 +45,6 @@ USER
 
 ---
 
----
-
 ## J00-SCOPE-02 — ONE CURRENT NORMATIVE SUITE
 
 The current production contract consists of the six consolidated normative components and the separate Release Profile listed in `docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md`.
@@ -67,8 +65,6 @@ The suite version identifies the current combined product contract. Component re
 Historical material cannot override, supplement, or fill a gap in the current suite. A future material product, architecture, security, platform, release, trust, or governance amendment is incomplete until the affected active clauses, manifest, Release Profile when applicable, verification requirements, and implementation sequencing are reconciled in one reviewed change.
 ---
 
----
-
 ## J00-SCOPE-03 — CONTRACT LANGUAGE
 
 `MUST`, `MUST NOT`, `SHALL`, and `SHALL NOT` are mandatory.
@@ -81,36 +77,11 @@ Unknown/ambiguous security-critical interpretation SHALL fail closed rather than
 
 ---
 
----
-
 ## J00-SCOPE-04 — PRODUCT DEFINITION
 
-JARVIS is a persistent, local-first AI operating companion with a Windows V1 full host and an architecture explicitly preserving future Linux full-host support.
-
-V1 SHALL provide:
-
-- natural text interaction;
-- production voice interaction through replaceable local-first providers;
-- a unified dark-theme **JARVIS Mission Control** interface with one approved brand/design system across conversation, missions, approvals, systems, integrations, memory, artifacts, diagnostics, and voice state;
-- a dedicated primary desktop dashboard/window that can be hidden, shown, windowed, maximized, full-screen, or focused-context presented under deterministic native/application policy;
-- adaptive layout across qualified window sizes, screen classes, multi-monitor/DPI conditions, WebView zoom/reflow, accessibility modes, and user text scaling without inventing separate visual products;
-- AI orchestration for flexible language understanding;
-- deterministic authorization and typed tool/integration execution;
-- durable project, memory, mission, task, approval, budget, event, and recovery state;
-- bounded AI workers and graph-based missions;
-- dynamic graph revision through validated immutable graph versions;
-- queueing, priority, pause/resume/cancel/recovery;
-- provider supervision, setup/repair state, compatibility qualification, and capability-based routing;
-- secure credentials and integration boundaries;
-- worker journals/work dashboard without private chain-of-thought;
-- exact budget/usage accounting;
-- event-triggered automation under normal authorization;
-- encrypted backup/restore and staged reversible updates;
-- production diagnostics, provenance, and qualification evidence.
+JARVIS is a persistent, local-first AI operating companion. `RP-01` through `RP-13` select the V1 product, support, capability, integration, voice, UI, hardware, and artifact profile. J01 through J04 own the complete runtime, data, security, operations, provider, integration, voice, and UI behavior; J05 owns qualification and release decisions.
 
 JARVIS SHALL NOT be implemented as a single LLM session with broad shell access, as a custom foundation-model project, as unrelated screens that merely share a name, or as Windows-specific domain logic coupled directly to native APIs when a platform capability boundary is appropriate.
-
----
 
 ---
 
@@ -147,11 +118,11 @@ When the hosting provider/account does not expose server-side branch protection/
 
 The compensating mode does not claim hard server-side prevention of an out-of-band repository administrator force push or deletion. That residual hosting limitation is explicit and accepted by this contract only while the required server-side capability is unavailable. The exception SHALL NOT be used to disable an available protection feature, waive mandatory CI, permit force-push implementation workflow, create a broad bypass, or misrepresent repository state.
 
+Before any authorized candidate publication, contract or verification-system changes SHALL pass a local fail-fast preflight in this order: relevant targeted checks; the normal local test profile; then applicable contract, schema/generated-output, governance, security, provenance, architecture, format, strict-type, build, and platform checks. Local preflight is supplementary evidence only, cannot qualify CI or a release, and cannot replace exact-candidate GitHub Actions verification.
+
 A pull-request requirement is strongly preferred for implementation changes. Repository governance SHALL NOT require maintaining a second long-lived authoritative branch.
 
 Phase 0 SHALL also establish machine-readable canonical definitions/checks for repeated security/profile constants and capability matrices where practical, with CI detecting divergence from current normative values rather than relying indefinitely on manual duplication discipline.
-
----
 
 ---
 
@@ -164,8 +135,6 @@ Material changes to product scope, runtime roles/platform intent, trust boundari
 No later document, branch, report, or historical material silently supersedes an active clause until the active suite is synchronously reconciled.
 
 If current normative documents conflict, the contract is defective and implementation SHALL stop at that ambiguity until the documents are reconciled.
-
----
 
 ---
 
@@ -192,8 +161,6 @@ V1 does not require:
 - direct Proxmox Backup Server administration.
 
 The absence of Linux/companion delivery from V1 SHALL NOT be used to justify violating the platform-boundary clauses in J01 during Windows implementation.
-
----
 
 ---
 
@@ -234,8 +201,6 @@ These rules preserve the JARVIS trust, state, recovery, provider, UI, integratio
 Prefer explicit, bounded, testable code over cleverness at authority/state/security boundaries.
 
 > **Abstract the capability, not the security away.**
-
----
 
 ---
 
@@ -297,8 +262,6 @@ Linux folders/interfaces MAY exist as contracts/test fixtures in V1, but V1 SHAL
 
 ---
 
----
-
 ## J00-CODE-03 — DEPENDENCY DIRECTION AND PLATFORM PORTABILITY
 
 - React SHALL not import Core persistence, provider implementations, secure-store code, process supervisor, or tool executors.
@@ -318,35 +281,9 @@ Operating-system selection SHALL occur at composition/startup/platform-adapter b
 
 ---
 
----
-
 ## J00-CODE-04 — PLATFORM CAPABILITY CONTRACTS
 
-Native responsibilities SHALL be exposed through explicit typed capabilities or equivalent service boundaries for responsibilities such as:
-
-```text
-PlatformSecureStorage
-PlatformLocalIpc
-PlatformProcessSupervisor
-PlatformSessionObserver
-PlatformWindowController
-PlatformNotificationBackend
-PlatformPathsAndIdentity
-PlatformAudioBackend
-PlatformUpdateBackend
-PlatformPrivilegeMediator
-PlatformSystemInfo
-```
-
-Interface names may vary. The contract must express required semantics and failure modes, not the implementation technology.
-
-Capability discovery reports technical availability/qualification only. It never grants action authority.
-
-An unavailable/unqualified platform capability SHALL block or degrade the dependent feature truthfully. There is no weaker generic fallback merely to preserve nominal cross-platform parity.
-
-Windows V1 backend implementations remain governed by all specific Windows requirements in the Runtime/Security/Data/Release contracts.
-
----
+`J01-PLAT-04` through `J01-PLAT-28` own the required platform capabilities, composition boundary, availability/qualification semantics, and Windows V1 mechanism requirements. Coding work SHALL consume those typed boundaries rather than introduce direct native dependencies into shared Core/domain/policy/protocol code.
 
 ---
 
@@ -374,8 +311,6 @@ Authoritative money uses parsed exact integer/decimal logic, never JavaScript `n
 
 ---
 
----
-
 ## J00-CODE-06 — RUST BASELINE
 
 Rust uses a pinned stable toolchain unless a reviewed platform requirement dictates otherwise.
@@ -392,8 +327,6 @@ Unsafe Rust:
 - native handles/resources use RAII.
 
 Windows-specific unsafe/handle code lives in the Windows backend, not generic domain crates.
-
----
 
 ---
 
@@ -418,8 +351,6 @@ Validation occurs before expensive work and before authorization. Security-mater
 
 ---
 
----
-
 ## J00-CODE-08 — STATE-MACHINE OWNERSHIP
 
 Mission/task/attempt/approval/provider/module/integration transitions happen only through their owning services/policy modules.
@@ -434,15 +365,11 @@ One durable `RESUMING` TaskState is canonical. Unknown persisted states fail clo
 
 ---
 
----
-
 ## J00-CODE-09 — PERMISSIONENGINE CODE
 
 PermissionEngine SHALL implement the exact ordered precedence owned by J03-SEC-13 as deterministic policy code. UI, tool, provider, and platform adapters SHALL call that implementation rather than duplicate or reinterpret its rules.
 
-The J03-SEC-13 negative cases remain mandatory: hard invariants and explicit DENY precedence; separation of current instructions, standing permission, and precedent; HIGH/CRITICAL authorization limits; final confirmation for destructive actions; and rejection of provider setup/elevation, platform availability, or AI confidence as authorization. Tests SHALL prove those cases and policy decisions SHALL persist stable reason-code/version references rather than only human prose.
-
----
+J03-SEC-13 through J03-SEC-18 own authorization behavior and negative cases; J05-VER-15 owns their qualification. Policy decisions SHALL persist stable reason-code/version references rather than only human prose.
 
 ---
 
@@ -459,8 +386,6 @@ Local cancellation does not prove external side effect absence; `UNCERTAIN`/live
 All normal managed executable children use the semantic PlatformProcessSupervisor boundary.
 
 On Windows V1 the backend SHALL preserve mandatory Job Object and handle-inheritance invariants. A UAC-launched provider setup helper may use a separately qualified native lifecycle, but it remains explicitly tracked/awaited/reconciled and never becomes a general breakaway-worker exception.
-
----
 
 ---
 
@@ -483,8 +408,6 @@ Provider setup failures SHALL map to explicit setup/repair diagnostics rather th
 
 ---
 
----
-
 ## J00-CODE-12 — LOGGING / OBSERVABILITY
 
 Logging is structured and uses relevant correlation/mission/task/attempt/tool/provider/module/integration/platform identifiers.
@@ -494,8 +417,6 @@ Never log passwords/recovery factors, KDF-derived working keys, `DB_DEK`, `Backu
 Prevent secret entry first; centralized redaction is defense in depth.
 
 A mandatory audit write failure SHALL fail/rollback the authoritative state change when audit/state atomicity is required.
-
----
 
 ---
 
@@ -519,8 +440,6 @@ Logical durable state SHOULD remain platform-neutral. Inherently platform-specif
 
 ---
 
----
-
 ## J00-CODE-14 — MIGRATIONS
 
 Migrations are monotonic, deterministic, reviewed, fixture-tested production code.
@@ -531,15 +450,11 @@ Changes to KDF profiles/verifiers/key slots, money precision, DataSensitivity/Da
 
 ---
 
----
-
 ## J00-CODE-15 — KDF / PASSWORD CODE
 
-JARVIS SHALL have one validated implementation path for production KDF profiles. The exact Argon2id profile, salt/parameter floor, profile distinction, verifier/key-slot persistence, re-hash/re-wrap rules, comparison/zeroization requirements, and test-only restrictions are owned by J03-SEC-04 and J02-DATA-05 and SHALL be consumed without reinterpretation.
+JARVIS SHALL have one validated implementation path for the production KDF profiles owned by J03-SEC-04 and J02-DATA-05, consumed without reinterpretation.
 
 Code SHALL use a maintained reviewed implementation, qualified CSPRNG/backend, bounded accepted parameters, and fail closed on under-floor or malformed production metadata. Test-only reduced parameters SHALL be impossible to activate in a production release/configuration.
-
----
 
 ---
 
@@ -561,36 +476,15 @@ Where possible, execution also uses expected file identity/hash/version to fail 
 
 ---
 
----
-
 ## J00-CODE-17 — CREDENTIAL / SECRET CODE
 
-Credential and secret code SHALL implement the opaque-handle, broker, storage, environment-allowlist, and provider-setup boundaries owned by J03-SEC-06, J03-SEC-07, J03-SEC-23, J03-SEC-24, and the applicable J02 state rules. Core types SHALL not expose broad raw-token fields, resolve credentials directly, or depend on DPAPI.
-
-Windows V1 uses the qualified Windows secure-storage path; future Linux storage is separately qualified and does not move secrets into portable Core state. Secret wrappers avoid ordinary serialization, `WORKSPACE_ENGINEERING` receives no unrelated integration secrets, and provider-owned setup credentials never enter Core/config/logs.
-
----
+Credential and secret code SHALL consume the opaque-handle, broker, storage, environment-allowlist, provider-setup, and durable-state boundaries in J03-SEC-06, J03-SEC-07, J03-SEC-23, J03-SEC-24, J01-PLAT-14, and the applicable J02 clauses. Core types SHALL not expose broad raw-token fields, resolve credentials directly, or depend on a platform-native storage mechanism.
 
 ---
 
 ## J00-CODE-18 — APPROVAL CANONICALIZATION CODE
 
-There is one implementation contract for `CanonicalActionDescriptorV1`, whose exact fields, canonicalization, digest, approval binding, and rejection vectors are owned by J01-PROTO-18, J01-PROTO-25, and J03-SEC-17.
-
-Focused modules expose typed operations equivalent to:
-
-```text
-buildCanonicalAction(...resolved material...) -> CanonicalActionDescriptorV1
-canonicalizeAction(descriptor) -> bytes
-digestAction(bytes) -> SHA-256 bytes
-encodeActionDigest(bytes) -> base64url-no-pad
-```
-
-Adapters/tools cannot independently omit/add material approval fields.
-
-Rust and TypeScript pass shared golden vectors including duplicate-key/non-finite/negative-zero/Unicode/precision rejection.
-
----
+`CanonicalActionDescriptorV1`, its fields, canonicalization, digest, approval binding, rejection vectors, and qualification are owned by J01-PROTO-18, J01-PROTO-25, J03-SEC-17, and J05-VER-08/J05-VER-10. Adapters and tools SHALL consume that one contract and SHALL NOT add, omit, or reinterpret material approval fields.
 
 ---
 
@@ -610,72 +504,33 @@ A mismatch maps to typed `PRECONDITION`/`CONFLICT`, triggers re-resolution, and 
 
 ---
 
----
-
 ## J00-CODE-20 — PROVIDER ADAPTER / SETUP / PLATFORM STANDARDS
 
-Provider discovery, compatibility/platform identity, setup/repair, health/auth state, normalized events/errors, capabilities/resources, cancellation, supervisor behavior, routing, and conformance are owned by J01-RT-14/J01-RT-16, J01-PROTO-19, J03-SEC-23, and J04-OPS-14. Adapters SHALL expose those typed semantics and shall not turn provider availability or setup elevation into authority.
-
-The Windows Codex qualification remains a separate native target: setup-helper identity, actual sandbox restrictions, no workspace-only isolation claim without proof, provider-update invalidation, and evidence identity are required. Future Linux evidence is not reusable for Windows or vice versa. Session-resume metadata stays in the adapter; durability stays in Core.
-
----
+Provider behavior, setup/repair, compatibility, platform identity, normalized events/errors, routing, and conformance are owned by J01-RT-14 through J01-RT-16, J01-PROTO-19, J03-SEC-21 through J03-SEC-23, J04-OPS-14, and J05-VER-17. Adapters SHALL expose those typed semantics and SHALL NOT turn availability or setup elevation into authority.
 
 ---
 
 ## J00-CODE-21 — TOOL ADAPTER STANDARDS
 
-Every executable tool has one registered `ToolManifest` and bounded input/output schemas.
-
-Tool implementation:
-
-- accepts validated typed arguments;
-- declares required semantic platform capabilities and optional explicit platform compatibility where native behavior differs;
-- revalidates mutable security-critical preconditions before execution;
-- never self-authorizes;
-- uses only declared credential capabilities;
-- uses conditional mutation where supported;
-- returns typed outcome including `UNCERTAIN`;
-- provides postcondition evidence for consequential success;
-- emits audit/domain events through owning runtime;
-- passes independent contract/platform tests.
-
-Split broad multi-purpose tools when broadness materially increases blast radius or makes authorization/postconditions ambiguous.
-
----
+Every executable tool SHALL consume the registered `ToolManifest`, bounded schemas, authority, credential, conditional-mutation, outcome, audit, platform, and qualification requirements owned by J01-PROTO-16, J03-SEC-13, J03-SEC-18, J03-SEC-24, J01-PLAT-26, and J05-VER-18. A broad multi-purpose tool SHALL be split when it makes authorization or postconditions ambiguous or materially enlarges blast radius.
 
 ---
 
 ## J00-CODE-22 — GITHUB ADAPTER STANDARDS
 
-GitHub code SHALL expose only the typed semantic operations and exact V1 capability set owned by RP-09.1, J01-PROTO-21, and J05-VER-24. Generic repository/secret/branch-protection/membership administration, repository deletion, and ref deletion SHALL NOT be smuggled through those capabilities; `GITHUB_ACTIONS_DISPATCH` remains optional for V1.
-
-`GITHUB_REF_WRITE` uses canonical repository/ref identity, allowed-target policy, and expected-ref/conditional mutation for create/update where applicable.
-
-Credential scopes/permissions SHALL be the least privilege that supports the enabled capability set.
-
-Remote GitHub semantic operations SHOULD remain platform-neutral; local Git/filesystem mechanics use the platform path/process boundary.
-
----
+GitHub code SHALL expose only the typed V1 capability selection and exclusions owned by RP-09.1, J01-PROTO-21, J03-SEC-24, and J05-VER-24. Local Git/filesystem mechanics SHALL use the platform path/process boundary.
 
 ---
 
 ## J00-CODE-23 — PROXMOX ADAPTER STANDARDS
 
-Proxmox code SHALL expose only the typed semantic operations, exact scope, TLS/credential boundary, asynchronous task/postcondition, and `UNCERTAIN` behavior owned by RP-09.2, J01-PROTO-21, J03-SEC-25, and J05-VER-25. It shall never expose a generic arbitrary REST endpoint to AI or silently fall back to SSH/`qm`/`pct`/`pvesh`/root/direct `/etc/pve`; guest-shell connection remains separate.
-
-Guest-create/config/backup implementations SHALL preserve the narrower semantics defined by the Release Profile and SHALL NOT use those capabilities as aliases for generic datastore/network/PBS administration.
-
-Remote Proxmox API semantics SHOULD remain platform-neutral; platform support still requires the concrete release to qualify its TLS/runtime/network/credential dependencies.
-
----
+Proxmox code SHALL expose only the typed V1 capability selection, TLS/credential boundary, asynchronous task/postcondition, `UNCERTAIN`, and prohibited-fallback behavior owned by RP-09.2, J01-PROTO-21, J03-SEC-25, and J05-VER-25. Remote semantics remain platform-neutral; concrete support requires qualified platform dependencies.
 
 ---
 
 ## J00-CODE-24 — MODULE CODE
 
-Module execution classes, manifest compatibility, supervisor/health operations, authenticated catalog metadata, and platform-specific conformance are owned by J01-PROTO-20, J03-SEC-26/J03-SUPPLY, and J05-VER-26. Code SHALL preserve the `DATA_ONLY`, `BUILT_IN_TRUSTED`, and `EXTERNAL_MANAGED` class boundaries, including no execution for data-only content and no Core-internal imports for externally managed modules.
-
----
+Module execution classes, manifest compatibility, catalog trust, lifecycle, platform support, and conformance are owned by J01-PROTO-20, J03-SEC-26, J03-SUPPLY, and J05-VER-26. Code SHALL consume those boundaries without reinterpretation.
 
 ---
 
@@ -683,19 +538,13 @@ Module execution classes, manifest compatibility, supervisor/health operations, 
 
 React is presentation/control, never authority. The Tauri/WebView security configuration and negative requirements are owned by J03-SEC-20 and J05-VER-12; the UI identity, design-token, brand-asset, typography, accessibility, state-language, adaptive-layout, and reusable-component requirements are owned by J04-UI-03–J04-UI-28 and J05-VER-11/J05-VER-35.
 
-This code boundary SHALL consume those canonical capabilities and components, handle stale/conflict/degraded/recovery/platform-unavailable states, and never reimplement PermissionEngine to improve UX. Platform-native window authority remains behind PlatformWindowController.
-
-Platform-native window behavior remains behind PlatformWindowController; React SHALL NOT own native platform presentation authority.
-
----
+This boundary SHALL consume those canonical capabilities and components, handle their required truthful states, and never reimplement PermissionEngine or platform-native window authority for UX.
 
 ---
 
 ## J00-CODE-26 — BACKUP / RECOVERY CODE
 
-Backup implementation SHALL use the exact hierarchy, key separation, fixed format, slot rules, restore order, bounded parser, and activation checks owned by J02-DATA-27 through J02-BACKUP-15 and the applicable J03 security clauses. Code SHALL preserve the Windows local secure-store slot, no plaintext snapshot-key sidecar, portable recovery without the historical local key, and the absence of a V1 cross-platform-restore guarantee.
-
----
+Backup and recovery code SHALL consume the hierarchy, format, slots, parser, restore, activation, and security rules owned by J02-DATA-27 through J02-BACKUP-15 and the applicable J03 clauses without reinterpretation.
 
 ---
 
@@ -705,26 +554,11 @@ Tests are production artifacts.
 
 Prefer observable invariants over private implementation details. Security/state tests use deterministic fixtures/properties.
 
-Mocks SHALL NOT replace required real Windows V1 integration tests against:
-
-- actual selected SQLite/SQLCipher binding;
-- Windows named-pipe DACL/bootstrap backend;
-- Tauri capabilities/CSP/navigation configuration;
-- Windows Job Objects/process trees;
-- packaged Node/Core runtime;
-- qualified Windows Codex executable/setup/sandbox;
-- signed updater;
-- GitHub/Proxmox conformance environments/fixtures where release qualification requires them;
-- actual voice stack/devices for production qualification;
-- representative UI viewport/DPI/accessibility behavior for production qualification.
-
-CI/unit/architecture tests SHALL additionally verify platform boundary rules even though Linux runtime conformance is not a V1 gate.
+`J05-VER-07` through `J05-VER-37` own required test layers, real-platform evidence, conformance environments, and release qualification. Test code SHALL not substitute mocks for evidence that those clauses require from a real Windows target, selected integration, device, package, or signed artifact. CI/unit/architecture tests SHALL additionally verify J01 platform-boundary rules even though Linux runtime conformance is not a V1 gate.
 
 Synthetic fixtures never contain real credentials.
 
 Flaky tests are defects; blind rerun-to-green is not normal release policy.
-
----
 
 ---
 
@@ -761,8 +595,6 @@ The current mode, exact server-side protection facts, fallback transition record
 
 ---
 
----
-
 ## J00-CODE-29 — DEPENDENCIES AND THIRD-PARTY ASSETS
 
 Add dependencies only for a concrete product/engineering need.
@@ -781,8 +613,6 @@ Fonts, icon libraries, images, audio models, and other redistributable third-par
 
 ---
 
----
-
 ## J00-CODE-30 — CONFIGURATION / FEATURE FLAGS
 
 Configuration is typed/versioned/runtime-validated.
@@ -797,65 +627,15 @@ No production feature flag may enable an under-floor KDF, unqualified provider s
 
 ---
 
----
-
 ## J00-CODE-31 — CODE REVIEW REQUIREMENTS
 
-Explicit invariant review is required for changes to:
-
-- PermissionEngine/authority/approval;
-- action canonicalization;
-- KDF/password/recovery profiles;
-- secure store/session recovery;
-- platform capability interfaces/composition;
-- IPC/native broker/process supervision/elevation mediation;
-- Tauri capabilities/CSP/navigation/UI identity accessibility;
-- path canonicalization/platform path identity;
-- task/mission state machines;
-- provider setup/sandbox/compatibility/platform support/fallback;
-- database/WAL/migration/backup/restore;
-- modules/catalog/update signing/platform compatibility;
-- GitHub/Proxmox/other infrastructure integration capability matrices;
-- release packaging/update/provenance.
-
-Review verifies tests prove the invariant, not only that code looks plausible.
-
----
+Explicit invariant review is required for changes governed by J01 platform/runtime/protocol clauses, J02 persistence/backup clauses, J03 security/trust clauses, J04 operations/UI clauses, the Release Profile selections, or J05 qualification gates. Review SHALL verify the owner's required tests prove the invariant, not merely that code appears plausible.
 
 ---
 
 ## J00-CODE-32 — ARCHITECTURE-ENFORCEMENT INVARIANTS
 
-Production code/CI SHALL make these statements true:
-
-1. UI cannot instantiate execution authority.
-2. Provider adapters cannot mutate authoritative mission/task state directly.
-3. Workers/tools cannot widen authority/scope.
-4. Core domain types do not leak provider-native or OS-native implementation structures.
-5. Unvalidated external/AI input cannot enter execution code.
-6. Authoritative state transitions occur only through owning services.
-7. PermissionEngine has one deterministic precedence implementation.
-8. Approval hashing has one canonical implementation contract.
-9. Authoritative DB writes cannot bypass transaction/version/event invariants.
-10. Raw credentials cannot flow into normal domain/logging/backup channels.
-11. Unsafe native code is narrowly contained/reviewed.
-12. Long-running async/process work has cancellation/lifecycle ownership.
-13. Shared process semantics use PlatformProcessSupervisor; Windows implementation satisfies mandatory Job Object policy.
-14. Provider setup/sandbox claims match platform-specific conformance evidence.
-15. Provider setup elevation never becomes normal worker elevation.
-16. Consequential target changes are detected through fresh/conditional validation where supported.
-17. Portable encrypted restore is technically complete, not only documented.
-18. JARVIS-managed production KDF profiles meet the current floor and are versioned.
-19. GitHub/Proxmox support claims cannot exceed the signed capability/platform matrix.
-20. Canonical UI identity/assets/accessibility are release-tested, not optional styling.
-21. CI plus the active qualified repository-governance mode enforce major package/security/config/history boundaries; server protection is mandatory when available and compensating controls remain explicit when it is not.
-22. Shared Core/domain/policy/protocol code cannot import Windows-native backend implementations.
-23. OS selection is concentrated in composition/platform adapters rather than scattered through domain/features.
-24. Platform capability absence never triggers an unsafe weaker fallback.
-25. Windows production mechanisms are not weakened for Linux portability.
-26. Linux/companion support cannot be claimed without future explicit qualification.
-
----
+Production code and CI SHALL enforce the complete invariants owned by J01-PLAT-05 through J01-PLAT-28, J01-RT-07 through J01-RT-23, J01-PROTO-11 through J01-PROTO-21, J02-DATA-07 through J02-BACKUP-17, J03-SEC-06 through J03-SEC-32, J04-OPS-02 through J04-OPS-30, and J05-VER-09 through J05-VER-37. This includes one authority path, typed state transitions, canonical approvals, secret boundaries, owned process lifecycle, conditional mutation, portable recovery, and truthful platform qualification. Windows ARM64, Linux, and companion support remain governed by J01-PLAT-03, J01-PLAT-10 through J01-PLAT-12, J01-PLAT-23 through J01-PLAT-25, and the Release Profile; they SHALL NOT be inferred from a launchable build or executable.
 
 ---
 
@@ -867,4 +647,4 @@ Production code/CI SHALL make these statements true:
 
 ---
 
-**END — JARVIS SCOPE, GOVERNANCE & CODING CONTRACT v1.0.8**
+**END — JARVIS SCOPE, GOVERNANCE & CODING CONTRACT v1.0.9**

@@ -6,7 +6,7 @@ import {
   evaluateDesktopFoundation,
   loadDesktopFoundationSnapshot,
 } from "../../../tools/ci/check-desktop-foundation.mjs";
-import { validatePhase0Snapshot } from "../../../tools/checkpoints/phase0-checkpoint.mjs";
+import { requiredWorkflowSteps, validatePhase0Snapshot } from "../../../tools/checkpoints/phase0-checkpoint.mjs";
 import profile from "../../../tools/checkpoints/phase0-checkpoint-profile.json" with { type: "json" };
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -69,9 +69,9 @@ test("Section 1.1 requires a real production Tauri build rather than cargo check
 });
 
 function phase0Workflow(productionStep = PRODUCTION_STEP) {
-  const gates = profile.requiredWorkflowSteps
-    .filter(({ name }) => name !== "Rust Windows-target build")
-    .map(({ name, run }) => `      - name: ${name}\n        run: ${run}\n`)
+  const gates = requiredWorkflowSteps(profile)
+    .filter(({ workflowName }) => workflowName !== "Rust Windows-target build")
+    .map(({ workflowName, command }) => `      - name: ${workflowName}\n        run: ${command}\n`)
     .join("\n");
 
   return `name: Static CI

@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import {
   checkPhase0,
+  requiredWorkflowSteps,
   validatePhase0Snapshot,
 } from "../../../tools/checkpoints/phase0-checkpoint.mjs";
 import profile from "../../../tools/checkpoints/phase0-checkpoint-profile.json" with {
@@ -27,11 +28,11 @@ const childIds = [
 ];
 
 function workflowFromProfile() {
-  const gates = profile.requiredWorkflowSteps
-    .filter(({ name }) => name !== "Rust Windows-target build")
+  const gates = requiredWorkflowSteps(profile)
+    .filter(({ workflowName }) => workflowName !== "Rust Windows-target build")
     .map(
-      ({ name, run }) =>
-        `      - name: ${name}\n        run: ${run}\n`,
+      ({ workflowName, command }) =>
+        `      - name: ${workflowName}\n        run: ${command}\n`,
     )
     .join("\n");
 
@@ -128,6 +129,19 @@ function codes(overrides = {}) {
 
 test("0.CP aggregate Phase 0 checkpoint snapshot passes", () => {
   assert.deepEqual(codes(), []);
+});
+
+test("Phase 0 profile rejects missing, extra, duplicate, reordered, and unknown gate IDs", () => {
+  const mutations = [
+    profile.requiredGateIds.slice(1),
+    [...profile.requiredGateIds, "phase0-section-checkpoint"],
+    [profile.requiredGateIds[0], profile.requiredGateIds[0], ...profile.requiredGateIds.slice(2)],
+    [profile.requiredGateIds[1], profile.requiredGateIds[0], ...profile.requiredGateIds.slice(2)],
+    ["unknown-gate", ...profile.requiredGateIds.slice(1)],
+  ];
+  for (const requiredGateIds of mutations) {
+    assert.ok(codes({ profile: { ...profile, requiredGateIds } }).includes("PHASE0_PROFILE_INVALID"));
+  }
 });
 
 test("missing mandatory Phase 0 gate fails closed", () => {

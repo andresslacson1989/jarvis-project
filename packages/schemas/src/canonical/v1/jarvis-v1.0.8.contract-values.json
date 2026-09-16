@@ -2,15 +2,15 @@
   "schemaVersion": 1,
   "canonicalValuesId": "jarvis.contract-values.v1.0.8",
   "contractSuiteVersion": "1.0.8",
-  "releaseProfileVersion": "1.0.8",
+  "releaseProfileVersion": "1.0.9",
   "contractComponentRevisions": {
-    "scopeGovernanceCoding": "1.0.8",
-    "runtimePlatformProtocol": "1.0.8",
-    "dataStateBackup": "1.0.8",
-    "securityTrust": "1.0.8",
-    "operationsIntegrationsUx": "1.0.8",
-    "verificationRelease": "1.0.8",
-    "releaseProfile": "1.0.8"
+    "scopeGovernanceCoding": "1.0.9",
+    "runtimePlatformProtocol": "1.0.9",
+    "dataStateBackup": "1.0.9",
+    "securityTrust": "1.0.9",
+    "operationsIntegrationsUx": "1.0.9",
+    "verificationRelease": "1.0.9",
+    "releaseProfile": "1.0.9"
   },
   "protocolMajor": 1,
   "v1RuntimeTarget": {
