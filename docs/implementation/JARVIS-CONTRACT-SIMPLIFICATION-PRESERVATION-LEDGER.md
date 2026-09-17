@@ -1,5 +1,41 @@
 # JARVIS Contract Simplification Preservation Ledger
 
+## Current successor remediation ledger — 2026-09-17
+
+This section describes the successor built from audited predecessor `d447b89c7506281567f5ee2f8771fba91a8bdf1f`. The successor's own SHA and future GitHub run are bound externally at handoff; the tracked ledger records completed predecessor evidence and must not claim that evidence qualifies its successor.
+
+| ID | Governing owner / source | Current correction and preserved boundary | Validator / evidence | Status |
+| --- | --- | --- | --- | --- |
+| AUD-01 | J00-GOV-28; J05-VER-33; governance profile | Replaced ambiguous stale `currentCandidateEvidence` with `latestRecordedCandidateEvidence`, role `LATEST_COMPLETED_PREDECESSOR`, and `doesNotQualifySuccessor=true`. Recorded exact `d447...` run/jobs/artifacts without claiming successor, integration, Section 1.4, or release qualification. | `check-repository-governance.mjs`; governance unit mutations; `MASTER-PROTECTION.md`; GitHub run `35184074308` | **REPOSITORY CLOSED; successor exact CI/audit open** |
+| AUD-02 | MAN-03; MAN-07; Section 1.4 historical evidence | Replaced active/governing labels on six retired paths with explicit historical non-authority labels; added the current v1.0.8 authority block; omitted the transient absolute worktree store path without changing its historical result. | contract-drift slash/backslash/disguised-label mutations | **CLOSED** |
+| AUD-03 | J01-RT-06 | Enforced the distinct bootstrap identity tuple across canonical schema/value, bootstrap schema, and TypeScript protocol source through the official schema command. No selected value changed. | `check-schemas.mjs`; static-CI tool mutations for missing, swapped, conflated, unsupported, mismatched, and extra fields | **CLOSED** |
+| AUD-04 | Final-closure goal G-04/G-07 | Added current successor sections to report, ledger, findings, and matrix-traceability records while preserving immutable historical bodies. | current branch/base/predecessor/scope/metrics/evidence/blocker mapping | **CLOSED; external gates reported** |
+| AUD-05 | `AGENTS.md`; developer execution goal §8.1; README routing | Restored concise explicit routing to the developer execution goal and contract final-closure goal, each labeled non-normative and subordinate to the active suite. | exact link/reference review and format check | **CLOSED** |
+| AUD-06 | MAN-08; J00-GOV-29 | Recorded the owner's limited ratification of the CI-authority amendment introduced by `5435fc96f852534e856094ff9d72eef03e254bb8`: GitHub Actions mandatory, GitLab mirror-only, LocalCI non-authoritative. No other rule is authorized or broadened. | manifest, governance, canonical-value, schema, and contract-drift checks | **CLOSED** |
+| AUD-07 | stacked candidate scope; matrix rules | Separated contract consolidation, `d2cc90be` matrix/plan reconciliation, `833c8a83` preserved Section 1.4 implementation/evidence, and the five-file `d447...` delta. Kept Section 1.4 `VERIFYING` and all negative evidence. | full diff review; matrix byte comparison for this successor; current report | **CLOSED; lifecycle gates open** |
+
+### Current contract-derived mapping
+
+| Active owner / artifact | Exact current obligation or value | Successor treatment | Proof |
+| --- | --- | --- | --- |
+| MAN-08 | Suite `1.0.8`; components/Profile `1.0.9`; limited CI-authority amendment lineage | Normative text unchanged. Owner/governance authorization reference: explicit owner task authorization dated 2026-09-17, limited to the amendment introduced by `5435fc96f852534e856094ff9d72eef03e254bb8`; no secret or private token is stored. | manifest/component revision validation and governance checks |
+| J01-RT-06 | `contractSuiteVersion=1.0.8`, `releaseProfileVersion=1.0.9`; identities distinct; missing/swapped/conflated/unsupported fail | Normative text and values unchanged; official cross-file enforcement added. | `tools/ci/check-schemas.mjs`; `pnpm schema:check` |
+| Canonical `ciAuthorities` schema/value | sole eligible and selected type `GITHUB_ACTIONS`, pipeline `static-ci` | Values unchanged; strict schema and predecessor-governance evidence remain separate. | canonical instance validation and authority mutations |
+| `bootstrap-configuration.schema.json` | suite/profile/canonical/protocol constants | Source unchanged; compared to supported canonical tuple and protocol interface. | schema identity mutation suite |
+| `packages/protocol/src/config.ts` | `BootstrapConfigurationV1` literal identity fields | Source unchanged; parsed as the TypeScript identity source and rejected on mismatch or extra identity fields. | schema identity mutation suite |
+| `tools/ci/check-schemas.mjs` | official schema inventory and instance gate | Extended fail-closed cross-file identity validation; unrelated schema-only fixtures remain supported when no official identity artifact is present. | focused static-CI tool tests and official schema command |
+| `tests/layers/unit/static-ci-tools.test.mjs` | schema/CI tool regression coverage | Added official-command positive proof and nine negative identity classes. | focused Node test pass |
+| Governance profile / operational aid | latest completed predecessor evidence only | Records exact `d447...` run `35184074308`; explicitly cannot qualify successor. | governance validator, documentation validator, and 59 focused tests |
+
+### Current external blockers
+
+- Successor commit identity and exact-head GitHub Actions evidence do not exist until commit/publication.
+- Independent Auditor approval of that exact successor remains required.
+- Integration, authoritative-`master` verification, Section 1.4 lifecycle approval, and the Section 1 checkpoint remain open.
+- No matrix progression, release qualification, or `Production Complete` claim is permitted.
+
+## Historical preservation record — non-current
+
 > **Historical-state reconciliation (2026-09-17):** Baselines and hashes in this ledger are immutable historical measurements of the recorded simplification stages, not descriptions of the current worktree. The published pre-remediation candidate is `983e25cac90028449876b4f0c8678449bd18b49b`; exact GitHub Actions run `35163261745` passed for that SHA, its normal local profile passed 25 files, and its active suite measured 8,112 lines, 385 unique clause IDs, and 362 J00–J05 separator lines. First remediation candidate `2f587a52cd385e0da9532b509776cb90fcd1ec46` added the explicit J01 bootstrap version-identity invariant, measured 8,114 active-suite lines, and passed exact GitHub Actions run `35171102471` attempt 2. These are fixed historical identities; any later candidate requires its own exact-candidate evidence. Matrix/plan reconciliation is separately authorized and committed in `d2cc90be`; preserved Section 1.4 implementation/evidence is separate and remains `VERIFYING`.
 
 **Status:** Non-normative execution aid. It records planned and completed preservation checks; it does not alter contract authority, authorize implementation, or replace active clauses.

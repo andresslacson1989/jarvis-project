@@ -4,7 +4,7 @@
 **Governing clauses:** J00-GOV-28; J05-VER-33
 **Authoritative branch:** `master`  
 **Mandatory CI pipeline:** `static-ci`
-**Selected CI authority:** `GITHUB_ACTIONS` (capability baseline; exact v1.0.8 candidate run not recorded)
+**Selected CI authority:** `GITHUB_ACTIONS` (historical capability baseline plus a latest-completed-predecessor evidence record; successor qualification remains external)
 
 This document is an operational implementation aid for the repository-governance requirements in J00-GOV-28, J05-VER-33, and Implementation Plan Phase 0. It is not a substitute for those normative requirements.
 
@@ -38,7 +38,43 @@ Its current residual-risk value is:
 SERVER_ENFORCED_PROTECTION_ACTIVE
 ```
 
-The current v1.0.8 candidate has no exact GitHub Actions run recorded under its immutable candidate SHA. `EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED` remains the truthful candidate-evidence state; this operational profile does not promote local checks or historical runs into current CI qualification.
+## Latest recorded exact-candidate predecessor evidence
+
+The profile records the latest completed predecessor in status `RECORDED` with role `LATEST_COMPLETED_PREDECESSOR` and `doesNotQualifySuccessor=true`. The immutable evidence is:
+
+```text
+contractSuiteVersion=1.0.8
+status=RECORDED
+recordedCandidateRole=LATEST_COMPLETED_PREDECESSOR
+doesNotQualifySuccessor=true
+candidateSha=d447b89c7506281567f5ee2f8771fba91a8bdf1f
+repository=andresslacson1989/jarvis-project
+ref=refs/heads/codex/contract-consolidation
+workflow=.github/workflows/static-ci.yml
+job=static-ci
+runId=35184074308
+runAttempt=1
+event=pull_request
+headBranch=codex/contract-consolidation
+startedAt=2026-09-17T05:00:49Z
+finishedAt=2026-09-17T05:16:36Z
+recordedAt=2026-09-17T06:24:08Z
+terminalResult=SUCCESS
+requiredChecksPassed=true
+windows-tauri-build jobId=105082244361 startedAt=2026-09-17T05:00:52Z finishedAt=2026-09-17T05:08:41Z terminalResult=SUCCESS
+static-ci jobId=105083793438 startedAt=2026-09-17T05:08:44Z finishedAt=2026-09-17T05:16:35Z terminalResult=SUCCESS
+jarvis-section-1-4-tauri-single-instance-evidence artifactId=10481224055 digest=sha256:3bd623d2e9e932cfc233ce20f08a7ad92ab728d809171d9d264a747218c7e885
+jarvis-section-1-4-windows-native-evidence artifactId=10481019827 digest=sha256:b770658c5ab2e2964d46d5ff997bd59512e599894542e982a306c4d3e59424d4
+evidenceIdentity=github-actions:repository=andresslacson1989/jarvis-project:ref=refs/heads/codex/contract-consolidation:workflow=.github/workflows/static-ci.yml:job=static-ci:runId=35184074308:runAttempt=1:sha=d447b89c7506281567f5ee2f8771fba91a8bdf1f:windowsJobId=105082244361:staticCiJobId=105083793438
+artifactEvidenceIdentity=github-actions-artifacts:repository=andresslacson1989/jarvis-project:ref=refs/heads/codex/contract-consolidation:workflow=.github/workflows/static-ci.yml:job=static-ci:runId=35184074308:runAttempt=1:sha=d447b89c7506281567f5ee2f8771fba91a8bdf1f:artifact=10481224055@sha256:3bd623d2e9e932cfc233ce20f08a7ad92ab728d809171d9d264a747218c7e885:artifact=10481019827@sha256:b770658c5ab2e2964d46d5ff997bd59512e599894542e982a306c4d3e59424d4
+qualificationBlocker=SUCCESSOR_EXACT_CANDIDATE_GITHUB_ACTIONS_REQUIRED
+qualificationBlocker=INDEPENDENT_AUDIT_APPROVAL_REQUIRED
+qualificationBlocker=SECTION_1_4_INTEGRATION_REQUIRED
+qualificationBlocker=AUTHORITATIVE_MASTER_VERIFICATION_REQUIRED
+qualificationBlocker=SECTION_1_CHECKPOINT_REQUIRED
+```
+
+This predecessor record does not qualify the successor documentation commit, the current checkout, integration, Section 1.4, or release. A successor is qualified only by its own external exact-head GitHub Actions checks/artifacts and independent audit handoff; a tracked commit is never required to embed its own future SHA or run identity. Independent approval, Section 1.4 integration, authoritative-`master` verification, and the Section 1 checkpoint remain open.
 
 GitHub Actions remains the sole CI authority. GitLab is repository mirror-only and LocalCI is non-authoritative compatibility/security tooling. Local preflight is required before publication or candidate qualification, but ordinary local execution is not GitHub authority.
 

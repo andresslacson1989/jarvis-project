@@ -92,12 +92,63 @@
         "cosignTransparencyLogVerification": "NOT_CLAIMED_OFFLINE"
         }
       },
-      "currentCandidateEvidence": {
+      "latestRecordedCandidateEvidence": {
         "contractSuiteVersion": "1.0.8",
-        "status": "NOT_RECORDED",
-        "reason": "EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED"
+        "status": "RECORDED",
+        "recordedCandidateRole": "LATEST_COMPLETED_PREDECESSOR",
+        "doesNotQualifySuccessor": true,
+        "candidateSha": "d447b89c7506281567f5ee2f8771fba91a8bdf1f",
+        "repository": "andresslacson1989/jarvis-project",
+        "ref": "refs/heads/codex/contract-consolidation",
+        "workflow": ".github/workflows/static-ci.yml",
+        "job": "static-ci",
+        "runId": "35184074308",
+        "runAttempt": "1",
+        "event": "pull_request",
+        "headBranch": "codex/contract-consolidation",
+        "startedAt": "2026-09-17T05:00:49Z",
+        "finishedAt": "2026-09-17T05:16:36Z",
+        "recordedAt": "2026-09-17T06:24:08Z",
+        "terminalResult": "SUCCESS",
+        "requiredChecksPassed": true,
+        "jobs": [
+          {
+            "name": "windows-tauri-build",
+            "jobId": "105082244361",
+            "startedAt": "2026-09-17T05:00:52Z",
+            "finishedAt": "2026-09-17T05:08:41Z",
+            "terminalResult": "SUCCESS"
+          },
+          {
+            "name": "static-ci",
+            "jobId": "105083793438",
+            "startedAt": "2026-09-17T05:08:44Z",
+            "finishedAt": "2026-09-17T05:16:35Z",
+            "terminalResult": "SUCCESS"
+          }
+        ],
+        "artifacts": [
+          {
+            "name": "jarvis-section-1-4-tauri-single-instance-evidence",
+            "artifactId": "10481224055",
+            "digest": "sha256:3bd623d2e9e932cfc233ce20f08a7ad92ab728d809171d9d264a747218c7e885"
+          },
+          {
+            "name": "jarvis-section-1-4-windows-native-evidence",
+            "artifactId": "10481019827",
+            "digest": "sha256:b770658c5ab2e2964d46d5ff997bd59512e599894542e982a306c4d3e59424d4"
+          }
+        ],
+        "evidenceIdentity": "github-actions:repository=andresslacson1989/jarvis-project:ref=refs/heads/codex/contract-consolidation:workflow=.github/workflows/static-ci.yml:job=static-ci:runId=35184074308:runAttempt=1:sha=d447b89c7506281567f5ee2f8771fba91a8bdf1f:windowsJobId=105082244361:staticCiJobId=105083793438",
+        "artifactEvidenceIdentity": "github-actions-artifacts:repository=andresslacson1989/jarvis-project:ref=refs/heads/codex/contract-consolidation:workflow=.github/workflows/static-ci.yml:job=static-ci:runId=35184074308:runAttempt=1:sha=d447b89c7506281567f5ee2f8771fba91a8bdf1f:artifact=10481224055@sha256:3bd623d2e9e932cfc233ce20f08a7ad92ab728d809171d9d264a747218c7e885:artifact=10481019827@sha256:b770658c5ab2e2964d46d5ff997bd59512e599894542e982a306c4d3e59424d4"
       },
-      "qualificationBlockers": []
+      "qualificationBlockers": [
+        "SUCCESSOR_EXACT_CANDIDATE_GITHUB_ACTIONS_REQUIRED",
+        "INDEPENDENT_AUDIT_APPROVAL_REQUIRED",
+        "SECTION_1_4_INTEGRATION_REQUIRED",
+        "AUTHORITATIVE_MASTER_VERIFICATION_REQUIRED",
+        "SECTION_1_CHECKPOINT_REQUIRED"
+      ]
     },
     "commonRequirements": {
       "exactResolvedCommitRequired": "REQUIRED",

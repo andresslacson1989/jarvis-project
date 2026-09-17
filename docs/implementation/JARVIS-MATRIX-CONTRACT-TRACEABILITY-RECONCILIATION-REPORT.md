@@ -1,5 +1,19 @@
 # JARVIS Matrix Contract-Traceability Reconciliation Report
 
+## Current stacked-candidate disposition — 2026-09-17
+
+The matrix/plan reconciliation remains the separately authorized `d2cc90be` scope. It is present in the complete stacked branch but is not attributed to contract simplification or to the preserved Section 1.4 implementation/evidence merged by `833c8a83`.
+
+- Latest audited predecessor: `d447b89c7506281567f5ee2f8771fba91a8bdf1f`; exact GitHub run `35184074308` succeeded, but independent decision was `NOT APPROVED — NEXT PASS` for current-record and enforcement gaps.
+- Current successor remediation does not edit the Implementation Plan, live matrix, or Matrix Reference.
+- Live status remains Section 1 `IN PROGRESS`, Section 1.4 `VERIFYING`, and `Production Complete` `NO`.
+- Historical matrix/plan reconciliation identities below remain immutable; they do not qualify the successor.
+- The successor's exact SHA and GitHub run are external handoff evidence and must match the eventual audit target. Until then, matrix reconciliation remains repository-side closed but candidate lifecycle approval remains open.
+
+No status, score, evidence, dependency, execution pointer, application evidence, or release gate is advanced by this report update.
+
+## Historical reconciliation report — non-current
+
 > **Historical-state reconciliation (2026-09-17):** The baseline and “uncommitted/no candidate” statements below describe the original reconciliation execution snapshot. The separately authorized reconciliation was committed as `d2cc90be` and is distinct from contract consolidation and preserved Section 1.4 implementation/evidence. The published combined pre-remediation candidate is `983e25cac90028449876b4f0c8678449bd18b49b`; exact GitHub Actions run `35163261745` passed for that SHA and its normal local profile passed 25 files. First remediation candidate `2f587a52cd385e0da9532b509776cb90fcd1ec46` passed exact GitHub Actions run `35171102471` attempt 2. These are fixed historical identities; any later candidate requires its own exact-candidate evidence. No matrix status, score, evidence identity, or execution pointer was advanced by either reconciliation step; Section 1.4 remains `VERIFYING`.
 
 ## Decision

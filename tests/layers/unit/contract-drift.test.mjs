@@ -39,7 +39,7 @@ test("0.12 package and CI gates are wired", () => {
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { checkContractDriftFromTexts } from "../../../tools/contract/check-drift.mjs";
+import { checkContractDriftFromTexts, checkRetiredAuthorityLabelsFromText } from "../../../tools/contract/check-drift.mjs";
 import { checkGeneratedArtifacts, writeGeneratedArtifacts } from "../../../tools/contract/generate-contract-artifacts.mjs";
 import { hasForbiddenDecisionRecordReference, validateContractManifest, validateMatrixTraceabilityTexts, validateTrackedDecisionRecordPaths } from "../../../tools/contract/manifest.mjs";
 
@@ -278,6 +278,44 @@ test("clean human-readable contract fixture matches canonical values", () => {
 test("clean CRLF human-readable contract fixture matches canonical values", () => {
   const crlf = Object.fromEntries(Object.entries(humanFixture()).map(([key, value]) => [key, value.replaceAll("\n", "\r\n")]));
   assert.deepEqual(checkContractDriftFromTexts(canonical, crlf), []);
+});
+
+test("retired contract paths fail closed under unqualified authority labels", () => {
+  const forwardSlash = checkRetiredAuthorityLabelsFromText(
+    "docs/implementation/evidence/fixture.md",
+    "- Active manifest: docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md\n",
+  );
+  assert.deepEqual(forwardSlash.map(({ code }) => code), ["DRIFT_RETIRED_AUTHORITY_LABEL"]);
+
+  const windowsSlash = checkRetiredAuthorityLabelsFromText(
+    "docs\\implementation\\governance\\fixture.md",
+    "- Current governing contract: docs\\implementation\\JARVIS-RUNTIME-CONTRACT.md\r\n",
+  );
+  assert.deepEqual(windowsSlash.map(({ code }) => code), ["DRIFT_RETIRED_AUTHORITY_LABEL"]);
+
+  const historical = checkRetiredAuthorityLabelsFromText(
+    "docs/implementation/evidence/fixture.md",
+    "- Historical source identity — non-authoritative: docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md\n",
+  );
+  assert.deepEqual(historical, []);
+
+  const disguisedActive = checkRetiredAuthorityLabelsFromText(
+    "docs/implementation/evidence/fixture.md",
+    "- Historical active manifest: docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md (non-authoritative chronology)\n",
+  );
+  assert.deepEqual(disguisedActive.map(({ code }) => code), ["DRIFT_RETIRED_AUTHORITY_LABEL"]);
+
+  const suffixActive = checkRetiredAuthorityLabelsFromText(
+    "docs/implementation/governance/fixture.md",
+    "- docs/implementation/JARVIS-RUNTIME-CONTRACT.md — current governing contract\n",
+  );
+  assert.deepEqual(suffixActive.map(({ code }) => code), ["DRIFT_RETIRED_AUTHORITY_LABEL"]);
+
+  const current = checkRetiredAuthorityLabelsFromText(
+    "docs/implementation/evidence/fixture.md",
+    "- Current authoritative active path: docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md\n",
+  );
+  assert.deepEqual(current, []);
 });
 
 for (const [name, mutate, expectedCode] of [

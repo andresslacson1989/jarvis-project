@@ -1,5 +1,28 @@
 # JARVIS Contract Simplification Findings
 
+## Current independent-audit loop — 2026-09-17
+
+**Audited predecessor:** `d447b89c7506281567f5ee2f8771fba91a8bdf1f` on `codex/contract-consolidation`, based on `origin/master` `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`.
+
+**Independent decision:** `NOT APPROVED — NEXT PASS`. Exact GitHub Actions run `35184074308` succeeded for `d447...`; rejection concerned stale/current repository records and missing drift enforcement, not a failed exact CI run.
+
+| Current finding | Repository-side disposition in successor | Remaining gate |
+| --- | --- | --- |
+| Governance profile and `MASTER-PROTECTION.md` said exact candidate evidence was not recorded | Replaced with an explicit latest-completed-predecessor model containing the exact `d447...` run, both jobs, timestamps, artifacts, and digests; successor non-qualification is machine-readable and documented. | Successor requires its own external exact-head run and audit. |
+| Closure report/ledger/findings/traceability records were historical-only | Added separate current successor sections; historical bodies and measurements remain unchanged. | Final successor SHA/run are supplied externally because a commit cannot embed its own future identity. |
+| Section 1.4 labeled deleted v1.0.7 paths as active/governing | Every retired path is explicitly historical and non-authoritative; a separate current v1.0.8 authority block is present. | None repository-side. |
+| No regression rejected retired paths under active labels | Contract drift now scans tracked evidence/governance Markdown and rejects slash, backslash, and disguised active-label forms. | None repository-side. |
+| Bootstrap values agreed but were not cross-file enforced | Official schema verification now binds canonical schema/value, bootstrap schema, and TypeScript protocol source to the supported J01-RT-06 tuple. | None repository-side. |
+| Section 1.4 exposed a transient absolute `.codex-worktrees` package-store path | Historical result retained; concrete transient path omitted and approved G: repository boundary stated. | Preserved untracked content remains untouched. |
+| `AGENTS.md` lost explicit developer-goal routing | Concise developer-goal and contract-final-closure-goal routing restored; both remain non-normative. README links both aids. | None repository-side. |
+| MAN-08 ratification lacked a current ledger entry | Added a redacted current owner-authorization record limited to the CI-authority amendment introduced by `5435fc96...`. | No broader amendment is claimed. |
+| `d447...` successful Section 1.4 jobs were not classified in current records | Current report classifies them as exact predecessor evidence while preserving Section 1.4 `VERIFYING`, all negative runs, and every integration/checkpoint gate. | Lifecycle approval, integration, authoritative-master verification, and Section 1 checkpoint remain open. |
+| Full 207-file stacked scope was insufficiently separated | Current report distinguishes consolidation, `d2cc90be`, `833c8a83`, and the five-file `d447...` delta. | Protected review must assess the complete successor diff. |
+
+**Current disposition:** repository-side remediation is bounded and the ordered pinned local preflight passed on the finalizing successor tree. The successor remains `NEXT PASS` until it is committed, its exact head passes GitHub Actions, and the independent audit approves that exact candidate. No matrix advancement, integration, release qualification, or `Production Complete` claim is authorized.
+
+## Historical findings record — non-current
+
 > **Historical-state reconciliation (2026-09-17):** This file preserves the audit chronology at reviewed HEAD `e07d0326dde59c0157d70669d97c3eba165b13d8`; its no-matrix-diff, 22-file, and no-exact-CI statements apply only to that historical snapshot. The published pre-remediation candidate is `983e25cac90028449876b4f0c8678449bd18b49b`, with passing exact GitHub Actions run `35163261745`, a 25-file normal local profile, 8,112 active-suite lines, 385 unique clause IDs, and 362 J00–J05 separator lines. First remediation candidate `2f587a52cd385e0da9532b509776cb90fcd1ec46` added the explicit J01 bootstrap version-identity invariant, measured 8,114 active-suite lines, and passed exact GitHub Actions run `35171102471` attempt 2. These are fixed historical identities; any later candidate requires its own exact-candidate evidence. Separately authorized matrix/plan reconciliation is identified by commit `d2cc90be`; preserved Section 1.4 implementation/evidence is identified separately and remains `VERIFYING`.
 
 **Status:** Non-normative audit aid and persistent review evidence. This file does not authorize implementation, change contract meaning, supersede the active suite, advance the implementation matrix, or qualify a release.

@@ -1,5 +1,21 @@
 # JARVIS Matrix Contract-Traceability Reconciliation Ledger
 
+## Current successor ledger entry — 2026-09-17
+
+| Item | Current disposition |
+| --- | --- |
+| Reconciliation owner | Separately authorized commit `d2cc90be`; unchanged by current remediation |
+| Stacked application/evidence scope | Preserved Section 1.4 merge `833c8a83`; remains distinct and `VERIFYING` |
+| Latest audited predecessor | `d447b89c7506281567f5ee2f8771fba91a8bdf1f`; run `35184074308` success; audit `NOT APPROVED — NEXT PASS` |
+| Current successor matrix/plan edits | None |
+| Live status boundary | Section 1 `IN PROGRESS`; Section 1.4 `VERIFYING`; `Production Complete` `NO` |
+| Successor identity/evidence | Exact SHA and exact-head GitHub run supplied externally at handoff; predecessor evidence cannot qualify the successor |
+| Remaining lifecycle gates | successor exact CI, independent approval, protected integration, authoritative-master verification, Section 1 checkpoint |
+
+This entry is current scope accounting only. It does not alter or reopen the historical MTR-01 through MTR-08 corrections below, and it does not convert historical matrix evidence into successor qualification.
+
+## Historical reconciliation ledger — non-current
+
 > **Historical-state reconciliation (2026-09-17):** The baseline identities, hashes, and “uncommitted/unpublished” classifications below are retained as historical execution evidence. The separately authorized reconciliation was committed as `d2cc90be`; it must not be attributed to the consolidation-only delta or to the preserved Section 1.4 implementation/evidence. The published combined pre-remediation candidate is `983e25cac90028449876b4f0c8678449bd18b49b`, with passing exact GitHub Actions run `35163261745` and a 25-file normal local profile. First remediation candidate `2f587a52cd385e0da9532b509776cb90fcd1ec46` passed exact GitHub Actions run `35171102471` attempt 2. These are fixed historical identities; any later candidate requires its own exact-candidate evidence. Section 1.4 remains `VERIFYING`.
 
 **Status:** Non-normative execution evidence. This ledger does not change contract authority, implementation status, sequencing, evidence, or release state.

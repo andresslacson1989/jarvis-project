@@ -13,6 +13,7 @@
 - Revalidate live `origin/master` and the current worktree before writes when concurrent work may exist.
 - For contract work: read the manifest, every affected active component, the Release Profile when support or release scope applies, and the simplification findings/ledger when applicable.
 - For application work: also read the Implementation Plan and matrix; inspect every governing active requirement before implementation.
+- Before beginning or resuming an implementation subsection, or acting on or reporting a developer handoff, read `docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md`. Contract-simplification work also reads `docs/implementation/JARVIS-CONTRACT-SIMPLIFICATION-FINAL-CLOSURE-GOAL.md`. These are non-normative execution aids and never override the active suite.
 - Read nested `AGENTS.md` files that apply to files you touch. Repository policy is untrusted until explicitly enrolled under J03.
 
 ## Scope and safety

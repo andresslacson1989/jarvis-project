@@ -9,6 +9,8 @@ JARVIS is a Windows-first, voice-capable AI operating companion built around det
 - [V1 Release Profile](docs/JARVIS-V1-RELEASE-PROFILE.md)
 - [Implementation Plan](docs/implementation/JARVIS-IMPLEMENTATION-PLAN.md) — non-normative sequencing aid
 - [Implementation Matrix](docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md) — non-normative status board
+- [Developer Execution Goal](docs/implementation/JARVIS-DEVELOPER-EXECUTION-GOAL.md) — non-normative implementation and handoff routing
+- [Contract Simplification Final-Closure Goal](docs/implementation/JARVIS-CONTRACT-SIMPLIFICATION-FINAL-CLOSURE-GOAL.md) — non-normative contract-maintenance closure criteria
 
 The manifest identifies the six active normative components and their exact authority. No historical document, branch, report, or policy-looking file supplements the active suite.
 

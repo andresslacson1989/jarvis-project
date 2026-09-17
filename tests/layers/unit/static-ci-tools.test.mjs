@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { checkFormat } from "../../../tools/ci/check-format.mjs";
-import { checkSchemas, validateSchemaInstance } from "../../../tools/ci/check-schemas.mjs";
+import { checkSchemas, validateBootstrapIdentityArtifacts, validateSchemaInstance } from "../../../tools/ci/check-schemas.mjs";
 import { scanSecrets } from "../../../tools/ci/scan-secrets.mjs";
 import { checkDependencies } from "../../../tools/ci/check-dependencies.mjs";
 import { checkProvenance } from "../../../tools/ci/check-provenance.mjs";
@@ -21,6 +21,24 @@ async function tempRepo(files = {}) {
 
 function codes(result) {
   return result.violations.map((item) => item.code);
+}
+
+const identityArtifactPaths = Object.freeze([
+  "packages/schemas/src/canonical/v1/contract-values.schema.json",
+  "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json",
+  "packages/schemas/src/config/v1/bootstrap-configuration.schema.json",
+  "packages/protocol/src/config.ts",
+]);
+
+async function identityArtifactFixture() {
+  const repositoryRoot = resolve(import.meta.dirname, "..", "..", "..");
+  return Object.fromEntries(await Promise.all(identityArtifactPaths.map(async (path) => [path, await readFile(resolve(repositoryRoot, path), "utf8")])));
+}
+
+function mutateJsonFile(files, path, mutate) {
+  const value = JSON.parse(files[path]);
+  mutate(value);
+  files[path] = `${JSON.stringify(value)}\n`;
 }
 
 test("format checker accepts clean LF text and rejects deterministic hygiene violations", async () => {
@@ -91,17 +109,108 @@ test("canonical contract values strictly validate CI authority and distinct rele
   }
 });
 
+test("bootstrap identity artifacts fail closed on missing, swapped, conflated, unsupported, mismatched, or extra identity", async () => {
+  const cleanFiles = await identityArtifactFixture();
+  const clean = await tempRepo(cleanFiles);
+  assert.deepEqual((await validateBootstrapIdentityArtifacts(clean)).violations, []);
+  assert.deepEqual((await checkSchemas(clean)).violations, []);
+
+  const mutations = [
+    {
+      name: "missing identity",
+      expected: "SCHEMA_BOOTSTRAP_IDENTITY_FIELD_MISSING",
+      mutate(files) {
+        mutateJsonFile(files, "packages/schemas/src/config/v1/bootstrap-configuration.schema.json", (value) => {
+          delete value.properties.releaseProfileVersion;
+          value.required = value.required.filter((field) => field !== "releaseProfileVersion");
+        });
+      },
+    },
+    {
+      name: "swapped suite and profile",
+      expected: "SCHEMA_BOOTSTRAP_IDENTITY_UNSUPPORTED",
+      mutate(files) {
+        mutateJsonFile(files, "packages/schemas/src/config/v1/bootstrap-configuration.schema.json", (value) => {
+          value.properties.contractSuiteVersion.const = "1.0.9";
+          value.properties.releaseProfileVersion.const = "1.0.8";
+        });
+      },
+    },
+    {
+      name: "conflated suite and profile",
+      expected: "SCHEMA_BOOTSTRAP_IDENTITY_UNSUPPORTED",
+      mutate(files) {
+        mutateJsonFile(files, "packages/schemas/src/config/v1/bootstrap-configuration.schema.json", (value) => {
+          value.properties.releaseProfileVersion.const = value.properties.contractSuiteVersion.const;
+        });
+      },
+    },
+    {
+      name: "unsupported suite version",
+      expected: "SCHEMA_BOOTSTRAP_IDENTITY_UNSUPPORTED",
+      mutate(files) {
+        mutateJsonFile(files, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json", (value) => {
+          value.contractSuiteVersion = "9.9.9";
+        });
+      },
+    },
+    {
+      name: "protocol source mismatch",
+      expected: "SCHEMA_BOOTSTRAP_IDENTITY_MISMATCH",
+      mutate(files) {
+        files["packages/protocol/src/config.ts"] = files["packages/protocol/src/config.ts"].replace('releaseProfileVersion: "1.0.9";', 'releaseProfileVersion: "1.0.8";');
+      },
+    },
+    {
+      name: "canonical ID mismatch",
+      expected: "SCHEMA_BOOTSTRAP_IDENTITY_MISMATCH",
+      mutate(files) {
+        mutateJsonFile(files, "packages/schemas/src/config/v1/bootstrap-configuration.schema.json", (value) => {
+          value.properties.canonicalValuesId.const = "jarvis.contract-values.invalid";
+        });
+      },
+    },
+    {
+      name: "extra schema identity field",
+      expected: "SCHEMA_BOOTSTRAP_IDENTITY_FIELD_EXTRA",
+      mutate(files) {
+        mutateJsonFile(files, "packages/schemas/src/config/v1/bootstrap-configuration.schema.json", (value) => {
+          value.properties.manifestVersion = { const: "1.0.8" };
+          value.required.push("manifestVersion");
+        });
+      },
+    },
+    {
+      name: "extra protocol identity field",
+      expected: "SCHEMA_BOOTSTRAP_IDENTITY_FIELD_EXTRA",
+      mutate(files) {
+        files["packages/protocol/src/config.ts"] = files["packages/protocol/src/config.ts"].replace("  protocolMajor: 1;", '  protocolMajor: 1;\n  manifestVersion: "1.0.8";');
+      },
+    },
+    {
+      name: "missing protocol artifact",
+      expected: "SCHEMA_BOOTSTRAP_IDENTITY_ARTIFACT_MISSING",
+      mutate(files) {
+        delete files["packages/protocol/src/config.ts"];
+      },
+    },
+  ];
+
+  for (const item of mutations) {
+    const files = await identityArtifactFixture();
+    item.mutate(files);
+    const root = await tempRepo(files);
+    assert.ok(codes(await validateBootstrapIdentityArtifacts(root)).includes(item.expected), `${item.name} should produce ${item.expected}`);
+    assert.ok(codes(await checkSchemas(root)).includes(item.expected), `${item.name} should fail the official schema command`);
+  }
+});
+
 test("official schema verification fails closed on canonical contract-value drift", async () => {
-  const repositoryRoot = resolve(import.meta.dirname, "..", "..", "..");
-  const schemaText = await readFile(resolve(repositoryRoot, "packages/schemas/src/canonical/v1/contract-values.schema.json"), "utf8");
-  const canonicalText = await readFile(resolve(repositoryRoot, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"), "utf8");
-  const root = await tempRepo({
-    "packages/schemas/src/canonical/v1/contract-values.schema.json": schemaText,
-    "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json": canonicalText,
-  });
+  const files = await identityArtifactFixture();
+  const root = await tempRepo(files);
   assert.deepEqual((await checkSchemas(root)).violations, []);
 
-  const drifted = JSON.parse(canonicalText);
+  const drifted = JSON.parse(files["packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"]);
   drifted.ciAuthorities.pipelineIdentity = "unqualified-ci";
   await writeFile(resolve(root, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"), `${JSON.stringify(drifted)}\n`);
   assert.ok(codes(await checkSchemas(root)).includes("SCHEMA_CANONICAL_INSTANCE_INVALID"));

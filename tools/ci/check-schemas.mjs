@@ -6,6 +6,24 @@ import Ajv2020 from "ajv/dist/2020.js";
 import { isMain, relativePath, violation, printViolations } from "./lib.mjs";
 
 const DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema";
+const BOOTSTRAP_IDENTITY_FIELDS = Object.freeze([
+  "contractSuiteVersion",
+  "releaseProfileVersion",
+  "canonicalValuesId",
+  "protocolMajor",
+]);
+const SUPPORTED_BOOTSTRAP_IDENTITY = Object.freeze({
+  contractSuiteVersion: "1.0.8",
+  releaseProfileVersion: "1.0.9",
+  canonicalValuesId: "jarvis.contract-values.v1.0.8",
+  protocolMajor: 1,
+});
+const BOOTSTRAP_IDENTITY_PATHS = Object.freeze({
+  canonicalSchema: "packages/schemas/src/canonical/v1/contract-values.schema.json",
+  canonicalValues: "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json",
+  bootstrapSchema: "packages/schemas/src/config/v1/bootstrap-configuration.schema.json",
+  protocolSource: "packages/protocol/src/config.ts",
+});
 
 export function validateDraft202012Schema(schema) {
   const validator = new Ajv2020({ allErrors: true, strict: true, validateFormats: false });
@@ -58,6 +76,142 @@ function walkObjects(value, visit) {
     visit(value);
     for (const child of Object.values(value)) walkObjects(child, visit);
   }
+}
+
+function isBootstrapIdentityLikeField(field) {
+  return field === "schemaVersion" || field === "protocolMajor" || /Version$/.test(field) || /^canonical.*Id$/.test(field);
+}
+
+function schemaIdentity(schema, path, violations) {
+  const identity = {};
+  const properties = schema?.properties;
+  const required = schema?.required;
+  if (!properties || typeof properties !== "object" || Array.isArray(properties) || !Array.isArray(required)) {
+    violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_STRUCTURE", path, "identity schema must expose object properties and a required array"));
+    return identity;
+  }
+
+  for (const field of BOOTSTRAP_IDENTITY_FIELDS) {
+    const property = properties[field];
+    if (!property || typeof property !== "object" || Array.isArray(property) || !("const" in property) || !required.includes(field)) {
+      violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_FIELD_MISSING", path, `${field} must be required and defined by const`));
+      continue;
+    }
+    identity[field] = property.const;
+  }
+
+  const allowedIdentityFields = new Set(["schemaVersion", ...BOOTSTRAP_IDENTITY_FIELDS]);
+  for (const field of Object.keys(properties)) {
+    if (isBootstrapIdentityLikeField(field) && !allowedIdentityFields.has(field)) {
+      violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_FIELD_EXTRA", path, `unsupported identity field ${field}`));
+    }
+  }
+  return identity;
+}
+
+function canonicalIdentity(values, path, violations) {
+  const identity = {};
+  if (!values || typeof values !== "object" || Array.isArray(values)) {
+    violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_STRUCTURE", path, "canonical values must be a JSON object"));
+    return identity;
+  }
+  for (const field of BOOTSTRAP_IDENTITY_FIELDS) {
+    if (!(field in values)) {
+      violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_FIELD_MISSING", path, `${field} is required`));
+      continue;
+    }
+    identity[field] = values[field];
+  }
+  return identity;
+}
+
+function protocolSourceIdentity(source, path, violations) {
+  const identity = {};
+  const interfaceMatch = String(source).match(/export interface BootstrapConfigurationV1\s*\{([\s\S]*?)^\}/m);
+  if (!interfaceMatch) {
+    violations.push(violation("SCHEMA_BOOTSTRAP_PROTOCOL_SOURCE_INVALID", path, "BootstrapConfigurationV1 interface is missing or malformed"));
+    return identity;
+  }
+
+  const body = interfaceMatch[1];
+  for (const field of BOOTSTRAP_IDENTITY_FIELDS) {
+    const fieldMatch = body.match(new RegExp(`^ {2}${field}:\\s*(?:\"([^\"\\r\\n]+)\"|([0-9]+));\\s*$`, "m"));
+    if (!fieldMatch) {
+      violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_FIELD_MISSING", path, `${field} must be a top-level string or integer literal`));
+      continue;
+    }
+    identity[field] = fieldMatch[1] ?? Number(fieldMatch[2]);
+  }
+
+  const allowedIdentityFields = new Set(["schemaVersion", ...BOOTSTRAP_IDENTITY_FIELDS]);
+  for (const fieldMatch of body.matchAll(/^ {2}([A-Za-z_$][A-Za-z0-9_$]*):[^;\r\n]+;\s*$/gm)) {
+    const field = fieldMatch[1];
+    if (isBootstrapIdentityLikeField(field) && !allowedIdentityFields.has(field)) {
+      violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_FIELD_EXTRA", path, `unsupported identity field ${field}`));
+    }
+  }
+  return identity;
+}
+
+function validateSupportedAndMatchingIdentities(identities, violations) {
+  for (const [source, identity] of Object.entries(identities)) {
+    for (const field of BOOTSTRAP_IDENTITY_FIELDS) {
+      if (!(field in identity)) continue;
+      if (identity[field] !== SUPPORTED_BOOTSTRAP_IDENTITY[field]) {
+        violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_UNSUPPORTED", source, `${field}=${JSON.stringify(identity[field])} is unsupported; expected ${JSON.stringify(SUPPORTED_BOOTSTRAP_IDENTITY[field])}`));
+      }
+    }
+  }
+
+  const canonical = identities[BOOTSTRAP_IDENTITY_PATHS.canonicalValues] ?? {};
+  for (const [source, identity] of Object.entries(identities)) {
+    if (source === BOOTSTRAP_IDENTITY_PATHS.canonicalValues) continue;
+    for (const field of BOOTSTRAP_IDENTITY_FIELDS) {
+      if (!(field in canonical) || !(field in identity)) continue;
+      if (identity[field] !== canonical[field]) {
+        violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_MISMATCH", source, `${field} must match ${BOOTSTRAP_IDENTITY_PATHS.canonicalValues}`));
+      }
+    }
+  }
+}
+
+export async function validateBootstrapIdentityArtifacts(rootDir) {
+  const violations = [];
+  const resolvedPaths = Object.fromEntries(Object.entries(BOOTSTRAP_IDENTITY_PATHS).map(([name, path]) => [name, resolve(rootDir, path)]));
+  const presentCount = Object.values(resolvedPaths).filter((path) => existsSync(path)).length;
+  if (presentCount === 0) return { violations };
+
+  for (const [name, absolutePath] of Object.entries(resolvedPaths)) {
+    if (!existsSync(absolutePath)) {
+      violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_ARTIFACT_MISSING", BOOTSTRAP_IDENTITY_PATHS[name], "required cross-file identity artifact is missing"));
+    }
+  }
+  if (violations.length > 0) return { violations };
+
+  let canonicalSchema;
+  let canonicalValues;
+  let bootstrapSchema;
+  let protocolSource;
+  try {
+    [canonicalSchema, canonicalValues, bootstrapSchema, protocolSource] = await Promise.all([
+      readFile(resolvedPaths.canonicalSchema, "utf8").then(JSON.parse),
+      readFile(resolvedPaths.canonicalValues, "utf8").then(JSON.parse),
+      readFile(resolvedPaths.bootstrapSchema, "utf8").then(JSON.parse),
+      readFile(resolvedPaths.protocolSource, "utf8"),
+    ]);
+  } catch (error) {
+    violations.push(violation("SCHEMA_BOOTSTRAP_IDENTITY_ARTIFACT_INVALID", "bootstrap identity artifacts", error instanceof Error ? error.message : String(error)));
+    return { violations };
+  }
+
+  const identities = {
+    [BOOTSTRAP_IDENTITY_PATHS.canonicalSchema]: schemaIdentity(canonicalSchema, BOOTSTRAP_IDENTITY_PATHS.canonicalSchema, violations),
+    [BOOTSTRAP_IDENTITY_PATHS.canonicalValues]: canonicalIdentity(canonicalValues, BOOTSTRAP_IDENTITY_PATHS.canonicalValues, violations),
+    [BOOTSTRAP_IDENTITY_PATHS.bootstrapSchema]: schemaIdentity(bootstrapSchema, BOOTSTRAP_IDENTITY_PATHS.bootstrapSchema, violations),
+    [BOOTSTRAP_IDENTITY_PATHS.protocolSource]: protocolSourceIdentity(protocolSource, BOOTSTRAP_IDENTITY_PATHS.protocolSource, violations),
+  };
+  validateSupportedAndMatchingIdentities(identities, violations);
+  return { violations };
 }
 
 export async function checkSchemas(rootDir) {
@@ -128,6 +282,9 @@ export async function checkSchemas(rootDir) {
       }
     });
   }
+
+  const bootstrapIdentity = await validateBootstrapIdentityArtifacts(rootDir);
+  violations.push(...bootstrapIdentity.violations);
 
   return { schemaCount: files.length, uniqueIdCount: ids.size, violations };
 }

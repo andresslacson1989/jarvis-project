@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { extractFenceAfter, extractTypeUnion, isMain, MANIFEST_PATH, printViolations, readCanonical, readUtf8, sameSet, violation, escapeRegex } from "./lib.mjs";
 
@@ -9,6 +10,62 @@ const DOCS = Object.freeze({
   backup: "docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md",
   supplyChain: "docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md",
 });
+
+const RETIRED_CONTRACT_PATHS = Object.freeze([
+  "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md",
+  "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md",
+  "docs/implementation/JARVIS-RUNTIME-CONTRACT.md",
+  "docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md",
+  "docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md",
+  "docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md",
+]);
+
+const TRACKED_AUTHORITY_MARKDOWN_ROOTS = Object.freeze([
+  "docs/implementation/evidence/",
+  "docs/implementation/governance/",
+]);
+
+const UNQUALIFIED_AUTHORITY_LABEL = /\b(?:active|current|governing|authoritative|normative|selected|designated)\b/i;
+function normalizeRepositoryPath(value) {
+  return String(value).replaceAll("\\", "/").replace(/^\.\//, "").toLowerCase();
+}
+
+function isTrackedAuthorityMarkdown(path) {
+  const normalized = normalizeRepositoryPath(path);
+  return normalized.endsWith(".md") && TRACKED_AUTHORITY_MARKDOWN_ROOTS.some((root) => normalized.startsWith(root));
+}
+
+export function checkRetiredAuthorityLabelsFromText(path, text) {
+  if (!isTrackedAuthorityMarkdown(path)) return [];
+  const normalizedRetiredPaths = RETIRED_CONTRACT_PATHS.map((retiredPath) => [retiredPath, normalizeRepositoryPath(retiredPath)]);
+  return String(text ?? "")
+    .split(/\r?\n/)
+    .flatMap((line, index) => {
+      const normalizedLine = normalizeRepositoryPath(line);
+      const retiredEntry = normalizedRetiredPaths.find(([, normalizedPath]) => normalizedLine.includes(normalizedPath));
+      if (!retiredEntry) return [];
+      const [retiredPath] = retiredEntry;
+      const authorityContext = normalizedLine.replace(/\bnon[-\s]?(?:authoritative|current)\b/gi, "");
+      if (!UNQUALIFIED_AUTHORITY_LABEL.test(authorityContext)) return [];
+      return [violation(
+        "DRIFT_RETIRED_AUTHORITY_LABEL",
+        path,
+        `retired/deleted contract path ${retiredPath} appears under an unqualified active/current authority label at line ${index + 1}`,
+      )];
+    });
+}
+
+async function checkTrackedAuthorityMarkdown(rootDir) {
+  const tracked = execFileSync(
+    "git",
+    ["ls-files", "-z", "--", "docs/implementation/evidence", "docs/implementation/governance"],
+    { cwd: rootDir, encoding: "utf8", maxBuffer: 4 * 1024 * 1024 },
+  )
+    .split("\0")
+    .filter((path) => isTrackedAuthorityMarkdown(path));
+  const results = await Promise.all(tracked.map(async (path) => checkRetiredAuthorityLabelsFromText(path, await readUtf8(rootDir, path))));
+  return results.flat();
+}
 
 function regexValue(text, regex) {
   return text.match(regex)?.[1] ?? null;
@@ -175,7 +232,7 @@ export function checkContractDriftFromTexts(canonical, docs) {
 export async function checkContractDrift(rootDir) {
   const { values: canonical } = await readCanonical(rootDir);
   const docs = Object.fromEntries(await Promise.all(Object.entries(DOCS).map(async ([key, path]) => [key, await readUtf8(rootDir, path)])));
-  return checkContractDriftFromTexts(canonical, docs);
+  return [...checkContractDriftFromTexts(canonical, docs), ...(await checkTrackedAuthorityMarkdown(rootDir))];
 }
 
 if (isMain(import.meta.url)) {

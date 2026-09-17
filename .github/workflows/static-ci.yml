@@ -210,6 +210,8 @@ jobs:
         run: pnpm contract:check
 
       - name: Repository governance
+        env:
+          JARVIS_CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: pnpm governance:check
 
       - name: Secret scan
