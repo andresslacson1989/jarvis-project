@@ -1,6 +1,15 @@
 # JARVIS Contract Simplification Preservation Ledger
 
-## Current successor remediation ledger — 2026-09-17
+## Current successor audit ledger — 2026-09-18
+
+| ID | Governing owner / source | Current evidence and correction | Status |
+| --- | --- | --- | --- |
+| AUD-10 | J00-GOV-28; J05-VER-33; exact-candidate authority | Candidate `73a9f4a554e7088e728ff14f0f339687add5991e`, run `35261372904`, attempts 1–3 all failed. Attempt 3 Windows job `105414670560` passed Tauri qualification and failed native process qualification at 18/20; static job `105417229965` failed closed at the prerequisite. Predecessor success is not inherited. | **OPEN — fresh exact successor CI and audit required** |
+| AUD-11 | Final-closure goal byte-for-byte evidence boundary | The whole-record projection previously normalized CRLF to LF. It now rejects any carriage-return byte before replacing only the exact two owner-authorized spans; a CRLF-only protected-content mutation fails closed while the LF projection remains anchored to `sha256:3899deede27909afdc04a08e3874cf2b887ab74f5cfde39e535200f9ff4fae37`. | **REPOSITORY CLOSED; exact successor CI/audit open** |
+
+Section 1.4 remains `VERIFYING`; Section 1 remains `IN PROGRESS`. No matrix progression, application change, integration, release qualification, or `Production Complete` claim is authorized.
+
+## Prior successor remediation ledger — non-current (2026-09-17)
 
 This section describes the successor built from audited predecessor `d447b89c7506281567f5ee2f8771fba91a8bdf1f`. The successor's own SHA and future GitHub run are bound externally at handoff; the tracked ledger records completed predecessor evidence and must not claim that evidence qualifies its successor.
 

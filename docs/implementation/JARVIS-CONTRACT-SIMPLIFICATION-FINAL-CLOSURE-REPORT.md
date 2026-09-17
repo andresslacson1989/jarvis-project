@@ -1,6 +1,17 @@
 # JARVIS Contract Simplification Final Closure Report
 
-## Current auditor-remediation pass — 2026-09-18
+## Current auditor-remediation pass — later 2026-09-18
+
+**Repository-side disposition:** `NEXT PASS`. Candidate `73a9f4a554e7088e728ff14f0f339687add5991e` was committed and published, but exact GitHub Actions run `35261372904` failed all three attempts. On attempt 3, Windows job `105414670560` passed Tauri qualification and failed native process qualification at `18 passed; 2 failed`; static job `105417229965` correctly failed closed on that prerequisite. The independent audit also found that the whole-record guard normalized CRLF before hashing. The current tree rejects carriage-return bytes and adds a CRLF negative regression. No application implementation, matrix progression, integration, release qualification, or `Production Complete` action is authorized.
+
+### Current exact evidence and remaining gates
+
+- The failed run is authoritative negative evidence for `73a9f4a...`; predecessor success is not inherited.
+- The two failed attempt-3 process tests were `windows_owner_second_launch_and_crash_recovery_qualification` and `windows_cancel_serializes_with_release_before_state_and_ack_boundaries`.
+- Repository-side prior bypass classes remain closed; raw protected bytes now fail on CRLF rather than being normalized.
+- A newly committed successor must pass exact-head GitHub Actions and independent audit. Section 1.4 remains `VERIFYING` and Section 1 remains `IN PROGRESS`.
+
+## Prior auditor-remediation pass — non-current (2026-09-18)
 
 **Repository-side disposition:** `NEXT PASS` after the independent audit of `2587d1d26dfe69781a06ecf7ab706d7edec1b5f0` closed Phase 0 propagation but demonstrated that the initial selected-token evidence guard was incomplete. The current tree contains the bounded whole-document guard correction and remains open until committed, exact-head GitHub Actions passes, and the independent Auditor approves that exact successor. No application implementation, matrix progression, integration, release qualification, or `Production Complete` action is authorized by this pass.
 

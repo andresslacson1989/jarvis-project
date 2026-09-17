@@ -1,6 +1,16 @@
 # JARVIS Contract Simplification Findings
 
-## Current independent-audit loop — 2026-09-18
+## Current independent-audit loop — later 2026-09-18
+
+**Audited candidate:** `73a9f4a554e7088e728ff14f0f339687add5991e`; exact GitHub Actions run `35261372904` completed with failure across attempts 1–3. Attempt 3 Windows job `105414670560` passed the Tauri single-instance qualification but the native process qualification finished `18 passed; 2 failed` (`windows_owner_second_launch_and_crash_recovery_qualification` and `windows_cancel_serializes_with_release_before_state_and_ack_boundaries`). Static job `105417229965` correctly failed closed at the Windows prerequisite. The successful predecessor run does not qualify this candidate.
+
+**Independent decision:** `NOT APPROVED — NEXT PASS`. The whole-record evidence guard closes the prior selected-token bypasses, but it normalized CRLF to LF before hashing and therefore did not enforce the stated byte-for-byte invariant for protected content.
+
+**Successor correction:** the protected projection now rejects every carriage-return byte before applying the exact two authorized-span replacements. A focused CRLF-only mutation regression fails closed. No Section 1.4 evidence value, application source, active contract, matrix, workflow, or LocalCI authority changed.
+
+**Current disposition:** repository-side raw-byte correction is present, while exact-candidate CI and independent approval remain open for the next committed successor. Section 1.4 remains `VERIFYING`; Section 1 remains `IN PROGRESS`; no integration, release qualification, or `Production Complete` claim is made.
+
+## Prior independent-audit loop — non-current (2026-09-18)
 
 **Audited predecessor:** `2587d1d26dfe69781a06ecf7ab706d7edec1b5f0`; exact GitHub Actions run `35257664469` passed both required jobs.
 

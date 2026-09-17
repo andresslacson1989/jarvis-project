@@ -39,8 +39,8 @@ const replaceExactlyOnce = (text, exact, marker) => {
   return `${text.slice(0, first)}${marker}${text.slice(first + exact.length)}`;
 };
 const section14ProtectedProjection = (text) => {
-  const normalized = text.replace(/\r\n/g, "\n");
-  const withoutAuthorityHygiene = replaceExactlyOnce(normalized, section14AuthorizedAuthorityBlock, "<AUTHORIZED_AUTHORITY_HYGIENE>\n");
+  if (text.includes("\r")) return null;
+  const withoutAuthorityHygiene = replaceExactlyOnce(text, section14AuthorizedAuthorityBlock, "<AUTHORIZED_AUTHORITY_HYGIENE>\n");
   if (withoutAuthorityHygiene === null) return null;
   return replaceExactlyOnce(withoutAuthorityHygiene, section14AuthorizedStoreLine, "<AUTHORIZED_STORE_PATH_HYGIENE>");
 };
@@ -102,6 +102,7 @@ test("owner-authorized Section 1.4 hygiene preserves the complete remaining evid
   }
   assert.equal(section14EvidenceScopeIsPreserved(evidence.replace("Current authoritative active path", "Current optional path")), false);
   assert.equal(section14EvidenceScopeIsPreserved(evidence.replace("approved G:\\ repository boundary", "approved C:\\ repository boundary")), false);
+  assert.equal(section14EvidenceScopeIsPreserved(evidence.replace("\n", "\r\n")), false, "CRLF mutation of protected bytes was accepted");
 });
 
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
