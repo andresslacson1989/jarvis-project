@@ -8,6 +8,8 @@ This is pure contract simplification, optimization, consolidation, and contract-
 
 It does **not** authorize application implementation or refactoring, new product behavior, implementation-plan sequencing changes, implementation-matrix progression, application evidence advancement, publication, push, integration, release qualification, Production Complete, or auditor handoff.
 
+**Owner-authorized evidence-hygiene exception (2026-09-18):** the owner explicitly authorizes a documentation-only correction to `docs/implementation/evidence/1.4-single-instance-ownership.md`. The exception is limited to labeling six retired v1.0.7 paths as historical/non-authoritative, listing the current v1.0.8 authority and non-normative implementation routing, and replacing one transient repository-external worktree-store path with truthful approved `G:\` repository-boundary wording. It does not authorize changing any application behavior, evidence result/status, test count, candidate/tree SHA, run/job/artifact identity, digest, matrix status, implementation claim, or lifecycle decision. An existing contract-drift test SHALL freeze the behavior section and evidence identity/result values and SHALL fail on a mutation of any protected value.
+
 ADRs and separate decision records are prohibited. Do not create, retain, consult, cite, or use them as current or historical authority. Resolve every authorized contract correction directly and synchronously in the active suite.
 
 ## 2. Governing agreement
@@ -207,7 +209,7 @@ Additionally prove:
 - all exact cryptographic values, thresholds, capability selections, negative cases, and release vetoes remain;
 - all 30 semantic gates and the Phase 0 subset have complete, tested consumer mappings;
 - no tracked ADR, decision-record, or historical-overlay path/reference acts as authority;
-- implementation matrix, implementation plan, application source, and application evidence are byte-for-byte unchanged;
+- implementation matrix, implementation plan, and application source are byte-for-byte unchanged; application evidence is byte-for-byte unchanged except for the exact owner-authorized documentation-only evidence-hygiene exception above, whose protected behavior and evidence-result values remain frozen by a negative scope test;
 - every changed test is within the explicitly allowed validator scope and retains or strengthens its prior assertions;
 - no publication, push, integration, release qualification, or auditor handoff occurred;
 - GitHub Actions remains authoritative and no local result is represented as exact-candidate CI evidence.
@@ -226,7 +228,7 @@ Completion requires every statement below to be true:
 6. Phase 0 and LocalCI fail closed when definitions, renderer execution, ordering, or evidence sequencing drift.
 7. MAN-08/version treatment has explicit valid authority and is not circular.
 8. Findings, ledger, goal, and final report contain no unsupported completion claim or stale metric.
-9. No prohibited implementation, matrix, plan, evidence, publication, integration, release, or audit-handoff action occurred.
+9. No prohibited implementation, matrix, plan, evidence advancement, publication, integration, release, or audit-handoff action occurred; the exact owner-authorized documentation-only evidence-hygiene exception changed no protected behavior or evidence-result value.
 10. Every applicable local validation passes, and every unavailable external gate is reported exactly.
 
 Any failed, unknown, unproven, contradictory, or blocked criterion requires `NEXT PASS`.

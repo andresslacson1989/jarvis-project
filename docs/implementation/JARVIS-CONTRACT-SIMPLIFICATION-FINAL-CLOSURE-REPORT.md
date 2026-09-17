@@ -1,6 +1,43 @@
 # JARVIS Contract Simplification Final Closure Report
 
-## Current successor remediation record — 2026-09-17
+## Current auditor-remediation pass — 2026-09-18
+
+**Repository-side disposition:** `NEXT PASS` until this successor is committed, its exact head passes GitHub Actions, and the independent Auditor approves that exact candidate. No application implementation, matrix progression, integration, release qualification, or `Production Complete` action is authorized by this pass.
+
+### Identity and scope
+
+- Branch: `codex/contract-consolidation`.
+- Authoritative base and merge base: `origin/master` at `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`.
+- Independently audited predecessor: `504224e0d290b6d83840b419ef400870097f6477`; exact GitHub Actions run `35210965748` passed, but the audit decision was `NOT APPROVED — NEXT PASS` on two repository-side findings.
+- The successor SHA and exact GitHub run are intentionally external handoff evidence and are not embedded in the commit that they identify.
+- Preserved untracked paths remain `.codex-worktrees/` and `reports/`.
+- Section 1.4 remains `VERIFYING`; Section 1 remains `IN PROGRESS`; no matrix, plan, application source, application behavior, or lifecycle status is advanced.
+
+### Authorized corrections
+
+| Finding | Exact correction |
+| --- | --- |
+| Protected evidence scope contradiction | The owner explicitly authorized a narrow documentation-only exception for `docs/implementation/evidence/1.4-single-instance-ownership.md`. `JARVIS-CONTRACT-SIMPLIFICATION-FINAL-CLOSURE-GOAL.md` and the ledger now limit it to retired-path labels, current authority/routing text, and transient-path wording. `contract-drift.test.mjs` freezes the unchanged behavior-section hash and all 301 protected candidate/run/job/artifact/digest/result tokens and rejects protected-value mutations. |
+| Phase 0 explicit-candidate propagation | `tools/checkpoints/phase0-checkpoint.mjs` passes the explicit candidate SHA into nested governance validation with fail-closed precedence. `phase0-checkpoint.test.mjs` proves a consistently rebound predecessor record is rejected and proves absent Phase 0 candidate records remain valid for a self-contained explicit checkout. |
+
+The successor changes only this goal/report/findings/ledger, the Phase 0 validator, and focused validator tests. It does not change the active manifest, J00–J05, Release Profile, Implementation Plan, matrix, matrix reference, application source, package source, or the Section 1.4 evidence file itself.
+
+### Verification on the finalizing tree
+
+- Official pinned tools: Node `24.18.0`, pnpm `11.21.0`, Rust/Cargo `1.97.1`.
+- Focused Phase 0, contract-drift, and governance suite: `122/122` passed. An earlier pre-final run exposed an ineffective behavior-mutation fixture; the fixture was corrected to mutate an actual protected behavior line and the complete focused suite was rerun successfully.
+- Normal deterministic profile: 25 files passed.
+- Contract generated hash `6800d094131e689047deb4cba61917a07e60067aa56b14b36f9e476f8ef489b3`; manifest 7 components at suite `1.0.8`; contract drift passed.
+- Schema 20/3 unique IDs; governance, secret scan (381 files), dependency inventory (npm 73/cargo 456), provenance (543 dependencies/3 actions/4 toolchains/1 security tool), architecture, and format (171 files) passed.
+- Strict typecheck, TypeScript build, Core build, desktop UI build, desktop foundation/security, and Phase 0 passed.
+- `pnpm audit --audit-level high` found no known vulnerabilities. Cargo audit found no vulnerabilities and seven allowed informational warnings; machine review passed with five Windows-resolved and two Windows-unresolved warnings.
+- Rust formatting, clippy warnings-as-errors, all-target/all-feature host check, Windows-target check, native Git Bash LocalCI syntax, and `git diff --check` passed.
+
+Remaining gates are commit, non-force GitHub publication, exact-head GitHub Actions, and independent Auditor approval of that exact successor. Integration and post-integration lifecycle work remain outside this pass.
+
+> Contract simplification completion is not application implementation, release qualification, or Production Complete.
+
+## Prior successor remediation record — non-current (2026-09-17)
 
 **Repository-side disposition:** `NEXT PASS` until the successor has its own external exact-head GitHub Actions result and independent Auditor approval. The repository corrections listed here are bounded contract/governance/verification-system maintenance; this section does not claim integration, Section 1.4 verification, release qualification, or `Production Complete`.
 

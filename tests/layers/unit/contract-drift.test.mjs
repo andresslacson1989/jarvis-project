@@ -7,6 +7,15 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
+const section14EvidenceValuePattern = /https:\/\/github\.com\/andresslacson1989\/jarvis-project\/actions\/runs\/\d+|\b[0-9a-f]{40}\b|\b[0-9a-f]{64}\b|\b(?:runId|runAttempt|exitCode|manifestCount|observedCount|status)=(?:[A-Z_]+|\d+)|`completed \/ (?:success|failure)`|\b\d+ passed(?:; \d+ failed)?\b|\b\d+\/\d+\b/g;
+const digest = (value) => createHash("sha256").update(value).digest("hex");
+const section14Behavior = (text) => text.replace(/\r\n/g, "\n").match(/^## Behavior proven by the candidate\n.*?(?=^## Exact candidate GitHub Actions qualification\n)/ms)?.[0] ?? "";
+const section14EvidenceValues = (text) => [...text.matchAll(section14EvidenceValuePattern)].map(([value]) => value);
+const section14EvidenceScopeIsPreserved = (text) =>
+  digest(section14Behavior(text)) === "6ed033de0f669f487ba6856a2e1480134fa78d30f3d8715cba5c34fd77db56d6" &&
+  section14EvidenceValues(text).length === 301 &&
+  digest(section14EvidenceValues(text).join("\n")) === "e59f67a418303d7296a1d0ff5c32d11484c14733ea0d8f0b426854031d9146fe";
+
 const required = [
   "tools/contract/lib.mjs",
   "tools/contract/manifest.mjs",
@@ -34,6 +43,33 @@ test("0.12 package and CI gates are wired", () => {
   assert.doesNotMatch(workflow, /run: pnpm contract:check-generated/);
   assert.doesNotMatch(workflow, /run: pnpm contract:check-manifest/);
   assert.doesNotMatch(workflow, /run: pnpm contract:check-drift/);
+});
+
+test("owner-authorized Section 1.4 evidence hygiene preserves behavior and evidence-result identities", () => {
+  const evidence = readFileSync(resolve(root, "docs/implementation/evidence/1.4-single-instance-ownership.md"), "utf8");
+  assert.equal(section14EvidenceScopeIsPreserved(evidence), true);
+  assert.equal(
+    section14EvidenceScopeIsPreserved(evidence.replace(
+      "2fad8d4c1077d6bcae674183ac03f8339bee5a6c",
+      "f".repeat(40),
+    )),
+    false,
+  );
+  assert.equal(section14EvidenceScopeIsPreserved(evidence.replace("status=PASS", "status=FAIL")), false);
+  assert.equal(
+    section14EvidenceScopeIsPreserved(evidence.replace(
+      "fce8f4b1e3fbc9f98cadc106b9c4a8650eb94bdf71e3bedf5ded78d0a459a9dd",
+      "f".repeat(64),
+    )),
+    false,
+  );
+  assert.equal(
+    section14EvidenceScopeIsPreserved(evidence.replace(
+      "Tauri show/focus dispatch remains bounded and native; an unacknowledged second launch is a non-success result.",
+      "Tauri show/focus dispatch may be unbounded; an unacknowledged second launch can be treated as success.",
+    )),
+    false,
+  );
 });
 
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";

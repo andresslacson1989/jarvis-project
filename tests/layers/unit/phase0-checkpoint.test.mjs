@@ -110,6 +110,7 @@ const matrix =
 const allEvidencePaths = new Set(profile.requiredEvidencePaths);
 const governanceProfile = JSON.parse(readFileSync("docs/implementation/governance/repository-governance-profile.json", "utf8"));
 const governanceDocument = readFileSync("docs/implementation/governance/MASTER-PROTECTION.md", "utf8");
+const clone = (value) => JSON.parse(JSON.stringify(value));
 
 function codes(overrides = {}) {
   return validatePhase0Snapshot({
@@ -303,6 +304,34 @@ test("explicit candidate mode rejects present-but-mismatched records", () => {
     checkedOutSha: "b".repeat(40),
     explicitCandidateSha: "b".repeat(40),
   }).includes("PHASE0_CANDIDATE_MISMATCH"));
+});
+
+test("explicit candidate mode rejects governance predecessor evidence rebound to the current checkout", () => {
+  const explicitCandidateSha = "b".repeat(40);
+  const recordedCandidateSha = governanceProfile.mandatoryCi.selectedAuthority.latestRecordedCandidateEvidence.candidateSha;
+  const reboundGovernanceProfile = JSON.parse(
+    JSON.stringify(clone(governanceProfile)).replaceAll(recordedCandidateSha, explicitCandidateSha),
+  );
+  const result = codes({
+    governanceProfile: reboundGovernanceProfile,
+    currentCandidateSha: null,
+    evidenceCandidateSha: null,
+    matrixCandidateSha: null,
+    checkedOutSha: explicitCandidateSha,
+    explicitCandidateSha,
+  });
+  assert.ok(result.includes("PHASE0_GOVERNANCE_RECORDED_PREDECESSOR_SELF_REFERENCE"));
+});
+
+test("explicit candidate mode remains valid when Phase 0 candidate records are absent", () => {
+  const explicitCandidateSha = "b".repeat(40);
+  assert.deepEqual(codes({
+    currentCandidateSha: null,
+    evidenceCandidateSha: null,
+    matrixCandidateSha: null,
+    checkedOutSha: explicitCandidateSha,
+    explicitCandidateSha,
+  }), []);
 });
 
 test("candidate mode does not accept an evidence revision as the exact implementation checkout", async () => {

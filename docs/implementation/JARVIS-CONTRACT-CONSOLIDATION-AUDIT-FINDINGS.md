@@ -1,6 +1,19 @@
 # JARVIS Contract Simplification Findings
 
-## Current independent-audit loop — 2026-09-17
+## Current independent-audit loop — 2026-09-18
+
+**Audited predecessor:** `504224e0d290b6d83840b419ef400870097f6477` on `codex/contract-consolidation`, based on `origin/master` `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`.
+
+**Independent decision:** `NOT APPROVED — NEXT PASS`. Exact GitHub Actions run `35210965748` succeeded for `504224e0...`; rejection identified two repository-side control/scope gaps rather than a failed exact CI run.
+
+| Current finding | Repository-side disposition in successor | Remaining gate |
+| --- | --- | --- |
+| The final-closure goal required application evidence to remain byte-for-byte unchanged while `docs/implementation/evidence/1.4-single-instance-ownership.md` contained a necessary documentation-only authority/path correction | The owner explicitly authorized a narrow evidence-hygiene exception on 2026-09-18. The goal and ledger identify the exact file/ranges and allowed fields. A negative scope test freezes the unchanged behavior-section hash and all 301 candidate/run/job/artifact/digest/result tokens and rejects candidate-SHA, status, artifact-digest, or behavior mutations. | New successor SHA requires exact-head GitHub Actions and independent re-audit. |
+| Explicit `JARVIS_CANDIDATE_SHA` was not propagated into repository-governance validation nested inside Phase 0 | `validatePhase0Snapshot` now passes `explicitCandidateSha ?? currentCandidateSha` to the governance validator. A focused regression consistently rebinds all predecessor SHA references to the explicit checkout and requires `PHASE0_GOVERNANCE_RECORDED_PREDECESSOR_SELF_REFERENCE`; a separate regression proves absent Phase 0 candidate records remain valid in explicit mode. | New successor SHA requires exact-head GitHub Actions and independent re-audit. |
+
+**Current disposition:** both repository-side findings are corrected within the authorized verification-system and documentation scope. The pinned local focused suite passed `122/122`, the normal profile passed 25 files, and the full applicable local verification sequence passed. The successor remains `NEXT PASS` until committed, published, verified by an exact-head GitHub Actions run, and independently approved. No matrix advancement, integration, release qualification, or `Production Complete` claim is authorized.
+
+## Prior independent-audit loop — non-current (2026-09-17)
 
 **Audited predecessor:** `d447b89c7506281567f5ee2f8771fba91a8bdf1f` on `codex/contract-consolidation`, based on `origin/master` `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`.
 

@@ -166,7 +166,9 @@ export function validatePhase0Snapshot({
 
   const workflowText = String(workflow);
   if (governanceProfile !== null) {
-    for (const item of validateRepositoryGovernanceProfile(governanceProfile, workflowText)) {
+    for (const item of validateRepositoryGovernanceProfile(governanceProfile, workflowText, {
+      currentCandidateSha: explicitCandidateSha ?? currentCandidateSha ?? undefined,
+    })) {
       violations.push(violation(`PHASE0_${item.code}`, "docs/implementation/governance/repository-governance-profile.json", item.detail));
     }
   }
