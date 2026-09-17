@@ -2,13 +2,23 @@
 
 ## Current independent-audit loop — 2026-09-18
 
+**Audited predecessor:** `2587d1d26dfe69781a06ecf7ab706d7edec1b5f0`; exact GitHub Actions run `35257664469` passed both required jobs.
+
+**Independent decision:** `NOT APPROVED — NEXT PASS`. The Phase 0 explicit-candidate finding is closed. The remaining P1 showed that the first evidence-scope guard protected only selected token classes and accepted mutations to job/artifact IDs, repository/ref, timestamp, runner image, and cleanup booleans.
+
+**Successor correction:** `contract-drift.test.mjs` now validates the two exact owner-authorized hygiene spans and replaces only those exact spans with stable markers. It hashes the complete remaining Markdown as one protected projection (`sha256:3899deede27909afdc04a08e3874cf2b887ab74f5cfde39e535200f9ff4fae37`). Any retained byte outside the two exact spans is therefore protected without relying on a token inventory. Focused regressions cover all seven demonstrated bypass classes plus candidate SHA, status, digest, behavior, retained test-result prose, lifecycle disposition, and unauthorized mutations inside each hygiene span.
+
+**Current disposition:** repository-side correction is complete and locally focused verification passes. A new successor commit, exact-head GitHub Actions run, and independent re-audit remain required. Section 1.4 remains `VERIFYING`; Section 1 remains `IN PROGRESS`; no integration or release claim is made.
+
+## Prior independent-audit loop — non-current (earlier 2026-09-18)
+
 **Audited predecessor:** `504224e0d290b6d83840b419ef400870097f6477` on `codex/contract-consolidation`, based on `origin/master` `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`.
 
 **Independent decision:** `NOT APPROVED — NEXT PASS`. Exact GitHub Actions run `35210965748` succeeded for `504224e0...`; rejection identified two repository-side control/scope gaps rather than a failed exact CI run.
 
 | Current finding | Repository-side disposition in successor | Remaining gate |
 | --- | --- | --- |
-| The final-closure goal required application evidence to remain byte-for-byte unchanged while `docs/implementation/evidence/1.4-single-instance-ownership.md` contained a necessary documentation-only authority/path correction | The owner explicitly authorized a narrow evidence-hygiene exception on 2026-09-18. The goal and ledger identify the exact file/ranges and allowed fields. A negative scope test freezes the unchanged behavior-section hash and all 301 candidate/run/job/artifact/digest/result tokens and rejects candidate-SHA, status, artifact-digest, or behavior mutations. | New successor SHA requires exact-head GitHub Actions and independent re-audit. |
+| The final-closure goal required application evidence to remain byte-for-byte unchanged while `docs/implementation/evidence/1.4-single-instance-ownership.md` contained a necessary documentation-only authority/path correction | The owner explicitly authorized a narrow evidence-hygiene exception on 2026-09-18. The goal and ledger identify the exact file/ranges and allowed fields. The initial negative scope test froze the behavior section and 301 selected identity/result tokens; the later audit demonstrated that this was incomplete. | Superseded by the current whole-document protected projection correction above. |
 | Explicit `JARVIS_CANDIDATE_SHA` was not propagated into repository-governance validation nested inside Phase 0 | `validatePhase0Snapshot` now passes `explicitCandidateSha ?? currentCandidateSha` to the governance validator. A focused regression consistently rebinds all predecessor SHA references to the explicit checkout and requires `PHASE0_GOVERNANCE_RECORDED_PREDECESSOR_SELF_REFERENCE`; a separate regression proves absent Phase 0 candidate records remain valid in explicit mode. | New successor SHA requires exact-head GitHub Actions and independent re-audit. |
 
 **Current disposition:** both repository-side findings are corrected within the authorized verification-system and documentation scope. The pinned local focused suite passed `122/122`, the normal profile passed 25 files, and the full applicable local verification sequence passed. The successor remains `NEXT PASS` until committed, published, verified by an exact-head GitHub Actions run, and independently approved. No matrix advancement, integration, release qualification, or `Production Complete` claim is authorized.

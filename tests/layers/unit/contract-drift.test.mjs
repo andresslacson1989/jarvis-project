@@ -7,14 +7,47 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-const section14EvidenceValuePattern = /https:\/\/github\.com\/andresslacson1989\/jarvis-project\/actions\/runs\/\d+|\b[0-9a-f]{40}\b|\b[0-9a-f]{64}\b|\b(?:runId|runAttempt|exitCode|manifestCount|observedCount|status)=(?:[A-Z_]+|\d+)|`completed \/ (?:success|failure)`|\b\d+ passed(?:; \d+ failed)?\b|\b\d+\/\d+\b/g;
 const digest = (value) => createHash("sha256").update(value).digest("hex");
-const section14Behavior = (text) => text.replace(/\r\n/g, "\n").match(/^## Behavior proven by the candidate\n.*?(?=^## Exact candidate GitHub Actions qualification\n)/ms)?.[0] ?? "";
-const section14EvidenceValues = (text) => [...text.matchAll(section14EvidenceValuePattern)].map(([value]) => value);
-const section14EvidenceScopeIsPreserved = (text) =>
-  digest(section14Behavior(text)) === "6ed033de0f669f487ba6856a2e1480134fa78d30f3d8715cba5c34fd77db56d6" &&
-  section14EvidenceValues(text).length === 301 &&
-  digest(section14EvidenceValues(text).join("\n")) === "e59f67a418303d7296a1d0ff5c32d11484c14733ea0d8f0b426854031d9146fe";
+const section14AuthorizedAuthorityBlock = `- Historical source identity — non-authoritative: \`docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md\`.
+- Historical source identity — non-authoritative: \`docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md\` §§5, 8, and 28.
+- Historical source identity — non-authoritative: \`docs/implementation/JARVIS-RUNTIME-CONTRACT.md\` §4.
+- Historical source identity — non-authoritative: \`docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md\` §9.
+- Historical source identity — non-authoritative: \`docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md\` §§7–10.
+- Historical source identity — non-authoritative: \`docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md\` §§6, 9, 11, 12, and 33.
+
+### Current authority
+
+The current authoritative source paths are:
+
+- Current authoritative active path: \`docs/JARVIS-CONTRACT-MANIFEST-v1.0.8.md\`.
+- Current authoritative active path: \`docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md\`.
+- Current authoritative active path: \`docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md\`.
+- Current authoritative active path: \`docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md\`.
+- Current authoritative active path: \`docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md\`.
+- Current authoritative active path: \`docs/implementation/JARVIS-04-OPERATIONS-INTEGRATIONS-UX-CONTRACT.md\`.
+- Current authoritative active path: \`docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md\`.
+- Current authoritative active path: \`docs/JARVIS-V1-RELEASE-PROFILE.md\`.
+
+### Implementation routing and lifecycle boundary
+
+The Implementation Plan and matrix pointers are non-normative execution aids. The CI-authority statement below derives from J00-GOV-28 and J05-VER-33.
+`;
+const section14AuthorizedStoreLine = "- Exact pinned local toolchain: Node `24.18.0` and pnpm `11.21.0`; `pnpm toolchain:verify` passed. The official normal profile passed with its pinned package store inside the approved G:\\ repository boundary (`[tests] PASS files=24`). The transient absolute worktree path is intentionally omitted because it is not part of reproducibility identity.";
+const replaceExactlyOnce = (text, exact, marker) => {
+  const first = text.indexOf(exact);
+  if (first < 0 || text.indexOf(exact, first + exact.length) >= 0) return null;
+  return `${text.slice(0, first)}${marker}${text.slice(first + exact.length)}`;
+};
+const section14ProtectedProjection = (text) => {
+  const normalized = text.replace(/\r\n/g, "\n");
+  const withoutAuthorityHygiene = replaceExactlyOnce(normalized, section14AuthorizedAuthorityBlock, "<AUTHORIZED_AUTHORITY_HYGIENE>\n");
+  if (withoutAuthorityHygiene === null) return null;
+  return replaceExactlyOnce(withoutAuthorityHygiene, section14AuthorizedStoreLine, "<AUTHORIZED_STORE_PATH_HYGIENE>");
+};
+const section14EvidenceScopeIsPreserved = (text) => {
+  const projection = section14ProtectedProjection(text);
+  return projection !== null && digest(projection) === "3899deede27909afdc04a08e3874cf2b887ab74f5cfde39e535200f9ff4fae37";
+};
 
 const required = [
   "tools/contract/lib.mjs",
@@ -45,31 +78,30 @@ test("0.12 package and CI gates are wired", () => {
   assert.doesNotMatch(workflow, /run: pnpm contract:check-drift/);
 });
 
-test("owner-authorized Section 1.4 evidence hygiene preserves behavior and evidence-result identities", () => {
+test("owner-authorized Section 1.4 hygiene preserves the complete remaining evidence record", () => {
   const evidence = readFileSync(resolve(root, "docs/implementation/evidence/1.4-single-instance-ownership.md"), "utf8");
   assert.equal(section14EvidenceScopeIsPreserved(evidence), true);
-  assert.equal(
-    section14EvidenceScopeIsPreserved(evidence.replace(
-      "2fad8d4c1077d6bcae674183ac03f8339bee5a6c",
-      "f".repeat(40),
-    )),
-    false,
-  );
-  assert.equal(section14EvidenceScopeIsPreserved(evidence.replace("status=PASS", "status=FAIL")), false);
-  assert.equal(
-    section14EvidenceScopeIsPreserved(evidence.replace(
-      "fce8f4b1e3fbc9f98cadc106b9c4a8650eb94bdf71e3bedf5ded78d0a459a9dd",
-      "f".repeat(64),
-    )),
-    false,
-  );
-  assert.equal(
-    section14EvidenceScopeIsPreserved(evidence.replace(
-      "Tauri show/focus dispatch remains bounded and native; an unacknowledged second launch is a non-success result.",
-      "Tauri show/focus dispatch may be unbounded; an unacknowledged second launch can be treated as success.",
-    )),
-    false,
-  );
+  const protectedMutations = [
+    ["2fad8d4c1077d6bcae674183ac03f8339bee5a6c", "f".repeat(40)],
+    ["status=PASS", "status=FAIL"],
+    ["fce8f4b1e3fbc9f98cadc106b9c4a8650eb94bdf71e3bedf5ded78d0a459a9dd", "f".repeat(64)],
+    ["artifact ID `10343211159`", "artifact ID `99999999999`"],
+    ["ID `103933188293`", "ID `99999999999`"],
+    ["andresslacson1989/jarvis-project", "attacker/other-repo"],
+    ["refs/pull/18/merge", "refs/heads/attacker"],
+    ["2026-09-14T05:19:37Z", "2099-01-01T00:00:00Z"],
+    ["image `win25-vs2026`", "image `linux-latest`"],
+    ["forcedCleanup=false", "forcedCleanup=true"],
+    ["Tauri show/focus dispatch remains bounded and native; an unacknowledged second launch is a non-success result.", "Tauri show/focus dispatch may be unbounded; an unacknowledged second launch can be treated as success."],
+    ["The native transcript reports `18 passed; 2 failed`", "The native transcript reports `20 passed; 0 failed`"],
+    ["Section 1.4 has no independent lifecycle approval yet.", "Section 1.4 has independent lifecycle approval."],
+  ];
+  for (const [from, to] of protectedMutations) {
+    assert.notEqual(evidence.indexOf(from), -1, `mutation fixture missing: ${from}`);
+    assert.equal(section14EvidenceScopeIsPreserved(evidence.replace(from, to)), false, `protected mutation was accepted: ${from}`);
+  }
+  assert.equal(section14EvidenceScopeIsPreserved(evidence.replace("Current authoritative active path", "Current optional path")), false);
+  assert.equal(section14EvidenceScopeIsPreserved(evidence.replace("approved G:\\ repository boundary", "approved C:\\ repository boundary")), false);
 });
 
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";

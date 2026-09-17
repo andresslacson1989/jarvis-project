@@ -2,13 +2,13 @@
 
 ## Current auditor-remediation pass — 2026-09-18
 
-**Repository-side disposition:** `NEXT PASS` until this successor is committed, its exact head passes GitHub Actions, and the independent Auditor approves that exact candidate. No application implementation, matrix progression, integration, release qualification, or `Production Complete` action is authorized by this pass.
+**Repository-side disposition:** `NEXT PASS` after the independent audit of `2587d1d26dfe69781a06ecf7ab706d7edec1b5f0` closed Phase 0 propagation but demonstrated that the initial selected-token evidence guard was incomplete. The current tree contains the bounded whole-document guard correction and remains open until committed, exact-head GitHub Actions passes, and the independent Auditor approves that exact successor. No application implementation, matrix progression, integration, release qualification, or `Production Complete` action is authorized by this pass.
 
 ### Identity and scope
 
 - Branch: `codex/contract-consolidation`.
 - Authoritative base and merge base: `origin/master` at `bb59c13d99c8b472de0dbe08b8f5ce59cf50e705`.
-- Independently audited predecessor: `504224e0d290b6d83840b419ef400870097f6477`; exact GitHub Actions run `35210965748` passed, but the audit decision was `NOT APPROVED — NEXT PASS` on two repository-side findings.
+- Latest independently audited predecessor: `2587d1d26dfe69781a06ecf7ab706d7edec1b5f0`; exact GitHub Actions run `35257664469` passed, but the audit decision was `NOT APPROVED — NEXT PASS` because the initial evidence guard was incomplete. Its predecessor `504224e0d290b6d83840b419ef400870097f6477` was the source of the two-finding pass that first introduced the Phase 0 correction and narrow evidence authorization.
 - The successor SHA and exact GitHub run are intentionally external handoff evidence and are not embedded in the commit that they identify.
 - Preserved untracked paths remain `.codex-worktrees/` and `reports/`.
 - Section 1.4 remains `VERIFYING`; Section 1 remains `IN PROGRESS`; no matrix, plan, application source, application behavior, or lifecycle status is advanced.
@@ -17,7 +17,7 @@
 
 | Finding | Exact correction |
 | --- | --- |
-| Protected evidence scope contradiction | The owner explicitly authorized a narrow documentation-only exception for `docs/implementation/evidence/1.4-single-instance-ownership.md`. `JARVIS-CONTRACT-SIMPLIFICATION-FINAL-CLOSURE-GOAL.md` and the ledger now limit it to retired-path labels, current authority/routing text, and transient-path wording. `contract-drift.test.mjs` freezes the unchanged behavior-section hash and all 301 protected candidate/run/job/artifact/digest/result tokens and rejects protected-value mutations. |
+| Protected evidence scope contradiction | The owner explicitly authorized a narrow documentation-only exception for `docs/implementation/evidence/1.4-single-instance-ownership.md`. `contract-drift.test.mjs` now requires both exact authorized spans, replaces only those spans with stable markers, and freezes the complete remaining Markdown projection at `sha256:3899deede27909afdc04a08e3874cf2b887ab74f5cfde39e535200f9ff4fae37`. This removes the incomplete token-inventory boundary. Regressions reject the Auditor's seven demonstrated bypass classes plus candidate SHA, status, digest, behavior, retained test-result prose, lifecycle disposition, and unauthorized changes inside either hygiene span. |
 | Phase 0 explicit-candidate propagation | `tools/checkpoints/phase0-checkpoint.mjs` passes the explicit candidate SHA into nested governance validation with fail-closed precedence. `phase0-checkpoint.test.mjs` proves a consistently rebound predecessor record is rejected and proves absent Phase 0 candidate records remain valid for a self-contained explicit checkout. |
 
 The successor changes only this goal/report/findings/ledger, the Phase 0 validator, and focused validator tests. It does not change the active manifest, J00–J05, Release Profile, Implementation Plan, matrix, matrix reference, application source, package source, or the Section 1.4 evidence file itself.
@@ -101,7 +101,7 @@ This exact run qualifies only the recorded predecessor. It is supporting exact-c
 | G-06 protected-test scope | Closed; current changes affect validator tests only and do not alter application behavior assertions. |
 | G-07 current closure report | Repository record delivered by this section; external successor CI and independent approval remain open lifecycle gates. |
 
-### Current audit findings and verification state
+### Prior audit findings and verification state — non-current
 
 Repository-side corrections cover the stale governance model, exact predecessor-identity binding, retired authority labels, bootstrap cross-file drift, transient worktree path, explicit execution-goal routing, MAN-08 authorization record, current reporting, and stacked-scope accounting. The ordered pinned local preflight passed on this finalizing working tree: exact Node `24.18.0`, pnpm `11.21.0`, Rust/Cargo `1.97.1`; focused regressions `105/105`; normal profile `25` files; generated-contract hash `6800d094131e689047deb4cba61917a07e60067aa56b14b36f9e476f8ef489b3`; manifest `7` components at suite `1.0.8`; schema `20` with `3` unique IDs; governance, contract drift, secrets (`381` files), dependencies (`npm=73`, `cargo=456`), provenance (`543` dependencies, `3` actions, `4` toolchains, `1` security tool), architecture, format (`171` files), strict types, TypeScript/Core/UI builds, desktop foundation/security, Phase 0, Rust formatting, Windows-target/all-target/all-feature checks, clippy warnings-as-errors, and native Git Bash LocalCI syntax all passed. `pnpm audit --audit-level high` found no known vulnerabilities; RustSec found no vulnerability and its seven informational warnings passed the checked Windows-resolution review (`5` resolved, `2` unresolved).
 
