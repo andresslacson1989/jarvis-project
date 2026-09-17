@@ -26,6 +26,20 @@ export function validateDraft202012Schema(schema) {
   });
 }
 
+export function validateSchemaInstance(schema, instance) {
+  const validator = new Ajv2020({ allErrors: true, strict: true, validateFormats: false });
+  try {
+    const validate = validator.compile(schema);
+    const valid = validate(instance);
+    return Object.freeze({
+      valid,
+      errors: valid ? [] : (validate.errors ?? []).map((error) => `${error.instancePath || "#"} ${error.message ?? "instance validation failed"}`),
+    });
+  } catch (error) {
+    return Object.freeze({ valid: false, errors: [error instanceof Error ? error.message : String(error)] });
+  }
+}
+
 async function collectSchemas(current, out) {
   if (!existsSync(current)) return;
   const entries = await readdir(current, { withFileTypes: true });
@@ -78,6 +92,18 @@ export async function checkSchemas(rootDir) {
     const draftValidation = validateDraft202012Schema(schema);
     if (!draftValidation.valid) {
       violations.push(violation("SCHEMA_DRAFT_2020_12_INVALID", path, draftValidation.errors.join("; ").slice(0, 2_048)));
+    }
+    if (path === "packages/schemas/src/canonical/v1/contract-values.schema.json") {
+      const instancePath = resolve(schemaRoot, "canonical", "v1", "jarvis-v1.0.8.contract-values.json");
+      try {
+        const instance = JSON.parse(await readFile(instancePath, "utf8"));
+        const instanceValidation = validateSchemaInstance(schema, instance);
+        if (!instanceValidation.valid) {
+          violations.push(violation("SCHEMA_CANONICAL_INSTANCE_INVALID", relativePath(rootDir, instancePath), instanceValidation.errors.join("; ").slice(0, 2_048)));
+        }
+      } catch (error) {
+        violations.push(violation("SCHEMA_CANONICAL_INSTANCE_UNREADABLE", relativePath(rootDir, instancePath), error instanceof Error ? error.message : String(error)));
+      }
     }
     if (typeof schema.$id === "string") {
       const prior = ids.get(schema.$id);

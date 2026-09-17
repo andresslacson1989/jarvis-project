@@ -697,6 +697,8 @@ Startup SHALL occur in this order:
 
 Failure of a mandatory step produces explicit recovery/diagnostic state rather than a false ready state.
 
+The bootstrap `contractSuiteVersion` identifies the selected contract suite, while `releaseProfileVersion` identifies the revision of the active Release Profile component. These identities are intentionally distinct and SHALL match the active manifest exactly; for the current suite they are `1.0.8` and `1.0.9`, respectively. Missing, swapped, conflated, or unsupported values fail bootstrap validation.
+
 ---
 
 ## J01-RT-07 — PRIVILEGED CORE IPC

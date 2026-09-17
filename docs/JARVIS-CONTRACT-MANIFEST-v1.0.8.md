@@ -99,7 +99,7 @@ The suite version advances when a material current rule changes in areas such as
 
 Individual component revisions advance when the corresponding component's normative content changes. The manifest records the exact current component revision set. The current J00–J05 and Release Profile revisions advance to 1.0.9 for this lossless normative-text simplification; the combined suite remains 1.0.8 because no material current product, security, platform, protocol, release, trust, or governance rule changed.
 
-This v1.0.8 suite advances v1.0.7 because mandatory CI authority changed from a qualified-authority alternative to GitHub Actions only. That is a material repository-governance qualification change; this consolidation does not weaken any other active requirement.
+This v1.0.8 suite advances v1.0.7 because mandatory CI authority changed from a qualified-authority alternative to GitHub Actions only, with GitLab mirror-only and LocalCI non-authoritative. That material repository-governance qualification amendment was introduced by commit `5435fc96f852534e856094ff9d72eef03e254bb8` and subsequently ratified by explicit owner/governance authorization. The ratification is limited to that CI-authority amendment; this consolidation does not weaken or authorize changes to any other active requirement.
 
 Every production release records at least:
 

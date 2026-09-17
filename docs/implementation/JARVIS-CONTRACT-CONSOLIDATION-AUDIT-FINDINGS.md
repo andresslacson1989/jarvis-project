@@ -1,5 +1,7 @@
 # JARVIS Contract Simplification Findings
 
+> **Current-state reconciliation (2026-09-17):** This file preserves the audit chronology at reviewed HEAD `e07d0326dde59c0157d70669d97c3eba165b13d8`; its no-matrix-diff, 22-file, and no-exact-CI statements apply only to that historical snapshot. The published pre-remediation candidate is `983e25cac90028449876b4f0c8678449bd18b49b`, with passing exact GitHub Actions run `35163261745`, a 25-file normal local profile, 8,112 active-suite lines, 385 unique clause IDs, and 362 J00–J05 separator lines. The present correction worktree has 8,114 active-suite lines due to the explicit J01 bootstrap version-identity invariant and is not yet exact-candidate qualified. Separately authorized matrix/plan reconciliation is identified by commit `d2cc90be`; preserved Section 1.4 implementation/evidence is identified separately and remains `VERIFYING`.
+
 **Status:** Non-normative audit aid and persistent review evidence. This file does not authorize implementation, change contract meaning, supersede the active suite, advance the implementation matrix, or qualify a release.
 
 **Review date:** 2026-09-15

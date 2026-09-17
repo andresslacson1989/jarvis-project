@@ -1,5 +1,7 @@
 # JARVIS Matrix Contract-Traceability Reconciliation Ledger
 
+> **Current-state reconciliation (2026-09-17):** The baseline identities, hashes, and “uncommitted/unpublished” classifications below are retained as historical execution evidence. The separately authorized reconciliation was committed as `d2cc90be`; it must not be attributed to the consolidation-only delta or to the preserved Section 1.4 implementation/evidence. The published combined pre-remediation candidate is `983e25cac90028449876b4f0c8678449bd18b49b`, with passing exact GitHub Actions run `35163261745` and a 25-file normal local profile. Section 1.4 remains `VERIFYING`, and the present correction has no new exact-candidate evidence yet.
+
 **Status:** Non-normative execution evidence. This ledger does not change contract authority, implementation status, sequencing, evidence, or release state.
 
 ## Repository and file baseline

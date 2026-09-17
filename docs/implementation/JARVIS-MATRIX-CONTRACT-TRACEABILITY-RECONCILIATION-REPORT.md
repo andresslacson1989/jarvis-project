@@ -1,5 +1,7 @@
 # JARVIS Matrix Contract-Traceability Reconciliation Report
 
+> **Current-state reconciliation (2026-09-17):** The baseline and “uncommitted/no candidate” statements below describe the original reconciliation execution snapshot. The separately authorized reconciliation was committed as `d2cc90be` and is distinct from contract consolidation and preserved Section 1.4 implementation/evidence. The published combined pre-remediation candidate is `983e25cac90028449876b4f0c8678449bd18b49b`; exact GitHub Actions run `35163261745` passed for that SHA and its normal local profile passed 25 files. No matrix status, score, evidence identity, or execution pointer was advanced by the reconciliation or by the present correction; Section 1.4 remains `VERIFYING`. The present uncommitted correction requires a fresh candidate and exact run.
+
 ## Decision
 
 **COMPLETE for the bounded matrix/plan contract-traceability reconciliation.** No application implementation, contract-authority change, matrix progress, evidence advancement, release qualification, publication, integration, or `Production Complete` declaration occurred.

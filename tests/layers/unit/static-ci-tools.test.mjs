@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { checkFormat } from "../../../tools/ci/check-format.mjs";
-import { checkSchemas } from "../../../tools/ci/check-schemas.mjs";
+import { checkSchemas, validateSchemaInstance } from "../../../tools/ci/check-schemas.mjs";
 import { scanSecrets } from "../../../tools/ci/scan-secrets.mjs";
 import { checkDependencies } from "../../../tools/ci/check-dependencies.mjs";
 import { checkProvenance } from "../../../tools/ci/check-provenance.mjs";
@@ -66,6 +66,45 @@ test("schema checker rejects malformed, duplicate, escaping, and unresolved sche
   for (const code of ["SCHEMA_INVALID_JSON", "SCHEMA_WRONG_DRAFT", "SCHEMA_DUPLICATE_ID", "SCHEMA_UNRESOLVED_REF", "SCHEMA_REF_ESCAPE"]) {
     assert.ok(invalidCodes.includes(code), `expected ${code}`);
   }
+});
+
+test("canonical contract values strictly validate CI authority and distinct release-profile identity", async () => {
+  const root = resolve(import.meta.dirname, "..", "..", "..");
+  const schema = JSON.parse(await readFile(resolve(root, "packages/schemas/src/canonical/v1/contract-values.schema.json"), "utf8"));
+  const canonical = JSON.parse(await readFile(resolve(root, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"), "utf8"));
+  assert.deepEqual(validateSchemaInstance(schema, canonical), { valid: true, errors: [] });
+
+  const mutations = [
+    (value) => { delete value.ciAuthorities; },
+    (value) => { value.ciAuthorities = "GITHUB_ACTIONS"; },
+    (value) => { value.ciAuthorities.selectedType = "LOCALCI"; },
+    (value) => { value.ciAuthorities.eligibleTypes = ["LOCALCI"]; },
+    (value) => { value.ciAuthorities.pipelineIdentity = "other-ci"; },
+    (value) => { value.ciAuthorities.unknown = true; },
+    (value) => { value.unknown = true; },
+    (value) => { value.releaseProfileVersion = value.contractSuiteVersion; },
+  ];
+  for (const mutate of mutations) {
+    const value = structuredClone(canonical);
+    mutate(value);
+    assert.equal(validateSchemaInstance(schema, value).valid, false);
+  }
+});
+
+test("official schema verification fails closed on canonical contract-value drift", async () => {
+  const repositoryRoot = resolve(import.meta.dirname, "..", "..", "..");
+  const schemaText = await readFile(resolve(repositoryRoot, "packages/schemas/src/canonical/v1/contract-values.schema.json"), "utf8");
+  const canonicalText = await readFile(resolve(repositoryRoot, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"), "utf8");
+  const root = await tempRepo({
+    "packages/schemas/src/canonical/v1/contract-values.schema.json": schemaText,
+    "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json": canonicalText,
+  });
+  assert.deepEqual((await checkSchemas(root)).violations, []);
+
+  const drifted = JSON.parse(canonicalText);
+  drifted.ciAuthorities.pipelineIdentity = "unqualified-ci";
+  await writeFile(resolve(root, "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json"), `${JSON.stringify(drifted)}\n`);
+  assert.ok(codes(await checkSchemas(root)).includes("SCHEMA_CANONICAL_INSTANCE_INVALID"));
 });
 
 test("secret scanner rejects likely credentials while allowing explicit synthetic placeholders", async () => {

@@ -1,5 +1,7 @@
 # JARVIS Contract Simplification Final Closure Report
 
+> **Current-state reconciliation (2026-09-17):** The repository identity and measurements below are the historical, pre-commit closure snapshot at `e07d0326dde59c0157d70669d97c3eba165b13d8`; statements that the work was uncommitted, unpublished, or lacked exact-candidate CI are not current claims. The published pre-remediation candidate is `983e25cac90028449876b4f0c8678449bd18b49b`, and exact GitHub Actions run `35163261745` passed for that SHA. At that candidate, the normal local profile passed 25 files and the active suite measured 8,112 lines, 385 unique clause IDs, and 362 J00–J05 separator lines. The present correction worktree measures 8,114 active-suite lines because J01 now includes an explicit two-line bootstrap version-identity invariant; it requires a new commit and exact-candidate run before qualification. The consolidation-only work remains distinct from the separately authorized matrix/plan reconciliation committed in `d2cc90be` and from the preserved Section 1.4 implementation/evidence merged by `833c8a83`; Section 1.4 remains `VERIFYING`.
+
 **Result:** COMPLETE for the bounded contract simplification, optimization, consolidation, and contract-maintenance validation goal.
 
 **Not approved or performed:** application implementation, implementation-plan or matrix progression, evidence advancement, publication, push, integration, release qualification, auditor handoff, or `Production Complete`.

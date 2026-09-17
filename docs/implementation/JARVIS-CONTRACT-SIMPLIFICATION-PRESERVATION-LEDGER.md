@@ -1,5 +1,7 @@
 # JARVIS Contract Simplification Preservation Ledger
 
+> **Current-state reconciliation (2026-09-17):** Baselines and hashes in this ledger are immutable historical measurements of the recorded simplification stages, not descriptions of the current worktree. The published pre-remediation candidate is `983e25cac90028449876b4f0c8678449bd18b49b`; exact GitHub Actions run `35163261745` passed for that SHA, its normal local profile passed 25 files, and its active suite measured 8,112 lines, 385 unique clause IDs, and 362 J00–J05 separator lines. The present correction adds the explicit J01 bootstrap version-identity invariant, making the uncommitted active-suite line count 8,114; fresh exact-candidate evidence remains required. Matrix/plan reconciliation is separately authorized and committed in `d2cc90be`; preserved Section 1.4 implementation/evidence is separate and remains `VERIFYING`.
+
 **Status:** Non-normative execution aid. It records planned and completed preservation checks; it does not alter contract authority, authorize implementation, or replace active clauses.
 
 ## Baseline
