@@ -46,7 +46,7 @@ const section14ProtectedProjection = (text) => {
 };
 const section14EvidenceScopeIsPreserved = (text) => {
   const projection = section14ProtectedProjection(text);
-  return projection !== null && digest(projection) === "3899deede27909afdc04a08e3874cf2b887ab74f5cfde39e535200f9ff4fae37";
+  return projection !== null && digest(projection) === "68f017fb0d89e56efa686e52061ce047c3ee7de8ce04e791e0cc652d89c38f1b";
 };
 
 const required = [
@@ -83,6 +83,7 @@ test("owner-authorized Section 1.4 hygiene preserves the complete remaining evid
   assert.equal(section14EvidenceScopeIsPreserved(evidence), true);
   const protectedMutations = [
     ["2fad8d4c1077d6bcae674183ac03f8339bee5a6c", "f".repeat(40)],
+    ["35287157210", "35287157211"],
     ["status=PASS", "status=FAIL"],
     ["fce8f4b1e3fbc9f98cadc106b9c4a8650eb94bdf71e3bedf5ded78d0a459a9dd", "f".repeat(64)],
     ["artifact ID `10343211159`", "artifact ID `99999999999`"],
@@ -94,7 +95,7 @@ test("owner-authorized Section 1.4 hygiene preserves the complete remaining evid
     ["forcedCleanup=false", "forcedCleanup=true"],
     ["Tauri show/focus dispatch remains bounded and native; an unacknowledged second launch is a non-success result.", "Tauri show/focus dispatch may be unbounded; an unacknowledged second launch can be treated as success."],
     ["The native transcript reports `18 passed; 2 failed`", "The native transcript reports `20 passed; 0 failed`"],
-    ["Section 1.4 has no independent lifecycle approval yet.", "Section 1.4 has independent lifecycle approval."],
+    ["scoped independent lifecycle approval is confirmed.", "scoped independent lifecycle approval is not confirmed."],
   ];
   for (const [from, to] of protectedMutations) {
     assert.notEqual(evidence.indexOf(from), -1, `mutation fixture missing: ${from}`);
