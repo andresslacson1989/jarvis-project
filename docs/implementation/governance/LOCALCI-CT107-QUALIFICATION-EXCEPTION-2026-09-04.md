@@ -1,21 +1,20 @@
-# LocalCI CT107 Qualification Exception
+# Historical LocalCI CT107 Testing Exception — Non-authoritative
 
 **Exception ID:** `JARVIS-CT107-QUAL-EXCEPTION-2026-09-04-v1`  
-**Status:** `AUTHORIZED_FOR_ONE_BOUNDED_QUALIFICATION_RUN`  
+**Status:** `HISTORICAL_BOUNDED_TESTING_RECORD — NON_AUTHORITATIVE`
 **Approval timestamp:** `2026-09-04` (Asia/Manila; exact UTC event timestamp is retained in the approval/audit record)  
 **Approver:** repository and LocalCI document owner, as explicitly approved in the controlling Codex task  
 **Evidence provenance:** owner approval in the implementation task and independent auditor response
 
 ## Scope and supersession
 
-This exception authorizes one bounded, non-mutating LocalCI qualification run for
+This historical exception authorized one bounded, non-mutating LocalCI testing run for
 the exact JARVIS candidate `0fc861fca5e8d5d382176fce143607af61ee994c` on CT107.
 For this run only, it supersedes the CT107 no-testing clauses in:
 
-- `F:\local-ci-installation\PRODUCTION_IMPLEMENTATION_GOAL.md` §§87–91;
-- `F:\local-ci-installation\docs\install.md` §§12–27.
+- the then-applicable LocalCI operational restrictions, recorded outside this repository.
 
-It does not change the production role of CT107, authorize installation or setup
+It did not change the production role of CT107, authorize installation or setup
 work, or authorize any unrelated LocalCI or Proxmox operation. CT104 is not part
 of this exception.
 
@@ -94,6 +93,6 @@ The final evidence package MUST retain, with UTC timestamps and verifier identit
 8. post-run proof that CT107 setup/configuration/registration and unrelated
    resources were unchanged, plus independent reviewer sign-off.
 
-This exception authorizes testing only. It does not make LocalCI qualified and
-does not change the repository status: Section 0 and Section 1.2 remain
-`VERIFYING` until every mandatory gate and independent review pass.
+This historical record authorized testing only. It did not make LocalCI qualified
+and cannot qualify CI, release evidence, the current v1.0.8 consolidation, or any
+current matrix status.

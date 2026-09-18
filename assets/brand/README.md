@@ -1,6 +1,6 @@
 # JARVIS Brand Assets
 
-This directory contains the canonical production source assets for the JARVIS brand defined by `docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md`.
+This directory contains the canonical production source assets for the JARVIS brand defined by `J04` UI identity clauses.
 
 Current canonical sources:
 
@@ -26,6 +26,6 @@ Functional UI status colors are not logo colors.
 - Do not rotate, stretch, recolor with semantic status colors, add permanent glow/bevel/texture, or alter the segmented-ring/core geometry for production variants.
 - The lockup uses the release-owned Inter UI typeface with the contract fallback stack. Production packaging SHALL provide the qualified font locally; it SHALL NOT depend on a network/CDN fetch.
 - Font, icon, and other third-party visual dependencies SHALL have recorded source/license/provenance and required notices included in release artifacts.
-- If the wordmark is later converted to outlined vector paths, the visual result SHALL preserve the approved lockup proportions and requires a normal synchronous design-contract update.
+- If the wordmark is later converted to outlined vector paths, the visual result SHALL preserve the approved lockup proportions and requires a normal synchronous active-contract update.
 
 These files are product assets. Generated platform artifacts may differ in file format or required padding but SHALL preserve the canonical identity.

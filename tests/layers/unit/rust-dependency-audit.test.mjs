@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ACCEPTANCE_GATES } from "../../../tools/ci/localci-gate-manifest.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -56,7 +57,8 @@ test("Rust dependency vulnerability audit is exact-pinned, provenance-tracked, m
   }
 
   assert.match(workflow, /JARVIS_RUST_AUDIT_PASSED:\s*'1'/);
-  assert.match(evidenceGenerator, /"rust-dependency-vulnerability-rustsec"/);
+  assert.match(evidenceGenerator, /import \{ ACCEPTANCE_GATES as GATES \} from "\.\/localci-gate-manifest\.mjs"/);
+  assert.ok(ACCEPTANCE_GATES.includes("rust-dependency-vulnerability-rustsec"));
   assert.match(evidenceGenerator, /JARVIS_RUST_AUDIT_PASSED=1 is required for PASS evidence/);
 });
 

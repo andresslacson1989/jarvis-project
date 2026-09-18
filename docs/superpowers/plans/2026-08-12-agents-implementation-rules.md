@@ -38,5 +38,5 @@ Modify only `AGENTS.md` to add a dedicated implementation execution protocol cov
 
 - Re-fetch `AGENTS.md` after the write.
 - Confirm all pre-existing governance sections remain present.
-- Confirm the new execution protocol does not contradict the v1.0.5 manifest, Implementation Plan, Release Profile, Coding Standards, Data/State, Runtime, Security, or Verification contracts.
+- Confirm the new execution protocol does not contradict MAN-01, the Implementation Plan, the Release Profile, J00-CODE, J02-DATA, J01-RT, J03-SEC, or J05-VER.
 - Confirm no application implementation files were modified.

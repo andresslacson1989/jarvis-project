@@ -1,14 +1,71 @@
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { extractFenceAfter, extractTypeUnion, isMain, printViolations, readCanonical, readUtf8, sameSet, violation, escapeRegex } from "./lib.mjs";
+import { extractFenceAfter, extractTypeUnion, isMain, MANIFEST_PATH, printViolations, readCanonical, readUtf8, sameSet, violation, escapeRegex } from "./lib.mjs";
 
 const DOCS = Object.freeze({
-  manifest: "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md",
+  manifest: MANIFEST_PATH,
   releaseProfile: "docs/JARVIS-V1-RELEASE-PROFILE.md",
-  portability: "docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md",
-  protocol: "docs/implementation/JARVIS-PROTOCOL-SCHEMA-CONTRACT.md",
-  backup: "docs/implementation/JARVIS-BACKUP-CRYPTOGRAPHY-CONTRACT.md",
-  supplyChain: "docs/implementation/JARVIS-SUPPLY-CHAIN-TRUST-CONTRACT.md",
+  portability: "docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md",
+  protocol: "docs/implementation/JARVIS-01-RUNTIME-PLATFORM-PROTOCOL-CONTRACT.md",
+  backup: "docs/implementation/JARVIS-02-DATA-STATE-BACKUP-CONTRACT.md",
+  supplyChain: "docs/implementation/JARVIS-03-SECURITY-TRUST-CONTRACT.md",
 });
+
+const RETIRED_CONTRACT_PATHS = Object.freeze([
+  "docs/JARVIS-CONTRACT-MANIFEST-v1.0.7.md",
+  "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md",
+  "docs/implementation/JARVIS-RUNTIME-CONTRACT.md",
+  "docs/implementation/JARVIS-UI-IDENTITY-DESIGN-SYSTEM-CONTRACT.md",
+  "docs/implementation/JARVIS-PLATFORM-PORTABILITY-CONTRACT.md",
+  "docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md",
+]);
+
+const TRACKED_AUTHORITY_MARKDOWN_ROOTS = Object.freeze([
+  "docs/implementation/evidence/",
+  "docs/implementation/governance/",
+]);
+
+const UNQUALIFIED_AUTHORITY_LABEL = /\b(?:active|current|governing|authoritative|normative|selected|designated)\b/i;
+function normalizeRepositoryPath(value) {
+  return String(value).replaceAll("\\", "/").replace(/^\.\//, "").toLowerCase();
+}
+
+function isTrackedAuthorityMarkdown(path) {
+  const normalized = normalizeRepositoryPath(path);
+  return normalized.endsWith(".md") && TRACKED_AUTHORITY_MARKDOWN_ROOTS.some((root) => normalized.startsWith(root));
+}
+
+export function checkRetiredAuthorityLabelsFromText(path, text) {
+  if (!isTrackedAuthorityMarkdown(path)) return [];
+  const normalizedRetiredPaths = RETIRED_CONTRACT_PATHS.map((retiredPath) => [retiredPath, normalizeRepositoryPath(retiredPath)]);
+  return String(text ?? "")
+    .split(/\r?\n/)
+    .flatMap((line, index) => {
+      const normalizedLine = normalizeRepositoryPath(line);
+      const retiredEntry = normalizedRetiredPaths.find(([, normalizedPath]) => normalizedLine.includes(normalizedPath));
+      if (!retiredEntry) return [];
+      const [retiredPath] = retiredEntry;
+      const authorityContext = normalizedLine.replace(/\bnon[-\s]?(?:authoritative|current)\b/gi, "");
+      if (!UNQUALIFIED_AUTHORITY_LABEL.test(authorityContext)) return [];
+      return [violation(
+        "DRIFT_RETIRED_AUTHORITY_LABEL",
+        path,
+        `retired/deleted contract path ${retiredPath} appears under an unqualified active/current authority label at line ${index + 1}`,
+      )];
+    });
+}
+
+async function checkTrackedAuthorityMarkdown(rootDir) {
+  const tracked = execFileSync(
+    "git",
+    ["ls-files", "-z", "--", "docs/implementation/evidence", "docs/implementation/governance"],
+    { cwd: rootDir, encoding: "utf8", maxBuffer: 4 * 1024 * 1024 },
+  )
+    .split("\0")
+    .filter((path) => isTrackedAuthorityMarkdown(path));
+  const results = await Promise.all(tracked.map(async (path) => checkRetiredAuthorityLabelsFromText(path, await readUtf8(rootDir, path))));
+  return results.flat();
+}
 
 function regexValue(text, regex) {
   return text.match(regex)?.[1] ?? null;
@@ -87,12 +144,18 @@ export function checkContractDriftFromTexts(canonical, docs) {
   expectSet(violations, "DRIFT_PROVIDER_SETUP_STATES", DOCS.protocol, extractTypeUnion(protocol, "ProviderSetupState"), canonical.providerSetupStates, "ProviderSetupState");
   expectSet(violations, "DRIFT_MODULE_EXECUTION_CLASSES", DOCS.protocol, extractTypeUnion(protocol, "ModuleExecutionClass"), canonical.moduleExecutionClasses, "ModuleExecutionClass");
 
-  const governanceSection = section(releaseProfile, "# 17. REPOSITORY GOVERNANCE GATE", "# 18. PRODUCTION-COMPLETE GATE");
-  for (const authority of canonical.ciAuthorities.eligibleTypes) {
-    expectRegex(violations, "DRIFT_CI_AUTHORITY_TYPES", DOCS.releaseProfile, governanceSection, new RegExp(`\\b${escapeRegex(authority)}\\b`), `eligible CI authority ${authority} missing`);
-  }
+  const governanceSection = section(releaseProfile, "# RP-17 — REPOSITORY GOVERNANCE GATE", "# RP-18 — PRODUCTION-COMPLETE GATE");
+  if (JSON.stringify(canonical.ciAuthorities.eligibleTypes) !== JSON.stringify(["GITHUB_ACTIONS"])) violations.push(violation("DRIFT_CI_AUTHORITY_TYPES", DOCS.manifest, "only GITHUB_ACTIONS may be eligible"));
+  expectRegex(violations, "DRIFT_CI_AUTHORITY_TYPES", DOCS.releaseProfile, governanceSection, /GITHUB_ACTIONS/, "GitHub Actions authority missing");
+  expectRegex(violations, "DRIFT_CI_GITLAB_MIRROR", DOCS.releaseProfile, governanceSection, /GitLab is repository mirror-only/, "GitLab mirror-only rule missing");
+  expectRegex(violations, "DRIFT_CI_LOCALCI_NONAUTHORITY", DOCS.releaseProfile, governanceSection, /LocalCI[\s\S]*?cannot satisfy this gate/, "LocalCI non-authority rule missing");
   expectRegex(violations, "DRIFT_SELECTED_CI_AUTHORITY", DOCS.releaseProfile, governanceSection, new RegExp(`qualified[^\\n]*${escapeRegex(canonical.ciAuthorities.selectedType)}`, "i"), `selected CI authority ${canonical.ciAuthorities.selectedType} missing`);
   expectRegex(violations, "DRIFT_CI_PIPELINE_IDENTITY", DOCS.releaseProfile, governanceSection, new RegExp(`\\b${escapeRegex(canonical.ciAuthorities.pipelineIdentity)}\\b`, "i"), `CI pipeline identity ${canonical.ciAuthorities.pipelineIdentity} missing`);
+
+  const ttsAec = section(protocol, "## J01-RT-26A", "## J01-RT-27");
+  for (const marker of ["tts.started", "tts.audio_chunk", "tts.completed", "tts.stopped", "tts.error", "exact speaker/TTS render reference", "double-talk handling", "noise suppression", "gain control", "sample rates", "Provider Supervisor", "safe half-duplex fallback"]) {
+    expectRegex(violations, "DRIFT_TTS_AEC_CONTRACT", DOCS.protocol, ttsAec, new RegExp(escapeRegex(marker), "i"), `required normalized TTS/AEC marker missing: ${marker}`);
+  }
 
   const githubAll = [...canonical.githubCapabilities.mandatory, ...canonical.githubCapabilities.optional];
   expectSet(violations, "DRIFT_GITHUB_PROTOCOL_CAPABILITIES", DOCS.protocol, extractTypeUnion(protocol, "GitHubCapability"), githubAll, "GitHub protocol capabilities");
@@ -111,8 +174,8 @@ export function checkContractDriftFromTexts(canonical, docs) {
   const sessionFloor = canonical.kdf.sessionAndPortableRecoveryFloor;
   expectRegex(violations, "DRIFT_KDF_ALGORITHM", DOCS.protocol, protocol, /algorithm:\s*'ARGON2ID'/, "Argon2id algorithm binding missing");
   expectRegex(violations, "DRIFT_KDF_VERSION", DOCS.protocol, protocol, new RegExp(`version:\\s*0x${canonical.kdf.version.toString(16)}`, "i"), `Argon2id version must be 0x${canonical.kdf.version.toString(16)}`);
-  for (const [field, operator, value] of [["memoryKiB", ">=", sessionFloor.memoryKiB], ["iterations", ">=", sessionFloor.iterations], ["parallelism", "=", sessionFloor.parallelism], ["saltBytes", ">=", sessionFloor.saltBytes], ["outputBytes", ">=", sessionFloor.outputBytes]]) {
-    expectRegex(violations, "DRIFT_KDF_SESSION_FLOOR", DOCS.protocol, protocol, new RegExp(`${field}\\s*${escapeRegex(operator)}\\s*${value}`), `${field} ${operator} ${value} missing from production KDF floor`);
+  for (const [label, operator, value] of [["memory", ">=", sessionFloor.memoryKiB], ["passes", ">=", sessionFloor.iterations], ["parallelism", "", sessionFloor.parallelism], ["salt", ">=", sessionFloor.saltBytes], ["output", ">=", sessionFloor.outputBytes]]) {
+    expectRegex(violations, "DRIFT_KDF_SESSION_FLOOR", DOCS.supplyChain, supplyChain, new RegExp(`${label}:\\s*${escapeRegex(operator)}\\s*${value}`, "i"), `${label} ${operator} ${value} missing from production KDF floor`);
   }
 
   const format = colonBlock(extractFenceAfter(backup, "The first production format is:"));
@@ -169,7 +232,7 @@ export function checkContractDriftFromTexts(canonical, docs) {
 export async function checkContractDrift(rootDir) {
   const { values: canonical } = await readCanonical(rootDir);
   const docs = Object.fromEntries(await Promise.all(Object.entries(DOCS).map(async ([key, path]) => [key, await readUtf8(rootDir, path)])));
-  return checkContractDriftFromTexts(canonical, docs);
+  return [...checkContractDriftFromTexts(canonical, docs), ...(await checkTrackedAuthorityMarkdown(rootDir))];
 }
 
 if (isMain(import.meta.url)) {

@@ -553,5 +553,6 @@ This file records the repository-reviewed dependency, toolchain, and CI/bootstra
 | toolchain:Rust | 1.97.1 | BUILD_TOOL | MIT OR Apache-2.0 | https://github.com/rust-lang/rust |
 | action:actions/checkout | v7.0.1 / 3d3c42e5aac5ba805825da76410c181273ba90b1 | CI_BOOTSTRAP | MIT | https://github.com/actions/checkout |
 | action:pnpm/setup | v2.0.2 / 84cb39b217b10273981911c288cd62326dc7c6d2 | CI_BOOTSTRAP | MIT | https://github.com/pnpm/setup |
+| action:actions/upload-artifact | v4.6.2 / ea165f8d65b6e75b540449e92b4886f43607fa02 | CI_EVIDENCE_UPLOAD | MIT | https://github.com/actions/upload-artifact |
 
 `third_party/provenance.json` is the machine-readable review record consumed by static CI. Final packaged dependencies/assets, required license texts, SBOM, and signed release provenance remain cumulative release work.

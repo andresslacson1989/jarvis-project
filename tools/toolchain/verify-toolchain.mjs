@@ -81,8 +81,18 @@ assert(baseline.tauri?.javascriptPluginOpener === "2.5.4", "Tauri JavaScript ope
 assert(baseline.tauri?.qualification === "DESKTOP_FOUNDATION_IMPLEMENTED_NOT_RELEASE_QUALIFIED", "Tauri qualification state must remain truthful after Section 1.1 implementation");
 assert(desktopPackage.dependencies?.["@tauri-apps/api"] === baseline.tauri.javascriptApi, "desktop Tauri JavaScript API must match the selected release fact");
 assert(desktopPackage.devDependencies?.["@tauri-apps/cli"] === baseline.tauri.cli, "desktop Tauri CLI must match the selected release fact");
-assert(desktopCargo.includes(`tauri-build = "=${baseline.tauri.build}"`), "desktop tauri-build must match the selected release fact");
-assert(desktopCargo.includes(`[dependencies]\ntauri = { version = "=${baseline.tauri.runtime}", default-features = false }`), "desktop host-visible Tauri pairing must match the selected release fact with default features disabled");
+const tauriBuildPin = `tauri-build = "=${baseline.tauri.build}"`;
+const tauriBuildPinWithEmptyFeatures = `tauri-build = { version = "=${baseline.tauri.build}", features = [] }`;
+assert(
+  desktopCargo.includes(tauriBuildPin) || desktopCargo.includes(tauriBuildPinWithEmptyFeatures),
+  "desktop tauri-build must match the selected release fact",
+);
+const hostTauriPairing = `[dependencies]\ntauri = { version = "=${baseline.tauri.runtime}", default-features = false }`;
+const hostTauriPairingWithEmptyFeatures = `[dependencies]\ntauri = { version = "=${baseline.tauri.runtime}", default-features = false , features = [] }`;
+assert(
+  desktopCargo.includes(hostTauriPairing) || desktopCargo.includes(hostTauriPairingWithEmptyFeatures),
+  "desktop host-visible Tauri pairing must match the selected release fact with default features disabled",
+);
 assert(desktopCargo.includes(`[target.'cfg(target_os = "windows")'.dependencies]\ntauri = { version = "=${baseline.tauri.runtime}", default-features = false, features = ["wry"] }`), "desktop Windows Tauri runtime must match the selected release fact with only wry enabled");
 
 const EXPECTED = Object.freeze({

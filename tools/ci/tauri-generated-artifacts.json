@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "root": "apps/desktop/src-tauri/gen/schemas",
+  "files": {
+    "acl-manifests.json": "4d93885b464518dae2a2ed75ec63efc2c9d5a8991f51c26e6764dcb4264623c5",
+    "capabilities.json": "29eb267745a510845c1334f9ef0e342d5e85294a5ee22ab83f7c2902b6f67222",
+    "desktop-schema.json": "623c82e1cf0b1093b61b4b0900f8e2f06fbef272b8e5c24cc90dde35b063da97",
+    "windows-schema.json": "623c82e1cf0b1093b61b4b0900f8e2f06fbef272b8e5c24cc90dde35b063da97"
+  }
+}

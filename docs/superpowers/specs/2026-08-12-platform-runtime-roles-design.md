@@ -1,6 +1,6 @@
 # JARVIS Platform Runtime Roles Design
 
-**Status:** Approved design input for Contract Suite v1.0.4  
+**Status:** Historical design input for the pre-consolidation Contract Suite v1.0.4; current authority is the manifest and J00–J05
 **Date:** 2026-08-12
 
 ## Goal

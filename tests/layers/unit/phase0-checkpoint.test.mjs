@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import {
   checkPhase0,
+  requiredWorkflowSteps,
   validatePhase0Snapshot,
 } from "../../../tools/checkpoints/phase0-checkpoint.mjs";
 import profile from "../../../tools/checkpoints/phase0-checkpoint-profile.json" with {
@@ -27,11 +28,11 @@ const childIds = [
 ];
 
 function workflowFromProfile() {
-  const gates = profile.requiredWorkflowSteps
-    .filter(({ name }) => name !== "Rust Windows-target build")
+  const gates = requiredWorkflowSteps(profile)
+    .filter(({ workflowName }) => workflowName !== "Rust Windows-target build")
     .map(
-      ({ name, run }) =>
-        `      - name: ${name}\n        run: ${run}\n`,
+      ({ workflowName, command }) =>
+        `      - name: ${workflowName}\n        run: ${command}\n`,
     )
     .join("\n");
 
@@ -91,7 +92,7 @@ const packageJson = {
 };
 
 const canonicalValues = {
-  contractSuiteVersion: "1.0.7",
+  contractSuiteVersion: "1.0.8",
   v1RuntimeTarget: {
     platform: "WINDOWS",
     runtimeRole: "FULL_HOST",
@@ -100,13 +101,16 @@ const canonicalValues = {
 };
 
 const matrix =
-  `| Contract suite | JARVIS v1.0.7 |\n` +
+  `| Contract suite | JARVIS v1.0.8 |\n` +
   childIds
     .map((id) => `| ↳ **${id}** x | **VERIFIED** |`)
     .join("\n") +
   "\n";
 
 const allEvidencePaths = new Set(profile.requiredEvidencePaths);
+const governanceProfile = JSON.parse(readFileSync("docs/implementation/governance/repository-governance-profile.json", "utf8"));
+const governanceDocument = readFileSync("docs/implementation/governance/MASTER-PROTECTION.md", "utf8");
+const clone = (value) => JSON.parse(JSON.stringify(value));
 
 function codes(overrides = {}) {
   return validatePhase0Snapshot({
@@ -118,12 +122,27 @@ function codes(overrides = {}) {
     linuxSourcePaths: [],
     androidSourcePaths: [],
     existingPaths: allEvidencePaths,
+    governanceProfile,
+    governanceDocument,
     ...overrides,
   }).map((item) => item.code);
 }
 
 test("0.CP aggregate Phase 0 checkpoint snapshot passes", () => {
   assert.deepEqual(codes(), []);
+});
+
+test("Phase 0 profile rejects missing, extra, duplicate, reordered, and unknown gate IDs", () => {
+  const mutations = [
+    profile.requiredGateIds.slice(1),
+    [...profile.requiredGateIds, "phase0-section-checkpoint"],
+    [profile.requiredGateIds[0], profile.requiredGateIds[0], ...profile.requiredGateIds.slice(2)],
+    [profile.requiredGateIds[1], profile.requiredGateIds[0], ...profile.requiredGateIds.slice(2)],
+    ["unknown-gate", ...profile.requiredGateIds.slice(1)],
+  ];
+  for (const requiredGateIds of mutations) {
+    assert.ok(codes({ profile: { ...profile, requiredGateIds } }).includes("PHASE0_PROFILE_INVALID"));
+  }
 });
 
 test("missing mandatory Phase 0 gate fails closed", () => {
@@ -169,8 +188,8 @@ test("conditional native production Tauri gate fails closed", () => {
 
 test("conditional mandatory Phase 0 gate fails closed", () => {
   const workflow = workflowFromProfile().replace(
-    "      - name: Contract and profile drift\n        run: pnpm contract:check-drift",
-    "      - name: Contract and profile drift\n        if: false\n        run: pnpm contract:check-drift",
+    "      - name: Contract suite validation\n        run: pnpm contract:check",
+    "      - name: Contract suite validation\n        if: false\n        run: pnpm contract:check",
   );
   assert.ok(codes({ workflow }).includes("PHASE0_GATE_SKIPPABLE"));
 });
@@ -227,7 +246,7 @@ test("unverified child subsection fails checkpoint", () => {
 
 test("verified Section 0 summary permits completed child rows to be compacted later", () => {
   const compactMatrix =
-    "| Contract suite | JARVIS v1.0.7 |\n" +
+    "| Contract suite | JARVIS v1.0.8 |\n" +
     "| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFIED** | — |\n";
   assert.deepEqual(codes({ matrix: compactMatrix }), []);
 });
@@ -235,14 +254,14 @@ test("verified Section 0 summary permits completed child rows to be compacted la
 test("live matrix suite drift fails checkpoint", () => {
   assert.ok(
     codes({
-      matrix: matrix.replace("JARVIS v1.0.7", "JARVIS v1.0.5"),
+      matrix: matrix.replace("JARVIS v1.0.8", "JARVIS v1.0.5"),
     }).includes("PHASE0_MATRIX_SUITE_DRIFT"),
   );
 });
 
-test("current checkpoint evidence cannot remain VERIFIED while LocalCI is VERIFYING", () => {
+test("current checkpoint evidence cannot remain VERIFIED while mandatory GitHub Actions is VERIFYING", () => {
   const matrixWithSection =
-    `| Contract suite | JARVIS v1.0.7 |\n| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFYING** |\n` +
+    `| Contract suite | JARVIS v1.0.8 |\n| **SECTION 0 — Repository / Platform Contracts / Toolchain / Governance** | **VERIFYING** |\n` +
     childIds.map((id) => `| ↳ **${id}** x | **VERIFIED** |`).join("\n");
   const result = codes({
     matrix: matrixWithSection,
@@ -287,6 +306,34 @@ test("explicit candidate mode rejects present-but-mismatched records", () => {
   }).includes("PHASE0_CANDIDATE_MISMATCH"));
 });
 
+test("explicit candidate mode rejects governance predecessor evidence rebound to the current checkout", () => {
+  const explicitCandidateSha = "b".repeat(40);
+  const recordedCandidateSha = governanceProfile.mandatoryCi.selectedAuthority.latestRecordedCandidateEvidence.candidateSha;
+  const reboundGovernanceProfile = JSON.parse(
+    JSON.stringify(clone(governanceProfile)).replaceAll(recordedCandidateSha, explicitCandidateSha),
+  );
+  const result = codes({
+    governanceProfile: reboundGovernanceProfile,
+    currentCandidateSha: null,
+    evidenceCandidateSha: null,
+    matrixCandidateSha: null,
+    checkedOutSha: explicitCandidateSha,
+    explicitCandidateSha,
+  });
+  assert.ok(result.includes("PHASE0_GOVERNANCE_RECORDED_PREDECESSOR_SELF_REFERENCE"));
+});
+
+test("explicit candidate mode remains valid when Phase 0 candidate records are absent", () => {
+  const explicitCandidateSha = "b".repeat(40);
+  assert.deepEqual(codes({
+    currentCandidateSha: null,
+    evidenceCandidateSha: null,
+    matrixCandidateSha: null,
+    checkedOutSha: explicitCandidateSha,
+    explicitCandidateSha,
+  }), []);
+});
+
 test("candidate mode does not accept an evidence revision as the exact implementation checkout", async () => {
   const previous = process.env.JARVIS_CANDIDATE_SHA;
   try {
@@ -299,9 +346,15 @@ test("candidate mode does not accept an evidence revision as the exact implement
   }
 });
 
-test("LocalCI exports the explicit candidate before the Phase-0 gate", () => {
-  const script = readFileSync(".localci/ci.sh", "utf8");
-  assert.ok(script.indexOf("export JARVIS_CANDIDATE_SHA=") < script.indexOf("run_gate phase0-section-checkpoint"));
+test("Phase 0 profile rejects retained ADR and decision-source paths", () => {
+  const existingPaths = new Set([...allEvidencePaths, "docs/adr"]);
+  assert.ok(codes({ existingPaths }).includes("PHASE0_SUPERSEDED_ACTIVE_CONTRACT"));
+});
+
+test("canonical CI authority permits GitHub Actions only", () => {
+  const values = JSON.parse(readFileSync("packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json", "utf8"));
+  assert.deepEqual(values.ciAuthorities.eligibleTypes, ["GITHUB_ACTIONS"]);
+  assert.equal(values.ciAuthorities.selectedType, "GITHUB_ACTIONS");
 });
 
 test("candidate CI requires the checked-out SHA to equal the explicit candidate", () => {
@@ -322,7 +375,7 @@ test("missing child evidence fails checkpoint", () => {
   );
 });
 
-test("superseded active top-level contract fails checkpoint", () => {
+test("obsolete pre-consolidation top-level contract path fails checkpoint", () => {
   const existingPaths = new Set([
     ...allEvidencePaths,
     "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.5.md",
@@ -342,4 +395,10 @@ test("unsafe pull_request_target trigger fails checkpoint", () => {
   assert.ok(
     codes({ workflow }).includes("PHASE0_UNSAFE_WORKFLOW_TRIGGER"),
   );
+});
+
+test("Phase 0 rejects stale current repository-governance facts", () => {
+  const staleProfile = JSON.parse(JSON.stringify(governanceProfile));
+  staleProfile.governanceMode = "COMPENSATING_CONTROLS";
+  assert.ok(codes({ governanceProfile: staleProfile }).some((code) => code.startsWith("PHASE0_GOVERNANCE_")));
 });

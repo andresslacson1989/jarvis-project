@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildCiEvidence, buildLocalCiExecutionEvidence, GATES, parseLocalCiGateResults } from "../../../tools/ci/generate-evidence.mjs";
+import { buildCiEvidence, buildLocalCiExecutionEvidence, GATES, parseLocalCiGateResults, versionProbeInvocation } from "../../../tools/ci/generate-evidence.mjs";
 
 const candidateSha = "a".repeat(40);
 const syntheticMergeSha = "b".repeat(40);
@@ -31,11 +31,26 @@ const versions = {
   cargo: "1.97.1",
 };
 
+test("Windows version probes invoke pnpm through cmd without changing other commands", () => {
+  assert.deepEqual(
+    versionProbeInvocation("pnpm", ["exec", "tsc", "--version"], "cmd.exe"),
+    { command: "cmd.exe", args: ["/d", "/s", "/c", "pnpm exec tsc --version"] },
+  );
+  assert.deepEqual(
+    versionProbeInvocation("pnpm", ["--version"], ""),
+    { command: "pnpm", args: ["--version"] },
+  );
+  assert.deepEqual(
+    versionProbeInvocation("cargo", ["--version"], "cmd.exe"),
+    { command: "cargo", args: ["--version"] },
+  );
+});
+
 test("CI evidence binds to the explicitly verified candidate SHA instead of pull-request GITHUB_SHA", () => {
   const evidence = buildCiEvidence({
     env: env(),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
   });
 
@@ -48,7 +63,7 @@ test("CI evidence fails closed when the verified candidate SHA is absent or malf
     () => buildCiEvidence({
       env: env({ JARVIS_CANDIDATE_SHA: "" }),
       versions,
-      contractSuiteVersion: "1.0.7",
+      contractSuiteVersion: "1.0.8",
       governanceMode: "COMPENSATING_CONTROLS",
     }),
     /JARVIS_CANDIDATE_SHA/,
@@ -58,7 +73,7 @@ test("CI evidence fails closed when the verified candidate SHA is absent or malf
     () => buildCiEvidence({
       env: env({ JARVIS_CANDIDATE_SHA: "not-a-sha" }),
       versions,
-      contractSuiteVersion: "1.0.7",
+      contractSuiteVersion: "1.0.8",
       governanceMode: "COMPENSATING_CONTROLS",
     }),
     /JARVIS_CANDIDATE_SHA/,
@@ -106,7 +121,7 @@ test("LocalCI execution evidence binds server identities and every measured gate
   const evidence = buildLocalCiExecutionEvidence({
     env: localCiEnv(),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults,
   });
@@ -125,7 +140,7 @@ test("LocalCI evidence rejects a candidate identity that differs from the resolv
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ JARVIS_CANDIDATE_SHA: syntheticMergeSha }),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   }), /must match exactly/);
@@ -135,7 +150,7 @@ test("LocalCI replay identity is stable and distinct idempotency keys are not co
   const args = {
     env: localCiEnv(),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   };
@@ -153,70 +168,70 @@ test("LocalCI evidence rejects omitted, duplicate, failed, and mismatched gate/s
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ LOCALCI_RESOLVED_COMMIT: syntheticMergeSha }),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: parseLocalCiGateResults(localCiGateText()),
   }), /must match exactly/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ LOCALCI_OBSERVED_CHECKOUT_SHA: syntheticMergeSha }),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   }), /observed checkout SHA/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ LOCALCI_OBSERVED_REPOSITORY: "attacker/repo" }),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   }), /observed repository remote/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ LOCALCI_OBSERVED_REF: "refs/heads/other" }),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   }), /observed ref/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv(),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: [],
   }), /every mandatory gate/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv(),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: [{ gate: GATES[0], status: "FAILED" }],
   }), /not successful/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ LOCALCI_REQUESTED_REF: "refs/tags/v1" }),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   }), /observed ref/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ LOCALCI_STARTED_AT: "2026-09-03T00:00:01Z" }),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   }), /ordered/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ LOCALCI_IDEMPOTENCY_KEY: "" }),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   }), /LOCALCI_IDEMPOTENCY_KEY/);
   assert.throws(() => buildLocalCiExecutionEvidence({
     env: localCiEnv({ LOCALCI_PIPELINE_PROFILE: "smoke" }),
     versions,
-    contractSuiteVersion: "1.0.7",
+    contractSuiteVersion: "1.0.8",
     governanceMode: "COMPENSATING_CONTROLS",
     gateResults: localCiGateText(),
   }), /LOCALCI_PIPELINE_PROFILE/);

@@ -4,7 +4,7 @@
 
 ## Canonical layers
 
-`tests/test-layers.json` contains exactly the 15 layers from Verification Contract §7. Each layer has a stable directory under `tests/layers/<layer-id>/`.
+`tests/test-layers.json` contains exactly the 15 layers from J05-VER-07. Each layer has a stable directory under `tests/layers/<layer-id>/`.
 
 The Phase-0 harness activates deterministic foundation coverage for unit, property/state-machine, schema/contract, platform-architecture, and safety/adversarial behavior. Later owning sections add real integration, UI, recovery, persistence, performance, voice, packaging, provider, tool, and module tests to their reserved layers.
 

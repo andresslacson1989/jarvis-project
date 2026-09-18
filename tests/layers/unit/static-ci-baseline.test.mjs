@@ -45,6 +45,8 @@ test("static CI workflow is least-privileged and uses immutable action SHAs", { 
   assert.match(workflow, /cargo audit --file Cargo\.lock --target-os windows --target-arch x86_64/);
   assert.match(workflow, /cargo clippy[^\n]*-D warnings/);
   assert.match(workflow, /rustup toolchain install 1\.97\.1 --component rustfmt --component clippy --target x86_64-pc-windows-msvc/);
+  assert.match(workflow, /- name: Contract suite validation\s+run: pnpm contract:check/);
+  assert.match(workflow, /- name: Desktop security contract\s+run: pnpm desktop:security:check/);
 });
 
 test("package scripts expose every static CI gate", () => {

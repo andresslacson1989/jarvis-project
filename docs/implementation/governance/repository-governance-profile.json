@@ -1,30 +1,56 @@
 {
-  "schemaVersion": 3,
-  "governanceMode": "COMPENSATING_CONTROLS",
+  "schemaVersion": 4,
+  "governanceMode": "SERVER_ENFORCED",
   "provider": "GITHUB",
   "repository": "andresslacson1989/jarvis-project",
+  "repositoryVisibility": "PUBLIC",
   "authoritativeBranch": "master",
   "serverSideProtection": {
-    "available": false,
-    "active": false,
-    "reason": "HOSTING_PLAN_LIMITATION",
-    "observationSource": "USER_SUPPLIED_GITHUB_ADMIN_ATTEMPT",
-    "observedHttpStatus": 403,
-    "observedMessage": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    "available": true,
+    "active": true,
+    "requiredStatusChecks": {
+      "contexts": [
+        "static-ci"
+      ],
+      "strict": true
+    },
+    "requiredApprovingReviews": 1,
+    "enforceAdministrators": true,
+    "allowForcePushes": false,
+    "allowDeletions": false,
+    "requiredConversationResolution": true,
+    "restrictions": null,
+    "observation": {
+      "source": "AUTHENTICATED_GITHUB_API",
+      "observedAt": "2026-09-15T01:49:15Z",
+      "repository": "andresslacson1989/jarvis-project",
+      "repositoryId": 1330469646,
+      "repositoryVisibility": "public",
+      "defaultBranch": "master",
+      "protectedBranch": "master",
+      "ref": "refs/heads/master",
+      "endpoint": "GET https://api.github.com/repos/andresslacson1989/jarvis-project/branches/master/protection",
+      "evidenceIdentity": "github-api:repo-1330469646:refs/heads/master:protection:static-ci:app-15368",
+      "requiredStatusCheckAppId": 15368
+    }
   },
   "mandatoryCi": {
     "pipelineIdentity": "static-ci",
     "eligibleAuthorityTypes": [
-      "GITHUB_ACTIONS",
-      "LOCALCI"
+      "GITHUB_ACTIONS"
     ],
     "selectedAuthority": {
       "type": "GITHUB_ACTIONS",
       "workflow": ".github/workflows/static-ci.yml",
       "job": "static-ci",
       "qualificationScope": "JARVIS_REPOSITORY_CI",
-      "qualificationStatus": "QUALIFIED",
-      "lastObservedRun": {
+      "qualificationStatus": "QUALIFIED_AUTHORITY_CAPABILITY_BASELINE",
+      "authorityCapabilityBaseline": {
+        "status": "QUALIFIED",
+        "contractSuiteVersion": "1.0.7",
+        "scope": "HISTORICAL_AUTHORITY_CAPABILITY_BASELINE",
+        "doesNotQualifyCurrentSuite": "1.0.8",
+        "lastObservedRun": {
         "runId": "33934840029",
         "runAttempt": "1",
         "candidateSha": "052902bfc52e676910d287e13fbf8a026915efe0",
@@ -46,17 +72,16 @@
           "arch": "X64"
         },
         "evidence": "PHASE_0_STATIC_CI status=PASS; exact checkout and git rev-parse HEAD matched candidateSha"
-      },
-      "qualificationBlockers": [],
-      "evidenceRevisionValidation": {
+        },
+        "evidenceRevisionValidation": {
         "commitSha": "a077dfdacd80f7ef5ef48d64f5cc61cec4fae70d",
         "runId": "33938490684",
         "status": "SUCCESS",
         "windowsJobId": "101231030877",
         "staticCiJobId": "101232608613",
         "purpose": "GOVERNANCE_EVIDENCE_REVISION_CONSISTENCY"
-      },
-      "authoritativeMasterVerification": {
+        },
+        "authoritativeMasterVerification": {
         "commitSha": "2cfcca9f2f7ee0faf334223b659e94ab410f5acd",
         "runId": "33950976184",
         "status": "SUCCESS",
@@ -65,7 +90,65 @@
         "staticCiJobId": "101267451179",
         "artifactCount": 0,
         "cosignTransparencyLogVerification": "NOT_CLAIMED_OFFLINE"
-      }
+        }
+      },
+      "latestRecordedCandidateEvidence": {
+        "contractSuiteVersion": "1.0.8",
+        "status": "RECORDED",
+        "recordedCandidateRole": "LATEST_COMPLETED_PREDECESSOR",
+        "doesNotQualifySuccessor": true,
+        "candidateSha": "d447b89c7506281567f5ee2f8771fba91a8bdf1f",
+        "repository": "andresslacson1989/jarvis-project",
+        "ref": "refs/heads/codex/contract-consolidation",
+        "workflow": ".github/workflows/static-ci.yml",
+        "job": "static-ci",
+        "runId": "35184074308",
+        "runAttempt": "1",
+        "event": "pull_request",
+        "headBranch": "codex/contract-consolidation",
+        "startedAt": "2026-09-17T05:00:49Z",
+        "finishedAt": "2026-09-17T05:16:36Z",
+        "recordedAt": "2026-09-17T06:24:08Z",
+        "terminalResult": "SUCCESS",
+        "requiredChecksPassed": true,
+        "jobs": [
+          {
+            "name": "windows-tauri-build",
+            "jobId": "105082244361",
+            "startedAt": "2026-09-17T05:00:52Z",
+            "finishedAt": "2026-09-17T05:08:41Z",
+            "terminalResult": "SUCCESS"
+          },
+          {
+            "name": "static-ci",
+            "jobId": "105083793438",
+            "startedAt": "2026-09-17T05:08:44Z",
+            "finishedAt": "2026-09-17T05:16:35Z",
+            "terminalResult": "SUCCESS"
+          }
+        ],
+        "artifacts": [
+          {
+            "name": "jarvis-section-1-4-tauri-single-instance-evidence",
+            "artifactId": "10481224055",
+            "digest": "sha256:3bd623d2e9e932cfc233ce20f08a7ad92ab728d809171d9d264a747218c7e885"
+          },
+          {
+            "name": "jarvis-section-1-4-windows-native-evidence",
+            "artifactId": "10481019827",
+            "digest": "sha256:b770658c5ab2e2964d46d5ff997bd59512e599894542e982a306c4d3e59424d4"
+          }
+        ],
+        "evidenceIdentity": "github-actions:repository=andresslacson1989/jarvis-project:ref=refs/heads/codex/contract-consolidation:workflow=.github/workflows/static-ci.yml:job=static-ci:runId=35184074308:runAttempt=1:sha=d447b89c7506281567f5ee2f8771fba91a8bdf1f:windowsJobId=105082244361:staticCiJobId=105083793438",
+        "artifactEvidenceIdentity": "github-actions-artifacts:repository=andresslacson1989/jarvis-project:ref=refs/heads/codex/contract-consolidation:workflow=.github/workflows/static-ci.yml:job=static-ci:runId=35184074308:runAttempt=1:sha=d447b89c7506281567f5ee2f8771fba91a8bdf1f:artifact=10481224055@sha256:3bd623d2e9e932cfc233ce20f08a7ad92ab728d809171d9d264a747218c7e885:artifact=10481019827@sha256:b770658c5ab2e2964d46d5ff997bd59512e599894542e982a306c4d3e59424d4"
+      },
+      "qualificationBlockers": [
+        "SUCCESSOR_EXACT_CANDIDATE_GITHUB_ACTIONS_REQUIRED",
+        "INDEPENDENT_AUDIT_APPROVAL_REQUIRED",
+        "SECTION_1_4_INTEGRATION_REQUIRED",
+        "AUTHORITATIVE_MASTER_VERIFICATION_REQUIRED",
+        "SECTION_1_CHECKPOINT_REQUIRED"
+      ]
     },
     "commonRequirements": {
       "exactResolvedCommitRequired": "REQUIRED",
@@ -78,26 +161,31 @@
       "idempotentSubmission": "REQUIRED",
       "durableAuditableEvidence": "REQUIRED"
     },
-    "localCiRequirements": {
-      "authenticatedTls": "REQUIRED",
-      "nonAdministratorApiClient": "REQUIRED",
-      "repositoryProfileRefAllowlist": "REQUIRED",
-      "serverSideRevisionResolution": "REQUIRED",
-      "rootlessJobIsolation": "REQUIRED",
-      "arbitraryExecutionSurfacesDenied": "REQUIRED",
-      "controlledUpgradeAndClock": "REQUIRED",
-      "evidenceRetentionExport": "REQUIRED",
-      "cancellationRecoveryTested": "REQUIRED"
-    }
+    "gitlabRole": "REPOSITORY_MIRROR_ONLY",
+    "localCiRole": "NON_AUTHORITATIVE_COMPATIBILITY_OR_SECURITY_TOOLING"
   },
-  "controls": {
-    "temporaryImplementationBranches": true,
-    "candidateCiRequired": true,
-    "liveAuthoritativeTipRevalidation": true,
-    "reconcileUnexpectedMovement": true,
-    "nonForceIntegrationOnly": true,
-    "postIntegrationVerification": true
-  },
-  "residualRisk": "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED",
-  "serverModeRequiredWhenAvailable": true
+  "residualRisk": "SERVER_ENFORCED_PROTECTION_ACTIVE",
+  "serverModeRequiredWhenAvailable": true,
+  "historicalTransition": {
+    "notCurrent": true,
+    "previousGovernanceMode": "COMPENSATING_CONTROLS",
+    "previousRepositoryVisibility": "PRIVATE",
+    "previousServerSideProtection": {
+      "available": false,
+      "active": false,
+      "reason": "HOSTING_PLAN_LIMITATION",
+      "observationSource": "USER_SUPPLIED_GITHUB_ADMIN_ATTEMPT",
+      "observedHttpStatus": 403,
+      "observedMessage": "Upgrade to GitHub Pro or make this repository public to enable this feature."
+    },
+    "previousControls": {
+      "temporaryImplementationBranches": true,
+      "candidateCiRequired": true,
+      "liveAuthoritativeTipRevalidation": true,
+      "reconcileUnexpectedMovement": true,
+      "nonForceIntegrationOnly": true,
+      "postIntegrationVerification": true
+    },
+    "previousResidualRisk": "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED"
+  }
 }

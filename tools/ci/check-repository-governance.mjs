@@ -1,13 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GATES } from "./generate-evidence.mjs";
-import { LOCALCI_GATE_COMMANDS } from "./localci-gate-manifest.mjs";
 
 const EXPECTED_REPOSITORY = "andresslacson1989/jarvis-project";
+const EXPECTED_REPOSITORY_ID = 1330469646;
 const EXPECTED_BRANCH = "master";
 const EXPECTED_CI = "static-ci";
-const ELIGIBLE_CI_AUTHORITIES = Object.freeze(["GITHUB_ACTIONS", "LOCALCI"]);
+const EXPECTED_STATUS_CHECK_APP_ID = 15368;
+const EXPECTED_SERVER_RESIDUAL_RISK = "SERVER_ENFORCED_PROTECTION_ACTIVE";
+const EXPECTED_RESIDUAL_RISK = "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED";
 const REQUIRED_COMMON_CI_CONTROLS = Object.freeze([
   "exactResolvedCommitRequired",
   "completePipelineRequired",
@@ -19,22 +20,6 @@ const REQUIRED_COMMON_CI_CONTROLS = Object.freeze([
   "idempotentSubmission",
   "durableAuditableEvidence",
 ]);
-const REQUIRED_LOCALCI_CONTROLS = Object.freeze([
-  "authenticatedTls",
-  "nonAdministratorApiClient",
-  "repositoryProfileRefAllowlist",
-  "serverSideRevisionResolution",
-  "rootlessJobIsolation",
-  "arbitraryExecutionSurfacesDenied",
-  "controlledUpgradeAndClock",
-  "evidenceRetentionExport",
-  "cancellationRecoveryTested",
-]);
-const EXPECTED_RESIDUAL_RISK = "OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED";
-const SUPERSEDED_AUTHORITATIVE_MASTER = Object.freeze({
-  commitSha: "cae911e2bb88e046ae84828bc98a5b484da401d1",
-  runId: "33944300852",
-});
 const REQUIRED_COMPENSATING_CONTROLS = Object.freeze([
   "temporaryImplementationBranches",
   "candidateCiRequired",
@@ -43,12 +28,17 @@ const REQUIRED_COMPENSATING_CONTROLS = Object.freeze([
   "nonForceIntegrationOnly",
   "postIntegrationVerification",
 ]);
-const REQUIRED_SERVER_CONTROLS = Object.freeze([
-  "forcePushBlocked",
-  "deletionBlocked",
-  "administratorsCovered",
-  "strictRequiredChecks",
-  "bypassNarrowAndAuditable",
+const REQUIRED_QUALIFICATION_BLOCKERS = Object.freeze([
+  "SUCCESSOR_EXACT_CANDIDATE_GITHUB_ACTIONS_REQUIRED",
+  "INDEPENDENT_AUDIT_APPROVAL_REQUIRED",
+  "SECTION_1_4_INTEGRATION_REQUIRED",
+  "AUTHORITATIVE_MASTER_VERIFICATION_REQUIRED",
+  "SECTION_1_CHECKPOINT_REQUIRED",
+]);
+const REQUIRED_PREDECESSOR_JOBS = Object.freeze(["windows-tauri-build", "static-ci"]);
+const REQUIRED_PREDECESSOR_ARTIFACTS = Object.freeze([
+  "jarvis-section-1-4-tauri-single-instance-evidence",
+  "jarvis-section-1-4-windows-native-evidence",
 ]);
 
 function violation(code, detail) {
@@ -59,138 +49,330 @@ function workflowHasStaticCi(workflowText) {
   return /^\s{2}static-ci:\s*$/m.test(workflowText) && /^\s{4}name:\s*static-ci\s*$/m.test(workflowText);
 }
 
-export function validateRepositoryGovernanceProfile(profile, workflowText, localCiScript = "") {
+function validateServerEnforcedProtection(profile, server) {
   const violations = [];
-  if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
-    return [violation("GOVERNANCE_PROFILE_INVALID", "profile must be an object")];
+  if (profile.repositoryVisibility !== "PUBLIC") violations.push(violation("GOVERNANCE_REPOSITORY_VISIBILITY", "SERVER_ENFORCED governance requires the observed repository visibility to be PUBLIC"));
+  if (server.available !== true || server.active !== true) violations.push(violation("GOVERNANCE_SERVER_PROTECTION_STATE", "SERVER_ENFORCED governance requires available and active server-side protection"));
+
+  const requiredStatusChecks = server.requiredStatusChecks ?? {};
+  if (JSON.stringify(requiredStatusChecks.contexts) !== JSON.stringify([EXPECTED_CI]) || requiredStatusChecks.strict !== true) {
+    violations.push(violation("GOVERNANCE_SERVER_REQUIRED_CHECKS", "server protection must require strict static-ci status checks and no other current context"));
   }
-  if (profile.schemaVersion !== 3) violations.push(violation("GOVERNANCE_PROFILE_VERSION", "schemaVersion must equal 3"));
+  if (server.requiredApprovingReviews !== 1) violations.push(violation("GOVERNANCE_SERVER_REQUIRED_REVIEW", "server protection must require one approving pull-request review"));
+  if (server.enforceAdministrators !== true) violations.push(violation("GOVERNANCE_SERVER_ADMIN_ENFORCEMENT", "server protection must enforce the required controls for administrators"));
+  if (server.allowForcePushes !== false) violations.push(violation("GOVERNANCE_SERVER_FORCE_PUSH", "server protection must disallow force pushes"));
+  if (server.allowDeletions !== false) violations.push(violation("GOVERNANCE_SERVER_DELETION", "server protection must disallow branch deletion"));
+  if (server.requiredConversationResolution !== true) violations.push(violation("GOVERNANCE_SERVER_CONVERSATION_RESOLUTION", "server protection must require conversation resolution"));
+  if (server.restrictions !== null) violations.push(violation("GOVERNANCE_SERVER_RESTRICTIONS", "current branch restrictions must be recorded exactly as the observed GitHub configuration"));
+
+  const observation = server.observation ?? {};
+  const observationValid =
+    observation.source === "AUTHENTICATED_GITHUB_API" &&
+    /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(observation.observedAt ?? "")) &&
+    observation.repository === EXPECTED_REPOSITORY &&
+    observation.repositoryId === EXPECTED_REPOSITORY_ID &&
+    observation.repositoryVisibility === "public" &&
+    observation.defaultBranch === EXPECTED_BRANCH &&
+    observation.protectedBranch === EXPECTED_BRANCH &&
+    observation.ref === "refs/heads/master" &&
+    observation.endpoint === "GET https://api.github.com/repos/andresslacson1989/jarvis-project/branches/master/protection" &&
+    observation.evidenceIdentity === "github-api:repo-1330469646:refs/heads/master:protection:static-ci:app-15368" &&
+    observation.requiredStatusCheckAppId === EXPECTED_STATUS_CHECK_APP_ID;
+  if (!observationValid) violations.push(violation("GOVERNANCE_SERVER_OBSERVATION_INVALID", "current server-protection facts must retain the authenticated GitHub API observation identity and exact master protection target"));
+
+  if (profile.residualRisk !== EXPECTED_SERVER_RESIDUAL_RISK) violations.push(violation("GOVERNANCE_SERVER_RESIDUAL_RISK", "SERVER_ENFORCED governance must record active protection rather than the fallback residual risk"));
+  if ("controls" in profile) violations.push(violation("GOVERNANCE_STALE_CURRENT_CONTROLS", "fallback controls must not remain as current fields after transition to SERVER_ENFORCED governance"));
+  for (const key of ["reason", "observationSource", "observedHttpStatus", "observedMessage"]) {
+    if (key in server) violations.push(violation("GOVERNANCE_STALE_CURRENT_PROTECTION_FIELDS", `${key} is a stale fallback field and must be retained only under historicalTransition`));
+  }
+
+  const transition = profile.historicalTransition ?? {};
+  if (
+    transition.notCurrent !== true ||
+    transition.previousGovernanceMode !== "COMPENSATING_CONTROLS" ||
+    transition.previousRepositoryVisibility !== "PRIVATE" ||
+    transition.previousServerSideProtection?.available !== false ||
+    transition.previousServerSideProtection?.active !== false ||
+    transition.previousServerSideProtection?.reason !== "HOSTING_PLAN_LIMITATION" ||
+    transition.previousServerSideProtection?.observedHttpStatus !== 403 ||
+    transition.previousControls?.temporaryImplementationBranches !== true ||
+    transition.previousControls?.candidateCiRequired !== true ||
+    transition.previousControls?.liveAuthoritativeTipRevalidation !== true ||
+    transition.previousControls?.reconcileUnexpectedMovement !== true ||
+    transition.previousControls?.nonForceIntegrationOnly !== true ||
+    transition.previousControls?.postIntegrationVerification !== true ||
+    transition.previousResidualRisk !== EXPECTED_RESIDUAL_RISK
+  ) {
+    violations.push(violation("GOVERNANCE_HISTORICAL_TRANSITION_INVALID", "the prior compensating-control record must be explicitly labeled non-current and kept under historicalTransition"));
+  }
+  return violations;
+}
+
+function isIsoTimestamp(value) {
+  return /^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value ?? "")) && Number.isFinite(Date.parse(value));
+}
+
+function isFullRef(value) {
+  return /^refs\/(?:heads|pull|tags)\/\S+$/.test(String(value ?? ""));
+}
+
+function isPositiveInteger(value) {
+  return /^[1-9][0-9]*$/.test(String(value ?? ""));
+}
+
+function rejectUnexpectedFields(candidate, allowedFields, violations, code = "GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID") {
+  for (const field of Object.keys(candidate)) {
+    if (!allowedFields.includes(field)) violations.push(violation(code, `recorded predecessor evidence contains unexpected field ${field}`));
+  }
+}
+
+function validateLatestRecordedCandidateEvidence(candidate, currentCandidateSha) {
+  const violations = [];
+  if (currentCandidateSha !== undefined && currentCandidateSha !== "" && !/^[0-9a-f]{40}$/.test(String(currentCandidateSha))) {
+    violations.push(violation("GOVERNANCE_CURRENT_CANDIDATE_SHA_INVALID", "CI-supplied current candidate SHA must be an immutable lowercase 40-hex commit"));
+  }
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate) || candidate.contractSuiteVersion !== "1.0.8") {
+    return [violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", "latest recorded predecessor evidence must identify contract suite 1.0.8")];
+  }
+
+  const requiredRecordedFields = [
+    ["status", (value) => value === "RECORDED"],
+    ["recordedCandidateRole", (value) => value === "LATEST_COMPLETED_PREDECESSOR"],
+    ["doesNotQualifySuccessor", (value) => value === true],
+    ["candidateSha", (value) => /^[0-9a-f]{40}$/.test(String(value ?? ""))],
+    ["repository", (value) => value === EXPECTED_REPOSITORY],
+    ["ref", isFullRef],
+    ["workflow", (value) => value === ".github/workflows/static-ci.yml"],
+    ["job", (value) => value === EXPECTED_CI],
+    ["runId", isPositiveInteger],
+    ["runAttempt", isPositiveInteger],
+    ["event", (value) => value === "pull_request"],
+    ["headBranch", (value) => typeof value === "string" && value.length > 0 && candidate.ref === `refs/heads/${value}`],
+    ["startedAt", isIsoTimestamp],
+    ["finishedAt", isIsoTimestamp],
+    ["recordedAt", isIsoTimestamp],
+    ["terminalResult", (value) => value === "SUCCESS"],
+    ["requiredChecksPassed", (value) => value === true],
+    ["jobs", Array.isArray],
+    ["artifacts", Array.isArray],
+    ["evidenceIdentity", (value) => typeof value === "string"],
+    ["artifactEvidenceIdentity", (value) => typeof value === "string"],
+  ];
+  rejectUnexpectedFields(candidate, ["contractSuiteVersion", ...requiredRecordedFields.map(([field]) => field)], violations);
+  for (const [field, predicate] of requiredRecordedFields) {
+    if (!predicate(candidate[field])) violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", `RECORDED predecessor evidence must contain a valid ${field}`));
+  }
+  if (isIsoTimestamp(candidate.startedAt) && isIsoTimestamp(candidate.finishedAt) && Date.parse(candidate.finishedAt) < Date.parse(candidate.startedAt)) {
+    violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", "RECORDED predecessor evidence finishedAt must not precede startedAt"));
+  }
+  if (isIsoTimestamp(candidate.finishedAt) && isIsoTimestamp(candidate.recordedAt) && Date.parse(candidate.recordedAt) < Date.parse(candidate.finishedAt)) {
+    violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", "RECORDED predecessor evidence recordedAt must not precede finishedAt"));
+  }
+
+  const jobs = Array.isArray(candidate.jobs) ? candidate.jobs : [];
+  if (JSON.stringify(jobs.map((job) => job?.name)) !== JSON.stringify(REQUIRED_PREDECESSOR_JOBS)) {
+    violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", "recorded predecessor jobs must be the exact ordered Windows and static-ci jobs"));
+  }
+  for (const job of jobs) {
+    if (!job || typeof job !== "object" || Array.isArray(job)) continue;
+    rejectUnexpectedFields(job, ["name", "jobId", "startedAt", "finishedAt", "terminalResult"], violations);
+    if (!isPositiveInteger(job.jobId) || !isIsoTimestamp(job.startedAt) || !isIsoTimestamp(job.finishedAt) || job.terminalResult !== "SUCCESS" || Date.parse(job.finishedAt) < Date.parse(job.startedAt)) {
+      violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", `recorded predecessor job ${String(job.name)} is incomplete or unsuccessful`));
+    }
+    if (isIsoTimestamp(candidate.startedAt) && isIsoTimestamp(candidate.finishedAt) && isIsoTimestamp(job.startedAt) && isIsoTimestamp(job.finishedAt)
+      && (Date.parse(job.startedAt) < Date.parse(candidate.startedAt) || Date.parse(job.finishedAt) > Date.parse(candidate.finishedAt))) {
+      violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", `recorded predecessor job ${String(job.name)} falls outside the recorded run interval`));
+    }
+  }
+
+  const artifacts = Array.isArray(candidate.artifacts) ? candidate.artifacts : [];
+  if (JSON.stringify(artifacts.map((artifact) => artifact?.name)) !== JSON.stringify(REQUIRED_PREDECESSOR_ARTIFACTS)) {
+    violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", "recorded predecessor artifacts must be the exact ordered Section 1.4 evidence artifacts"));
+  }
+  for (const artifact of artifacts) {
+    if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) continue;
+    rejectUnexpectedFields(artifact, ["name", "artifactId", "digest"], violations);
+    if (!isPositiveInteger(artifact.artifactId) || !/^sha256:[0-9a-f]{64}$/.test(String(artifact.digest ?? ""))) {
+      violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", `recorded predecessor artifact ${String(artifact.name)} lacks an immutable ID or SHA-256 digest`));
+    }
+  }
+
+  const expectedEvidenceIdentity = `github-actions:repository=${candidate.repository}:ref=${candidate.ref}:workflow=${candidate.workflow}:job=${candidate.job}:runId=${candidate.runId}:runAttempt=${candidate.runAttempt}:sha=${candidate.candidateSha}:windowsJobId=${jobs[0]?.jobId}:staticCiJobId=${jobs[1]?.jobId}`;
+  if (candidate.evidenceIdentity !== expectedEvidenceIdentity) {
+    violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", "evidenceIdentity must exactly bind the predecessor candidate, run, workflow, ref, and ordered job IDs"));
+  }
+  const expectedArtifactEvidenceIdentity = `github-actions-artifacts:repository=${candidate.repository}:ref=${candidate.ref}:workflow=${candidate.workflow}:job=${candidate.job}:runId=${candidate.runId}:runAttempt=${candidate.runAttempt}:sha=${candidate.candidateSha}:artifact=${artifacts[0]?.artifactId}@${artifacts[0]?.digest}:artifact=${artifacts[1]?.artifactId}@${artifacts[1]?.digest}`;
+  if (candidate.artifactEvidenceIdentity !== expectedArtifactEvidenceIdentity) {
+    violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_EVIDENCE_INVALID", "artifactEvidenceIdentity must exactly bind the predecessor candidate, run, workflow, ref, ordered artifact IDs, and digests"));
+  }
+
+  if (/^[0-9a-f]{40}$/.test(String(currentCandidateSha ?? "")) && currentCandidateSha === candidate.candidateSha) {
+    violations.push(violation("GOVERNANCE_RECORDED_PREDECESSOR_SELF_REFERENCE", "latest recorded predecessor evidence cannot claim the candidate currently under validation"));
+  }
+  return violations;
+}
+
+export function validateRepositoryGovernanceProfile(profile, workflowText, options = {}) {
+  const violations = [];
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return [violation("GOVERNANCE_PROFILE_INVALID", "profile must be an object")];
+  if (profile.schemaVersion !== 4) violations.push(violation("GOVERNANCE_PROFILE_VERSION", "schemaVersion must equal 4"));
   if (profile.provider !== "GITHUB") violations.push(violation("GOVERNANCE_PROVIDER", "provider must be GITHUB"));
   if (profile.repository !== EXPECTED_REPOSITORY) violations.push(violation("GOVERNANCE_REPOSITORY", `repository must be ${EXPECTED_REPOSITORY}`));
   if (profile.authoritativeBranch !== EXPECTED_BRANCH) violations.push(violation("GOVERNANCE_AUTHORITATIVE_BRANCH", `authoritativeBranch must be ${EXPECTED_BRANCH}`));
+
   const mandatoryCi = profile.mandatoryCi ?? {};
   if (mandatoryCi.pipelineIdentity !== EXPECTED_CI) violations.push(violation("GOVERNANCE_REQUIRED_CI_CONTEXT", `mandatoryCi.pipelineIdentity must be ${EXPECTED_CI}`));
-  if (JSON.stringify(mandatoryCi.eligibleAuthorityTypes) !== JSON.stringify(ELIGIBLE_CI_AUTHORITIES)) {
-    violations.push(violation("GOVERNANCE_CI_AUTHORITY_SET", "eligibleAuthorityTypes must be exactly GITHUB_ACTIONS and LOCALCI"));
-  }
-  for (const control of REQUIRED_COMMON_CI_CONTROLS) {
-    if (mandatoryCi.commonRequirements?.[control] !== "REQUIRED") violations.push(violation("GOVERNANCE_COMMON_CI_REQUIREMENT_MISSING", `${control} must be REQUIRED`));
-  }
+  if (JSON.stringify(mandatoryCi.eligibleAuthorityTypes) !== JSON.stringify(["GITHUB_ACTIONS"])) violations.push(violation("GOVERNANCE_CI_AUTHORITY_SET", "eligibleAuthorityTypes must be exactly GITHUB_ACTIONS"));
+  if (mandatoryCi.selectedAuthority?.type !== "GITHUB_ACTIONS") violations.push(violation("GOVERNANCE_CI_AUTHORITY_INVALID", "selected authority must be GITHUB_ACTIONS"));
+  if (mandatoryCi.selectedAuthority?.qualificationStatus !== "QUALIFIED_AUTHORITY_CAPABILITY_BASELINE") violations.push(violation("GOVERNANCE_CI_AUTHORITY_STATUS_INVALID", "GitHub Actions authority must distinguish its historical capability baseline from recorded predecessor and current-candidate evidence"));
+  if (!workflowHasStaticCi(String(workflowText ?? ""))) violations.push(violation("GOVERNANCE_CI_WORKFLOW_MISMATCH", "GitHub Actions must expose job id/name static-ci"));
+  for (const control of REQUIRED_COMMON_CI_CONTROLS) if (mandatoryCi.commonRequirements?.[control] !== "REQUIRED") violations.push(violation("GOVERNANCE_COMMON_CI_REQUIREMENT_MISSING", `${control} must be REQUIRED`));
+  if (mandatoryCi.gitlabRole !== "REPOSITORY_MIRROR_ONLY") violations.push(violation("GOVERNANCE_GITLAB_ROLE", "GitLab must be repository mirror-only"));
+  if (mandatoryCi.localCiRole !== "NON_AUTHORITATIVE_COMPATIBILITY_OR_SECURITY_TOOLING" || "localCiRequirements" in mandatoryCi) violations.push(violation("GOVERNANCE_LOCALCI_ROLE", "LocalCI must be non-authoritative tooling without a mandatory-CI qualification profile"));
+
   const selected = mandatoryCi.selectedAuthority ?? {};
-  if (!ELIGIBLE_CI_AUTHORITIES.includes(selected.type)) violations.push(violation("GOVERNANCE_CI_AUTHORITY_INVALID", "selected authority must be GITHUB_ACTIONS or LOCALCI"));
-  if (!["QUALIFIED", "VERIFYING"].includes(selected.qualificationStatus)) violations.push(violation("GOVERNANCE_CI_AUTHORITY_STATUS_INVALID", "selected authority status must be QUALIFIED or VERIFYING"));
-  if (selected.type === "GITHUB_ACTIONS" && !workflowHasStaticCi(String(workflowText ?? ""))) {
-    violations.push(violation("GOVERNANCE_CI_WORKFLOW_MISMATCH", "selected GitHub Actions workflow must expose job id/name static-ci"));
+  const baseline = selected.authorityCapabilityBaseline;
+  const candidate = selected.latestRecordedCandidateEvidence;
+  if ("currentCandidateEvidence" in selected) violations.push(violation("GOVERNANCE_LEGACY_CURRENT_CANDIDATE_EVIDENCE", "the ambiguous currentCandidateEvidence field is prohibited; use latestRecordedCandidateEvidence"));
+  if (!baseline || baseline.status !== "QUALIFIED" || baseline.scope !== "HISTORICAL_AUTHORITY_CAPABILITY_BASELINE" || baseline.contractSuiteVersion !== "1.0.7" || baseline.doesNotQualifyCurrentSuite !== "1.0.8") {
+    violations.push(violation("GOVERNANCE_HISTORICAL_BASELINE_SCOPE_INVALID", "GitHub Actions authority baseline must be explicitly historical v1.0.7 capability evidence that cannot qualify v1.0.8"));
   }
-  if (selected.type === "LOCALCI") {
-    if (selected.instanceIdentity !== "CT107" || selected.pipelineProfile !== "tauri2418" || selected.repositoryPipeline !== ".localci/ci.sh") {
-      violations.push(violation("GOVERNANCE_LOCALCI_IDENTITY", "selected LocalCI identity/profile/pipeline must match the qualified profile"));
-    }
-    if (selected.submissionContract?.pipelineProfile !== "tauri2418" || selected.submissionContract?.fullRefRequired !== true || selected.submissionContract?.requestedCommitOptional !== true || selected.submissionContract?.idempotencyKeyRequired !== true || selected.submissionContract?.serverResolutionAttestationRequired !== true) {
-      violations.push(violation("GOVERNANCE_LOCALCI_SUBMISSION_CONTRACT", "LocalCI submission contract must require tauri2418, full refs, idempotency, and server resolution attestation"));
-    }
-    const localCiText = String(localCiScript).replace(/\r\n/g, "\n");
-    if (!localCiText.includes("set -Eeuo pipefail")) violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_MISSING", "qualified LocalCI repository pipeline must fail closed"));
-    const declaredCommands = [...localCiText.matchAll(/^run_gate\s+([a-z0-9-]+)\s+(.+)$/gm)].filter(([, gate]) => gate !== "static-ci-evidence").map(([, gate, command]) => [gate, command.trim()]);
-    const declaredGates = declaredCommands.map(([gate]) => gate);
-    if (JSON.stringify(declaredGates) !== JSON.stringify(GATES)) {
-      violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_INCOMPLETE", "LocalCI pipeline must declare every mandatory gate exactly once in canonical order"));
-    }
-    if (JSON.stringify(declaredCommands) !== JSON.stringify(LOCALCI_GATE_COMMANDS)) {
-      violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_COMMAND_MISMATCH", "LocalCI pipeline must use the canonical mandatory gate commands and arguments exactly"));
-    }
-    for (const marker of ["LOCALCI_EXPECTED_COMMIT", "LOCALCI_RESOLVED_COMMIT", "LOCALCI_JOB_ID", "LOCALCI_REPOSITORY", "LOCALCI_PIPELINE_PROFILE", "LOCALCI_IDEMPOTENCY_KEY", "LOCALCI_SERVER_RESOLVED_REPOSITORY", "LOCALCI_SERVER_RESOLVED_REF", "LOCALCI_RESOLUTION_ATTESTATION_ID", "LOCALCI_OBSERVED_CHECKOUT_SHA", "LOCALCI_OBSERVED_REPOSITORY", "LOCALCI_OBSERVED_REF", "native Windows", "JARVIS_CI_GATE_RESULTS_PATH", "PENDING_AUTHORITY_FINALIZATION"]) {
-      if (!localCiText.includes(marker)) violations.push(violation("GOVERNANCE_LOCALCI_PIPELINE_METADATA_MISSING", `LocalCI pipeline is missing ${marker}`));
-    }
-    for (const control of REQUIRED_LOCALCI_CONTROLS) {
-      if (mandatoryCi.localCiRequirements?.[control] !== "REQUIRED") violations.push(violation("GOVERNANCE_LOCALCI_REQUIREMENT_MISSING", `${control} must be REQUIRED`));
-    }
-    const evidence = selected.qualificationEvidence ?? {};
-    if (selected.qualificationStatus === "VERIFYING") {
-      if (!selected.lastObservedRun || !Array.isArray(selected.qualificationBlockers) || selected.qualificationBlockers.length === 0) violations.push(violation("GOVERNANCE_LOCALCI_QUALIFICATION_STATE_INVALID", "VERIFYING LocalCI authority must record an observed run and explicit blockers"));
-    }
-    const timestamps = [evidence.timestamps?.queuedAt, evidence.timestamps?.startedAt, evidence.timestamps?.finishedAt];
-    const evidenceGates = Array.isArray(evidence.gateResults) ? evidence.gateResults.map((item) => item?.gate) : [];
-    if (selected.qualificationStatus === "QUALIFIED" && (evidence.authority?.type !== "LOCALCI" || evidence.authority.instanceIdentity !== selected.instanceIdentity || evidence.authority.pipelineIdentity !== EXPECTED_CI || !String(evidence.authority.pipelineVersion ?? "") || evidence.submission?.pipelineProfile !== selected.pipelineProfile || !/^[A-Za-z0-9._:-]{1,128}$/.test(String(evidence.submission?.idempotencyKey ?? "")) || !/^refs\/heads\/[A-Za-z0-9._\/-]+$/.test(String(evidence.requestedRevision?.ref ?? "")) || !/^[0-9a-f]{40}$/.test(String(evidence.requestedRevision?.expectedCommit ?? "")) || (evidence.requestedRevision.requestedCommit !== null && evidence.requestedRevision.requestedCommit !== evidence.requestedRevision.expectedCommit) || evidence.requestedRevision.expectedCommit !== evidence.requestedRevision.resolvedCommit || evidence.serverResolution?.repository !== EXPECTED_REPOSITORY || evidence.serverResolution?.ref !== evidence.requestedRevision.ref || evidence.serverResolution?.commit !== evidence.requestedRevision.resolvedCommit || !String(evidence.serverResolution?.attestationId ?? "") || evidence.terminalStatus !== "SUCCEEDED" || !String(evidence.authority.jobId ?? "") || timestamps.some((value) => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(String(value ?? ""))) || new Date(evidence.timestamps?.queuedAt).getTime() > new Date(evidence.timestamps?.startedAt).getTime() || new Date(evidence.timestamps?.startedAt).getTime() > new Date(evidence.timestamps?.finishedAt).getTime() || evidence.runner?.os !== "Windows" || evidence.runner?.arch !== "X64" || evidence.observedCheckout?.sha !== evidence.requestedRevision.expectedCommit || !/^(https:\/\/github\.com\/andresslacson1989\/jarvis-project\.git|git@github\.com:andresslacson1989\/jarvis-project\.git)$/.test(String(evidence.observedCheckout?.remote ?? "")) || evidence.observedCheckout?.ref !== evidence.requestedRevision.ref || JSON.stringify(evidenceGates) !== JSON.stringify(GATES) || evidence.gateResults?.some((item) => item?.status !== "PASSED") || !/^[0-9a-f]{64}$/.test(String(evidence.logs?.sha256 ?? "")) || !String(evidence.logs?.exportIdentity ?? "") || !/^[0-9a-f]{64}$/.test(String(evidence.artifacts?.indexSha256 ?? "")) || !String(evidence.artifacts?.exportIdentity ?? "") || evidence.cancellationRecovery?.status !== "PASSED" || !String(evidence.cancellationRecovery?.evidenceIdentity ?? ""))) {
-      violations.push(violation("GOVERNANCE_LOCALCI_EVIDENCE_INVALID", "LocalCI qualification requires successful exact-SHA job evidence"));
-    }
+  const observed = baseline?.lastObservedRun;
+  if (!observed || !/^[0-9a-f]{40}$/.test(String(observed.candidateSha ?? "")) || !/^[0-9]+$/.test(String(observed.runId ?? "")) || observed.status !== "SUCCESS" || observed.workflow !== ".github/workflows/static-ci.yml" || observed.job !== "static-ci") {
+    violations.push(violation("GOVERNANCE_HISTORICAL_CANDIDATE_EVIDENCE_INVALID", "historical authority baseline must retain a complete exact candidate run identity"));
   }
-  if (selected.type === "GITHUB_ACTIONS") {
-    const authoritative = selected.authoritativeMasterVerification;
-    const validShape = authoritative &&
-      /^[0-9a-f]{40}$/.test(String(authoritative.commitSha ?? "")) &&
-      /^[0-9]+$/.test(String(authoritative.runId ?? "")) &&
-      authoritative.status === "SUCCESS" &&
-      authoritative.ref === "refs/heads/master" &&
-      /^[0-9]+$/.test(String(authoritative.windowsJobId ?? "")) &&
-      /^[0-9]+$/.test(String(authoritative.staticCiJobId ?? "")) &&
-      Number.isInteger(authoritative.artifactCount) &&
-      authoritative.artifactCount >= 0 &&
-      authoritative.cosignTransparencyLogVerification === "NOT_CLAIMED_OFFLINE";
-    if (!validShape) {
-      violations.push(violation("GOVERNANCE_AUTHORITATIVE_MASTER_EVIDENCE_INVALID", "qualified GitHub Actions authority must record a complete current exact-master verification identity"));
-    } else if (authoritative.commitSha === SUPERSEDED_AUTHORITATIVE_MASTER.commitSha && authoritative.runId === SUPERSEDED_AUTHORITATIVE_MASTER.runId) {
-      violations.push(violation("GOVERNANCE_AUTHORITATIVE_MASTER_EVIDENCE_STALE", "authoritative master evidence must not retain the superseded cae911e/33944300852 identity"));
-    }
+  const revision = baseline?.evidenceRevisionValidation;
+  if (!revision || !/^[0-9a-f]{40}$/.test(String(revision.commitSha ?? "")) || !/^[0-9]+$/.test(String(revision.runId ?? "")) || revision.status !== "SUCCESS") {
+    violations.push(violation("GOVERNANCE_HISTORICAL_EVIDENCE_REVISION_INVALID", "historical authority baseline must retain its evidence-revision validation identity"));
   }
-  if (profile.serverModeRequiredWhenAvailable !== true) violations.push(violation("GOVERNANCE_SERVER_MODE_REENABLE_REQUIRED", "server mode must become mandatory when hosting capability becomes available"));
+  const authoritative = baseline?.authoritativeMasterVerification;
+  if (!authoritative || !/^[0-9a-f]{40}$/.test(String(authoritative.commitSha ?? "")) || !/^[0-9]+$/.test(String(authoritative.runId ?? "")) || authoritative.status !== "SUCCESS" || authoritative.ref !== "refs/heads/master" || !/^[0-9]+$/.test(String(authoritative.windowsJobId ?? "")) || !/^[0-9]+$/.test(String(authoritative.staticCiJobId ?? ""))) {
+    violations.push(violation("GOVERNANCE_HISTORICAL_MASTER_EVIDENCE_INVALID", "historical authority baseline must retain its exact-master verification identity"));
+  }
+  violations.push(...validateLatestRecordedCandidateEvidence(candidate, options.currentCandidateSha));
+  if (JSON.stringify(selected.qualificationBlockers) !== JSON.stringify(REQUIRED_QUALIFICATION_BLOCKERS)) {
+    violations.push(violation("GOVERNANCE_QUALIFICATION_BLOCKERS_INVALID", "successor CI, audit, integration, authoritative-master verification, and the Section 1 checkpoint must remain explicit blockers"));
+  }
 
   const server = profile.serverSideProtection ?? {};
   if (profile.governanceMode === "COMPENSATING_CONTROLS") {
-    if (server.available !== false) violations.push(violation("GOVERNANCE_FALLBACK_REQUIRES_UNAVAILABLE_PROTECTION", "fallback requires verified server-side protection availability=false"));
-    if (server.active !== false) violations.push(violation("GOVERNANCE_FALLBACK_CANNOT_CLAIM_ACTIVE_PROTECTION", "fallback must not claim active server protection"));
-    if (server.reason !== "HOSTING_PLAN_LIMITATION") violations.push(violation("GOVERNANCE_HOSTING_LIMITATION_REQUIRED", "fallback reason must be HOSTING_PLAN_LIMITATION"));
-    if (server.observedHttpStatus !== 403) violations.push(violation("GOVERNANCE_HOSTING_OBSERVATION_REQUIRED", "fallback must preserve the observed HTTP 403 hosting denial"));
-    for (const control of REQUIRED_COMPENSATING_CONTROLS) {
-      if (profile.controls?.[control] !== true) violations.push(violation("GOVERNANCE_COMPENSATING_CONTROL_DISABLED", `${control} must be true`));
-    }
-    if (profile.residualRisk !== EXPECTED_RESIDUAL_RISK) violations.push(violation("GOVERNANCE_RESIDUAL_RISK_REQUIRED", "fallback must explicitly preserve the server-side residual risk"));
+    if (server.available !== false || server.active !== false || server.reason !== "HOSTING_PLAN_LIMITATION" || server.observedHttpStatus !== 403) violations.push(violation("GOVERNANCE_FALLBACK_REQUIRES_UNAVAILABLE_PROTECTION", "fallback requires the verified unavailable hosting-protection record"));
+    for (const control of REQUIRED_COMPENSATING_CONTROLS) if (profile.controls?.[control] !== true) violations.push(violation("GOVERNANCE_COMPENSATING_CONTROL_DISABLED", `${control} must be true`));
+    if (profile.residualRisk !== EXPECTED_RESIDUAL_RISK) violations.push(violation("GOVERNANCE_RESIDUAL_RISK_REQUIRED", "fallback must record the server-side residual risk"));
   } else if (profile.governanceMode === "SERVER_ENFORCED") {
-    if (server.available !== true || server.active !== true) violations.push(violation("GOVERNANCE_SERVER_MODE_NOT_ACTIVE", "server mode requires available=true and active=true"));
-    for (const control of REQUIRED_SERVER_CONTROLS) {
-      if (server[control] !== true) violations.push(violation("GOVERNANCE_SERVER_CONTROL_MISSING", `${control} must be true in SERVER_ENFORCED mode`));
-    }
+    violations.push(...validateServerEnforcedProtection(profile, server));
   } else {
     violations.push(violation("GOVERNANCE_MODE_INVALID", "governanceMode must be SERVER_ENFORCED or COMPENSATING_CONTROLS"));
   }
+  if (profile.serverModeRequiredWhenAvailable !== true) violations.push(violation("GOVERNANCE_SERVER_MODE_REENABLE_REQUIRED", "server mode must become mandatory when hosting capability becomes available"));
+  return violations;
+}
 
+export function validateRepositoryGovernanceDocumentation(profile, documentationText) {
+  const violations = [];
+  const text = String(documentationText ?? "").replace(/\r\n/g, "\n");
+  const historicalHeading = "## Historical transition — non-current";
+  const historicalIndex = text.indexOf(historicalHeading);
+  const current = historicalIndex >= 0 ? text.slice(0, historicalIndex) : text;
+
+  if (!text.includes("## Current effective mode")) violations.push(violation("GOVERNANCE_DOCUMENT_CURRENT_SECTION_MISSING", "MASTER-PROTECTION.md must contain a current effective-mode section"));
+  if (historicalIndex < 0) violations.push(violation("GOVERNANCE_DOCUMENT_HISTORY_BOUNDARY_MISSING", "MASTER-PROTECTION.md must place prior governance facts under a historical non-current heading"));
+
+  if (profile?.governanceMode === "SERVER_ENFORCED") {
+    const requiredCurrentText = [
+      /SERVER_ENFORCED/,
+      /public repository/i,
+      /authoritative branch.*master/i,
+      /static-ci/i,
+      /one approving (?:pull-request )?review/i,
+      /administrator/i,
+      /force pushes?.*blocked|force pushes?.*disallowed|force pushes?.*not allowed/i,
+      /deletions?.*blocked|deletions?.*disallowed|deletions?.*not allowed/i,
+      /conversation resolution/i,
+      /AUTHENTICATED_GITHUB_API/,
+      /repository-governance-profile\.json/,
+    ];
+    for (const pattern of requiredCurrentText) {
+      if (!pattern.test(current)) violations.push(violation("GOVERNANCE_DOCUMENT_CURRENT_FACT_MISSING", `MASTER-PROTECTION.md current section must contain ${pattern}`));
+    }
+    for (const pattern of [/COMPENSATING_CONTROLS/i, /HTTP\s*403/i, /private repository/i, /not protected/i, /OUT_OF_BAND_ADMIN_FORCE_PUSH_OR_DELETION_NOT_SERVER_BLOCKED/]) {
+      if (pattern.test(current)) violations.push(violation("GOVERNANCE_DOCUMENT_STALE_CURRENT_FACT", `MASTER-PROTECTION.md current section contains stale fallback fact ${pattern}`));
+    }
+    const candidate = profile?.mandatoryCi?.selectedAuthority?.latestRecordedCandidateEvidence ?? {};
+    if (candidate.status === "RECORDED") {
+      const jobs = Array.isArray(candidate.jobs) ? candidate.jobs : [];
+      const artifacts = Array.isArray(candidate.artifacts) ? candidate.artifacts : [];
+      const qualificationBlockers = profile?.mandatoryCi?.selectedAuthority?.qualificationBlockers ?? [];
+      const requiredEvidenceLines = [
+        `contractSuiteVersion=${candidate.contractSuiteVersion}`,
+        `status=${candidate.status}`,
+        `recordedCandidateRole=${candidate.recordedCandidateRole}`,
+        `doesNotQualifySuccessor=${candidate.doesNotQualifySuccessor}`,
+        `candidateSha=${candidate.candidateSha}`,
+        `repository=${candidate.repository}`,
+        `ref=${candidate.ref}`,
+        `workflow=${candidate.workflow}`,
+        `job=${candidate.job}`,
+        `runId=${candidate.runId}`,
+        `runAttempt=${candidate.runAttempt}`,
+        `event=${candidate.event}`,
+        `headBranch=${candidate.headBranch}`,
+        `startedAt=${candidate.startedAt}`,
+        `finishedAt=${candidate.finishedAt}`,
+        `recordedAt=${candidate.recordedAt}`,
+        `terminalResult=${candidate.terminalResult}`,
+        `requiredChecksPassed=${candidate.requiredChecksPassed}`,
+        ...jobs.map((job) => `${job.name} jobId=${job.jobId} startedAt=${job.startedAt} finishedAt=${job.finishedAt} terminalResult=${job.terminalResult}`),
+        ...artifacts.map((artifact) => `${artifact.name} artifactId=${artifact.artifactId} digest=${artifact.digest}`),
+        `evidenceIdentity=${candidate.evidenceIdentity}`,
+        `artifactEvidenceIdentity=${candidate.artifactEvidenceIdentity}`,
+        ...qualificationBlockers.map((blocker) => `qualificationBlocker=${blocker}`),
+      ];
+      for (const line of requiredEvidenceLines) {
+        if (!current.includes(line)) violations.push(violation("GOVERNANCE_DOCUMENT_CURRENT_FACT_MISSING", `MASTER-PROTECTION.md current section is missing exact predecessor evidence line ${line}`));
+      }
+      if (!/does not qualify the successor documentation commit, the current checkout, integration, Section 1\.4, or release/i.test(current)) {
+        violations.push(violation("GOVERNANCE_DOCUMENT_PREDECESSOR_BOUNDARY_MISSING", "MASTER-PROTECTION.md must state that predecessor evidence does not qualify the successor/current checkout, integration, Section 1.4, or release"));
+      }
+      if (/EXACT_GITHUB_ACTIONS_RUN_NOT_RECORDED|no exact GitHub Actions run recorded/i.test(current)) violations.push(violation("GOVERNANCE_DOCUMENT_STALE_CURRENT_FACT", "MASTER-PROTECTION.md current section cannot retain obsolete NOT_RECORDED wording after predecessor evidence is recorded"));
+    }
+  }
   return violations;
 }
 
 export function validateGovernanceContractTexts(implementationContract, verificationContract) {
   const violations = [];
   for (const [name, text] of [["implementation contract", implementationContract], ["verification contract", verificationContract]]) {
-    const contractText = String(text);
-    const hasCompensatingGovernance =
-      contractText.includes("COMPENSATING_CONTROLS") ||
-      /\bcompensating (?:governance|mode)\b/i.test(contractText);
-    if (!hasCompensatingGovernance) violations.push(violation("GOVERNANCE_CONTRACT_MODE_MISSING", `${name} must define compensating governance semantics`));
-    if (!contractText.includes("server-side branch protection") && !contractText.includes("server-side protection")) violations.push(violation("GOVERNANCE_SERVER_REQUIREMENT_MISSING", `${name} must retain server-side protection when available`));
-    if (!contractText.includes("non-force")) violations.push(violation("GOVERNANCE_NON_FORCE_REQUIREMENT_MISSING", `${name} must require non-force integration in fallback mode`));
-    if (!contractText.includes("GITHUB_ACTIONS") || !contractText.includes("LOCALCI")) violations.push(violation("GOVERNANCE_CI_AUTHORITY_EQUIVALENCE_MISSING", `${name} must define both qualified CI authority types`));
+    const contract = String(text);
+    if (!contract.includes("COMPENSATING_CONTROLS")) violations.push(violation("GOVERNANCE_CONTRACT_MODE_MISSING", `${name} must define compensating governance semantics`));
+    if (!/server-side (?:branch protection|protection)|ruleset/i.test(contract)) violations.push(violation("GOVERNANCE_SERVER_REQUIREMENT_MISSING", `${name} must retain server protection when available`));
+    if (!contract.includes("non-force")) violations.push(violation("GOVERNANCE_NON_FORCE_REQUIREMENT_MISSING", `${name} must require non-force integration`));
+    if (!contract.includes("GITHUB_ACTIONS") || !/GitLab (?:is )?(?:repository )?mirror-only/i.test(contract) || !/LocalCI[\s\S]*?(?:cannot|shall not|no result from it can)[\s\S]*?(?:satisfy|substitute)/i.test(contract)) violations.push(violation("GOVERNANCE_GITHUB_ONLY_CONTRACT", `${name} must make GitHub Actions sole authority, GitLab mirror-only, and LocalCI non-authoritative`));
+    if (/equal alternatives|qualified `LOCALCI` authority|GITHUB_ACTIONS` or `LOCALCI`/i.test(contract)) violations.push(violation("GOVERNANCE_LOCALCI_EQUIVALENCE", `${name} must not retain LocalCI authority equivalence`));
   }
   return violations;
 }
 
 async function main() {
   const root = fileURLToPath(new URL("../..", import.meta.url));
-  const [profileRaw, workflow, implementationContract, verificationContract, localCiScript] = await Promise.all([
+  const [profileRaw, workflow, implementationContract, verificationContract, masterProtection] = await Promise.all([
     readFile(resolve(root, "docs/implementation/governance/repository-governance-profile.json"), "utf8"),
     readFile(resolve(root, ".github/workflows/static-ci.yml"), "utf8"),
-    readFile(resolve(root, "docs/JARVIS-IMPLEMENTATION-CONTRACT-v1.0.7.md"), "utf8"),
-    readFile(resolve(root, "docs/implementation/JARVIS-VERIFICATION-RELEASE-CONTRACT.md"), "utf8"),
-    readFile(resolve(root, ".localci/ci.sh"), "utf8"),
+    readFile(resolve(root, "docs/implementation/JARVIS-00-SCOPE-GOVERNANCE-CODING-CONTRACT.md"), "utf8"),
+    readFile(resolve(root, "docs/implementation/JARVIS-05-VERIFICATION-RELEASE-CONTRACT.md"), "utf8"),
+    readFile(resolve(root, "docs/implementation/governance/MASTER-PROTECTION.md"), "utf8"),
   ]);
   const profile = JSON.parse(profileRaw);
   const violations = [
-    ...validateRepositoryGovernanceProfile(profile, workflow, localCiScript),
+    ...validateRepositoryGovernanceProfile(profile, workflow, { currentCandidateSha: process.env.JARVIS_CANDIDATE_SHA }),
+    ...validateRepositoryGovernanceDocumentation(profile, masterProtection),
     ...validateGovernanceContractTexts(implementationContract, verificationContract),
   ];
   if (violations.length > 0) {
     for (const item of violations) console.error(`[repository-governance] ${item.code}: ${item.detail}`);
     process.exit(1);
   }
-  console.log(`[repository-governance] PASS mode=${profile.governanceMode} required_ci=${profile.mandatoryCi.pipelineIdentity} authority=${profile.mandatoryCi.selectedAuthority.type}`);
+  console.log(`[repository-governance] PASS mode=${profile.governanceMode} required_ci=${profile.mandatoryCi.pipelineIdentity} authority=GITHUB_ACTIONS`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

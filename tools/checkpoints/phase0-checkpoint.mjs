@@ -3,6 +3,14 @@ import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  validateRepositoryGovernanceDocumentation,
+  validateRepositoryGovernanceProfile,
+} from "../ci/check-repository-governance.mjs";
+import {
+  ACCEPTANCE_GATE_BY_ID,
+  PHASE0_REQUIRED_GATE_IDS,
+} from "../ci/localci-gate-manifest.mjs";
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".rs"]);
 const REQUIRED_CHILDREN = Object.freeze([
@@ -22,6 +30,15 @@ const REQUIRED_CHILDREN = Object.freeze([
 ]);
 const PRODUCTION_TAURI_COMMAND =
   "pnpm tauri build --no-bundle --target x86_64-pc-windows-msvc --ci";
+
+export function requiredWorkflowSteps(profile) {
+  if (!Array.isArray(profile?.requiredGateIds)) return null;
+  if (profile.requiredGateIds.length !== PHASE0_REQUIRED_GATE_IDS.length) return null;
+  if (profile.requiredGateIds.some((id, index) => id !== PHASE0_REQUIRED_GATE_IDS[index])) return null;
+  const definitions = profile.requiredGateIds.map((id) => ACCEPTANCE_GATE_BY_ID.get(id));
+  if (definitions.some((definition) => definition === undefined)) return null;
+  return definitions;
+}
 
 function violation(code, path, detail) {
   return Object.freeze({ code, path, detail });
@@ -90,6 +107,8 @@ export function validatePhase0Snapshot({
   linuxSourcePaths = [],
   androidSourcePaths = [],
   existingPaths = new Set(),
+  governanceProfile = null,
+  governanceDocument = null,
   currentEvidenceStatus = null,
   governanceQualificationStatus = null,
   currentCandidateSha = null,
@@ -101,7 +120,8 @@ export function validatePhase0Snapshot({
 }) {
   const violations = [];
 
-  if (profile?.schemaVersion !== 1 || profile?.checkpointId !== "0.CP") {
+  const requiredGates = requiredWorkflowSteps(profile);
+  if (profile?.schemaVersion !== 1 || profile?.checkpointId !== "0.CP" || requiredGates === null) {
     return [
       violation(
         "PHASE0_PROFILE_INVALID",
@@ -111,12 +131,22 @@ export function validatePhase0Snapshot({
     ];
   }
 
-  if (profile.contractSuiteVersion !== "1.0.7") {
+  if (profile.contractSuiteVersion !== "1.0.8") {
     violations.push(
       violation(
         "PHASE0_CONTRACT_SUITE",
         "tools/checkpoints/phase0-checkpoint-profile.json",
-        "contractSuiteVersion must be 1.0.7",
+        "contractSuiteVersion must be 1.0.8",
+      ),
+    );
+  }
+
+  if (profile.forbiddenActivePathsRole !== "REJECTION_FIXTURES_ONLY_NON_AUTHORITATIVE") {
+    violations.push(
+      violation(
+        "PHASE0_FORBIDDEN_PATH_ROLE",
+        "tools/checkpoints/phase0-checkpoint-profile.json",
+        "forbidden legacy paths must be labeled as non-authoritative rejection fixtures",
       ),
     );
   }
@@ -135,6 +165,18 @@ export function validatePhase0Snapshot({
   }
 
   const workflowText = String(workflow);
+  if (governanceProfile !== null) {
+    for (const item of validateRepositoryGovernanceProfile(governanceProfile, workflowText, {
+      currentCandidateSha: explicitCandidateSha ?? currentCandidateSha ?? undefined,
+    })) {
+      violations.push(violation(`PHASE0_${item.code}`, "docs/implementation/governance/repository-governance-profile.json", item.detail));
+    }
+  }
+  if (governanceDocument !== null) {
+    for (const item of validateRepositoryGovernanceDocumentation(governanceProfile, governanceDocument)) {
+      violations.push(violation(`PHASE0_${item.code}`, "docs/implementation/governance/MASTER-PROTECTION.md", item.detail));
+    }
+  }
   if (/\bpull_request_target\s*:/.test(workflowText)) {
     violations.push(
       violation(
@@ -173,15 +215,15 @@ export function validatePhase0Snapshot({
   let lastIndex = -1;
   const nativeWindowsGateNames = new Set(["Rust Windows-target build"]);
 
-  for (const required of profile.requiredWorkflowSteps ?? []) {
-    if (nativeWindowsGateNames.has(required.name)) continue;
-    const index = steps.findIndex((step) => step.name === required.name);
+  for (const required of requiredGates) {
+    if (nativeWindowsGateNames.has(required.workflowName)) continue;
+    const index = steps.findIndex((step) => step.name === required.workflowName);
     if (index < 0) {
       violations.push(
         violation(
           "PHASE0_REQUIRED_GATE_MISSING",
           ".github/workflows/static-ci.yml",
-          `missing ${required.name}`,
+          `missing ${required.workflowName}`,
         ),
       );
       continue;
@@ -193,18 +235,18 @@ export function validatePhase0Snapshot({
         violation(
           "PHASE0_GATE_ORDER",
           ".github/workflows/static-ci.yml",
-          `${required.name} is out of required order`,
+          `${required.workflowName} is out of required order`,
         ),
       );
     }
     lastIndex = index;
 
-    if (step.run !== required.run) {
+    if (step.run !== required.command) {
       violations.push(
         violation(
           "PHASE0_GATE_COMMAND_DRIFT",
           ".github/workflows/static-ci.yml",
-          `${required.name} must run ${required.run}`,
+          `${required.workflowName} must run ${required.command}`,
         ),
       );
     }
@@ -214,7 +256,7 @@ export function validatePhase0Snapshot({
         violation(
           "PHASE0_GATE_SKIPPABLE",
           ".github/workflows/static-ci.yml",
-          `${required.name} may not use if/continue-on-error`,
+          `${required.workflowName} may not use if/continue-on-error`,
         ),
       );
     }
@@ -356,7 +398,7 @@ export function validatePhase0Snapshot({
 
   const target = canonicalValues?.v1RuntimeTarget ?? {};
   if (
-    canonicalValues?.contractSuiteVersion !== "1.0.7" ||
+    canonicalValues?.contractSuiteVersion !== "1.0.8" ||
     target.platform !== "WINDOWS" ||
     target.runtimeRole !== "FULL_HOST" ||
     target.architecture !== "x64"
@@ -364,8 +406,8 @@ export function validatePhase0Snapshot({
     violations.push(
       violation(
         "PHASE0_RUNTIME_TARGET",
-        "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
-        "V1 target must be JARVIS 1.0.7 WINDOWS/FULL_HOST/x64",
+        "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json",
+        "V1 target must be JARVIS 1.0.8 WINDOWS/FULL_HOST/x64",
       ),
     );
   }
@@ -380,12 +422,12 @@ export function validatePhase0Snapshot({
     );
   }
 
-  if (!String(matrix).includes("| Contract suite | JARVIS v1.0.7 |")) {
+  if (!String(matrix).includes("| Contract suite | JARVIS v1.0.8 |")) {
     violations.push(
       violation(
         "PHASE0_MATRIX_SUITE_DRIFT",
         "docs/implementation/JARVIS-IMPLEMENTATION-MATRIX.md",
-        "live matrix must identify JARVIS v1.0.7",
+        "live matrix must identify JARVIS v1.0.8",
       ),
     );
   }
@@ -404,7 +446,7 @@ export function validatePhase0Snapshot({
     }
   }
 
-  if (currentEvidenceStatus !== null || governanceQualificationStatus !== null) {
+  if (currentEvidenceStatus !== null) {
     const status = section0Status(matrix);
     const expected = status === "VERIFIED" ? "VERIFIED" : "VERIFYING";
     const expectedQualification = status === "VERIFIED" ? "QUALIFIED" : "VERIFYING";
@@ -451,7 +493,7 @@ export function validatePhase0Snapshot({
         violation(
           "PHASE0_SUPERSEDED_ACTIVE_CONTRACT",
           path,
-          "superseded top-level contract/manifest must not remain active",
+          "obsolete contract/manifest path must not remain active",
         ),
       );
     }
@@ -494,14 +536,14 @@ export async function checkPhase0(rootDir) {
   );
   const profile = JSON.parse(await readFile(profilePath, "utf8"));
 
-  const [workflow, packageJson, canonicalValues, matrix, checkpointEvidence, governanceProfile, linuxSourcePaths, androidSourcePaths] =
+  const [workflow, packageJson, canonicalValues, matrix, checkpointEvidence, governanceProfile, governanceDocument, linuxSourcePaths, androidSourcePaths] =
     await Promise.all([
       readFile(resolve(rootDir, ".github/workflows/static-ci.yml"), "utf8"),
       readFile(resolve(rootDir, "package.json"), "utf8").then(JSON.parse),
       readFile(
         resolve(
           rootDir,
-          "packages/schemas/src/canonical/v1/jarvis-v1.0.7.contract-values.json",
+          "packages/schemas/src/canonical/v1/jarvis-v1.0.8.contract-values.json",
         ),
         "utf8",
       ).then(JSON.parse),
@@ -511,6 +553,7 @@ export async function checkPhase0(rootDir) {
       ),
       readFile(resolve(rootDir, "docs/implementation/evidence/0.CP-phase0-checkpoint.md"), "utf8"),
       readFile(resolve(rootDir, "docs/implementation/governance/repository-governance-profile.json"), "utf8").then(JSON.parse),
+      readFile(resolve(rootDir, "docs/implementation/governance/MASTER-PROTECTION.md"), "utf8"),
       collectRuntimeSources(rootDir, "platform/linux"),
       collectRuntimeSources(rootDir, "platform/android"),
     ]);
@@ -545,8 +588,10 @@ export async function checkPhase0(rootDir) {
     linuxSourcePaths,
     androidSourcePaths,
     existingPaths,
-    currentEvidenceStatus: checkpointEvidence.match(/^\*\*(VERIFIED|VERIFYING)\b/m)?.[1] ?? null,
-    governanceQualificationStatus: governanceProfile?.mandatoryCi?.selectedAuthority?.qualificationStatus ?? null,
+    governanceProfile,
+    governanceDocument,
+    currentEvidenceStatus: /^\*\*Historical verification record/m.test(checkpointEvidence) ? null : checkpointEvidence.match(/^\*\*(VERIFIED|VERIFYING)\b/m)?.[1] ?? null,
+    governanceQualificationStatus: governanceProfile?.mandatoryCi?.selectedAuthority?.authorityCapabilityBaseline?.status ?? null,
     checkedOutSha,
     evidenceCandidateSha,
     matrixCandidateSha: matrix.match(/Implementation candidate under audit:\*{0,2}\s*`([0-9a-f]{40})`/)?.[1] ?? null,
