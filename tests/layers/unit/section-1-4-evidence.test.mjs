@@ -440,6 +440,9 @@ test("PowerShell native producer uses case-sensitive SHA and ref validation", ()
   assert.match(script, /function Test-Sha[\s\S]*?return \$value -cmatch/);
   assert.match(script, /function Test-ValidHeadRef[\s\S]*?\$value -cnotmatch/);
   assert.match(script, /function Test-AuthorityRef[\s\S]*?if \(\$value -cmatch/);
+  assert.match(script, /\$head_ref = if \(\[string\]::IsNullOrWhiteSpace\(\$env:GITHUB_HEAD_REF\)\) \{\s*\$null\s*\} else \{\s*\$env:GITHUB_HEAD_REF\.Trim\(\)\s*\}/);
+  assert.match(script, /headRef = \$head_ref/);
+  assert.doesNotMatch(script, /headRef = \$env:GITHUB_HEAD_REF/);
   assert.doesNotMatch(script, /function Test-Sha[\s\S]*?return \$value -match/);
   assert.match(script, /Tee-Object -FilePath \$log_path/);
   assert.match(script, /\$failure_header_pattern = .*stdout.*----/);

@@ -99,11 +99,16 @@ $candidate_sha = if (-not [string]::IsNullOrWhiteSpace($env:JARVIS_CANDIDATE_SHA
 $authority = [ordered]@{ type = $null; repository = $null; ref = $null; headRef = $null; workflow = $null; runId = $null; runAttempt = $null; job = $null }
 $runner = [ordered]@{ os = $null; arch = $null; image = $null }
 if ($evidence_mode -eq 'AUTHORITATIVE_GITHUB_ACTIONS') {
+    $head_ref = if ([string]::IsNullOrWhiteSpace($env:GITHUB_HEAD_REF)) {
+        $null
+    } else {
+        $env:GITHUB_HEAD_REF.Trim()
+    }
     $authority = [ordered]@{
         type = 'GITHUB_ACTIONS'
         repository = $env:GITHUB_REPOSITORY
         ref = $env:GITHUB_REF
-        headRef = $env:GITHUB_HEAD_REF
+        headRef = $head_ref
         workflow = $env:GITHUB_WORKFLOW
         runId = $env:GITHUB_RUN_ID
         runAttempt = $env:GITHUB_RUN_ATTEMPT
