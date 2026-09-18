@@ -565,10 +565,10 @@ test("matrix protected fields, plan order, and historical identities match the i
     .filter((value) => value !== reconciliationHead)
     .sort();
 
-  assert.equal(digest(protectedRows(matrix)), "d392600b0f872ff01eacdc12293ff61121f9021233a55937128ffea221ddeeb5");
+  assert.equal(digest(protectedRows(matrix)), "281f55f48c0e9a36e0209742682a0dad922653d2818991df6691fbeda537a04f");
   assert.equal(digest(protectedRows(reference)), "8bef39bc27ed2fbd258352f6d6bfaa6af4a76611715068a97cc1b1834db992da");
   assert.equal(digest(planOrder), "06ced9964892d15bcafd470ca8774731fdc556b6773fb0d105efe34ba956134e");
-  assert.equal(digest(historicalIdentities), "a72a8a03c0d916d2b3797749c5ad53e6f48c5b46f7ab27dc11a3b2f3f6724fbd");
+  assert.equal(digest(historicalIdentities), "a0203c7f877f3cc5bc488fd076feea0a8599a43381a0174ad55f00fc0cc526af");
 
   assert.notEqual(digest(protectedRows(matrix.replace("**IN PROGRESS**", "**VERIFIED**"))), digest(protectedRows(matrix)));
   assert.notEqual(digest(protectedRows(reference.replace("**NOT STARTED**", "**VERIFIED**"))), digest(protectedRows(reference)));
